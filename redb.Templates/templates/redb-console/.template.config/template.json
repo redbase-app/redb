@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "RedBase",
+  "classifications": [ "Console", "Database", "RedBase" ],
+  "identity": "RedBase.Console.Template",
+  "name": "RedBase Console Application",
+  "shortName": "redb",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "RedbApp",
+  "preferNameDirectory": true,
+  "symbols": {
+    "db": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "postgres",
+      "description": "Database provider to use",
+      "choices": [
+        { "choice": "postgres", "description": "PostgreSQL (via Npgsql)" },
+        { "choice": "mssql", "description": "Microsoft SQL Server" }
+      ]
+    },
+    "pro": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Include Pro features (LINQ compilation, change tracking, analytics)"
+    },
+    "UsePostgres": {
+      "type": "computed",
+      "value": "(db == \"postgres\")"
+    },
+    "UseMsSql": {
+      "type": "computed",
+      "value": "(db == \"mssql\")"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": []
+    }
+  ]
+}

@@ -1,0 +1,306 @@
+@using redb.PropsEditor.Services
+@using System.Text.Json
+@using Microsoft.FluentUI.AspNetCore.Components
+
+@* Renders a single property field based on its type *@
+
+@if (IsComplexType)
+{
+    @* Vertical layout for arrays and nested objects *@
+    <div style="padding: 4px 0; border-bottom: 1px solid #e5e5e5; max-width: 100%;">
+        <div style="font-size: 12px; color: #444; margin-bottom: 4px;">
+            @Metadata.Label@if (IsRequired) { <span style="color: #dc3545;">*</span> }
+        </div>
+        <div style="min-width: 0;">
+            @RenderEditor()
+        </div>
+    </div>
+}
+else
+{
+    @* Horizontal layout for simple types *@
+    <div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 8px; align-items: start; padding: 4px 0; border-bottom: 1px solid #e5e5e5; max-width: 100%;">
+        <div style="font-size: 12px; color: #444; padding-top: 6px;">
+            @Metadata.Label@if (IsRequired) { <span style="color: #dc3545;">*</span> }
+        </div>
+        <div style="min-width: 0; overflow: hidden;">
+            @RenderEditor()
+        </div>
+    </div>
+}
+
+@{
+    RenderFragment RenderEditor() => __builder =>
+    {
+        switch (Metadata.EditorType)
+        {
+            case EditorType.Text:
+                <FluentTextField Value="@GetStringValue()"
+                                 ValueChanged="@((string v) => SetValue(v))"
+                                 Placeholder="@Metadata.Placeholder"
+                                 ReadOnly="@IsReadOnly"
+                                 Style="width: 100%;" />
+                break;
+
+            case EditorType.TextArea:
+                <FluentTextArea Value="@GetStringValue()"
+                                ValueChanged="@((string v) => SetValue(v))"
+                                Placeholder="@Metadata.Placeholder"
+                                Rows="@Metadata.TextAreaRows"
+                                ReadOnly="@IsReadOnly"
+                                Style="width: 100%;" />
+                break;
+
+            case EditorType.Checkbox:
+                <FluentCheckbox Value="@GetBoolValue()"
+                                ValueChanged="@((bool v) => SetValue(v))"
+                                ReadOnly="@IsReadOnly" />
+                break;
+
+            case EditorType.Integer:
+                <FluentNumberField TValue="long?"
+                                   Value="@GetLongValue()"
+                                   ValueChanged="@((long? v) => SetNumericValue(v))"
+                                   ReadOnly="@IsReadOnly"
+                                   Style="width: 200px;" />
+                break;
+
+            case EditorType.Decimal:
+                <FluentNumberField TValue="decimal?"
+                                   Value="@GetDecimalValue()"
+                                   ValueChanged="@((decimal? v) => SetNumericValue(v))"
+                                   ReadOnly="@IsReadOnly"
+                                   Style="width: 200px;" />
+                break;
+
+            case EditorType.DateTime:
+                <FluentDatePicker Value="@GetDateTimeValue()"
+                                  ValueChanged="@((DateTime? v) => SetValue(v))"
+                                  ReadOnly="@IsReadOnly" />
+                break;
+
+            case EditorType.Enum:
+                <FluentSelect TOption="string"
+                              Value="@GetEnumStringValue()"
+                              ValueChanged="@((string v) => SetEnumValue(v))"
+                              Disabled="@IsReadOnly"
+                              Style="min-width: 200px;">
+                    @foreach (var name in GetEnumNames())
+                    {
+                        <FluentOption TOption="string" Value="@name">@name</FluentOption>
+                    }
+                </FluentSelect>
+                break;
+
+            case EditorType.StringArray:
+                <ArrayEditor Items="@GetStringArray()"
+                             OnItemsChanged="@SetStringArray"
+                             IsReadOnly="@IsReadOnly" />
+                break;
+
+            case EditorType.Object:
+                @* Nested object - render recursively *@
+                <NestedObjectEditor PropertyType="@Metadata.PropertyType"
+                                    Value="@Metadata.GetValue(Target)"
+                                    OnValueChanged="@SetNestedValue"
+                                    IsReadOnly="@IsReadOnly" />
+                break;
+
+            case EditorType.ObjectArray:
+                @* Array of objects - render as expandable list *@
+                var elementType = Metadata.PropertyType.GetElementType();
+                if (elementType != null)
+                {
+                    <NestedArrayEditor ElementType="@elementType"
+                                       Value="@(Metadata.GetValue(Target) as Array)"
+                                       OnValueChanged="@SetArrayValue"
+                                       IsReadOnly="@IsReadOnly" />
+                }
+                break;
+
+            case EditorType.PrimitiveArray:
+            case EditorType.Json:
+                <JsonEditor Value="@GetJsonValue()"
+                            OnValueChanged="@SetJsonValue"
+                            IsReadOnly="@IsReadOnly" />
+                break;
+        }
+
+        @if (!string.IsNullOrEmpty(Metadata.Description))
+        {
+            <div style="font-size: 11px; color: #888; margin-top: 2px;">@Metadata.Description</div>
+        }
+    };
+}
+
+@code {
+    private bool IsComplexType => Metadata.EditorType is EditorType.Object 
+        or EditorType.ObjectArray 
+        or EditorType.StringArray 
+        or EditorType.PrimitiveArray 
+        or EditorType.Json;
+    [Parameter, EditorRequired]
+    public required PropertyMetadata Metadata { get; set; }
+
+    [Parameter, EditorRequired]
+    public required object Target { get; set; }
+
+    [Parameter]
+    public EventCallback OnValueChanged { get; set; }
+
+    /// <summary>
+    /// Force this property to be read-only (overrides metadata).
+    /// </summary>
+    [Parameter]
+    public bool IsForceReadOnly { get; set; }
+
+    private bool IsReadOnly => Metadata.IsReadOnly || IsForceReadOnly;
+
+    private bool IsRequired => !IsNullable(Metadata.PropertyType);
+
+    private bool IsNullable(Type type)
+    {
+        return !type.IsValueType || Nullable.GetUnderlyingType(type) != null;
+    }
+
+    private string GetStringValue()
+    {
+        return Metadata.GetValue(Target)?.ToString() ?? "";
+    }
+
+    private bool GetBoolValue()
+    {
+        var val = Metadata.GetValue(Target);
+        return val is bool b && b;
+    }
+
+    private long? GetLongValue()
+    {
+        var val = Metadata.GetValue(Target);
+        return val switch
+        {
+            long l => l,
+            int i => i,
+            short s => s,
+            byte b => b,
+            _ => null
+        };
+    }
+
+    private decimal? GetDecimalValue()
+    {
+        var val = Metadata.GetValue(Target);
+        return val switch
+        {
+            decimal d => d,
+            double db => (decimal)db,
+            float f => (decimal)f,
+            _ => null
+        };
+    }
+
+    private DateTime? GetDateTimeValue()
+    {
+        var val = Metadata.GetValue(Target);
+        return val switch
+        {
+            DateTime dt => dt,
+            DateTimeOffset dto => dto.DateTime,
+            _ => null
+        };
+    }
+
+    private string GetEnumStringValue()
+    {
+        var val = Metadata.GetValue(Target);
+        return val?.ToString() ?? "";
+    }
+
+    private string[] GetEnumNames()
+    {
+        var enumType = Nullable.GetUnderlyingType(Metadata.PropertyType) ?? Metadata.PropertyType;
+        return Enum.GetNames(enumType);
+    }
+
+    private string[] GetStringArray()
+    {
+        var val = Metadata.GetValue(Target);
+        return val as string[] ?? [];
+    }
+
+    private string GetJsonValue()
+    {
+        var val = Metadata.GetValue(Target);
+        if (val == null) return "null";
+        try
+        {
+            return JsonSerializer.Serialize(val, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            return "{}";
+        }
+    }
+
+    private async Task SetValue(object? value)
+    {
+        Metadata.SetValue(Target, value);
+        await OnValueChanged.InvokeAsync();
+    }
+
+    private async Task SetNumericValue(object? value)
+    {
+        var targetType = Nullable.GetUnderlyingType(Metadata.PropertyType) ?? Metadata.PropertyType;
+        object? converted = null;
+
+        if (value != null)
+        {
+            converted = Convert.ChangeType(value, targetType);
+        }
+
+        Metadata.SetValue(Target, converted);
+        await OnValueChanged.InvokeAsync();
+    }
+
+    private async Task SetEnumValue(string value)
+    {
+        var enumType = Nullable.GetUnderlyingType(Metadata.PropertyType) ?? Metadata.PropertyType;
+        if (Enum.TryParse(enumType, value, out var result))
+        {
+            Metadata.SetValue(Target, result);
+            await OnValueChanged.InvokeAsync();
+        }
+    }
+
+    private async Task SetStringArray(string[] items)
+    {
+        Metadata.SetValue(Target, items);
+        await OnValueChanged.InvokeAsync();
+    }
+
+    private async Task SetJsonValue(string json)
+    {
+        try
+        {
+            var val = JsonSerializer.Deserialize(json, Metadata.PropertyType);
+            Metadata.SetValue(Target, val);
+            await OnValueChanged.InvokeAsync();
+        }
+        catch
+        {
+            // Invalid JSON - don't update
+        }
+    }
+
+    private async Task SetNestedValue(object? value)
+    {
+        Metadata.SetValue(Target, value);
+        await OnValueChanged.InvokeAsync();
+    }
+
+    private async Task SetArrayValue(Array? value)
+    {
+        Metadata.SetValue(Target, value);
+        await OnValueChanged.InvokeAsync();
+    }
+}

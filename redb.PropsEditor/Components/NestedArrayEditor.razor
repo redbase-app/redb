@@ -1,0 +1,152 @@
+@using redb.PropsEditor.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@inject PropsMetadataService MetadataService
+
+@* Renders an array of objects with expandable items *@
+
+<div style="width: 100%;">
+    <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 3px; cursor: pointer; user-select: none;"
+         @onclick="() => isExpanded = !isExpanded">
+        <span style="font-size: 10px;">@(isExpanded ? "▼" : "▶")</span>
+        <span style="font-size: 12px; color: #666;">@(ElementType.Name)[]</span>
+        <span style="font-size: 11px; color: #888;">(@GetCount() items)</span>
+        @if (!IsReadOnly)
+        {
+            <FluentButton Appearance="Appearance.Lightweight"
+                          Size="ButtonSize.Small"
+                          OnClick="@AddItem"
+                          Style="margin-left: auto; font-size: 11px;">
+                + Add
+            </FluentButton>
+        }
+    </div>
+
+    @if (isExpanded && items != null)
+    {
+        <div style="margin-left: 12px; margin-top: 4px; border-left: 2px solid #e0e0e0; padding-left: 8px;">
+            @for (var i = 0; i < items.Count; i++)
+            {
+                var index = i;
+                var item = items[index];
+                <div style="display: flex; align-items: start; gap: 4px; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
+                    <span style="font-size: 11px; color: #888; min-width: 24px; padding-top: 6px;">[@index]</span>
+                    <div style="flex: 1;">
+                        <NestedObjectEditor PropertyType="@ElementType"
+                                            Value="@item"
+                                            OnValueChanged="@(async (v) => await UpdateItem(index, v))"
+                                            IsReadOnly="@IsReadOnly" />
+                    </div>
+                    @if (!IsReadOnly)
+                    {
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      Size="ButtonSize.Small"
+                                      OnClick="@(() => RemoveItem(index))"
+                                      Style="color: #dc3545; font-size: 11px;">
+                            X
+                        </FluentButton>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// The element type of the array.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public required Type ElementType { get; set; }
+
+    /// <summary>
+    /// The current array value.
+    /// </summary>
+    [Parameter]
+    public Array? Value { get; set; }
+
+    /// <summary>
+    /// Called when the value changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<Array?> OnValueChanged { get; set; }
+
+    /// <summary>
+    /// Whether the editor is read-only.
+    /// </summary>
+    [Parameter]
+    public bool IsReadOnly { get; set; }
+
+    private bool isExpanded = false;
+    private List<object?>? items;
+
+    protected override void OnParametersSet()
+    {
+        if (Value != null)
+        {
+            items = new List<object?>();
+            foreach (var item in Value)
+            {
+                items.Add(item);
+            }
+        }
+        else
+        {
+            items = null;
+        }
+    }
+
+    private int GetCount()
+    {
+        return items?.Count ?? 0;
+    }
+
+    private async Task AddItem()
+    {
+        items ??= new List<object?>();
+        try
+        {
+            var newItem = Activator.CreateInstance(ElementType);
+            items.Add(newItem);
+            await NotifyChanged();
+        }
+        catch
+        {
+            // Cannot create instance
+        }
+    }
+
+    private async Task RemoveItem(int index)
+    {
+        if (items != null && index >= 0 && index < items.Count)
+        {
+            items.RemoveAt(index);
+            await NotifyChanged();
+        }
+    }
+
+    private async Task UpdateItem(int index, object? value)
+    {
+        if (items != null && index >= 0 && index < items.Count)
+        {
+            items[index] = value;
+            await NotifyChanged();
+        }
+    }
+
+    private async Task NotifyChanged()
+    {
+        if (items != null)
+        {
+            var array = Array.CreateInstance(ElementType, items.Count);
+            for (var i = 0; i < items.Count; i++)
+            {
+                array.SetValue(items[i], i);
+            }
+            await OnValueChanged.InvokeAsync(array);
+        }
+        else
+        {
+            await OnValueChanged.InvokeAsync(null);
+        }
+    }
+}

@@ -1,0 +1,184 @@
+@using redb.PropsEditor.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@inject PropsMetadataService MetadataService
+@typeparam TProps where TProps : class
+
+@* Universal property editor for any Props class *@
+
+<div style="min-width: 450px;">
+    @if (ShowHeader)
+    {
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #ddd; margin-bottom: 0.5rem;">
+            <span style="font-weight: 600; font-size: 1.1rem;">@GetTypeName()</span>
+            @if (ShowSaveButton)
+            {
+                <FluentButton Appearance="Appearance.Accent"
+                              OnClick="HandleSave"
+                              Disabled="@IsSaving">
+                    @(IsSaving ? "Saving..." : "Save")
+                </FluentButton>
+            }
+        </div>
+    }
+
+    <div>
+        @if (Value == null)
+        {
+            <div style="color: #666; padding: 1rem;">No data to edit.</div>
+        }
+        else
+        {
+            @* Group properties by GroupName *@
+            @foreach (var group in GetGroupedProperties())
+            {
+                @if (string.IsNullOrEmpty(group.Key))
+                {
+                    @* Properties without group *@
+                    @foreach (var prop in group)
+                    {
+                        <PropertyField Metadata="@prop"
+                                       Target="@Value"
+                                       OnValueChanged="HandlePropertyChanged"
+                                       IsForceReadOnly="@IsPropertyReadOnly(prop.Name)" />
+                    }
+                }
+                else
+                {
+                    @* Collapsible group *@
+                    var groupName = group.Key;
+                    var isExpanded = !collapsedGroups.Contains(groupName);
+
+                    <div style="margin-top: 0.75rem;">
+                        <div style="display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer; user-select: none;" @onclick="() => ToggleGroup(groupName)">
+                            <span style="cursor: pointer; font-size: 10px;">@(isExpanded ? "▼" : "▶")</span>
+                            <span style="font-weight: 500;">@groupName</span>
+                        </div>
+                        @if (isExpanded)
+                        {
+                            <div style="padding-left: 12px;">
+                                @foreach (var prop in group)
+                                {
+                                    <PropertyField Metadata="@prop"
+                                                   Target="@Value"
+                                                   OnValueChanged="HandlePropertyChanged"
+                                                   IsForceReadOnly="@IsPropertyReadOnly(prop.Name)" />
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// The Props object to edit.
+    /// </summary>
+    [Parameter]
+    public TProps? Value { get; set; }
+
+    /// <summary>
+    /// Called when the value changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<TProps> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Called when Save button is clicked.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    /// <summary>
+    /// Whether to show the Save button.
+    /// </summary>
+    [Parameter]
+    public bool ShowSaveButton { get; set; } = true;
+
+    /// <summary>
+    /// Whether to show the header with type name.
+    /// </summary>
+    [Parameter]
+    public bool ShowHeader { get; set; } = true;
+
+    /// <summary>
+    /// Whether save is in progress.
+    /// </summary>
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    /// <summary>
+    /// Property names that should be read-only (in addition to [PropsReadOnly] attribute).
+    /// </summary>
+    [Parameter]
+    public HashSet<string>? ReadOnlyPropertyNames { get; set; }
+
+    /// <summary>
+    /// If set, only these properties will be shown (whitelist mode).
+    /// </summary>
+    [Parameter]
+    public HashSet<string>? OnlyShowProperties { get; set; }
+
+    private HashSet<string> collapsedGroups = [];
+    private IEnumerable<PropertyMetadata>? properties;
+
+    protected override void OnParametersSet()
+    {
+        properties = MetadataService.GetProperties<TProps>();
+
+        // Initialize collapsed groups
+        foreach (var prop in properties.Where(p => p.GroupCollapsed && !string.IsNullOrEmpty(p.GroupName)))
+        {
+            collapsedGroups.Add(prop.GroupName!);
+        }
+    }
+
+    private string GetTypeName()
+    {
+        return typeof(TProps).Name;
+    }
+
+    private IEnumerable<IGrouping<string?, PropertyMetadata>> GetGroupedProperties()
+    {
+        var filtered = properties ?? [];
+        
+        // Whitelist mode - show only specified properties
+        if (OnlyShowProperties?.Count > 0)
+        {
+            filtered = filtered.Where(p => OnlyShowProperties.Contains(p.Name));
+        }
+        
+        return filtered
+            .GroupBy(p => p.GroupName)
+            .OrderBy(g => string.IsNullOrEmpty(g.Key) ? 0 : 1)
+            .ThenBy(g => g.Key);
+    }
+
+    private void ToggleGroup(string groupName)
+    {
+        if (collapsedGroups.Contains(groupName))
+            collapsedGroups.Remove(groupName);
+        else
+            collapsedGroups.Add(groupName);
+    }
+
+    private async Task HandlePropertyChanged()
+    {
+        if (Value != null)
+        {
+            await ValueChanged.InvokeAsync(Value);
+        }
+    }
+
+    private async Task HandleSave()
+    {
+        await OnSave.InvokeAsync();
+    }
+
+    private bool IsPropertyReadOnly(string propertyName)
+    {
+        return ReadOnlyPropertyNames?.Contains(propertyName) == true;
+    }
+}

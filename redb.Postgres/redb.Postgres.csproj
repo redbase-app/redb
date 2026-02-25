@@ -1,0 +1,85 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    
+    <!-- NuGet Package Metadata -->
+    <PackageId>redb.Postgres</PackageId>
+    <Product>REDB - Entity Database for .NET</Product>
+    <Description>PostgreSQL provider for REDB. Includes optimized SQL generation, tree queries with CTEs, and full LINQ support.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>
+    <PackageTags>database;orm;postgresql;postgres;linq;dotnet;redb</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="9.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\redb.Core\redb.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="sql\redb_init.sql" />
+  </ItemGroup>
+
+  <!-- Inline task: concatenate SQL source files into a single init script -->
+  <UsingTask TaskName="ConcatenateSqlFiles" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <InputFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <OutputFile ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("-- ==========================================================");
+        sb.AppendLine("-- REDB: Combined schema initialization script (auto-generated)");
+        sb.AppendLine("-- DO NOT EDIT — this file is overwritten on every build.");
+        sb.AppendLine("-- ==========================================================");
+        sb.AppendLine();
+        foreach (var item in InputFiles)
+        {
+            var path = item.ItemSpec;
+            sb.AppendLine("-- ===== " + System.IO.Path.GetFileName(path) + " =====");
+            sb.AppendLine(System.IO.File.ReadAllText(path));
+            sb.AppendLine();
+        }
+        System.IO.File.WriteAllText(OutputFile, sb.ToString());
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <!-- Run only for the first TFM to avoid parallel write conflicts on redb_init.sql -->
+  <Target Name="ConcatenateSql" BeforeTargets="BeforeBuild"
+          Condition="'$(TargetFramework)' == 'net8.0' OR '$(TargetFrameworks)' == ''">
+    <ItemGroup>
+      <SqlMainFile Include="sql\redbPostgre.sql" />
+      <!-- Order matters: metadata_cache creates _scheme_metadata_cache table needed by facets_search;
+           window creates resolve_field_path proc needed by aggregation -->
+      <SqlEarlyFiles Include="sql\redb_metadata_cache.sql;sql\redb_window.sql" />
+      <SqlOtherFiles Include="sql\*.sql" Exclude="sql\redbPostgre.sql;sql\redb_init.sql;@(SqlEarlyFiles)" />
+      <SqlAllFiles Include="@(SqlMainFile);@(SqlEarlyFiles);@(SqlOtherFiles)" />
+    </ItemGroup>
+    <ConcatenateSqlFiles InputFiles="@(SqlAllFiles)" OutputFile="sql\redb_init.sql" />
+  </Target>
+
+</Project>

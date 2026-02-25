@@ -1,0 +1,234 @@
+@using redb.Core
+@using redb.Core.Models.Entities
+@using redb.PropsEditor.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@inject IRedbService Redb
+@inject PropsMetadataService MetadataService
+@typeparam TProps where TProps : class, new()
+
+@* Grid view with CRUD operations for any Props type *@
+
+<div class="props-grid">
+    <div class="props-grid-header">
+        <h3>@GetTypeName()</h3>
+        <div class="props-grid-toolbar">
+            <FluentButton Appearance="Appearance.Accent" OnClick="ShowCreateDialog">
+                + New
+            </FluentButton>
+            <FluentButton Appearance="Appearance.Outline" OnClick="LoadData">
+                Refresh
+            </FluentButton>
+        </div>
+    </div>
+
+    <div class="props-grid-search">
+        <FluentTextField Value="@searchText"
+                         ValueChanged="@((string v) => { searchText = v; HandleSearch(); })"
+                         Placeholder="Search..."
+                         Style="width: 300px;" />
+        <span style="color: #666;">@items.Count items</span>
+    </div>
+
+    @if (loading)
+    {
+        <div style="padding: 2rem; text-align: center;">
+            <FluentProgressRing />
+            <p>Loading...</p>
+        </div>
+    }
+    else if (items.Count == 0)
+    {
+        <div style="padding: 2rem; text-align: center; color: #666;">
+            No items found. Click "+ New" to create one.
+        </div>
+    }
+    else
+    {
+        <FluentDataGrid Items="@filteredItems.AsQueryable()" TGridItem="RedbObject<TProps>" Style="--data-grid-row-height: 42px;">
+            <PropertyColumn Property="@(x => x.id)" Title="ID" Sortable="true" />
+            <PropertyColumn Property="@(x => x.name)" Title="Name" Sortable="true" />
+            @foreach (var prop in GetDisplayProperties().Take(3))
+            {
+                <TemplateColumn Title="@prop.Label">
+                    @GetDisplayValue(context, prop)
+                </TemplateColumn>
+            }
+            <TemplateColumn Title="Actions">
+                <div style="display: flex; gap: 4px; align-items: center; height: 100%;">
+                    <a href="javascript:void(0)" @onclick="@(() => ShowEditDialog(context))" @onclick:preventDefault
+                       style="font-size: 12px; color: #0078d4; text-decoration: none;">Edit</a>
+                    <a href="javascript:void(0)" @onclick="@(() => DeleteItem(context))" @onclick:preventDefault
+                       style="font-size: 12px; color: #dc3545; text-decoration: none;">Del</a>
+                </div>
+            </TemplateColumn>
+        </FluentDataGrid>
+    }
+</div>
+
+@* Edit Dialog *@
+<FluentDialog @ref="editDialog" Hidden="@dialogHidden" HiddenChanged="@((bool v) => dialogHidden = v)" Modal="true" TrapFocus="true" PreventScroll="true" Style="--dialog-width: 650px;">
+    <FluentDialogHeader>
+        @(editingItem?.id > 0 ? "Edit" : "Create") @GetTypeName()
+    </FluentDialogHeader>
+    <FluentDialogBody Style="max-width: 650px; overflow-x: hidden;">
+        @if (editingItem != null)
+        {
+            <div style="width: 100%; max-height: 75vh; overflow-y: auto; overflow-x: hidden;">
+                <RedbObjectEditor TProps="TProps"
+                                  Value="@editingItem"
+                                  ShowSaveButton="false" />
+            </div>
+        }
+    </FluentDialogBody>
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Accent" OnClick="SaveItem" Disabled="@saving">
+            @(saving ? "Saving..." : "Save")
+        </FluentButton>
+        <FluentButton OnClick="CloseDialog">Cancel</FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@code {
+    private List<RedbObject<TProps>> items = [];
+    private List<RedbObject<TProps>> filteredItems = [];
+    private bool loading = true;
+    private bool dialogHidden = true;
+    private bool saving;
+    private string searchText = "";
+    private FluentDialog? editDialog;
+
+    private RedbObject<TProps>? editingItem;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try
+        {
+            items = await Redb.Query<TProps>()
+                .OrderByDescendingRedb(x => x.DateModify)
+                .Take(1000)
+                .ToListAsync();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+            items = [];
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void HandleSearch()
+    {
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            filteredItems = items;
+        }
+        else
+        {
+            var search = searchText.ToLowerInvariant();
+            filteredItems = items
+                .Where(x => x.name?.ToLowerInvariant().Contains(search) == true)
+                .ToList();
+        }
+    }
+
+    private string GetTypeName() => typeof(TProps).Name;
+
+    private IEnumerable<PropertyMetadata> GetDisplayProperties()
+    {
+        return MetadataService.GetProperties<TProps>()
+            .Where(p => p.EditorType is EditorType.Text or EditorType.Checkbox or EditorType.Integer or EditorType.Decimal)
+            .Take(5);
+    }
+
+    private string GetDisplayValue(RedbObject<TProps> item, PropertyMetadata prop)
+    {
+        var val = prop.GetValue(item.Props);
+        if (val == null) return "-";
+        if (val is bool b) return b ? "Yes" : "No";
+        var str = val.ToString() ?? "";
+        return str.Length > 50 ? str[..50] + "..." : str;
+    }
+
+    private void ShowCreateDialog()
+    {
+        editingItem = new RedbObject<TProps> { Props = new TProps() };
+        dialogHidden = false;
+    }
+
+    private void ShowEditDialog(RedbObject<TProps> item)
+    {
+        // Clone the entire object for editing
+        var json = System.Text.Json.JsonSerializer.Serialize(item);
+        editingItem = System.Text.Json.JsonSerializer.Deserialize<RedbObject<TProps>>(json);
+        dialogHidden = false;
+    }
+
+    private async Task SaveItem()
+    {
+        if (editingItem == null) return;
+
+        saving = true;
+        try
+        {
+            // Auto-set name from Name/Title property if not set
+            if (string.IsNullOrEmpty(editingItem.name))
+            {
+                var nameProperty = MetadataService.GetProperties<TProps>()
+                    .FirstOrDefault(p => p.Name.Equals("Name", StringComparison.OrdinalIgnoreCase) ||
+                                         p.Name.Equals("Title", StringComparison.OrdinalIgnoreCase));
+
+                if (nameProperty != null)
+                {
+                    editingItem.name = nameProperty.GetValue(editingItem.Props)?.ToString();
+                }
+            }
+
+            await Redb.SaveAsync(editingItem);
+
+            dialogHidden = true;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving: {ex.Message}");
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task DeleteItem(RedbObject<TProps> item)
+    {
+        try
+        {
+            await Redb.DeleteAsync(item);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting: {ex.Message}");
+        }
+    }
+
+    private void CloseDialog()
+    {
+        dialogHidden = true;
+        editingItem = null;
+    }
+}

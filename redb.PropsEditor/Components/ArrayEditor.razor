@@ -1,0 +1,77 @@
+@using Microsoft.FluentUI.AspNetCore.Components
+
+@* Editor for string arrays with add/remove functionality *@
+
+<div class="array-editor">
+    <div class="array-editor-header">
+        <span style="font-size: 0.85rem; color: #666;">@Items.Length items</span>
+        @if (!IsReadOnly)
+        {
+            <FluentButton Appearance="Appearance.Outline"
+                          Size="ButtonSize.Small"
+                          OnClick="AddItem">
+                + Add
+            </FluentButton>
+        }
+    </div>
+
+    @for (int i = 0; i < Items.Length; i++)
+    {
+        var index = i;
+        <div class="array-item">
+            <span class="array-item-index">[@index]</span>
+            <div class="array-item-value">
+                <FluentTextField Value="@Items[index]"
+                                 ValueChanged="@((string v) => UpdateItem(index, v))"
+                                 ReadOnly="@IsReadOnly"
+                                 Style="width: 100%;" />
+            </div>
+            @if (!IsReadOnly)
+            {
+                <FluentButton Appearance="Appearance.Stealth"
+                              Size="ButtonSize.Small"
+                              OnClick="@(() => RemoveItem(index))"
+                              Title="Remove">
+                    X
+                </FluentButton>
+            }
+        </div>
+    }
+
+    @if (Items.Length == 0)
+    {
+        <div style="color: #888; font-size: 0.85rem; padding: 0.5rem 0;">
+            No items. Click "Add" to add one.
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string[] Items { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<string[]> OnItemsChanged { get; set; }
+
+    [Parameter]
+    public bool IsReadOnly { get; set; }
+
+    private async Task AddItem()
+    {
+        var newItems = Items.Append("").ToArray();
+        await OnItemsChanged.InvokeAsync(newItems);
+    }
+
+    private async Task RemoveItem(int index)
+    {
+        var newItems = Items.Where((_, i) => i != index).ToArray();
+        await OnItemsChanged.InvokeAsync(newItems);
+    }
+
+    private async Task UpdateItem(int index, string value)
+    {
+        var newItems = Items.ToArray();
+        newItems[index] = value;
+        await OnItemsChanged.InvokeAsync(newItems);
+    }
+}

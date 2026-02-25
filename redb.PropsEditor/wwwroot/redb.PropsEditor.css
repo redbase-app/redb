@@ -1,0 +1,195 @@
+/* redb.PropsEditor styles - VS Property Grid style */
+
+/* Global editor container */
+.props-editor-container {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 13px;
+    min-width: 450px;
+}
+
+/* Array editor - compact style */
+.array-editor {
+    width: 100%;
+    border: 1px solid #e5e5e5;
+    background: #fafafa;
+}
+
+.array-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    background: #f0f0f0;
+    border-bottom: 1px solid #e5e5e5;
+    font-size: 11px;
+}
+
+.array-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.array-item:last-child {
+    border-bottom: none;
+}
+
+.array-item-index {
+    color: #888;
+    font-size: 11px;
+    min-width: 24px;
+    text-align: right;
+}
+
+.array-item-value {
+    flex: 1;
+}
+
+.array-item-remove {
+    cursor: pointer;
+    color: #c42b1c;
+    font-size: 11px;
+    padding: 2px 4px;
+}
+
+.array-item-remove:hover {
+    background: #fde7e9;
+}
+
+/* Object editor */
+.object-editor {
+    width: 100%;
+    border: 1px solid #e5e5e5;
+    background: #fafafa;
+    padding: 4px;
+}
+
+/* JSON editor */
+.json-editor {
+    width: 100%;
+}
+
+.json-editor textarea {
+    font-family: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+}
+
+/* Props grid - list view */
+.props-grid {
+    background: #fff;
+    border: 1px solid #d4d4d4;
+}
+
+.props-grid-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #d4d4d4;
+    background: #f3f3f3;
+}
+
+.props-grid-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.props-grid-toolbar {
+    display: flex;
+    gap: 8px;
+}
+
+.props-grid-search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: #fafafa;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+/* Scheme browser */
+.scheme-browser {
+    padding: 16px;
+}
+
+.scheme-browser h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+}
+
+.scheme-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.scheme-card {
+    background: #fff;
+    border: 1px solid #d4d4d4;
+    padding: 12px;
+    transition: border-color 0.15s;
+}
+
+.scheme-card:hover {
+    border-color: #0078d4;
+}
+
+.scheme-card h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.scheme-card .count {
+    color: #666;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+/* Props Edit Dialog - override FluentUI defaults */
+.props-edit-dialog {
+    --dialog-width: 650px;
+    --dialog-height: auto;
+}
+
+.props-edit-dialog::part(control) {
+    width: 650px;
+    max-width: 90vw;
+    max-height: 90vh;
+}
+
+.props-edit-dialog fluent-dialog-body {
+    width: 100%;
+    min-width: 550px;
+}
+
+/* Ensure dialog content is wide enough */
+fluent-dialog.props-edit-dialog {
+    --dialog-width: 650px;
+}
+
+/* Override cursor for readonly fields - use normal text cursor, not "not-allowed" */
+fluent-text-field[readonly],
+fluent-text-area[readonly],
+fluent-number-field[readonly],
+fluent-checkbox[readonly] {
+    cursor: text;
+}
+
+fluent-text-field[readonly]::part(root),
+fluent-text-field[readonly]::part(control),
+fluent-text-area[readonly]::part(root),
+fluent-text-area[readonly]::part(control),
+fluent-number-field[readonly]::part(root),
+fluent-number-field[readonly]::part(control) {
+    cursor: text;
+}
+
+fluent-checkbox[readonly]::part(control) {
+    cursor: default;
+}
