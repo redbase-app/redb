@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class Win </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class Win ">
+      
+      <meta name="description" content="Static helper for window functions Used in Select to create ROW_NUMBER(), RANK(), SUM() OVER(), etc. expressions.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Query_Aggregation_Win.md&amp;value=---%0Auid%3A%20redb.Core.Query.Aggregation.Win%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Query.Aggregation.Win">
+
+
+
+  <h1 id="redb_Core_Query_Aggregation_Win" data-uid="redb.Core.Query.Aggregation.Win" class="text-break">
+Class Win  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L7"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Query.html">Query</a>.<a class="xref" href="redb.Core.Query.Aggregation.html">Aggregation</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Static helper for window functions
+Used in Select to create ROW_NUMBER(), RANK(), SUM() OVER(), etc. expressions.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class Win</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">Win</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Avg_" data-uid="redb.Core.Query.Aggregation.Win.Avg*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Avg_System_Decimal_" data-uid="redb.Core.Query.Aggregation.Win.Avg(System.Decimal)">
+  Avg(decimal)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L52"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>AVG(field) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static double Avg(decimal value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Avg_" data-uid="redb.Core.Query.Aggregation.Win.Avg*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Avg_System_Double_" data-uid="redb.Core.Query.Aggregation.Win.Avg(System.Double)">
+  Avg(double)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L58"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static double Avg(double value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Avg_" data-uid="redb.Core.Query.Aggregation.Win.Avg*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Avg_System_Int32_" data-uid="redb.Core.Query.Aggregation.Win.Avg(System.Int32)">
+  Avg(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L56"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static double Avg(int value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Avg_" data-uid="redb.Core.Query.Aggregation.Win.Avg*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Avg_System_Int64_" data-uid="redb.Core.Query.Aggregation.Win.Avg(System.Int64)">
+  Avg(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L54"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static double Avg(long value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Count_" data-uid="redb.Core.Query.Aggregation.Win.Count*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Count" data-uid="redb.Core.Query.Aggregation.Win.Count">
+  Count()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L64"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>COUNT(*) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int Count()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_DenseRank_" data-uid="redb.Core.Query.Aggregation.Win.DenseRank*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_DenseRank" data-uid="redb.Core.Query.Aggregation.Win.DenseRank">
+  DenseRank()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L26"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>DENSE_RANK() OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static long DenseRank()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_FirstValue_" data-uid="redb.Core.Query.Aggregation.Win.FirstValue*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_FirstValue__1___0_" data-uid="redb.Core.Query.Aggregation.Win.FirstValue``1(``0)">
+  FirstValue&lt;T&gt;(T)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L96"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>FIRST_VALUE(field) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static T FirstValue&lt;T&gt;(T value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Lag_" data-uid="redb.Core.Query.Aggregation.Win.Lag*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Lag__1___0_" data-uid="redb.Core.Query.Aggregation.Win.Lag``1(``0)">
+  Lag&lt;T&gt;(T)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L84"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>LAG(field) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static T Lag&lt;T&gt;(T value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_LastValue_" data-uid="redb.Core.Query.Aggregation.Win.LastValue*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_LastValue__1___0_" data-uid="redb.Core.Query.Aggregation.Win.LastValue``1(``0)">
+  LastValue&lt;T&gt;(T)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L102"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>LAST_VALUE(field) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static T LastValue&lt;T&gt;(T value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Lead_" data-uid="redb.Core.Query.Aggregation.Win.Lead*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Lead__1___0_" data-uid="redb.Core.Query.Aggregation.Win.Lead``1(``0)">
+  Lead&lt;T&gt;(T)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L90"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>LEAD(field) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static T Lead&lt;T&gt;(T value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Max_" data-uid="redb.Core.Query.Aggregation.Win.Max*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Max__1___0_" data-uid="redb.Core.Query.Aggregation.Win.Max``1(``0)">
+  Max&lt;T&gt;(T)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L76"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>MAX(field) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static T Max&lt;T&gt;(T value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Min_" data-uid="redb.Core.Query.Aggregation.Win.Min*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Min__1___0_" data-uid="redb.Core.Query.Aggregation.Win.Min``1(``0)">
+  Min&lt;T&gt;(T)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L70"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>MIN(field) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static T Min&lt;T&gt;(T value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">T</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Ntile_" data-uid="redb.Core.Query.Aggregation.Win.Ntile*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Ntile_System_Int32_" data-uid="redb.Core.Query.Aggregation.Win.Ntile(System.Int32)">
+  Ntile(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L32"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>NTILE(n) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int Ntile(int buckets)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>buckets</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Rank_" data-uid="redb.Core.Query.Aggregation.Win.Rank*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Rank" data-uid="redb.Core.Query.Aggregation.Win.Rank">
+  Rank()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L20"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>RANK() OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static long Rank()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_RowNumber_" data-uid="redb.Core.Query.Aggregation.Win.RowNumber*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_RowNumber" data-uid="redb.Core.Query.Aggregation.Win.RowNumber">
+  RowNumber()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L14"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>ROW_NUMBER() OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static long RowNumber()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Sum_" data-uid="redb.Core.Query.Aggregation.Win.Sum*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Sum_System_Decimal_" data-uid="redb.Core.Query.Aggregation.Win.Sum(System.Decimal)">
+  Sum(decimal)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L40"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>SUM(field) OVER (...)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static decimal Sum(decimal value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Sum_" data-uid="redb.Core.Query.Aggregation.Win.Sum*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Sum_System_Double_" data-uid="redb.Core.Query.Aggregation.Win.Sum(System.Double)">
+  Sum(double)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L46"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static double Sum(double value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Sum_" data-uid="redb.Core.Query.Aggregation.Win.Sum*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Sum_System_Int32_" data-uid="redb.Core.Query.Aggregation.Win.Sum(System.Int32)">
+  Sum(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L44"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int Sum(int value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Aggregation_Win_Sum_" data-uid="redb.Core.Query.Aggregation.Win.Sum*"></a>
+
+  <h3 id="redb_Core_Query_Aggregation_Win_Sum_System_Int64_" data-uid="redb.Core.Query.Aggregation.Win.Sum(System.Int64)">
+  Sum(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L42"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static long Sum(long value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Aggregation/Win.cs/#L7" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

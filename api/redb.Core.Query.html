@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace redb.Core.Query </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace redb.Core.Query ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Query">
+
+  <h1 id="redb_Core_Query" data-uid="redb.Core.Query" class="text-break">Namespace redb.Core.Query</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.FacetFilterBuilder.html">FacetFilterBuilder</a></dt>
+      <dd><p>Builds JSON filters for search_objects_with_facets function.
+Supports 25+ operators, nullable fields, Class fields, arrays.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.OrderingExpressionParser.html">OrderingExpressionParser</a></dt>
+      <dd><p>Parses ordering expressions from LINQ to REDB query format.
+Supports simple properties, ternary operators, arithmetic expressions and functions.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext&lt;TProps&gt;</a></dt>
+      <dd><p>Query context - contains all information about LINQ query</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.RedbProjectedQueryableTaskExtensions.html">RedbProjectedQueryableTaskExtensions</a></dt>
+      <dd><p>Extension methods for Task&lt;IRedbProjectedQueryable&lt;T&gt;&gt; to avoid double await.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.RedbProjectedQueryable-2.html">RedbProjectedQueryable&lt;TProps, TResult&gt;</a></dt>
+      <dd><p>Implementation of LINQ query projections in REDB with filtering and sorting support
+⭐ OPTIMIZED: Uses ProjectionFieldExtractor to load only required fields</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.RedbQueryableExtensions.html">RedbQueryableExtensions</a></dt>
+      <dd><p>Extension methods for IRedbQueryable.
+Adds ToSqlStringAsync() and ToAggregateSqlStringAsync() for SQL preview (debugging).</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.RedbQueryable-1.html">RedbQueryable&lt;TProps&gt;</a></dt>
+      <dd><p>Basic implementation of IRedbQueryable</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.Sql.html">Sql</a></dt>
+      <dd><p>SQL functions for use in LINQ expressions.
+Pro Only: Throws RedbProRequiredException in Open Source version.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.SqlPreviewResult.html">SqlPreviewResult</a></dt>
+      <dd><p>Result of SQL preview function execution.
+Used for mapping result from get_search_sql_preview() and related functions.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.TreeProjectedQueryable-2.html">TreeProjectedQueryable&lt;TProps, TResult&gt;</a></dt>
+      <dd><p>Implementation of projections for tree LINQ queries in REDB
+Specialized version for TreeRedbObject&lt;TProps&gt;</p>
+</dd>
+    </dl>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.IOrderedRedbQueryable-1.html">IOrderedRedbQueryable&lt;TProps&gt;</a></dt>
+      <dd><p>Interface for ordered queries (after OrderBy).
+Supports cascading sorts: OrderBy().ThenByRedb().ThenBy().</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.IRedbProjectedQueryable-1.html">IRedbProjectedQueryable&lt;TResult&gt;</a></dt>
+      <dd><p>Interface for LINQ query projections in REDB.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.IRedbQueryProvider.html">IRedbQueryProvider</a></dt>
+      <dd><p>Provider for executing LINQ queries.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable&lt;TProps&gt;</a></dt>
+      <dd><p>Main interface for type-safe LINQ queries to REDB.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+      <dd><p>SQL syntax abstraction for different DBMS support.</p>
+<p>IMPORTANT: Implementations in different projects MAY DIFFER!</p>
+<ul>
+<li>PostgreSqlDialect: CASE WHEN (tested - 15 ms on 15K objects)</li>
+<li>MsSqlDialect: will be later, possibly different implementation</li>
+</ul>
+<p>Current focus: PostgreSQL + performance.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.ITreeQueryProvider.html">ITreeQueryProvider</a></dt>
+      <dd><p>Extended provider for executing tree LINQ queries.
+Inherits base IRedbQueryProvider functionality and adds hierarchical constraint support.</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IBulkOperations </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IBulkOperations ">
+      
+      <meta name="description" content="Bulk operations abstraction for high-performance data operations. Replaces EFCore.BulkExtensions with pure ADO.NET COPY protocol.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Data_IBulkOperations.md&amp;value=---%0Auid%3A%20redb.Core.Data.IBulkOperations%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Data.IBulkOperations">
+
+
+
+  <h1 id="redb_Core_Data_IBulkOperations" data-uid="redb.Core.Data.IBulkOperations" class="text-break">
+Interface IBulkOperations  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L12"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Data.html">Data</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Bulk operations abstraction for high-performance data operations.
+Replaces EFCore.BulkExtensions with pure ADO.NET COPY protocol.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IBulkOperations</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Data_IBulkOperations_BulkDeleteObjectsAsync_" data-uid="redb.Core.Data.IBulkOperations.BulkDeleteObjectsAsync*"></a>
+
+  <h3 id="redb_Core_Data_IBulkOperations_BulkDeleteObjectsAsync_System_Collections_Generic_IEnumerable_System_Int64__" data-uid="redb.Core.Data.IBulkOperations.BulkDeleteObjectsAsync(System.Collections.Generic.IEnumerable{System.Int64})">
+  BulkDeleteObjectsAsync(IEnumerable&lt;long&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L46"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk delete objects by IDs.
+Uses ANY() with array for efficiency.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task BulkDeleteObjectsAsync(IEnumerable&lt;long&gt; objectIds)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>Object IDs to delete.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Data_IBulkOperations_BulkDeleteValuesAsync_" data-uid="redb.Core.Data.IBulkOperations.BulkDeleteValuesAsync*"></a>
+
+  <h3 id="redb_Core_Data_IBulkOperations_BulkDeleteValuesAsync_System_Collections_Generic_IEnumerable_System_Int64__" data-uid="redb.Core.Data.IBulkOperations.BulkDeleteValuesAsync(System.Collections.Generic.IEnumerable{System.Int64})">
+  BulkDeleteValuesAsync(IEnumerable&lt;long&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L52"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk delete values by IDs.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task BulkDeleteValuesAsync(IEnumerable&lt;long&gt; valueIds)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>valueIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>Value IDs to delete.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Data_IBulkOperations_BulkDeleteValuesByListItemIdsAsync_" data-uid="redb.Core.Data.IBulkOperations.BulkDeleteValuesByListItemIdsAsync*"></a>
+
+  <h3 id="redb_Core_Data_IBulkOperations_BulkDeleteValuesByListItemIdsAsync_System_Collections_Generic_IEnumerable_System_Int64__" data-uid="redb.Core.Data.IBulkOperations.BulkDeleteValuesByListItemIdsAsync(System.Collections.Generic.IEnumerable{System.Int64})">
+  BulkDeleteValuesByListItemIdsAsync(IEnumerable&lt;long&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L66"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk delete values by ListItem IDs.
+Used when deleting list items that are referenced by values.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task BulkDeleteValuesByListItemIdsAsync(IEnumerable&lt;long&gt; listItemIds)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>listItemIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>ListItem IDs whose referencing values to delete.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Data_IBulkOperations_BulkDeleteValuesByObjectIdsAsync_" data-uid="redb.Core.Data.IBulkOperations.BulkDeleteValuesByObjectIdsAsync*"></a>
+
+  <h3 id="redb_Core_Data_IBulkOperations_BulkDeleteValuesByObjectIdsAsync_System_Collections_Generic_IEnumerable_System_Int64__" data-uid="redb.Core.Data.IBulkOperations.BulkDeleteValuesByObjectIdsAsync(System.Collections.Generic.IEnumerable{System.Int64})">
+  BulkDeleteValuesByObjectIdsAsync(IEnumerable&lt;long&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L59"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk delete values by object IDs.
+Commonly used before re-inserting all values for object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task BulkDeleteValuesByObjectIdsAsync(IEnumerable&lt;long&gt; objectIds)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>Object IDs whose values to delete.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Data_IBulkOperations_BulkInsertObjectsAsync_" data-uid="redb.Core.Data.IBulkOperations.BulkInsertObjectsAsync*"></a>
+
+  <h3 id="redb_Core_Data_IBulkOperations_BulkInsertObjectsAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Entities_RedbObjectRow__" data-uid="redb.Core.Data.IBulkOperations.BulkInsertObjectsAsync(System.Collections.Generic.IEnumerable{redb.Core.Models.Entities.RedbObjectRow})">
+  BulkInsertObjectsAsync(IEnumerable&lt;RedbObjectRow&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L19"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk insert objects using COPY protocol.
+Much faster than individual INSERTs for large datasets.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task BulkInsertObjectsAsync(IEnumerable&lt;RedbObjectRow&gt; objects)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objects</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObjectRow.html">RedbObjectRow</a>&gt;</dt>
+    <dd><p>Objects to insert.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Data_IBulkOperations_BulkInsertValuesAsync_" data-uid="redb.Core.Data.IBulkOperations.BulkInsertValuesAsync*"></a>
+
+  <h3 id="redb_Core_Data_IBulkOperations_BulkInsertValuesAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Entities_RedbValue__" data-uid="redb.Core.Data.IBulkOperations.BulkInsertValuesAsync(System.Collections.Generic.IEnumerable{redb.Core.Models.Entities.RedbValue})">
+  BulkInsertValuesAsync(IEnumerable&lt;RedbValue&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L25"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk insert values using COPY protocol.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task BulkInsertValuesAsync(IEnumerable&lt;RedbValue&gt; values)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>values</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbValue.html">RedbValue</a>&gt;</dt>
+    <dd><p>Values to insert.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Data_IBulkOperations_BulkUpdateObjectsAsync_" data-uid="redb.Core.Data.IBulkOperations.BulkUpdateObjectsAsync*"></a>
+
+  <h3 id="redb_Core_Data_IBulkOperations_BulkUpdateObjectsAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Entities_RedbObjectRow__" data-uid="redb.Core.Data.IBulkOperations.BulkUpdateObjectsAsync(System.Collections.Generic.IEnumerable{redb.Core.Models.Entities.RedbObjectRow})">
+  BulkUpdateObjectsAsync(IEnumerable&lt;RedbObjectRow&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L32"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk update objects.
+Uses temp table + UPDATE FROM pattern for efficiency.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task BulkUpdateObjectsAsync(IEnumerable&lt;RedbObjectRow&gt; objects)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objects</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObjectRow.html">RedbObjectRow</a>&gt;</dt>
+    <dd><p>Objects to update.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Data_IBulkOperations_BulkUpdateValuesAsync_" data-uid="redb.Core.Data.IBulkOperations.BulkUpdateValuesAsync*"></a>
+
+  <h3 id="redb_Core_Data_IBulkOperations_BulkUpdateValuesAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Entities_RedbValue__" data-uid="redb.Core.Data.IBulkOperations.BulkUpdateValuesAsync(System.Collections.Generic.IEnumerable{redb.Core.Models.Entities.RedbValue})">
+  BulkUpdateValuesAsync(IEnumerable&lt;RedbValue&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L39"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk update values.
+Uses temp table + UPDATE FROM pattern for efficiency.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task BulkUpdateValuesAsync(IEnumerable&lt;RedbValue&gt; values)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>values</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbValue.html">RedbValue</a>&gt;</dt>
+    <dd><p>Values to update.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Data/IBulkOperations.cs/#L12" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class UserConfigurationProps </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class UserConfigurationProps ">
+      
+      <meta name="description" content="User configuration - personal settings and quotas All fields are nullable - null means &amp;quot;not overridden, take from higher configuration&amp;quot; Priority chain: RedbServiceConfiguration (sys) -&amp;gt; Default User Config -&amp;gt; Role Config -&amp;gt; User Config">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Models_Configuration_UserConfigurationProps.md&amp;value=---%0Auid%3A%20redb.Core.Models.Configuration.UserConfigurationProps%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Models.Configuration.UserConfigurationProps">
+
+
+
+  <h1 id="redb_Core_Models_Configuration_UserConfigurationProps" data-uid="redb.Core.Models.Configuration.UserConfigurationProps" class="text-break">
+Class UserConfigurationProps  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L12"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Models.html">Models</a>.<a class="xref" href="redb.Core.Models.Configuration.html">Configuration</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>User configuration - personal settings and quotas
+All fields are nullable - null means &quot;not overridden, take from higher configuration&quot;
+Priority chain: RedbServiceConfiguration (sys) -&gt; Default User Config -&gt; Role Config -&gt; User Config</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[RedbScheme(&quot;User configuration&quot;)]
+public class UserConfigurationProps</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">UserConfigurationProps</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_AlwaysCheckPermissionsOnLoad_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.AlwaysCheckPermissionsOnLoad*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_AlwaysCheckPermissionsOnLoad" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.AlwaysCheckPermissionsOnLoad">
+  AlwaysCheckPermissionsOnLoad
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L69"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Always check permissions on load
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool? AlwaysCheckPermissionsOnLoad { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_AlwaysCheckPermissionsOnSave_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.AlwaysCheckPermissionsOnSave*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_AlwaysCheckPermissionsOnSave" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.AlwaysCheckPermissionsOnSave">
+  AlwaysCheckPermissionsOnSave
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L75"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Always check permissions on save
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool? AlwaysCheckPermissionsOnSave { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_Description_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.Description*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_Description" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.Description">
+  Description
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L104"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Configuration description</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? Description { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_EavSaveStrategy_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.EavSaveStrategy*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_EavSaveStrategy" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.EavSaveStrategy">
+  EavSaveStrategy
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L97"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>EAV properties save strategy
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EavSaveStrategy? EavSaveStrategy { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Configuration.EavSaveStrategy.html">EavSaveStrategy</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_EnableLazyLoadingForProps_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.EnableLazyLoadingForProps*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_EnableLazyLoadingForProps" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.EnableLazyLoadingForProps">
+  EnableLazyLoadingForProps
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L61"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Enable lazy loading for Props
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool? EnableLazyLoadingForProps { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_ListCacheSize_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.ListCacheSize*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_ListCacheSize" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.ListCacheSize">
+  ListCacheSize
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L27"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>User list cache quota
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int? ListCacheSize { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_ListCacheTtlMinutes_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.ListCacheTtlMinutes*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_ListCacheTtlMinutes" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.ListCacheTtlMinutes">
+  ListCacheTtlMinutes
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L39"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>List cache TTL (in minutes)
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int? ListCacheTtlMinutes { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_MaxBatchSize_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.MaxBatchSize*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_MaxBatchSize" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.MaxBatchSize">
+  MaxBatchSize
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L89"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Maximum batch operation size
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int? MaxBatchSize { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_MaxLoadDepth_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.MaxLoadDepth*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_MaxLoadDepth" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.MaxLoadDepth">
+  MaxLoadDepth
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L47"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Maximum object loading depth
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int? MaxLoadDepth { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_MaxRequestsPerMinute_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.MaxRequestsPerMinute*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_MaxRequestsPerMinute" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.MaxRequestsPerMinute">
+  MaxRequestsPerMinute
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L83"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Maximum number of requests per minute
+null = no limits or use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int? MaxRequestsPerMinute { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_MaxTreeDepth_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.MaxTreeDepth*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_MaxTreeDepth" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.MaxTreeDepth">
+  MaxTreeDepth
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L53"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Maximum tree depth
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int? MaxTreeDepth { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_Priority_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.Priority*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_Priority" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.Priority">
+  Priority
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L111"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Configuration priority (for roles)
+Higher priority means more important configuration during merging
+User configurations are always applied last</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int Priority { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_PropsCacheSize_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.PropsCacheSize*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_PropsCacheSize" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.PropsCacheSize">
+  PropsCacheSize
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L21"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>User object cache quota (number of objects)
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int? PropsCacheSize { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Configuration_UserConfigurationProps_PropsCacheTtlMinutes_" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.PropsCacheTtlMinutes*"></a>
+
+  <h3 id="redb_Core_Models_Configuration_UserConfigurationProps_PropsCacheTtlMinutes" data-uid="redb.Core.Models.Configuration.UserConfigurationProps.PropsCacheTtlMinutes">
+  PropsCacheTtlMinutes
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L33"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object cache TTL (in minutes)
+null = use value from higher configuration</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int? PropsCacheTtlMinutes { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Configuration/UserConfigurationProps.cs/#L12" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

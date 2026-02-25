@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class ProPostgreSqlDialect </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class ProPostgreSqlDialect ">
+      
+      <meta name="description" content="Pro version of PostgreSQL dialect. Inherits all OpenSource SQL from PostgreSqlDialect and adds Pro-specific SQL.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Postgres_Pro_Sql_ProPostgreSqlDialect.md&amp;value=---%0Auid%3A%20redb.Postgres.Pro.Sql.ProPostgreSqlDialect%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect">
+
+
+
+  <h1 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect" class="text-break">
+Class ProPostgreSqlDialect  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L10"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Postgres.html">Postgres</a>.<a class="xref" href="redb.Postgres.Pro.html">Pro</a>.<a class="xref" href="redb.Postgres.Pro.Sql.html">Sql</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Postgres.Pro.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Pro version of PostgreSQL dialect.
+Inherits all OpenSource SQL from PostgreSqlDialect and adds Pro-specific SQL.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class ProPostgreSqlDialect : PostgreSqlDialect, ISqlDialectPro, ISqlDialect</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html">PostgreSqlDialect</a></div>
+      <div><span class="xref">ProPostgreSqlDialect</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Pro.Query.ISqlDialectPro.html">ISqlDialectPro</a></div>
+      <div><a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ProviderName">PostgreSqlDialect.ProviderName</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_FormatPagination_System_Nullable_System_Int32__System_Nullable_System_Int32__">PostgreSqlDialect.FormatPagination(int?, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_WrapSubquery_System_String_System_String_">PostgreSqlDialect.WrapSubquery(string, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_FormatPvtColumn_System_Int64_System_String_System_String_">PostgreSqlDialect.FormatPvtColumn(long, string, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_FormatArrayContains_System_String_System_String_">PostgreSqlDialect.FormatArrayContains(string, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_GetDbTypeName_System_String_">PostgreSqlDialect.GetDbTypeName(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_FormatParameter_System_Int32_">PostgreSqlDialect.FormatParameter(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_QuoteIdentifier_System_String_">PostgreSqlDialect.QuoteIdentifier(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_SelectById">PostgreSqlDialect.Roles_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_SelectByName">PostgreSqlDialect.Roles_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_SelectAll">PostgreSqlDialect.Roles_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_Insert">PostgreSqlDialect.Roles_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_UpdateName">PostgreSqlDialect.Roles_UpdateName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_Delete">PostgreSqlDialect.Roles_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_ExistsByName">PostgreSqlDialect.Roles_ExistsByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_ExistsByNameExcluding">PostgreSqlDialect.Roles_ExistsByNameExcluding()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_Count">PostgreSqlDialect.Roles_Count()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_UpdateConfiguration">PostgreSqlDialect.Roles_UpdateConfiguration()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_SelectConfigurationId">PostgreSqlDialect.Roles_SelectConfigurationId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_UsersRoles_Insert">PostgreSqlDialect.UsersRoles_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_UsersRoles_Delete">PostgreSqlDialect.UsersRoles_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_UsersRoles_DeleteByUser">PostgreSqlDialect.UsersRoles_DeleteByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_UsersRoles_DeleteByRole">PostgreSqlDialect.UsersRoles_DeleteByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_UsersRoles_Exists">PostgreSqlDialect.UsersRoles_Exists()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_UsersRoles_SelectRolesByUser">PostgreSqlDialect.UsersRoles_SelectRolesByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_UsersRoles_SelectUsersByRole">PostgreSqlDialect.UsersRoles_SelectUsersByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_UsersRoles_CountByRole">PostgreSqlDialect.UsersRoles_CountByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_ExistsById">PostgreSqlDialect.Users_ExistsById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_SelectIdByLogin">PostgreSqlDialect.Users_SelectIdByLogin()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_DeleteByRole">PostgreSqlDialect.Permissions_DeleteByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_GetEffectiveForObject">PostgreSqlDialect.Permissions_GetEffectiveForObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_SelectReadableObjectIds">PostgreSqlDialect.Permissions_SelectReadableObjectIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_Insert">PostgreSqlDialect.Permissions_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_Update">PostgreSqlDialect.Permissions_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_Delete">PostgreSqlDialect.Permissions_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_SelectById">PostgreSqlDialect.Permissions_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_SelectByUser">PostgreSqlDialect.Permissions_SelectByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_SelectByRole">PostgreSqlDialect.Permissions_SelectByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_SelectByObject">PostgreSqlDialect.Permissions_SelectByObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_SelectByUserRoleObject">PostgreSqlDialect.Permissions_SelectByUserRoleObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_DeleteByUserRoleObject">PostgreSqlDialect.Permissions_DeleteByUserRoleObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_DeleteByUser">PostgreSqlDialect.Permissions_DeleteByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_Count">PostgreSqlDialect.Permissions_Count()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_CountByUser">PostgreSqlDialect.Permissions_CountByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_CountByRole">PostgreSqlDialect.Permissions_CountByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Permissions_SelectUserRoleIds">PostgreSqlDialect.Permissions_SelectUserRoleIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_SelectById">PostgreSqlDialect.Users_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_SelectByLogin">PostgreSqlDialect.Users_SelectByLogin()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_Insert">PostgreSqlDialect.Users_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_Update">PostgreSqlDialect.Users_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_SoftDelete">PostgreSqlDialect.Users_SoftDelete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_UpdatePassword">PostgreSqlDialect.Users_UpdatePassword()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_UpdateStatus">PostgreSqlDialect.Users_UpdateStatus()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_ExistsByLogin">PostgreSqlDialect.Users_ExistsByLogin()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_ExistsByLoginExcluding">PostgreSqlDialect.Users_ExistsByLoginExcluding()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_ExistsByEmail">PostgreSqlDialect.Users_ExistsByEmail()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_Count">PostgreSqlDialect.Users_Count()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_CountEnabled">PostgreSqlDialect.Users_CountEnabled()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_SelectConfigurationId">PostgreSqlDialect.Users_SelectConfigurationId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Users_UpdateConfiguration">PostgreSqlDialect.Users_UpdateConfiguration()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_SelectIdByName">PostgreSqlDialect.Roles_SelectIdByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Roles_ExistsById">PostgreSqlDialect.Roles_ExistsById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_SelectByName">PostgreSqlDialect.Schemes_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_SelectById">PostgreSqlDialect.Schemes_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_SelectAll">PostgreSqlDialect.Schemes_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_Insert">PostgreSqlDialect.Schemes_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_UpdateHash">PostgreSqlDialect.Schemes_UpdateHash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_UpdateName">PostgreSqlDialect.Schemes_UpdateName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_SelectHashById">PostgreSqlDialect.Schemes_SelectHashById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_ExistsByName">PostgreSqlDialect.Schemes_ExistsByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_SelectObjectByName">PostgreSqlDialect.Schemes_SelectObjectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_InsertObject">PostgreSqlDialect.Schemes_InsertObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_SelectByScheme">PostgreSqlDialect.Structures_SelectByScheme()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_SelectBySchemeShort">PostgreSqlDialect.Structures_SelectBySchemeShort()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_SelectBySchemeCacheable">PostgreSqlDialect.Structures_SelectBySchemeCacheable()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_Insert">PostgreSqlDialect.Structures_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_UpdateType">PostgreSqlDialect.Structures_UpdateType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_UpdateCollectionType">PostgreSqlDialect.Structures_UpdateCollectionType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_UpdateKeyType">PostgreSqlDialect.Structures_UpdateKeyType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_UpdateAlias">PostgreSqlDialect.Structures_UpdateAlias()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_UpdateAllowNotNull">PostgreSqlDialect.Structures_UpdateAllowNotNull()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Structures_DeleteByIds_System_Collections_Generic_IEnumerable_System_Int64__">PostgreSqlDialect.Structures_DeleteByIds(IEnumerable&lt;long&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Types_SelectByName">PostgreSqlDialect.Types_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Types_SelectAll">PostgreSqlDialect.Types_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_SyncMetadataCache">PostgreSqlDialect.Schemes_SyncMetadataCache()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_MigrateStructureType">PostgreSqlDialect.Schemes_MigrateStructureType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Schemes_GetStructureTree">PostgreSqlDialect.Schemes_GetStructureTree()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_GetObjectJson">PostgreSqlDialect.Tree_GetObjectJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_SelectChildrenJson">PostgreSqlDialect.Tree_SelectChildrenJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_SelectPolymorphicChildren">PostgreSqlDialect.Tree_SelectPolymorphicChildren()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_SelectSchemeAndJson">PostgreSqlDialect.Tree_SelectSchemeAndJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_SelectChildrenBySchemeBase">PostgreSqlDialect.Tree_SelectChildrenBySchemeBase()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_SelectChildrenBase">PostgreSqlDialect.Tree_SelectChildrenBase()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_ObjectExists">PostgreSqlDialect.Tree_ObjectExists()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_SelectParentId">PostgreSqlDialect.Tree_SelectParentId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_UpdateParent">PostgreSqlDialect.Tree_UpdateParent()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_DeleteValuesByObjectIds">PostgreSqlDialect.Tree_DeleteValuesByObjectIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Tree_DeleteObjectsByIds">PostgreSqlDialect.Tree_DeleteObjectsByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectObjectById">PostgreSqlDialect.ObjectStorage_SelectObjectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectIdHash">PostgreSqlDialect.ObjectStorage_SelectIdHash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectIdHashScheme">PostgreSqlDialect.ObjectStorage_SelectIdHashScheme()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectObjectsByIds">PostgreSqlDialect.ObjectStorage_SelectObjectsByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_DeleteById">PostgreSqlDialect.ObjectStorage_DeleteById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_DeleteByIds">PostgreSqlDialect.ObjectStorage_DeleteByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_InsertObject">PostgreSqlDialect.ObjectStorage_InsertObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_UpdateObject">PostgreSqlDialect.ObjectStorage_UpdateObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_DeleteValuesByObjectId">PostgreSqlDialect.ObjectStorage_DeleteValuesByObjectId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_GetObjectJson">PostgreSqlDialect.ObjectStorage_GetObjectJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_GetObjectsJsonBulk">PostgreSqlDialect.ObjectStorage_GetObjectsJsonBulk()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectStructuresWithMetadata">PostgreSqlDialect.ObjectStorage_SelectStructuresWithMetadata()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectValuesWithTypes">PostgreSqlDialect.ObjectStorage_SelectValuesWithTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectStructureTypes">PostgreSqlDialect.ObjectStorage_SelectStructureTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectTypeById">PostgreSqlDialect.ObjectStorage_SelectTypeById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_CheckObjectExists">PostgreSqlDialect.ObjectStorage_CheckObjectExists()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectSchemeById">PostgreSqlDialect.ObjectStorage_SelectSchemeById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectValuesForObjects">PostgreSqlDialect.ObjectStorage_SelectValuesForObjects()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectSchemeIdsForObjects">PostgreSqlDialect.ObjectStorage_SelectSchemeIdsForObjects()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectValueById">PostgreSqlDialect.ObjectStorage_SelectValueById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectAllTypes">PostgreSqlDialect.ObjectStorage_SelectAllTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectExistingIds">PostgreSqlDialect.ObjectStorage_SelectExistingIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectSchemesByIds">PostgreSqlDialect.ObjectStorage_SelectSchemesByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_LockObjectsForUpdate">PostgreSqlDialect.ObjectStorage_LockObjectsForUpdate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ObjectStorage_SelectSchemeIdByObjectId">PostgreSqlDialect.ObjectStorage_SelectSchemeIdByObjectId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Lists_SelectById">PostgreSqlDialect.Lists_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Lists_SelectByName">PostgreSqlDialect.Lists_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Lists_SelectAll">PostgreSqlDialect.Lists_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Lists_Insert">PostgreSqlDialect.Lists_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Lists_Update">PostgreSqlDialect.Lists_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Lists_Delete">PostgreSqlDialect.Lists_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Lists_IsUsedInStructures">PostgreSqlDialect.Lists_IsUsedInStructures()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ListItems_SelectById">PostgreSqlDialect.ListItems_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ListItems_SelectByListId">PostgreSqlDialect.ListItems_SelectByListId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ListItems_SelectByListIdAndValue">PostgreSqlDialect.ListItems_SelectByListIdAndValue()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ListItems_Insert">PostgreSqlDialect.ListItems_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ListItems_UpdateAliasAndObject">PostgreSqlDialect.ListItems_UpdateAliasAndObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ListItems_Update">PostgreSqlDialect.ListItems_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ListItems_Delete">PostgreSqlDialect.ListItems_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_ListItems_SelectByObjectId">PostgreSqlDialect.ListItems_SelectByObjectId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Validation_SelectAllTypes">PostgreSqlDialect.Validation_SelectAllTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Validation_SelectSchemeByName">PostgreSqlDialect.Validation_SelectSchemeByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Validation_SelectStructuresBySchemeId">PostgreSqlDialect.Validation_SelectStructuresBySchemeId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_LazyLoader_SelectObjectBase">PostgreSqlDialect.LazyLoader_SelectObjectBase()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_LazyLoader_GetObjectJson">PostgreSqlDialect.LazyLoader_GetObjectJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_LazyLoader_GetObjectJsonBatch">PostgreSqlDialect.LazyLoader_GetObjectJsonBatch()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_LazyLoader_SelectObjectHash">PostgreSqlDialect.LazyLoader_SelectObjectHash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchObjectsFunction">PostgreSqlDialect.Query_SearchObjectsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchObjectsBaseFunction">PostgreSqlDialect.Query_SearchObjectsBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchObjectsProjectionByPathsFunction">PostgreSqlDialect.Query_SearchObjectsProjectionByPathsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchObjectsProjectionByIdsFunction">PostgreSqlDialect.Query_SearchObjectsProjectionByIdsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchTreeObjectsFunction">PostgreSqlDialect.Query_SearchTreeObjectsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchTreeObjectsBaseFunction">PostgreSqlDialect.Query_SearchTreeObjectsBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_CountTemplate">PostgreSqlDialect.Query_CountTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchTemplate">PostgreSqlDialect.Query_SearchTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchWithDistinctTemplate">PostgreSqlDialect.Query_SearchWithDistinctTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchFullTemplate">PostgreSqlDialect.Query_SearchFullTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_JsonCast">PostgreSqlDialect.Query_JsonCast()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_TextArrayCast">PostgreSqlDialect.Query_TextArrayCast()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_BigintArrayCast">PostgreSqlDialect.Query_BigintArrayCast()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_ProjectionByPathsTemplate">PostgreSqlDialect.Query_ProjectionByPathsTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_ProjectionByIdsTemplate_System_String_">PostgreSqlDialect.Query_ProjectionByIdsTemplate(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_CheckPermissionSql">PostgreSqlDialect.Query_CheckPermissionSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_AggregateBatchPreviewSql">PostgreSqlDialect.Query_AggregateBatchPreviewSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_AggregateFieldSql">PostgreSqlDialect.Query_AggregateFieldSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SqlPreviewTemplate">PostgreSqlDialect.Query_SqlPreviewTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_AggregateBatchSql">PostgreSqlDialect.Query_AggregateBatchSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SearchObjectsSimpleSql">PostgreSqlDialect.Query_SearchObjectsSimpleSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_AggregateGroupedSql">PostgreSqlDialect.Query_AggregateGroupedSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_AggregateArrayGroupedSql">PostgreSqlDialect.Query_AggregateArrayGroupedSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_WindowSql">PostgreSqlDialect.Query_WindowSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_TreeCountNormalSql_System_String_">PostgreSqlDialect.Query_TreeCountNormalSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_TreeSearchNormalSql_System_String_">PostgreSqlDialect.Query_TreeSearchNormalSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_TreeSearchWithParentIdsSql_System_String_">PostgreSqlDialect.Query_TreeSearchWithParentIdsSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_HasAncestorTreeSql_System_String_">PostgreSqlDialect.Query_HasAncestorTreeSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_HasAncestorNormalSql_System_String_">PostgreSqlDialect.Query_HasAncestorNormalSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_HasDescendantSql_System_String_">PostgreSqlDialect.Query_HasDescendantSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_GetParentIdsFromDescendantsSql_System_String_System_Int32_">PostgreSqlDialect.Query_GetParentIdsFromDescendantsSql(string, int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_TreeCountWithParentIdsSql_System_String_">PostgreSqlDialect.Query_TreeCountWithParentIdsSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_GetIdsWithAncestorsSql_System_String_">PostgreSqlDialect.Query_GetIdsWithAncestorsSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_LoadObjectsByIdsSql_System_String_System_Int32_">PostgreSqlDialect.Query_LoadObjectsByIdsSql(string, int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_TreeSqlPreviewTemplate_System_String_">PostgreSqlDialect.Query_TreeSqlPreviewTemplate(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SqlPreviewFunction">PostgreSqlDialect.Query_SqlPreviewFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_SqlPreviewBaseFunction">PostgreSqlDialect.Query_SqlPreviewBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_TreeSqlPreviewFunction">PostgreSqlDialect.Query_TreeSqlPreviewFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Query_TreeSqlPreviewBaseFunction">PostgreSqlDialect.Query_TreeSqlPreviewBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_SoftDelete_MarkForDeletion">PostgreSqlDialect.SoftDelete_MarkForDeletion()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_SoftDelete_PurgeTrash">PostgreSqlDialect.SoftDelete_PurgeTrash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_SoftDelete_GetDeletionProgress">PostgreSqlDialect.SoftDelete_GetDeletionProgress()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_SoftDelete_GetUserActiveDeletions">PostgreSqlDialect.SoftDelete_GetUserActiveDeletions()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_SoftDelete_GetOrphanedTasks">PostgreSqlDialect.SoftDelete_GetOrphanedTasks()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_SoftDelete_ClaimOrphanedTask">PostgreSqlDialect.SoftDelete_ClaimOrphanedTask()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Postgres.Sql.PostgreSqlDialect.html#redb_Postgres_Sql_PostgreSqlDialect_Warmup_AllMetadataCaches">PostgreSqlDialect.Warmup_AllMetadataCaches()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectListItemsByIds_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectListItemsByIds*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectListItemsByIds" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectListItemsByIds">
+  Materialization_SelectListItemsByIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L75"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select list items by IDs.
+Params: itemIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectListItemsByIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectObjectById_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectObjectById*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectObjectById" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectObjectById">
+  Materialization_SelectObjectById()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L59"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select object by ID with all base fields.
+Params: objectId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectObjectById()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectObjectsByIds_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectObjectsByIds*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectObjectsByIds" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectObjectsByIds">
+  Materialization_SelectObjectsByIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L79"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select objects by IDs (for nested objects).
+Params: objectIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectObjectsByIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectValuesByObjectAndStructureIds_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectValuesByObjectAndStructureIds*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectValuesByObjectAndStructureIds" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectValuesByObjectAndStructureIds">
+  Materialization_SelectValuesByObjectAndStructureIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L88"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select values by object IDs and structure IDs.
+Params: objectIds array, structureIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectValuesByObjectAndStructureIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectValuesByObjectIds_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectValuesByObjectIds*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Materialization_SelectValuesByObjectIds" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Materialization_SelectValuesByObjectIds">
+  Materialization_SelectValuesByObjectIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L68"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select values by object IDs.
+Params: objectIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectValuesByObjectIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Migration_Insert_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Migration_Insert*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Migration_Insert" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Migration_Insert">
+  Migration_Insert()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L48"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Insert migration record.
+Params: id, migrationId, schemeId, propertyName, expressionHash, sql, propsType, error, affectedRows, durationMs, dryRun, executedAt</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Migration_Insert()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Migration_SelectExisting_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Migration_SelectExisting*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Migration_SelectExisting" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Migration_SelectExisting">
+  Migration_SelectExisting()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L38"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if migration exists.
+Params: schemeId, migrationId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Migration_SelectExisting()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Migration_SelectExpressionHash_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Migration_SelectExpressionHash*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_Migration_SelectExpressionHash" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.Migration_SelectExpressionHash">
+  Migration_SelectExpressionHash()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L43"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get expression hash for migration.
+Params: schemeId, migrationId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Migration_SelectExpressionHash()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_SchemeResolver_SelectChildField_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.SchemeResolver_SelectChildField*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_SchemeResolver_SelectChildField" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.SchemeResolver_SelectChildField">
+  SchemeResolver_SelectChildField()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L21"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select field metadata by scheme, name, and parent structure.
+Params: $1=schemeId, $2=fieldName, $3=parentStructureId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string SchemeResolver_SelectChildField()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_SchemeResolver_SelectRootField_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.SchemeResolver_SelectRootField*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_SchemeResolver_SelectRootField" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.SchemeResolver_SelectRootField">
+  SchemeResolver_SelectRootField()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L16"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select field metadata by scheme, name, and no parent (root field).
+Params: $1=schemeId, $2=fieldName</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string SchemeResolver_SelectRootField()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_SchemeResolver_SelectRootFieldsIn_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.SchemeResolver_SelectRootFieldsIn*"></a>
+
+  <h3 id="redb_Postgres_Pro_Sql_ProPostgreSqlDialect_SchemeResolver_SelectRootFieldsIn_System_Int32_" data-uid="redb.Postgres.Pro.Sql.ProPostgreSqlDialect.SchemeResolver_SelectRootFieldsIn(System.Int32)">
+  SchemeResolver_SelectRootFieldsIn(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L26"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select multiple root fields by names (IN clause).
+Returns SQL with $1=schemeId, and remaining params for field names.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string SchemeResolver_SelectRootFieldsIn(int fieldCount)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fieldCount</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Sql/ProPostgreSqlDialect.cs/#L10" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

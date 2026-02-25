@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class NpgsqlRedbConnection </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class NpgsqlRedbConnection ">
+      
+      <meta name="description" content="PostgreSQL implementation of IRedbConnection using Npgsql. Provides pure ADO.NET database access with automatic transaction management.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Postgres_Data_NpgsqlRedbConnection.md&amp;value=---%0Auid%3A%20redb.Postgres.Data.NpgsqlRedbConnection%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Postgres.Data.NpgsqlRedbConnection">
+
+
+
+  <h1 id="redb_Postgres_Data_NpgsqlRedbConnection" data-uid="redb.Postgres.Data.NpgsqlRedbConnection" class="text-break">
+Class NpgsqlRedbConnection  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L16"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Postgres.html">Postgres</a>.<a class="xref" href="redb.Postgres.Data.html">Data</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Postgres.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>PostgreSQL implementation of IRedbConnection using Npgsql.
+Provides pure ADO.NET database access with automatic transaction management.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class NpgsqlRedbConnection : IRedbConnection, IAsyncDisposable, IDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">NpgsqlRedbConnection</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Data.IRedbConnection.html">IRedbConnection</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection__ctor_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.#ctor*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection__ctor_Npgsql_NpgsqlDataSource_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.#ctor(Npgsql.NpgsqlDataSource)">
+  NpgsqlRedbConnection(NpgsqlDataSource)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L37"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create connection from data source.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NpgsqlRedbConnection(NpgsqlDataSource dataSource)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>dataSource</code> <span class="xref">NpgsqlDataSource</span></dt>
+    <dd><p>Npgsql data source (pooled).</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection__ctor_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.#ctor*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection__ctor_System_String_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.#ctor(System.String)">
+  NpgsqlRedbConnection(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L46"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create connection from connection string.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NpgsqlRedbConnection(string connectionString)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>connectionString</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>PostgreSQL connection string.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_ConnectionString_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ConnectionString*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_ConnectionString" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ConnectionString">
+  ConnectionString
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L26"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Connection string.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string ConnectionString { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_CurrentTransaction_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.CurrentTransaction*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_CurrentTransaction" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.CurrentTransaction">
+  CurrentTransaction
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L31"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Current active transaction.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbTransaction? CurrentTransaction { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Data.IRedbTransaction.html">IRedbTransaction</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_BeginTransactionAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.BeginTransactionAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_BeginTransactionAsync" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.BeginTransactionAsync">
+  BeginTransactionAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L252"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Begin new transaction.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbTransaction&gt; BeginTransactionAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Data.IRedbTransaction.html">IRedbTransaction</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_Dispose_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.Dispose*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_Dispose" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.Dispose">
+  Dispose()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L381"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Synchronous dispose for DI container compatibility.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_DisposeAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.DisposeAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_DisposeAsync" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.DisposeAsync">
+  DisposeAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L358"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Performs application-defined tasks associated with freeing, releasing, or
+resetting unmanaged resources asynchronously.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>A task that represents the asynchronous dispose operation.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteAsync_System_String_System_Object___" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteAsync(System.String,System.Object[])">
+  ExecuteAsync(string, params object[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L211"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute SQL command (INSERT, UPDATE, DELETE).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; ExecuteAsync(string sql, params object[] parameters)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sql</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>parameters</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteAtomicAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteAtomicAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteAtomicAsync_System_Func_System_Threading_Tasks_Task__" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteAtomicAsync(System.Func{System.Threading.Tasks.Task})">
+  ExecuteAtomicAsync(Func&lt;Task&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L268"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute operations atomically (SaveChanges replacement).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task ExecuteAtomicAsync(Func&lt;Task&gt; operations)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>operations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-1">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteAtomicAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteAtomicAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteAtomicAsync__1_System_Func_System_Threading_Tasks_Task___0___" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteAtomicAsync``1(System.Func{System.Threading.Tasks.Task{``0}})">
+  ExecuteAtomicAsync&lt;T&gt;(Func&lt;Task&lt;T&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L294"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute operations atomically and return result.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;T&gt; ExecuteAtomicAsync&lt;T&gt;(Func&lt;Task&lt;T&gt;&gt; operations)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>operations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-1">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;T&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;T&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteJsonAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteJsonAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteJsonAsync_System_String_System_Object___" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteJsonAsync(System.String,System.Object[])">
+  ExecuteJsonAsync(string, params object[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L320"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute SQL returning JSON (for PostgreSQL functions).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;string?&gt; ExecuteJsonAsync(string sql, params object[] parameters)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sql</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>parameters</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteJsonListAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteJsonListAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteJsonListAsync_System_String_System_Object___" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteJsonListAsync(System.String,System.Object[])">
+  ExecuteJsonListAsync(string, params object[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L335"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute SQL returning multiple JSON rows.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;string&gt;&gt; ExecuteJsonListAsync(string sql, params object[] parameters)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sql</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>parameters</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteScalarAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteScalarAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_ExecuteScalarAsync__1_System_String_System_Object___" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.ExecuteScalarAsync``1(System.String,System.Object[])">
+  ExecuteScalarAsync&lt;T&gt;(string, params object[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L186"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute SQL query and return scalar value.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;T?&gt; ExecuteScalarAsync&lt;T&gt;(string sql, params object[] parameters)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sql</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>parameters</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;T&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_GetUnderlyingConnectionAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.GetUnderlyingConnectionAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_GetUnderlyingConnectionAsync" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.GetUnderlyingConnectionAsync">
+  GetUnderlyingConnectionAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L60"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get underlying connection (for bulk operations).
+This ensures all operations use the same connection and transaction.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;DbConnection&gt; GetUnderlyingConnectionAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection">DbConnection</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_QueryAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.QueryAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_QueryAsync__1_System_String_System_Object___" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.QueryAsync``1(System.String,System.Object[])">
+  QueryAsync&lt;T&gt;(string, params object[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L148"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute SQL query and map results to list of objects.
+Uses JsonPropertyName attribute for snake_case to PascalCase mapping.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;T&gt;&gt; QueryAsync&lt;T&gt;(string sql, params object[] parameters) where T : new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sql</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>parameters</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;T&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_QueryFirstOrDefaultAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.QueryFirstOrDefaultAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_QueryFirstOrDefaultAsync__1_System_String_System_Object___" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.QueryFirstOrDefaultAsync``1(System.String,System.Object[])">
+  QueryFirstOrDefaultAsync&lt;T&gt;(string, params object[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L168"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute SQL query and return first result.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;T?&gt; QueryFirstOrDefaultAsync&lt;T&gt;(string sql, params object[] parameters) where T : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sql</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>parameters</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;T&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Data_NpgsqlRedbConnection_QueryScalarListAsync_" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.QueryScalarListAsync*"></a>
+
+  <h3 id="redb_Postgres_Data_NpgsqlRedbConnection_QueryScalarListAsync__1_System_String_System_Object___" data-uid="redb.Postgres.Data.NpgsqlRedbConnection.QueryScalarListAsync``1(System.String,System.Object[])">
+  QueryScalarListAsync&lt;T&gt;(string, params object[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L222"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute SQL query and return list of scalar values (first column only).
+Use for simple queries like SELECT _id FROM ... that return single column.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;T&gt;&gt; QueryScalarListAsync&lt;T&gt;(string sql, params object[] parameters)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sql</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>parameters</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;T&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Data/NpgsqlRedbConnection.cs/#L16" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

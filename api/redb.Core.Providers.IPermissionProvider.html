@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IPermissionProvider </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IPermissionProvider ">
+      
+      <meta name="description" content="Provider for access permission management.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Providers_IPermissionProvider.md&amp;value=---%0Auid%3A%20redb.Core.Providers.IPermissionProvider%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Providers.IPermissionProvider">
+
+
+
+  <h1 id="redb_Core_Providers_IPermissionProvider" data-uid="redb.Core.Providers.IPermissionProvider" class="text-break">
+Interface IPermissionProvider  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L14"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Providers.html">Providers</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Provider for access permission management.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IPermissionProvider</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_System_Int64_System_Int64_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject(System.Int64,System.Int64)">
+  CanUserDeleteObject(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L274"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserDeleteObject(long objectId, long userId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject(redb.Core.Models.Contracts.IRedbObject)">
+  CanUserDeleteObject(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L41"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if current user can delete object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserDeleteObject(IRedbObject obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  CanUserDeleteObject(IRedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L68"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if user can delete object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserDeleteObject(IRedbObject obj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_redb_Core_Models_Entities_RedbObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject(redb.Core.Models.Entities.RedbObject)">
+  CanUserDeleteObject(RedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L85"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if current user can delete object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserDeleteObject(RedbObject obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.RedbObject.html">RedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_redb_Core_Models_Entities_RedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserDeleteObject(redb.Core.Models.Entities.RedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  CanUserDeleteObject(RedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L105"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if user can delete object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserDeleteObject(RedbObject obj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.RedbObject.html">RedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_System_Int64_System_Int64_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject(System.Int64,System.Int64)">
+  CanUserEditObject(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L268"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserEditObject(long objectId, long userId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject(redb.Core.Models.Contracts.IRedbObject)">
+  CanUserEditObject(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L26"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if current user can edit object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserEditObject(IRedbObject obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  CanUserEditObject(IRedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L53"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if user can edit object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserEditObject(IRedbObject obj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_redb_Core_Models_Entities_RedbObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject(redb.Core.Models.Entities.RedbObject)">
+  CanUserEditObject(RedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L75"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if current user can edit object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserEditObject(RedbObject obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.RedbObject.html">RedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserEditObject_redb_Core_Models_Entities_RedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserEditObject(redb.Core.Models.Entities.RedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  CanUserEditObject(RedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L90"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if user can edit object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserEditObject(RedbObject obj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.RedbObject.html">RedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserInsertScheme*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_System_Int64_System_Int64_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserInsertScheme(System.Int64,System.Int64)">
+  CanUserInsertScheme(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L272"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserInsertScheme(long schemeId, long userId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserInsertScheme*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_redb_Core_Models_Contracts_IRedbScheme_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserInsertScheme(redb.Core.Models.Contracts.IRedbScheme)">
+  CanUserInsertScheme(IRedbScheme)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if current user can create objects in scheme.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserInsertScheme(IRedbScheme scheme)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>scheme</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserInsertScheme*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_redb_Core_Models_Contracts_IRedbScheme_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserInsertScheme(redb.Core.Models.Contracts.IRedbScheme,redb.Core.Models.Contracts.IRedbUser)">
+  CanUserInsertScheme(IRedbScheme, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L63"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if user can create objects in scheme.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserInsertScheme(IRedbScheme scheme, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>scheme</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserInsertScheme*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_redb_Core_Models_Entities_RedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserInsertScheme(redb.Core.Models.Entities.RedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  CanUserInsertScheme(RedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L100"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if user can create objects in object's scheme.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserInsertScheme(RedbObject obj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.RedbObject.html">RedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_System_Int64_System_Int64_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject(System.Int64,System.Int64)">
+  CanUserSelectObject(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L270"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserSelectObject(long objectId, long userId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject(redb.Core.Models.Contracts.IRedbObject)">
+  CanUserSelectObject(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L31"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if current user can read object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserSelectObject(IRedbObject obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  CanUserSelectObject(IRedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L58"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if user can read object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserSelectObject(IRedbObject obj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_redb_Core_Models_Entities_RedbObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject(redb.Core.Models.Entities.RedbObject)">
+  CanUserSelectObject(RedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L80"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if current user can read object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserSelectObject(RedbObject obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.RedbObject.html">RedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CanUserSelectObject_redb_Core_Models_Entities_RedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.CanUserSelectObject(redb.Core.Models.Entities.RedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  CanUserSelectObject(RedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L95"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if user can read object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; CanUserSelectObject(RedbObject obj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.RedbObject.html">RedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_CreatePermissionAsync_" data-uid="redb.Core.Providers.IPermissionProvider.CreatePermissionAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_CreatePermissionAsync_redb_Core_Models_Permissions_PermissionRequest_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.CreatePermissionAsync(redb.Core.Models.Permissions.PermissionRequest,redb.Core.Models.Contracts.IRedbUser)">
+  CreatePermissionAsync(PermissionRequest, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L115"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create new permission.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbPermission&gt; CreatePermissionAsync(PermissionRequest request, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>request</code> <a class="xref" href="redb.Core.Models.Permissions.PermissionRequest.html">PermissionRequest</a></dt>
+    <dd><p>Permission data</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbPermission.html">IRedbPermission</a>&gt;</dt>
+    <dd><p>Created permission</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_DeletePermissionAsync_" data-uid="redb.Core.Providers.IPermissionProvider.DeletePermissionAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_DeletePermissionAsync_redb_Core_Models_Contracts_IRedbPermission_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.DeletePermissionAsync(redb.Core.Models.Contracts.IRedbPermission,redb.Core.Models.Contracts.IRedbUser)">
+  DeletePermissionAsync(IRedbPermission, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L132"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete permission.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; DeletePermissionAsync(IRedbPermission permission, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>permission</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbPermission.html">IRedbPermission</a></dt>
+    <dd><p>Permission to delete</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if permission deleted</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetAllEffectivePermissionsAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetAllEffectivePermissionsAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetAllEffectivePermissionsAsync_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.GetAllEffectivePermissionsAsync(redb.Core.Models.Contracts.IRedbUser)">
+  GetAllEffectivePermissionsAsync(IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L243"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all effective user permissions.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;EffectivePermissionResult&gt;&gt; GetAllEffectivePermissionsAsync(IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Permissions.EffectivePermissionResult.html">EffectivePermissionResult</a>&gt;&gt;</dt>
+    <dd><p>List of all effective user permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetEffectivePermissionsAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetEffectivePermissionsAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetEffectivePermissionsAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.IPermissionProvider.GetEffectivePermissionsAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbObject)">
+  GetEffectivePermissionsAsync(IRedbUser, IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L228"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get effective user permissions for object (including inheritance and roles).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;EffectivePermissionResult&gt; GetEffectivePermissionsAsync(IRedbUser user, IRedbObject obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd><p>Object</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Permissions.EffectivePermissionResult.html">EffectivePermissionResult</a>&gt;</dt>
+    <dd><p>Effective user permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetEffectivePermissionsBatchAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetEffectivePermissionsBatchAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetEffectivePermissionsBatchAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbObject___" data-uid="redb.Core.Providers.IPermissionProvider.GetEffectivePermissionsBatchAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbObject[])">
+  GetEffectivePermissionsBatchAsync(IRedbUser, IRedbObject[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L236"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get effective user permissions for multiple objects (batch).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;Dictionary&lt;IRedbObject, EffectivePermissionResult&gt;&gt; GetEffectivePermissionsBatchAsync(IRedbUser user, IRedbObject[] objects)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>objects</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>[]</dt>
+    <dd><p>Array of objects</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2">Dictionary</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, <a class="xref" href="redb.Core.Models.Permissions.EffectivePermissionResult.html">EffectivePermissionResult</a>&gt;&gt;</dt>
+    <dd><p>Dictionary object -&gt; effective permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetPermissionByIdAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionByIdAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetPermissionByIdAsync_System_Int64_" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionByIdAsync(System.Int64)">
+  GetPermissionByIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L162"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get permission by ID.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbPermission?&gt; GetPermissionByIdAsync(long permissionId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>permissionId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Permission ID</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbPermission.html">IRedbPermission</a>&gt;</dt>
+    <dd><p>Permission or null if not found</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetPermissionCountAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionCountAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetPermissionCountAsync" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionCountAsync">
+  GetPermissionCountAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L251"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get total permission count.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; GetPermissionCountAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Total number of permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetPermissionsByObjectAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionsByObjectAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetPermissionsByObjectAsync_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionsByObjectAsync(redb.Core.Models.Contracts.IRedbObject)">
+  GetPermissionsByObjectAsync(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L155"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get permissions for object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;IRedbPermission&gt;&gt; GetPermissionsByObjectAsync(IRedbObject obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd><p>Object</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbPermission.html">IRedbPermission</a>&gt;&gt;</dt>
+    <dd><p>List of permissions for object</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetPermissionsByRoleAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionsByRoleAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetPermissionsByRoleAsync_redb_Core_Models_Contracts_IRedbRole_" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionsByRoleAsync(redb.Core.Models.Contracts.IRedbRole)">
+  GetPermissionsByRoleAsync(IRedbRole)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L148"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get role permissions.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;IRedbPermission&gt;&gt; GetPermissionsByRoleAsync(IRedbRole role)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbPermission.html">IRedbPermission</a>&gt;&gt;</dt>
+    <dd><p>List of role permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetPermissionsByUserAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionsByUserAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetPermissionsByUserAsync_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.GetPermissionsByUserAsync(redb.Core.Models.Contracts.IRedbUser)">
+  GetPermissionsByUserAsync(IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L141"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get user permissions.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;IRedbPermission&gt;&gt; GetPermissionsByUserAsync(IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbPermission.html">IRedbPermission</a>&gt;&gt;</dt>
+    <dd><p>List of user permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetReadableObjectIds_" data-uid="redb.Core.Providers.IPermissionProvider.GetReadableObjectIds*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetReadableObjectIds" data-uid="redb.Core.Providers.IPermissionProvider.GetReadableObjectIds">
+  GetReadableObjectIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L21"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get IDs of objects readable by current user.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IQueryable&lt;long&gt; GetReadableObjectIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1">IQueryable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetReadableObjectIds_" data-uid="redb.Core.Providers.IPermissionProvider.GetReadableObjectIds*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetReadableObjectIds_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.GetReadableObjectIds(redb.Core.Models.Contracts.IRedbUser)">
+  GetReadableObjectIds(IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L48"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get IDs of objects readable by user.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IQueryable&lt;long&gt; GetReadableObjectIds(IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1">IQueryable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetRolePermissionCountAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetRolePermissionCountAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetRolePermissionCountAsync_redb_Core_Models_Contracts_IRedbRole_" data-uid="redb.Core.Providers.IPermissionProvider.GetRolePermissionCountAsync(redb.Core.Models.Contracts.IRedbRole)">
+  GetRolePermissionCountAsync(IRedbRole)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L265"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get role permission count.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; GetRolePermissionCountAsync(IRedbRole role)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Number of role permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GetUserPermissionCountAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GetUserPermissionCountAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GetUserPermissionCountAsync_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.GetUserPermissionCountAsync(redb.Core.Models.Contracts.IRedbUser)">
+  GetUserPermissionCountAsync(IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L258"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get user permission count.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; GetUserPermissionCountAsync(IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Number of user permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GrantPermissionAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GrantPermissionAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GrantPermissionAsync_redb_Core_Models_Contracts_IRedbRole_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Enums_PermissionAction_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.GrantPermissionAsync(redb.Core.Models.Contracts.IRedbRole,redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Enums.PermissionAction,redb.Core.Models.Contracts.IRedbUser)">
+  GrantPermissionAsync(IRedbRole, IRedbObject, PermissionAction, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L184"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Grant permission to role.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; GrantPermissionAsync(IRedbRole role, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd><p>Object</p>
+</dd>
+    <dt><code>actions</code> <a class="xref" href="redb.Core.Models.Enums.PermissionAction.html">PermissionAction</a></dt>
+    <dd><p>Permission actions</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if permission granted</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_GrantPermissionAsync_" data-uid="redb.Core.Providers.IPermissionProvider.GrantPermissionAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_GrantPermissionAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Enums_PermissionAction_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.GrantPermissionAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Enums.PermissionAction,redb.Core.Models.Contracts.IRedbUser)">
+  GrantPermissionAsync(IRedbUser, IRedbObject, PermissionAction, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L174"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Grant permission to user.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; GrantPermissionAsync(IRedbUser user, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd><p>Object</p>
+</dd>
+    <dt><code>actions</code> <a class="xref" href="redb.Core.Models.Enums.PermissionAction.html">PermissionAction</a></dt>
+    <dd><p>Permission actions</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if permission granted</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_RevokeAllRolePermissionsAsync_" data-uid="redb.Core.Providers.IPermissionProvider.RevokeAllRolePermissionsAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_RevokeAllRolePermissionsAsync_redb_Core_Models_Contracts_IRedbRole_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.RevokeAllRolePermissionsAsync(redb.Core.Models.Contracts.IRedbRole,redb.Core.Models.Contracts.IRedbUser)">
+  RevokeAllRolePermissionsAsync(IRedbRole, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L218"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Revoke all role permissions.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; RevokeAllRolePermissionsAsync(IRedbRole role, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Number of revoked permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_RevokeAllUserPermissionsAsync_" data-uid="redb.Core.Providers.IPermissionProvider.RevokeAllUserPermissionsAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_RevokeAllUserPermissionsAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.RevokeAllUserPermissionsAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbUser)">
+  RevokeAllUserPermissionsAsync(IRedbUser, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L210"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Revoke all user permissions.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; RevokeAllUserPermissionsAsync(IRedbUser user, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Number of revoked permissions</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_RevokePermissionAsync_" data-uid="redb.Core.Providers.IPermissionProvider.RevokePermissionAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_RevokePermissionAsync_redb_Core_Models_Contracts_IRedbRole_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.RevokePermissionAsync(redb.Core.Models.Contracts.IRedbRole,redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  RevokePermissionAsync(IRedbRole, IRedbObject, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L202"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Revoke permission from role.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; RevokePermissionAsync(IRedbRole role, IRedbObject obj, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd><p>Object</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if permission revoked</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_RevokePermissionAsync_" data-uid="redb.Core.Providers.IPermissionProvider.RevokePermissionAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_RevokePermissionAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.RevokePermissionAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  RevokePermissionAsync(IRedbUser, IRedbObject, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L193"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Revoke permission from user.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; RevokePermissionAsync(IRedbUser user, IRedbObject obj, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd><p>Object</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if permission revoked</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IPermissionProvider_UpdatePermissionAsync_" data-uid="redb.Core.Providers.IPermissionProvider.UpdatePermissionAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IPermissionProvider_UpdatePermissionAsync_redb_Core_Models_Contracts_IRedbPermission_redb_Core_Models_Permissions_PermissionRequest_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IPermissionProvider.UpdatePermissionAsync(redb.Core.Models.Contracts.IRedbPermission,redb.Core.Models.Permissions.PermissionRequest,redb.Core.Models.Contracts.IRedbUser)">
+  UpdatePermissionAsync(IRedbPermission, PermissionRequest, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L124"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Update permission.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbPermission&gt; UpdatePermissionAsync(IRedbPermission permission, PermissionRequest request, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>permission</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbPermission.html">IRedbPermission</a></dt>
+    <dd><p>Permission to update</p>
+</dd>
+    <dt><code>request</code> <a class="xref" href="redb.Core.Models.Permissions.PermissionRequest.html">PermissionRequest</a></dt>
+    <dd><p>New permission data</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbPermission.html">IRedbPermission</a>&gt;</dt>
+    <dd><p>Updated permission</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IPermissionProvider.cs/#L14" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

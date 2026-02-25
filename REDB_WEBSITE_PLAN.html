@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>REDB.Doc.Web - Website Implementation Plan </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="REDB.Doc.Web - Website Implementation Plan ">
+      
+      
+      <link rel="icon" href="favicon.ico">
+      <link rel="stylesheet" href="public/docfx.min.css">
+      <link rel="stylesheet" href="public/main.css">
+      <meta name="docfx:navrel" content="toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/blob/feature/redb-doc/docs/docfx/REDB_WEBSITE_PLAN.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="index.html">
+            <img id="logo" class="svg" src="logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="redbdocweb---website-implementation-plan">REDB.Doc.Web - Website Implementation Plan</h1>
+
+<h2 id="overview">Overview</h2>
+<p>Full-featured website for REDB framework: marketing, documentation, user accounts, and licensing.</p>
+<p><strong>Technology Stack:</strong></p>
+<ul>
+<li>Backend: ASP.NET Core 9.0 (Blazor Server)</li>
+<li>UI: Fluent UI Components</li>
+<li>Database: REDB (PostgreSQL)</li>
+<li>Payment: Stripe</li>
+<li>Email: SendGrid</li>
+</ul>
+<hr>
+<h2 id="architecture">Architecture</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                           REDB.Doc.Web                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────────────────┐ │
+│  │   Public Pages   │  │   Documentation  │  │      User Dashboard        │ │
+│  │   (Marketing)    │  │   (API + Guides) │  │   (Subscriptions/Licenses) │ │
+│  └──────────────────┘  └──────────────────┘  └────────────────────────────┘ │
+│           │                    │                         │                   │
+│           └────────────┬───────┴─────────────────────────┘                   │
+│                        ▼                                                     │
+│              ┌──────────────────┐                                            │
+│              │   REDB Database   │                                           │
+│              │    (PostgreSQL)   │                                           │
+│              └──────────────────┘                                            │
+│                        │                                                     │
+│     ┌──────────────────┼──────────────────┐                                  │
+│     ▼                  ▼                  ▼                                  │
+│  ┌──────────┐   ┌──────────────┐   ┌─────────────┐                          │
+│  │ Products │   │ DocMembers   │   │   Users     │                          │
+│  │ Pricing  │   │ Examples     │   │ Subscriptions│                         │
+│  │ Content  │   │ HowTo Guides │   │ Licenses    │                          │
+│  └──────────┘   └──────────────┘   └─────────────┘                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2 id="site-structure">Site Structure</h2>
+<h3 id="public-pages-marketing">Public Pages (Marketing)</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Page</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/</code></td>
+<td>Home</td>
+<td>Hero, products grid, features, CTA</td>
+</tr>
+<tr>
+<td><code>/products</code></td>
+<td>Products</td>
+<td>Detailed product comparison</td>
+</tr>
+<tr>
+<td><code>/pricing</code></td>
+<td>Pricing</td>
+<td>Pricing table with plans</td>
+</tr>
+<tr>
+<td><code>/quick-start</code></td>
+<td>Quick Start</td>
+<td>Installation and first steps</td>
+</tr>
+<tr>
+<td><code>/benefits</code></td>
+<td>Benefits</td>
+<td>Why REDB, use cases, comparisons</td>
+</tr>
+<tr>
+<td><code>/examples</code></td>
+<td>Examples</td>
+<td>Extended examples catalog</td>
+</tr>
+<tr>
+<td><code>/contact</code></td>
+<td>Contact</td>
+<td>Contact form</td>
+</tr>
+<tr>
+<td><code>/about</code></td>
+<td>About</td>
+<td>About the project</td>
+</tr>
+</tbody>
+</table>
+<h3 id="documentation-pages">Documentation Pages</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Page</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/docs</code></td>
+<td>Documentation Home</td>
+<td>Overview, navigation</td>
+</tr>
+<tr>
+<td><code>/docs/api</code></td>
+<td>API Reference</td>
+<td>Namespaces tree</td>
+</tr>
+<tr>
+<td><code>/docs/api/{uid}</code></td>
+<td>API Member</td>
+<td>Type/method documentation</td>
+</tr>
+<tr>
+<td><code>/docs/how-to</code></td>
+<td>How-To Guides</td>
+<td>Step-by-step guides</td>
+</tr>
+<tr>
+<td><code>/docs/how-to/{slug}</code></td>
+<td>Guide Detail</td>
+<td>Single guide</td>
+</tr>
+<tr>
+<td><code>/docs/search</code></td>
+<td>Search</td>
+<td>Full-text search</td>
+</tr>
+</tbody>
+</table>
+<h3 id="authentication">Authentication</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Page</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/login</code></td>
+<td>Login</td>
+<td>User login</td>
+</tr>
+<tr>
+<td><code>/register</code></td>
+<td>Register</td>
+<td>User registration</td>
+</tr>
+<tr>
+<td><code>/forgot-password</code></td>
+<td>Forgot Password</td>
+<td>Password recovery</td>
+</tr>
+<tr>
+<td><code>/confirm-email</code></td>
+<td>Confirm Email</td>
+<td>Email confirmation</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dashboard-authenticated">Dashboard (Authenticated)</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Page</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/dashboard</code></td>
+<td>Dashboard Home</td>
+<td>Overview, quick stats</td>
+</tr>
+<tr>
+<td><code>/dashboard/subscription</code></td>
+<td>Subscription</td>
+<td>Current plan, upgrade</td>
+</tr>
+<tr>
+<td><code>/dashboard/licenses</code></td>
+<td>Licenses</td>
+<td>License keys, downloads</td>
+</tr>
+<tr>
+<td><code>/dashboard/billing</code></td>
+<td>Billing</td>
+<td>Payment history</td>
+</tr>
+<tr>
+<td><code>/dashboard/profile</code></td>
+<td>Profile</td>
+<td>User profile edit</td>
+</tr>
+</tbody>
+</table>
+<h3 id="admin-admin-role">Admin (Admin Role)</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Page</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/admin</code></td>
+<td>Admin Home</td>
+<td>Dashboard</td>
+</tr>
+<tr>
+<td><code>/admin/products</code></td>
+<td>Products</td>
+<td>Manage products</td>
+</tr>
+<tr>
+<td><code>/admin/pricing</code></td>
+<td>Pricing</td>
+<td>Manage plans</td>
+</tr>
+<tr>
+<td><code>/admin/content</code></td>
+<td>Content</td>
+<td>Page content editor</td>
+</tr>
+<tr>
+<td><code>/admin/examples</code></td>
+<td>Examples</td>
+<td>Manage examples</td>
+</tr>
+<tr>
+<td><code>/admin/users</code></td>
+<td>Users</td>
+<td>User management</td>
+</tr>
+<tr>
+<td><code>/admin/import</code></td>
+<td>Import</td>
+<td>DocFX import trigger</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="data-models">Data Models</h2>
+<h3 id="models-location-redbdocmodels">Models Location: <code>redb.Doc.Models/</code></h3>
+<p><strong>Status:</strong> ✅ All models created</p>
+<table>
+<thead>
+<tr>
+<th>Folder</th>
+<th>Models</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Content/</code></td>
+<td>ProductProps, PricingPlanProps, ExampleProps, HowToGuideProps, PageContentProps, FaqItemProps</td>
+<td>✅ Created</td>
+</tr>
+<tr>
+<td><code>User/</code></td>
+<td>UserAccountProps, SubscriptionProps, LicenseKeyProps, PaymentHistoryProps</td>
+<td>✅ Created</td>
+</tr>
+<tr>
+<td>(root)</td>
+<td>DocMemberProps, DocExample, DocParameter, DocTypeParameter, DocException</td>
+<td>✅ Exists</td>
+</tr>
+</tbody>
+</table>
+<h3 id="1-content-models">1. Content Models</h3>
+<h4 id="productpropscs-created">ProductProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;Product&quot;)]
+public class ProductProps
+{
+    public string Name { get; set; } = &quot;&quot;;
+    public string Tagline { get; set; } = &quot;&quot;;
+    public string? Description { get; set; }
+    public string? IconUrl { get; set; }
+    public string? ScreenshotUrl { get; set; }
+    public string[]? Features { get; set; }
+    public string Type { get; set; } = &quot;free&quot;; // &quot;free&quot; | &quot;pro&quot;
+    public int DisplayOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+    public string? NuGetPackage { get; set; }
+    public string? GitHubUrl { get; set; }
+}
+</code></pre>
+<h4 id="pricingplanpropscs-created">PricingPlanProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;PricingPlan&quot;)]
+public class PricingPlanProps
+{
+    public string Name { get; set; } = &quot;&quot;;
+    public string? Description { get; set; }
+    public decimal PriceMonthly { get; set; }
+    public decimal? PriceYearly { get; set; }
+    public string[] Features { get; set; } = [];
+    public string[] ProductIds { get; set; } = [];
+    public int DisplayOrder { get; set; }
+    public bool IsFeatured { get; set; }
+    public bool IsActive { get; set; } = true;
+    public string? StripePriceIdMonthly { get; set; }
+    public string? StripePriceIdYearly { get; set; }
+}
+</code></pre>
+<h4 id="examplepropscs-created">ExampleProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;Example&quot;)]
+public class ExampleProps
+{
+    public string Title { get; set; } = &quot;&quot;;
+    public string Summary { get; set; } = &quot;&quot;;
+    public string? Description { get; set; }
+    public string Category { get; set; } = &quot;&quot;;
+    public string[]? Tags { get; set; }
+    public int Difficulty { get; set; } = 1;
+    public CodeBlock[]? CodeBlocks { get; set; }
+    public string? GitHubUrl { get; set; }
+    public string[]? RelatedApiUids { get; set; }
+    public int DisplayOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public class CodeBlock
+{
+    public string? Language { get; set; }
+    public string Code { get; set; } = &quot;&quot;;
+    public string? Caption { get; set; }
+}
+</code></pre>
+<h4 id="howtoguidepropscs-created">HowToGuideProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;HowToGuide&quot;)]
+public class HowToGuideProps
+{
+    public string Title { get; set; } = &quot;&quot;;
+    public string Slug { get; set; } = &quot;&quot;;
+    public string Summary { get; set; } = &quot;&quot;;
+    public string Content { get; set; } = &quot;&quot;;
+    public string Category { get; set; } = &quot;&quot;;
+    public string[]? Tags { get; set; }
+    public GuideStep[]? Steps { get; set; }
+    public string[]? RelatedApiUids { get; set; }
+    public int DisplayOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public class GuideStep
+{
+    public string Title { get; set; } = &quot;&quot;;
+    public string Content { get; set; } = &quot;&quot;;
+    public string? CodeSample { get; set; }
+    public string? CodeLanguage { get; set; }
+}
+</code></pre>
+<h4 id="pagecontentpropscs-created">PageContentProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;PageContent&quot;)]
+public class PageContentProps
+{
+    public string Slug { get; set; } = &quot;&quot;;
+    public string Title { get; set; } = &quot;&quot;;
+    public string? MetaDescription { get; set; }
+    public PageSection[]? Sections { get; set; }
+    public bool IsPublished { get; set; } = true;
+}
+
+public class PageSection
+{
+    public string Type { get; set; } = &quot;&quot;; // &quot;hero&quot;, &quot;features&quot;, &quot;text&quot;, &quot;cta&quot;
+    public string? Heading { get; set; }
+    public string? Content { get; set; }
+    public string? ImageUrl { get; set; }
+    public string? CtaText { get; set; }
+    public string? CtaUrl { get; set; }
+    public int DisplayOrder { get; set; }
+}
+</code></pre>
+<h4 id="faqitempropscs-created">FaqItemProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;FaqItem&quot;)]
+public class FaqItemProps
+{
+    public string Question { get; set; } = &quot;&quot;;
+    public string Answer { get; set; } = &quot;&quot;;
+    public string Category { get; set; } = &quot;&quot;;
+    public string[]? Tags { get; set; }
+    public int DisplayOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsExpandedByDefault { get; set; }
+}
+</code></pre>
+<h3 id="2-user-models">2. User Models</h3>
+<h4 id="useraccountpropscs-created">UserAccountProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;UserAccount&quot;)]
+public class UserAccountProps
+{
+    public string Email { get; set; } = &quot;&quot;;
+    public string FullName { get; set; } = &quot;&quot;;
+    public string? Company { get; set; }
+    public string PasswordHash { get; set; } = &quot;&quot;;
+    public bool EmailConfirmed { get; set; }
+    public DateTime RegisteredAt { get; set; }
+    public long? ActiveSubscriptionId { get; set; }
+    public string Role { get; set; } = &quot;user&quot;;
+    public string? StripeCustomerId { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+</code></pre>
+<h4 id="subscriptionpropscs-created">SubscriptionProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;Subscription&quot;)]
+public class SubscriptionProps
+{
+    public long UserId { get; set; }
+    public long PlanId { get; set; }
+    public string Status { get; set; } = &quot;active&quot;;
+    public string BillingPeriod { get; set; } = &quot;monthly&quot;;
+    public DateTime StartDate { get; set; }
+    public DateTime? CurrentPeriodEnd { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public string? StripeSubscriptionId { get; set; }
+    public decimal TotalPaid { get; set; }
+}
+</code></pre>
+<h4 id="licensekeypropscs-created">LicenseKeyProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;LicenseKey&quot;)]
+public class LicenseKeyProps
+{
+    public long UserId { get; set; }
+    public long SubscriptionId { get; set; }
+    public string LicenseKey { get; set; } = &quot;&quot;;
+    public string[] Features { get; set; } = [];
+    public string LicenseType { get; set; } = &quot;commercial&quot;;
+    public string Licensee { get; set; } = &quot;&quot;;
+    public DateTime IssuedAt { get; set; }
+    public DateTime? ExpiresAt { get; set; }
+    public bool IsRevoked { get; set; }
+    public int ActivationCount { get; set; }
+    public int MaxActivations { get; set; } = 1;
+    public string LicenseId { get; set; } = &quot;&quot;;
+}
+</code></pre>
+<h4 id="paymenthistorypropscs-created">PaymentHistoryProps.cs (CREATED)</h4>
+<pre><code class="lang-csharp">[RedbScheme(&quot;PaymentHistory&quot;)]
+public class PaymentHistoryProps
+{
+    public long UserId { get; set; }
+    public long SubscriptionId { get; set; }
+    public decimal Amount { get; set; }
+    public string Currency { get; set; } = &quot;usd&quot;;
+    public string Status { get; set; } = &quot;succeeded&quot;;
+    public DateTime PaymentDate { get; set; }
+    public string? StripePaymentIntentId { get; set; }
+    public string? InvoiceUrl { get; set; }
+}
+</code></pre>
+<h3 id="3-existing-model-from-redbdocimport">3. Existing Model (from redb.Doc.Import)</h3>
+<h4 id="docmemberpropscs-exists">DocMemberProps.cs (EXISTS)</h4>
+<p>Already implemented in <code>redb.Doc.Models/DocMemberProps.cs</code>. Used for API documentation imported from DocFX.</p>
+<hr>
+<h2 id="project-structure">Project Structure</h2>
+<pre><code>redb.Doc.Web/
+├── Program.cs
+├── appsettings.json
+│
+├── Components/
+│   ├── App.razor
+│   ├── Routes.razor
+│   ├── _Imports.razor
+│   │
+│   ├── Layout/
+│   │   ├── MainLayout.razor
+│   │   ├── PublicLayout.razor
+│   │   ├── DashboardLayout.razor
+│   │   ├── AdminLayout.razor
+│   │   ├── TopBar.razor
+│   │   ├── NavMenu.razor
+│   │   └── Footer.razor
+│   │
+│   ├── Pages/
+│   │   ├── Public/
+│   │   │   ├── Index.razor
+│   │   │   ├── Products.razor
+│   │   │   ├── Pricing.razor
+│   │   │   ├── QuickStart.razor
+│   │   │   ├── Benefits.razor
+│   │   │   ├── Examples.razor
+│   │   │   └── Contact.razor
+│   │   │
+│   │   ├── Docs/
+│   │   │   ├── Index.razor
+│   │   │   ├── ApiReference.razor
+│   │   │   ├── ApiMember.razor
+│   │   │   ├── HowTo.razor
+│   │   │   ├── HowToDetail.razor
+│   │   │   └── Search.razor
+│   │   │
+│   │   ├── Auth/
+│   │   │   ├── Login.razor
+│   │   │   ├── Register.razor
+│   │   │   └── ForgotPassword.razor
+│   │   │
+│   │   ├── Dashboard/
+│   │   │   ├── Index.razor
+│   │   │   ├── Subscription.razor
+│   │   │   ├── Licenses.razor
+│   │   │   ├── Billing.razor
+│   │   │   └── Profile.razor
+│   │   │
+│   │   └── Admin/
+│   │       ├── Index.razor
+│   │       ├── Products.razor
+│   │       ├── Pricing.razor
+│   │       ├── Content.razor
+│   │       ├── Examples.razor
+│   │       ├── Users.razor
+│   │       └── Import.razor
+│   │
+│   └── Shared/
+│       ├── ProductCard.razor
+│       ├── PricingCard.razor
+│       ├── ExampleCard.razor
+│       ├── CodeBlock.razor
+│       ├── ApiMemberCard.razor
+│       ├── SearchBox.razor
+│       ├── Breadcrumb.razor
+│       └── LoadingSpinner.razor
+│
+├── Services/
+│   ├── Content/
+│   │   ├── IProductService.cs
+│   │   ├── ProductService.cs
+│   │   ├── IPricingService.cs
+│   │   ├── PricingService.cs
+│   │   ├── IContentService.cs
+│   │   └── ContentService.cs
+│   │
+│   ├── Documentation/
+│   │   ├── IDocService.cs
+│   │   ├── DocService.cs
+│   │   ├── IExampleService.cs
+│   │   ├── ExampleService.cs
+│   │   ├── IGuideService.cs
+│   │   ├── GuideService.cs
+│   │   ├── ISearchService.cs
+│   │   └── SearchService.cs
+│   │
+│   ├── User/
+│   │   ├── IAuthService.cs
+│   │   ├── AuthService.cs
+│   │   ├── IUserService.cs
+│   │   ├── UserService.cs
+│   │   ├── ISubscriptionService.cs
+│   │   └── SubscriptionService.cs
+│   │
+│   └── Payment/
+│       ├── IPaymentService.cs
+│       ├── StripePaymentService.cs
+│       ├── ILicenseService.cs
+│       └── LicenseService.cs
+│
+├── Auth/
+│   ├── RedbAuthenticationStateProvider.cs
+│   └── RedbUserClaimsPrincipalFactory.cs
+│
+├── wwwroot/
+│   ├── css/
+│   │   ├── app.css
+│   │   ├── public.css
+│   │   ├── docs.css
+│   │   └── dashboard.css
+│   │
+│   ├── js/
+│   │   ├── site.js
+│   │   └── prism.js
+│   │
+│   └── images/
+│       ├── logo.svg
+│       ├── products/
+│       └── screenshots/
+│
+└── Dockerfile
+</code></pre>
+<hr>
+<h2 id="implementation-phases">Implementation Phases</h2>
+<h3 id="phase-1-foundation-week-1-2">Phase 1: Foundation (Week 1-2)</h3>
+<p><strong>Goal:</strong> Basic site with products and static pages</p>
+<ol>
+<li><p><strong>Models (redb.Doc.Models)</strong> ✅ CREATED</p>
+<ul>
+<li>[x] ProductProps.cs</li>
+<li>[x] PricingPlanProps.cs</li>
+<li>[x] PageContentProps.cs</li>
+<li>[x] ExampleProps.cs</li>
+<li>[x] HowToGuideProps.cs</li>
+<li>[x] FaqItemProps.cs</li>
+</ul>
+</li>
+<li><p><strong>Services (redb.Doc.Web)</strong></p>
+<ul>
+<li>[ ] ProductService</li>
+<li>[ ] PricingService</li>
+<li>[ ] ContentService</li>
+</ul>
+</li>
+<li><p><strong>Pages</strong></p>
+<ul>
+<li>[ ] PublicLayout.razor</li>
+<li>[ ] TopBar.razor</li>
+<li>[ ] Footer.razor</li>
+<li>[ ] Index.razor (Home)</li>
+<li>[ ] Products.razor</li>
+<li>[ ] Pricing.razor</li>
+</ul>
+</li>
+<li><p><strong>Components</strong></p>
+<ul>
+<li>[ ] ProductCard.razor</li>
+<li>[ ] PricingCard.razor</li>
+</ul>
+</li>
+<li><p><strong>Seed Data</strong></p>
+<ul>
+<li>[ ] 6 products (Core, Postgres, MSSql + Pro versions)</li>
+<li>[ ] 3-4 pricing plans</li>
+</ul>
+</li>
+</ol>
+<h3 id="phase-2-documentation-week-3-4">Phase 2: Documentation (Week 3-4)</h3>
+<p><strong>Goal:</strong> API Reference and examples</p>
+<ol>
+<li><p><strong>Integrate DocImportService</strong></p>
+<ul>
+<li>[ ] Reference redb.Doc.Import</li>
+<li>[ ] Import trigger from admin</li>
+</ul>
+</li>
+<li><p><strong>Services</strong></p>
+<ul>
+<li>[ ] DocService (API Reference)</li>
+<li>[ ] ExampleService</li>
+<li>[ ] GuideService</li>
+<li>[ ] SearchService</li>
+</ul>
+</li>
+<li><p><strong>Pages</strong></p>
+<ul>
+<li>[ ] ApiReference.razor</li>
+<li>[ ] ApiMember.razor</li>
+<li>[ ] Examples.razor</li>
+<li>[ ] HowTo.razor</li>
+<li>[ ] Search.razor</li>
+</ul>
+</li>
+<li><p><strong>Components</strong></p>
+<ul>
+<li>[ ] CodeBlock.razor (syntax highlighting)</li>
+<li>[ ] ApiMemberCard.razor</li>
+<li>[ ] ExampleCard.razor</li>
+<li>[ ] SearchBox.razor</li>
+</ul>
+</li>
+<li><p><strong>Content</strong></p>
+<ul>
+<li>[ ] Quick Start guide</li>
+<li>[ ] 5-10 extended examples</li>
+<li>[ ] 3-5 How-To guides</li>
+</ul>
+</li>
+</ol>
+<h3 id="phase-3-authentication-week-5">Phase 3: Authentication (Week 5)</h3>
+<p><strong>Goal:</strong> User registration and login</p>
+<ol>
+<li><p><strong>Models</strong> ✅ CREATED</p>
+<ul>
+<li>[x] UserAccountProps.cs</li>
+</ul>
+</li>
+<li><p><strong>Services</strong></p>
+<ul>
+<li>[ ] AuthService</li>
+<li>[ ] UserService</li>
+</ul>
+</li>
+<li><p><strong>Auth</strong></p>
+<ul>
+<li>[ ] RedbAuthenticationStateProvider</li>
+</ul>
+</li>
+<li><p><strong>Pages</strong></p>
+<ul>
+<li>[ ] Login.razor</li>
+<li>[ ] Register.razor</li>
+<li>[ ] ForgotPassword.razor</li>
+</ul>
+</li>
+<li><p><strong>Email</strong></p>
+<ul>
+<li>[ ] SendGrid integration</li>
+<li>[ ] Email templates</li>
+</ul>
+</li>
+</ol>
+<h3 id="phase-4-dashboard--subscriptions-week-6-7">Phase 4: Dashboard &amp; Subscriptions (Week 6-7)</h3>
+<p><strong>Goal:</strong> User dashboard with subscriptions</p>
+<ol>
+<li><p><strong>Models</strong> ✅ CREATED</p>
+<ul>
+<li>[x] SubscriptionProps.cs</li>
+<li>[x] LicenseKeyProps.cs</li>
+<li>[x] PaymentHistoryProps.cs</li>
+</ul>
+</li>
+<li><p><strong>Services</strong></p>
+<ul>
+<li>[ ] SubscriptionService</li>
+<li>[ ] LicenseService</li>
+<li>[ ] StripePaymentService</li>
+</ul>
+</li>
+<li><p><strong>Pages</strong></p>
+<ul>
+<li>[ ] DashboardLayout.razor</li>
+<li>[ ] Dashboard/Index.razor</li>
+<li>[ ] Dashboard/Subscription.razor</li>
+<li>[ ] Dashboard/Licenses.razor</li>
+<li>[ ] Dashboard/Profile.razor</li>
+</ul>
+</li>
+<li><p><strong>Stripe Integration</strong></p>
+<ul>
+<li>[ ] Checkout session</li>
+<li>[ ] Webhook handler</li>
+<li>[ ] Subscription management</li>
+</ul>
+</li>
+<li><p><strong>License Generation</strong></p>
+<ul>
+<li>[ ] JWT-based licenses</li>
+<li>[ ] Download links</li>
+</ul>
+</li>
+</ol>
+<h3 id="phase-5-admin-panel-week-8">Phase 5: Admin Panel (Week 8)</h3>
+<p><strong>Goal:</strong> Content management</p>
+<ol>
+<li><p><strong>Pages</strong></p>
+<ul>
+<li>[ ] AdminLayout.razor</li>
+<li>[ ] Admin/Index.razor</li>
+<li>[ ] Admin/Products.razor</li>
+<li>[ ] Admin/Pricing.razor</li>
+<li>[ ] Admin/Examples.razor</li>
+<li>[ ] Admin/Users.razor</li>
+<li>[ ] Admin/Import.razor</li>
+</ul>
+</li>
+<li><p><strong>Features</strong></p>
+<ul>
+<li>[ ] Product CRUD</li>
+<li>[ ] Pricing CRUD</li>
+<li>[ ] Example CRUD</li>
+<li>[ ] User management</li>
+<li>[ ] DocFX import trigger</li>
+</ul>
+</li>
+</ol>
+<h3 id="phase-6-polish-week-9-10">Phase 6: Polish (Week 9-10)</h3>
+<p><strong>Goal:</strong> Final touches</p>
+<ol>
+<li><p><strong>SEO</strong></p>
+<ul>
+<li>[ ] Meta tags</li>
+<li>[ ] Sitemap.xml</li>
+<li>[ ] Robots.txt</li>
+<li>[ ] Open Graph</li>
+</ul>
+</li>
+<li><p><strong>Performance</strong></p>
+<ul>
+<li>[ ] Response caching</li>
+<li>[ ] Static asset optimization</li>
+<li>[ ] Lazy loading</li>
+</ul>
+</li>
+<li><p><strong>Analytics</strong></p>
+<ul>
+<li>[ ] Google Analytics / Plausible</li>
+</ul>
+</li>
+<li><p><strong>Testing</strong></p>
+<ul>
+<li>[ ] Cross-browser testing</li>
+<li>[ ] Mobile responsiveness</li>
+<li>[ ] Load testing</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2 id="configuration">Configuration</h2>
+<h3 id="appsettingsjson">appsettings.json</h3>
+<pre><code class="lang-json">{
+  &quot;Logging&quot;: {
+    &quot;LogLevel&quot;: {
+      &quot;Default&quot;: &quot;Information&quot;,
+      &quot;Microsoft.AspNetCore&quot;: &quot;Warning&quot;,
+      &quot;Microsoft.EntityFrameworkCore&quot;: &quot;Warning&quot;
+    }
+  },
+  &quot;AllowedHosts&quot;: &quot;*&quot;,
+  
+  &quot;ConnectionStrings&quot;: {
+    &quot;RedbConnection&quot;: &quot;Host=localhost;Port=5432;Username=postgres;Password=xxx;Database=redbDocWeb&quot;
+  },
+  
+  &quot;Redb&quot;: {
+    &quot;License&quot;: &quot;YOUR_LICENSE_KEY&quot;
+  },
+  
+  &quot;Stripe&quot;: {
+    &quot;PublishableKey&quot;: &quot;pk_test_...&quot;,
+    &quot;SecretKey&quot;: &quot;sk_test_...&quot;,
+    &quot;WebhookSecret&quot;: &quot;whsec_...&quot;
+  },
+  
+  &quot;Email&quot;: {
+    &quot;Provider&quot;: &quot;SendGrid&quot;,
+    &quot;ApiKey&quot;: &quot;SG...&quot;,
+    &quot;FromEmail&quot;: &quot;noreply@redb.app&quot;,
+    &quot;FromName&quot;: &quot;REDB&quot;
+  },
+  
+  &quot;Site&quot;: {
+    &quot;Name&quot;: &quot;REDB - Lightning-Fast EAV Storage&quot;,
+    &quot;BaseUrl&quot;: &quot;https://redb.app&quot;,
+    &quot;SupportEmail&quot;: &quot;support@redb.app&quot;
+  },
+  
+  &quot;DocFx&quot;: {
+    &quot;ViewModelPath&quot;: &quot;../docs/docfx/_exportedViewModel&quot;
+  }
+}
+</code></pre>
+<hr>
+<h2 id="products-data-seed">Products Data (Seed)</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>NuGet Package</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REDB.Core</td>
+<td>free</td>
+<td>redb.Core</td>
+<td>Core EAV framework with LINQ support</td>
+</tr>
+<tr>
+<td>REDB.Postgres</td>
+<td>free</td>
+<td>redb.Postgres</td>
+<td>PostgreSQL provider</td>
+</tr>
+<tr>
+<td>REDB.MSSql</td>
+<td>free</td>
+<td>redb.MSSql</td>
+<td>MS SQL Server provider</td>
+</tr>
+<tr>
+<td>REDB.Core.Pro</td>
+<td>pro</td>
+<td>redb.Core.Pro</td>
+<td>Advanced features: bulk ops, expressions</td>
+</tr>
+<tr>
+<td>REDB.Postgres.Pro</td>
+<td>pro</td>
+<td>redb.Postgres.Pro</td>
+<td>PostgreSQL Pro with optimizations</td>
+</tr>
+<tr>
+<td>REDB.MSSql.Pro</td>
+<td>pro</td>
+<td>redb.MSSql.Pro</td>
+<td>MS SQL Pro with optimizations</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="pricing-plans-seed">Pricing Plans (Seed)</h2>
+<table>
+<thead>
+<tr>
+<th>Plan</th>
+<th>Monthly</th>
+<th>Yearly</th>
+<th>Products</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Free</td>
+<td>$0</td>
+<td>$0</td>
+<td>Core, Postgres, MSSql</td>
+</tr>
+<tr>
+<td>Starter</td>
+<td>$29</td>
+<td>$290</td>
+<td>+1 Pro module</td>
+</tr>
+<tr>
+<td>Professional</td>
+<td>$79</td>
+<td>$790</td>
+<td>All Pro modules</td>
+</tr>
+<tr>
+<td>Enterprise</td>
+<td>Contact</td>
+<td>Contact</td>
+<td>All + support</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="key-decisions">Key Decisions</h2>
+<h3 id="1-authentication">1. Authentication</h3>
+<p>Use <strong>custom authentication</strong> stored in REDB (not ASP.NET Identity with separate DB):</p>
+<ul>
+<li>UserAccountProps in REDB</li>
+<li>Custom AuthenticationStateProvider</li>
+<li>JWT tokens for API access</li>
+</ul>
+<h3 id="2-payment">2. Payment</h3>
+<p><strong>Stripe</strong> with:</p>
+<ul>
+<li>Checkout Sessions (redirect to Stripe)</li>
+<li>Customer Portal (manage subscriptions)</li>
+<li>Webhooks (subscription events)</li>
+</ul>
+<h3 id="3-license-keys">3. License Keys</h3>
+<p><strong>JWT-based licenses</strong>:</p>
+<ul>
+<li>Generated on subscription creation</li>
+<li>Signed with private key</li>
+<li>Validated in NuGet packages with public key</li>
+<li>Revocation support via database check</li>
+</ul>
+<h3 id="4-search">4. Search</h3>
+<p><strong>REDB Query API</strong>:</p>
+<ul>
+<li>Full-text search on all Props fields</li>
+<li>No external search engine needed</li>
+<li>Fast with proper indexing</li>
+</ul>
+<h3 id="5-content-management">5. Content Management</h3>
+<p><strong>REDB-based CMS</strong>:</p>
+<ul>
+<li>All content in REDB (products, pages, examples)</li>
+<li>Admin panel for editing</li>
+<li>No external CMS</li>
+</ul>
+<hr>
+<h2 id="related-documents">Related Documents</h2>
+<ul>
+<li><code>REDB_DOC_PROJECT_PLAN.md</code> - DocFX import and API Reference</li>
+<li><code>redb.Doc.Import/</code> - Import tool implementation</li>
+<li><code>redb.Doc.Models/</code> - Shared data models</li>
+</ul>
+<hr>
+<h2 id="next-steps">Next Steps</h2>
+<ol>
+<li><del>Create content models in <code>redb.Doc.Models/</code></del> ✅ DONE</li>
+<li>Implement services in <code>redb.Doc.Web/Services/</code></li>
+<li>Create Blazor components and pages</li>
+<li>Configure REDB connection in <code>redb.Doc.Web/Program.cs</code></li>
+<li>Seed initial data (products, pricing)</li>
+<li>Test and deploy</li>
+</ol>
+<hr>
+<h2 id="created-files-summary">Created Files Summary</h2>
+<h3 id="models-redbdocmodels">Models (redb.Doc.Models/)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Scheme</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Content/ProductProps.cs</code></td>
+<td>Product</td>
+<td>REDB packages info</td>
+</tr>
+<tr>
+<td><code>Content/PricingPlanProps.cs</code></td>
+<td>PricingPlan</td>
+<td>Subscription plans</td>
+</tr>
+<tr>
+<td><code>Content/ExampleProps.cs</code></td>
+<td>Example</td>
+<td>Code examples</td>
+</tr>
+<tr>
+<td><code>Content/HowToGuideProps.cs</code></td>
+<td>HowToGuide</td>
+<td>Step-by-step guides</td>
+</tr>
+<tr>
+<td><code>Content/PageContentProps.cs</code></td>
+<td>PageContent</td>
+<td>Static pages (Home, About)</td>
+</tr>
+<tr>
+<td><code>Content/FaqItemProps.cs</code></td>
+<td>FaqItem</td>
+<td>FAQ questions</td>
+</tr>
+<tr>
+<td><code>User/UserAccountProps.cs</code></td>
+<td>UserAccount</td>
+<td>User accounts</td>
+</tr>
+<tr>
+<td><code>User/SubscriptionProps.cs</code></td>
+<td>Subscription</td>
+<td>User subscriptions</td>
+</tr>
+<tr>
+<td><code>User/LicenseKeyProps.cs</code></td>
+<td>LicenseKey</td>
+<td>License keys</td>
+</tr>
+<tr>
+<td><code>User/PaymentHistoryProps.cs</code></td>
+<td>PaymentHistory</td>
+<td>Payment records</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/docs/docfx/REDB_WEBSITE_PLAN.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

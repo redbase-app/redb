@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IRedbObject </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IRedbObject ">
+      
+      <meta name="description" content="Base interface for all REDB objects Allows working with objects as classes rather than IDs Enriched with full functionality for working with trees, timestamps and auditing">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Models_Contracts_IRedbObject.md&amp;value=---%0Auid%3A%20redb.Core.Models.Contracts.IRedbObject%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Models.Contracts.IRedbObject">
+
+
+
+  <h1 id="redb_Core_Models_Contracts_IRedbObject" data-uid="redb.Core.Models.Contracts.IRedbObject" class="text-break">
+Interface IRedbObject  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L10"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Models.html">Models</a>.<a class="xref" href="redb.Core.Models.Contracts.html">Contracts</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Base interface for all REDB objects
+Allows working with objects as classes rather than IDs
+Enriched with full functionality for working with trees, timestamps and auditing</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IRedbObject</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetAge_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.GetAge(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetChildrenCountAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.GetChildrenCountAsync&lt;T&gt;(IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetDebugInfo_redb_Core_Models_Contracts_IRedbObject_">RedbObjectExtensions.GetDebugInfo(IRedbObject)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetDescendantsCountAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_System_Nullable_System_Int32__">RedbObjectExtensions.GetDescendantsCountAsync&lt;T&gt;(IRedbObject, ITreeProvider, int?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetDisplayName_redb_Core_Models_Contracts_IRedbObject_System_Boolean_">RedbObjectExtensions.GetDisplayName(IRedbObject, bool)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetTimeSinceLastModification_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.GetTimeSinceLastModification(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetTreeLevelAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.GetTreeLevelAsync&lt;T&gt;(IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_HasStarted_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.HasStarted(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsActiveAt_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.IsActiveAt(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsAncestorOfAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.IsAncestorOfAsync&lt;T&gt;(IRedbObject, IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsDescendantOfAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.IsDescendantOfAsync&lt;T&gt;(IRedbObject, IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsExpired_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.IsExpired(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsLeafAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.IsLeafAsync&lt;T&gt;(IRedbObject, ITreeProvider)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_DateBegin_" data-uid="redb.Core.Models.Contracts.IRedbObject.DateBegin*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_DateBegin" data-uid="redb.Core.Models.Contracts.IRedbObject.DateBegin">
+  DateBegin
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L65"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object validity start date (optional)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">DateTimeOffset? DateBegin { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_DateComplete_" data-uid="redb.Core.Models.Contracts.IRedbObject.DateComplete*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_DateComplete" data-uid="redb.Core.Models.Contracts.IRedbObject.DateComplete">
+  DateComplete
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L70"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object validity end date (optional)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">DateTimeOffset? DateComplete { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_DateCreate_" data-uid="redb.Core.Models.Contracts.IRedbObject.DateCreate*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_DateCreate" data-uid="redb.Core.Models.Contracts.IRedbObject.DateCreate">
+  DateCreate
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L55"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object creation date and time</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">DateTimeOffset DateCreate { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_DateModify_" data-uid="redb.Core.Models.Contracts.IRedbObject.DateModify*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_DateModify" data-uid="redb.Core.Models.Contracts.IRedbObject.DateModify">
+  DateModify
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L60"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object last modification date and time</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">DateTimeOffset DateModify { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_HasParent_" data-uid="redb.Core.Models.Contracts.IRedbObject.HasParent*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_HasParent" data-uid="redb.Core.Models.Contracts.IRedbObject.HasParent">
+  HasParent
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L43"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Checks if object has a parent</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool HasParent { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_Hash_" data-uid="redb.Core.Models.Contracts.IRedbObject.Hash*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_Hash" data-uid="redb.Core.Models.Contracts.IRedbObject.Hash">
+  Hash
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L143"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>MD5 hash of object for integrity control</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Guid? Hash { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_Id_" data-uid="redb.Core.Models.Contracts.IRedbObject.Id*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_Id" data-uid="redb.Core.Models.Contracts.IRedbObject.Id">
+  Id
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L18"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Unique object identifier
+Used for extracting ID from object in new methods</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long Id { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_IsRoot_" data-uid="redb.Core.Models.Contracts.IRedbObject.IsRoot*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_IsRoot" data-uid="redb.Core.Models.Contracts.IRedbObject.IsRoot">
+  IsRoot
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L48"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Checks if object is root (has no parent)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool IsRoot { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_Key_" data-uid="redb.Core.Models.Contracts.IRedbObject.Key*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_Key" data-uid="redb.Core.Models.Contracts.IRedbObject.Key">
+  Key
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L89"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object key field</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long? Key { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_Name_" data-uid="redb.Core.Models.Contracts.IRedbObject.Name*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_Name" data-uid="redb.Core.Models.Contracts.IRedbObject.Name">
+  Name
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L30"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object name
+Used for logging, debugging and user interface</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string Name { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_Note_" data-uid="redb.Core.Models.Contracts.IRedbObject.Note*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_Note" data-uid="redb.Core.Models.Contracts.IRedbObject.Note">
+  Note
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L138"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object notes</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string? Note { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_OwnerId_" data-uid="redb.Core.Models.Contracts.IRedbObject.OwnerId*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_OwnerId" data-uid="redb.Core.Models.Contracts.IRedbObject.OwnerId">
+  OwnerId
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L77"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object owner identifier</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long OwnerId { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ParentId_" data-uid="redb.Core.Models.Contracts.IRedbObject.ParentId*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ParentId" data-uid="redb.Core.Models.Contracts.IRedbObject.ParentId">
+  ParentId
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L38"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Parent object identifier
+null - if object is root</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long? ParentId { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_SchemeId_" data-uid="redb.Core.Models.Contracts.IRedbObject.SchemeId*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_SchemeId" data-uid="redb.Core.Models.Contracts.IRedbObject.SchemeId">
+  SchemeId
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L24"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object scheme identifier
+Used for schema permissions checking and validation</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long SchemeId { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ValueBool_" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueBool*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ValueBool" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueBool">
+  ValueBool
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L111"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Primitive boolean value (for primitive schemas)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool? ValueBool { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ValueBytes_" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueBytes*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ValueBytes" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueBytes">
+  ValueBytes
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L131"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Primitive byte array value (for primitive schemas)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">byte[]? ValueBytes { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ValueDatetime_" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueDatetime*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ValueDatetime" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueDatetime">
+  ValueDatetime
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L126"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Primitive datetime value (for primitive schemas)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">DateTimeOffset? ValueDatetime { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ValueDouble_" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueDouble*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ValueDouble" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueDouble">
+  ValueDouble
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L116"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Primitive double value (for primitive schemas)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">double? ValueDouble { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ValueGuid_" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueGuid*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ValueGuid" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueGuid">
+  ValueGuid
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L106"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Primitive GUID value (for primitive schemas)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Guid? ValueGuid { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ValueLong_" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueLong*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ValueLong" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueLong">
+  ValueLong
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L96"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Primitive long value (for primitive schemas)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long? ValueLong { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ValueNumeric_" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueNumeric*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ValueNumeric" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueNumeric">
+  ValueNumeric
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L121"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Primitive decimal value (for primitive schemas)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">decimal? ValueNumeric { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ValueString_" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueString*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ValueString" data-uid="redb.Core.Models.Contracts.IRedbObject.ValueString">
+  ValueString
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L101"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Primitive string value (for primitive schemas)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string? ValueString { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_WhoChangeId_" data-uid="redb.Core.Models.Contracts.IRedbObject.WhoChangeId*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_WhoChangeId" data-uid="redb.Core.Models.Contracts.IRedbObject.WhoChangeId">
+  WhoChangeId
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L82"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Identifier of user who last modified the object</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long WhoChangeId { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ResetId_" data-uid="redb.Core.Models.Contracts.IRedbObject.ResetId*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ResetId_System_Boolean_" data-uid="redb.Core.Models.Contracts.IRedbObject.ResetId(System.Boolean)">
+  ResetId(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L149"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Reset object ID to 0 and optionally ParentId to null</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ResetId(bool withParent = true)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>withParent</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If true, also resets ParentId to null (default true)</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_ResetIds_" data-uid="redb.Core.Models.Contracts.IRedbObject.ResetIds*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_ResetIds_System_Boolean_" data-uid="redb.Core.Models.Contracts.IRedbObject.ResetIds(System.Boolean)">
+  ResetIds(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L155"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Reset object ID and ParentId (recursively processes nested objects)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ResetIds(bool recursive = false)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If true, recursively resets ID in all nested IRedbObject in Props</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObject.cs/#L10" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class ProPostgresObjectStorageProvider </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class ProPostgresObjectStorageProvider ">
+      
+      <meta name="description" content="PostgreSQL Pro version of ObjectStorageProvider. Inherits parallel tree comparison from ProObjectStorageProviderBase. Provides PostgreSQL-specific SQL and ProLazyPropsLoader.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider.md&amp;value=---%0Auid%3A%20redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider">
+
+
+
+  <h1 id="redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider" data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider" class="text-break">
+Class ProPostgresObjectStorageProvider  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Providers/ProPostgresObjectStorageProvider.cs/#L23"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Postgres.html">Postgres</a>.<a class="xref" href="redb.Postgres.Pro.html">Pro</a>.<a class="xref" href="redb.Postgres.Pro.Providers.html">Providers</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Postgres.Pro.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>PostgreSQL Pro version of ObjectStorageProvider.
+Inherits parallel tree comparison from ProObjectStorageProviderBase.
+Provides PostgreSQL-specific SQL and ProLazyPropsLoader.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class ProPostgresObjectStorageProvider : ProObjectStorageProviderBase, IObjectStorageProvider</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html">ObjectStorageProviderBase</a></div>
+      <div><a class="xref" href="redb.Core.Pro.Providers.ProObjectStorageProviderBase.html">ProObjectStorageProviderBase</a></div>
+      <div><span class="xref">ProPostgresObjectStorageProvider</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html">IObjectStorageProvider</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.Core.Pro.Providers.ProObjectStorageProviderBase.html#redb_Core_Pro_Providers_ProObjectStorageProviderBase_AlignArrayBaseRecords_System_Collections_Generic_List_redb_Core_Pro_ChangeTracking_ValueTreeNode__System_Collections_Generic_List_redb_Core_Pro_ChangeTracking_ValueTreeNode__System_Collections_Generic_List_redb_Core_Models_Entities_RedbValue__">ProObjectStorageProviderBase.AlignArrayBaseRecords(List&lt;ValueTreeNode&gt;, List&lt;ValueTreeNode&gt;, List&lt;RedbValue&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Pro.Providers.ProObjectStorageProviderBase.html#redb_Core_Pro_Providers_ProObjectStorageProviderBase_CloneRValue_redb_Core_Models_Entities_RedbValue_">ProObjectStorageProviderBase.CloneRValue(RedbValue)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Pro.Providers.ProObjectStorageProviderBase.html#redb_Core_Pro_Providers_ProObjectStorageProviderBase_PrepareValuesByStrategy_System_Collections_Generic_List_redb_Core_Models_Contracts_IRedbObject__System_Collections_Generic_List_redb_Core_Models_Entities_RedbValue__System_Boolean_">ProObjectStorageProviderBase.PrepareValuesByStrategy(List&lt;IRedbObject&gt;, List&lt;RedbValue&gt;, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Pro.Providers.ProObjectStorageProviderBase.html#redb_Core_Pro_Providers_ProObjectStorageProviderBase_ExecuteBatchByStrategy_redb_Core_Models_Configuration_EavSaveStrategy_System_Collections_Generic_List_redb_Core_Models_Contracts_IRedbObject__System_Collections_Generic_List_redb_Core_Models_Entities_RedbValue__">ProObjectStorageProviderBase.ExecuteBatchByStrategy(EavSaveStrategy, List&lt;IRedbObject&gt;, List&lt;RedbValue&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_AddNewObjectsAsync__1_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject___0___">ObjectStorageProviderBase.AddNewObjectsAsync&lt;TProps&gt;(IEnumerable&lt;IRedbObject&lt;TProps&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_AddNewObjectsAsync__1_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject___0___redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.AddNewObjectsAsync&lt;TProps&gt;(IEnumerable&lt;IRedbObject&lt;TProps&gt;&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase__pendingValuesToUpdate">ObjectStorageProviderBase._pendingValuesToUpdate</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase__pendingValuesToInsert">ObjectStorageProviderBase._pendingValuesToInsert</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase__pendingValuesToDelete">ObjectStorageProviderBase._pendingValuesToDelete</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase__context">ObjectStorageProviderBase._context</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_Cache">ObjectStorageProviderBase.Cache</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_PropsCache">ObjectStorageProviderBase.PropsCache</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_Context">ObjectStorageProviderBase.Context</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_Serializer">ObjectStorageProviderBase.Serializer</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SchemeSyncProvider">ObjectStorageProviderBase.SchemeSyncProvider</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_Configuration">ObjectStorageProviderBase.Configuration</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_ListProvider">ObjectStorageProviderBase.ListProvider</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_Sql">ObjectStorageProviderBase.Sql</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_PermissionProvider">ObjectStorageProviderBase.PermissionProvider</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SecurityContext">ObjectStorageProviderBase.SecurityContext</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_Logger">ObjectStorageProviderBase.Logger</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadAsync__1_System_Int64_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadAsync&lt;TProps&gt;(long, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadAsync&lt;TProps&gt;(IRedbObject, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadAsync__1_System_Int64_redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadAsync&lt;TProps&gt;(long, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_CacheNestedObjects_System_Object_">ObjectStorageProviderBase.CacheNestedObjects(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SaveAsync_redb_Core_Models_Contracts_IRedbObject_">ObjectStorageProviderBase.SaveAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SaveAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.SaveAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SaveAsync__1_redb_Core_Models_Contracts_IRedbObject___0__">ObjectStorageProviderBase.SaveAsync&lt;TProps&gt;(IRedbObject&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_DeleteAsync_redb_Core_Models_Contracts_IRedbObject_">ObjectStorageProviderBase.DeleteAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_DeleteAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.DeleteAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_DeleteAsync_System_Int64_">ObjectStorageProviderBase.DeleteAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_DeleteAsync_System_Int64_redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.DeleteAsync(long, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_DeleteAsync_System_Collections_Generic_IEnumerable_System_Int64__">ObjectStorageProviderBase.DeleteAsync(IEnumerable&lt;long&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_DeleteAsync_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.DeleteAsync(IEnumerable&lt;long&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_DeleteAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__">ObjectStorageProviderBase.DeleteAsync(IEnumerable&lt;IRedbObject&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_DeleteAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.DeleteAsync(IEnumerable&lt;IRedbObject&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SoftDeleteAsync_System_Collections_Generic_IEnumerable_System_Int64__System_Nullable_System_Int64__">ObjectStorageProviderBase.SoftDeleteAsync(IEnumerable&lt;long&gt;, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SoftDeleteAsync_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int64__">ObjectStorageProviderBase.SoftDeleteAsync(IEnumerable&lt;long&gt;, IRedbUser, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SoftDeleteAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__System_Nullable_System_Int64__">ObjectStorageProviderBase.SoftDeleteAsync(IEnumerable&lt;IRedbObject&gt;, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SoftDeleteAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int64__">ObjectStorageProviderBase.SoftDeleteAsync(IEnumerable&lt;IRedbObject&gt;, IRedbUser, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_DeleteWithPurgeAsync_System_Collections_Generic_IEnumerable_System_Int64__System_Int32_System_IProgress_redb_Core_Services_PurgeProgress__System_Threading_CancellationToken_System_Nullable_System_Int64__">ObjectStorageProviderBase.DeleteWithPurgeAsync(IEnumerable&lt;long&gt;, int, IProgress&lt;PurgeProgress&gt;, CancellationToken, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_PurgeTrashAsync_System_Int64_System_Int32_System_Int32_System_IProgress_redb_Core_Services_PurgeProgress__System_Threading_CancellationToken_">ObjectStorageProviderBase.PurgeTrashAsync(long, int, int, IProgress&lt;PurgeProgress&gt;, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_GetDeletionProgressAsync_System_Int64_">ObjectStorageProviderBase.GetDeletionProgressAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_GetUserActiveDeletionsAsync_System_Int64_">ObjectStorageProviderBase.GetUserActiveDeletionsAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_GetOrphanedDeletionTasksAsync_System_Int32_">ObjectStorageProviderBase.GetOrphanedDeletionTasksAsync(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_TryClaimOrphanedTaskAsync_System_Int64_System_Int32_">ObjectStorageProviderBase.TryClaimOrphanedTaskAsync(long, int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadAsync_System_Collections_Generic_IEnumerable_System_Int64__System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadAsync(IEnumerable&lt;long&gt;, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadAsync_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadAsync(IEnumerable&lt;long&gt;, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadObjectsLazyAsync_System_Collections_Generic_List_System_Int64__">ObjectStorageProviderBase.LoadObjectsLazyAsync(List&lt;long&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadWithParentsAsync__1_System_Int64_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadWithParentsAsync&lt;TProps&gt;(long, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadWithParentsAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadWithParentsAsync&lt;TProps&gt;(IRedbObject, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadWithParentsAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadWithParentsAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadWithParentsAsync__1_System_Int64_redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadWithParentsAsync&lt;TProps&gt;(long, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadWithParentsAsync__1_System_Collections_Generic_IEnumerable_System_Int64__System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadWithParentsAsync&lt;TProps&gt;(IEnumerable&lt;long&gt;, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadWithParentsAsync__1_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadWithParentsAsync&lt;TProps&gt;(IEnumerable&lt;long&gt;, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadWithParentsAsync_System_Collections_Generic_IEnumerable_System_Int64__System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadWithParentsAsync(IEnumerable&lt;long&gt;, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_LoadWithParentsAsync_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">ObjectStorageProviderBase.LoadWithParentsAsync(IEnumerable&lt;long&gt;, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SaveAsync__1_redb_Core_Models_Contracts_IRedbObject___0__redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.SaveAsync&lt;TProps&gt;(IRedbObject&lt;TProps&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_GetSchemeFromCacheOrDbAsync_System_Int64_">ObjectStorageProviderBase.GetSchemeFromCacheOrDbAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_GetSchemeIdForObject_System_Int64_">ObjectStorageProviderBase.GetSchemeIdForObject(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SaveAsyncNew__1_redb_Core_Models_Contracts_IRedbObject___0__redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.SaveAsyncNew&lt;TProps&gt;(IRedbObject&lt;TProps&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_CollectAllObjectsRecursively_redb_Core_Models_Contracts_IRedbObject_System_Collections_Generic_List_redb_Core_Models_Contracts_IRedbObject__System_Collections_Generic_HashSet_System_Int64__">ObjectStorageProviderBase.CollectAllObjectsRecursively(IRedbObject, List&lt;IRedbObject&gt;, HashSet&lt;long&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_GetStructureDbType_redb_Core_Models_Contracts_IRedbStructure_">ObjectStorageProviderBase.GetStructureDbType(IRedbStructure)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_AssignMissingIds_System_Collections_Generic_List_redb_Core_Models_Contracts_IRedbObject__redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.AssignMissingIds(List&lt;IRedbObject&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_EnsureSchemesForAllTypes_System_Collections_Generic_List_redb_Core_Models_Contracts_IRedbObject__">ObjectStorageProviderBase.EnsureSchemesForAllTypes(List&lt;IRedbObject&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_ProcessAllObjectsPropertiesRecursively_System_Collections_Generic_List_redb_Core_Models_Contracts_IRedbObject__System_Collections_Generic_List_redb_Core_Models_Entities_RedbValue__">ObjectStorageProviderBase.ProcessAllObjectsPropertiesRecursively(List&lt;IRedbObject&gt;, List&lt;RedbValue&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_PrepareValuesWithTreeDeleteInsert_System_Collections_Generic_List_redb_Core_Models_Contracts_IRedbObject__System_Collections_Generic_List_redb_Core_Models_Entities_RedbValue__">ObjectStorageProviderBase.PrepareValuesWithTreeDeleteInsert(List&lt;IRedbObject&gt;, List&lt;RedbValue&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_UpdateExistingValueFields_redb_Core_Models_Entities_RedbValue_redb_Core_Models_Entities_RedbValue_System_Collections_Generic_Dictionary_System_Int64_System_String__">ObjectStorageProviderBase.UpdateExistingValueFields(RedbValue, RedbValue, Dictionary&lt;long, string&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_ConvertToObjectRecord_redb_Core_Models_Contracts_IRedbObject_">ObjectStorageProviderBase.ConvertToObjectRecord(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SaveAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__">ObjectStorageProviderBase.SaveAsync(IEnumerable&lt;IRedbObject&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SaveAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__redb_Core_Models_Contracts_IRedbUser_">ObjectStorageProviderBase.SaveAsync(IEnumerable&lt;IRedbObject&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.ObjectStorageProviderBase.html#redb_Core_Providers_Base_ObjectStorageProviderBase_SaveBatchWithDeleteInsertStrategy_System_Collections_Generic_List_redb_Core_Models_Contracts_IRedbObject__System_Collections_Generic_List_redb_Core_Models_Entities_RedbValue__">ObjectStorageProviderBase.SaveBatchWithDeleteInsertStrategy(List&lt;IRedbObject&gt;, List&lt;RedbValue&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider__ctor_" data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider.#ctor*"></a>
+
+  <h3 id="redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider__ctor_redb_Core_Data_IRedbContext_redb_Core_Serialization_IRedbObjectSerializer_redb_Core_Providers_IPermissionProvider_redb_Core_Models_Contracts_IRedbSecurityContext_redb_Core_Providers_ISchemeSyncProvider_redb_Core_Models_Configuration_RedbServiceConfiguration_redb_Core_Providers_IListProvider_redb_Core_Query_ISqlDialect_redb_Core_Pro_Query_ISqlDialectPro_Microsoft_Extensions_Logging_ILogger_" data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider.#ctor(redb.Core.Data.IRedbContext,redb.Core.Serialization.IRedbObjectSerializer,redb.Core.Providers.IPermissionProvider,redb.Core.Models.Contracts.IRedbSecurityContext,redb.Core.Providers.ISchemeSyncProvider,redb.Core.Models.Configuration.RedbServiceConfiguration,redb.Core.Providers.IListProvider,redb.Core.Query.ISqlDialect,redb.Core.Pro.Query.ISqlDialectPro,Microsoft.Extensions.Logging.ILogger)">
+  ProPostgresObjectStorageProvider(IRedbContext, IRedbObjectSerializer, IPermissionProvider, IRedbSecurityContext, ISchemeSyncProvider, RedbServiceConfiguration, IListProvider?, ISqlDialect?, ISqlDialectPro?, ILogger?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Providers/ProPostgresObjectStorageProvider.cs/#L29"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ProPostgresObjectStorageProvider(IRedbContext context, IRedbObjectSerializer serializer, IPermissionProvider permissionProvider, IRedbSecurityContext securityContext, ISchemeSyncProvider schemeSync, RedbServiceConfiguration configuration, IListProvider? listProvider = null, ISqlDialect? dialect = null, ISqlDialectPro? dialectPro = null, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+    <dt><code>serializer</code> <a class="xref" href="redb.Core.Serialization.IRedbObjectSerializer.html">IRedbObjectSerializer</a></dt>
+    <dd></dd>
+    <dt><code>permissionProvider</code> <a class="xref" href="redb.Core.Providers.IPermissionProvider.html">IPermissionProvider</a></dt>
+    <dd></dd>
+    <dt><code>securityContext</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbSecurityContext.html">IRedbSecurityContext</a></dt>
+    <dd></dd>
+    <dt><code>schemeSync</code> <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html">ISchemeSyncProvider</a></dt>
+    <dd></dd>
+    <dt><code>configuration</code> <a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+    <dt><code>listProvider</code> <a class="xref" href="redb.Core.Providers.IListProvider.html">IListProvider</a></dt>
+    <dd></dd>
+    <dt><code>dialect</code> <a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+    <dd></dd>
+    <dt><code>dialectPro</code> <a class="xref" href="redb.Core.Pro.Query.ISqlDialectPro.html">ISqlDialectPro</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider_CreateLazyPropsLoader_" data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider.CreateLazyPropsLoader*"></a>
+
+  <h3 id="redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider_CreateLazyPropsLoader" data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider.CreateLazyPropsLoader">
+  CreateLazyPropsLoader()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Providers/ProPostgresObjectStorageProvider.cs/#L51"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Pro: ProLazyPropsLoader for PVT materialization.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override ILazyPropsLoader CreateLazyPropsLoader()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.ILazyPropsLoader.html">ILazyPropsLoader</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider_LoadEagerAsync_" data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider.LoadEagerAsync*"></a>
+
+  <h3 id="redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider_LoadEagerAsync__1_System_Int64_System_Int32_" data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider.LoadEagerAsync``1(System.Int64,System.Int32)">
+  LoadEagerAsync&lt;TProps&gt;(long, int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Providers/ProPostgresObjectStorageProvider.cs/#L60"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Pro: EAGER loading via PVT (consistent with Query/TreeQuery).
+OpenSource uses get_object_json, Pro uses PVT for correct array handling.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override Task&lt;RedbObject&lt;TProps&gt;?&gt; LoadEagerAsync&lt;TProps&gt;(long objectId, int depth) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>depth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider_LoadObjectsEagerAsync_" data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider.LoadObjectsEagerAsync*"></a>
+
+  <h3 id="redb_Postgres_Pro_Providers_ProPostgresObjectStorageProvider_LoadObjectsEagerAsync_System_Collections_Generic_List_System_Int64__System_Int32_" data-uid="redb.Postgres.Pro.Providers.ProPostgresObjectStorageProvider.LoadObjectsEagerAsync(System.Collections.Generic.List{System.Int64},System.Int32)">
+  LoadObjectsEagerAsync(List&lt;long&gt;, int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Providers/ProPostgresObjectStorageProvider.cs/#L97"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Pro: Bulk EAGER loading via PVT.
+Uses LoadObjectsLazyAsync which uses CreateLazyPropsLoader() → ProLazyPropsLoader.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override Task&lt;List&lt;IRedbObject&gt;&gt; LoadObjectsEagerAsync(List&lt;long&gt; objectIds, int depth)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>depth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres.Pro/Providers/ProPostgresObjectStorageProvider.cs/#L23" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

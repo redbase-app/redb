@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IStructureMetadataCache </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IStructureMetadataCache ">
+      
+      <meta name="description" content="Specialized cache for field structures. Fast access to structure metadata by scheme, ID and type.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Caching_IStructureMetadataCache.md&amp;value=---%0Auid%3A%20redb.Core.Caching.IStructureMetadataCache%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Caching.IStructureMetadataCache">
+
+
+
+  <h1 id="redb_Core_Caching_IStructureMetadataCache" data-uid="redb.Core.Caching.IStructureMetadataCache" class="text-break">
+Interface IStructureMetadataCache  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L12"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Caching.html">Caching</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Specialized cache for field structures.
+Fast access to structure metadata by scheme, ID and type.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IStructureMetadataCache</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_GetAllCachedStructures_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetAllCachedStructures*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_GetAllCachedStructures" data-uid="redb.Core.Caching.IStructureMetadataCache.GetAllCachedStructures">
+  GetAllCachedStructures()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L105"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all cached structures (for diagnostics).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Dictionary&lt;long, RedbStructure&gt; GetAllCachedStructures()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2">Dictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>, <a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_GetSchemeToStructuresMap_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetSchemeToStructuresMap*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_GetSchemeToStructuresMap" data-uid="redb.Core.Caching.IStructureMetadataCache.GetSchemeToStructuresMap">
+  GetSchemeToStructuresMap()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L110"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme to structures map (for diagnostics).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Dictionary&lt;long, List&lt;RedbStructure&gt;&gt; GetSchemeToStructuresMap()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2">Dictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_GetStatistics_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStatistics*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_GetStatistics" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStatistics">
+  GetStatistics()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L100"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get structure cache statistics.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">StructureCacheStatistics GetStatistics()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.StructureCacheStatistics.html">StructureCacheStatistics</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_GetStructureByIdAsync_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructureByIdAsync*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_GetStructureByIdAsync_System_Int64_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructureByIdAsync(System.Int64)">
+  GetStructureByIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L34"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get structure by ID.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;RedbStructure?&gt; GetStructureByIdAsync(long structureId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>structureId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_GetStructureByNameAsync_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructureByNameAsync*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_GetStructureByNameAsync_System_Int64_System_String_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructureByNameAsync(System.Int64,System.String)">
+  GetStructureByNameAsync(long, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L39"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get structure by name within scheme.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;RedbStructure?&gt; GetStructureByNameAsync(long schemeId, string structureName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>structureName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_GetStructuresBySchemeIdAsync_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructuresBySchemeIdAsync*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_GetStructuresBySchemeIdAsync_System_Int64_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructuresBySchemeIdAsync(System.Int64)">
+  GetStructuresBySchemeIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L19"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all structures for scheme (most common case).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;RedbStructure&gt;&gt; GetStructuresBySchemeIdAsync(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_GetStructuresByTypeAsync_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructuresByTypeAsync*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_GetStructuresByTypeAsync_System_Type_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructuresByTypeAsync(System.Type)">
+  GetStructuresByTypeAsync(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L29"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get structures for .NET type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;RedbStructure&gt;&gt; GetStructuresByTypeAsync(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_GetStructuresByTypeAsync_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructuresByTypeAsync*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_GetStructuresByTypeAsync__1" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructuresByTypeAsync``1">
+  GetStructuresByTypeAsync&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L24"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get structures for .NET type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;RedbStructure&gt;&gt; GetStructuresByTypeAsync&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_GetStructuresMapBySchemeIdAsync_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructuresMapBySchemeIdAsync*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_GetStructuresMapBySchemeIdAsync_System_Int64_" data-uid="redb.Core.Caching.IStructureMetadataCache.GetStructuresMapBySchemeIdAsync(System.Int64)">
+  GetStructuresMapBySchemeIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L44"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get name -&gt; structure map for scheme (optimization for frequent lookups).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;Dictionary&lt;string, RedbStructure&gt;&gt; GetStructuresMapBySchemeIdAsync(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2">Dictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_InvalidateAll_" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateAll*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_InvalidateAll" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateAll">
+  InvalidateAll()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L93"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Clear all structure cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateAll()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_InvalidateStructure_" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateStructure*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_InvalidateStructure_System_Int64_" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateStructure(System.Int64)">
+  InvalidateStructure(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L73"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Remove structure from cache by ID.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateStructure(long structureId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>structureId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_InvalidateStructuresForScheme_" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateStructuresForScheme*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_InvalidateStructuresForScheme_System_Int64_" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateStructuresForScheme(System.Int64)">
+  InvalidateStructuresForScheme(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L78"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Remove all structures for scheme from cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateStructuresForScheme(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_InvalidateStructuresForType_" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateStructuresForType*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_InvalidateStructuresForType_System_Type_" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateStructuresForType(System.Type)">
+  InvalidateStructuresForType(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L88"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Remove structures for type from cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateStructuresForType(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_InvalidateStructuresForType_" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateStructuresForType*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_InvalidateStructuresForType__1" data-uid="redb.Core.Caching.IStructureMetadataCache.InvalidateStructuresForType``1">
+  InvalidateStructuresForType&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L83"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Remove structures for type from cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateStructuresForType&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_SetStructure_" data-uid="redb.Core.Caching.IStructureMetadataCache.SetStructure*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_SetStructure_redb_Core_Models_Entities_RedbStructure_" data-uid="redb.Core.Caching.IStructureMetadataCache.SetStructure(redb.Core.Models.Entities.RedbStructure)">
+  SetStructure(RedbStructure)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L51"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Add or update structure in cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetStructure(RedbStructure structure)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>structure</code> <a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_SetStructuresForScheme_" data-uid="redb.Core.Caching.IStructureMetadataCache.SetStructuresForScheme*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_SetStructuresForScheme_System_Int64_System_Collections_Generic_List_redb_Core_Models_Entities_RedbStructure__" data-uid="redb.Core.Caching.IStructureMetadataCache.SetStructuresForScheme(System.Int64,System.Collections.Generic.List{redb.Core.Models.Entities.RedbStructure})">
+  SetStructuresForScheme(long, List&lt;RedbStructure&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L56"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Add or update all structures for scheme in cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetStructuresForScheme(long schemeId, List&lt;RedbStructure&gt; structures)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>structures</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_SetStructuresForType_" data-uid="redb.Core.Caching.IStructureMetadataCache.SetStructuresForType*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_SetStructuresForType_System_Type_System_Collections_Generic_List_redb_Core_Models_Entities_RedbStructure__" data-uid="redb.Core.Caching.IStructureMetadataCache.SetStructuresForType(System.Type,System.Collections.Generic.List{redb.Core.Models.Entities.RedbStructure})">
+  SetStructuresForType(Type, List&lt;RedbStructure&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L66"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Add or update structures for type in cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetStructuresForType(Type type, List&lt;RedbStructure&gt; structures)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+    <dt><code>structures</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_IStructureMetadataCache_SetStructuresForType_" data-uid="redb.Core.Caching.IStructureMetadataCache.SetStructuresForType*"></a>
+
+  <h3 id="redb_Core_Caching_IStructureMetadataCache_SetStructuresForType__1_System_Collections_Generic_List_redb_Core_Models_Entities_RedbStructure__" data-uid="redb.Core.Caching.IStructureMetadataCache.SetStructuresForType``1(System.Collections.Generic.List{redb.Core.Models.Entities.RedbStructure})">
+  SetStructuresForType&lt;TProps&gt;(List&lt;RedbStructure&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L61"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Add or update structures for type in cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetStructuresForType&lt;TProps&gt;(List&lt;RedbStructure&gt; structures) where TProps : class</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>structures</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/IStructureMetadataCache.cs/#L12" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

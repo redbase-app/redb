@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>REDB.Doc - Documentation System Project Plan </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="REDB.Doc - Documentation System Project Plan ">
+      
+      
+      <link rel="icon" href="favicon.ico">
+      <link rel="stylesheet" href="public/docfx.min.css">
+      <link rel="stylesheet" href="public/main.css">
+      <meta name="docfx:navrel" content="toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/blob/feature/redb-doc/docs/docfx/REDB_DOC_PROJECT_PLAN.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="index.html">
+            <img id="logo" class="svg" src="logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="redbdoc---documentation-system-project-plan">REDB.Doc - Documentation System Project Plan</h1>
+
+<h2 id="overview">Overview</h2>
+<p>Documentation system built on REDB EAV storage with full-text search across all fields.</p>
+<hr>
+<h2 id="architecture">Architecture</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                         REDB.Doc                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐ │
+│  │  redb.Doc    │  │  redb.Doc    │  │     redb.Doc.Web       │ │
+│  │   .Models    │  │   .Import    │  │   (Documentation Site) │ │
+│  └──────────────┘  └──────────────┘  └────────────────────────┘ │
+│         │                 │                      │               │
+│         └────────┬────────┴──────────────────────┘               │
+│                  ▼                                               │
+│         ┌──────────────────┐                                     │
+│         │   REDB Database   │                                    │
+│         │  (Postgres/MSSql) │                                    │
+│         └──────────────────┘                                     │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h2 id="project-1-redbdocmodels">Project 1: redb.Doc.Models</h2>
+<h3 id="purpose">Purpose</h3>
+<p>Shared data model for documentation storage in REDB.</p>
+<h3 id="key-design-decisions">Key Design Decisions</h3>
+<p><strong>Use _objects base fields (metadata only):</strong>
+| _objects field | Purpose |
+|----------------|---------|
+| <code>name</code> | Short name (&quot;LoadAsync&quot;, &quot;IRedbService&quot;) |
+| <code>value_string</code> | <strong>UID</strong> (&quot;redb.Core.IRedbService.LoadAsync&quot;) |
+| <code>value_long</code> | Member type enum (Namespace=0, Interface=1, Method=10...) |
+| <code>parent_id</code> | Tree structure (Namespace → Type → Member) |
+| <code>key</code> | Sort order within parent |
+| <code>hash</code> | Change detection for re-import |</p>
+<p><strong>Props for ALL business data</strong> (including Summary - it's documentation content, not metadata).</p>
+<h3 id="model">Model</h3>
+<pre><code class="lang-csharp">// redb.Doc.Models/DocMemberType.cs
+public enum DocMemberType
+{
+    Namespace = 0,
+    Interface = 1,
+    Class = 2,
+    Struct = 3,
+    Enum = 4,
+    Delegate = 5,
+    
+    // Members
+    Method = 10,
+    Property = 11,
+    Event = 12,
+    Field = 13,
+    Constructor = 14,
+    Operator = 15,
+    
+    // Enum/Type members
+    EnumMember = 20,
+    TypeParameter = 21
+}
+
+// redb.Doc.Models/DocMemberProps.cs
+[RedbScheme(&quot;DocMember&quot;)]
+public class DocMemberProps
+{
+    // ═══════════════════════════════════════════════════════════════
+    // IMPORTED DATA (from DocFX, overwritten on re-import)
+    // ═══════════════════════════════════════════════════════════════
+    
+    // === IDENTIFICATION ===
+    
+    /// &lt;summary&gt;
+    /// Full name with generics (&quot;redb.Core.IRedbService.LoadAsync{TProps}&quot;)
+    /// &lt;/summary&gt;
+    public string? FullName { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Namespace part (&quot;redb.Core&quot;)
+    /// &lt;/summary&gt;
+    public string? Namespace { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Assembly name (&quot;redb.Core&quot;)
+    /// &lt;/summary&gt;
+    public string? Assembly { get; set; }
+    
+    // === DOCUMENTATION ===
+    
+    /// &lt;summary&gt;
+    /// Summary (main description)
+    /// &lt;/summary&gt;
+    public string? Summary { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Remarks (additional info)
+    /// &lt;/summary&gt;
+    public string? Remarks { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Code syntax (&quot;public Task{T} LoadAsync{TProps}(long id)&quot;)
+    /// &lt;/summary&gt;
+    public string? Syntax { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Return type UID
+    /// &lt;/summary&gt;
+    public string? ReturnTypeUid { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Return type display name
+    /// &lt;/summary&gt;
+    public string? ReturnTypeName { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Return description from XML
+    /// &lt;/summary&gt;
+    public string? ReturnDescription { get; set; }
+    
+    // === NESTED DATA ===
+    
+    /// &lt;summary&gt;
+    /// Method/constructor parameters
+    /// &lt;/summary&gt;
+    public DocParameter[]? Parameters { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Generic type parameters
+    /// &lt;/summary&gt;
+    public DocTypeParameter[]? TypeParameters { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Examples from DocFX (code blocks in comments)
+    /// OVERWRITTEN on re-import!
+    /// &lt;/summary&gt;
+    public DocExample[]? ImportedExamples { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Exception types that can be thrown
+    /// &lt;/summary&gt;
+    public DocException[]? Exceptions { get; set; }
+    
+    // === REFERENCES (by UID string) ===
+    
+    /// &lt;summary&gt;
+    /// Implemented interfaces UIDs
+    /// &lt;/summary&gt;
+    public string[]? ImplementsUids { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Full inheritance chain [&quot;System.Object&quot;, &quot;RedbObjectBase&quot;, &quot;RedbObject&quot;]
+    /// &lt;/summary&gt;
+    public string[]? InheritanceChain { get; set; }
+    
+    /// &lt;summary&gt;
+    /// See also references
+    /// &lt;/summary&gt;
+    public string[]? SeeAlsoUids { get; set; }
+    
+    /// &lt;summary&gt;
+    /// UID of method/property this overrides
+    /// &lt;/summary&gt;
+    public string? OverridesUid { get; set; }
+    
+    // === SOURCE LOCATION ===
+    
+    /// &lt;summary&gt;
+    /// Source file path relative to project (&quot;Models/RedbObject.cs&quot;)
+    /// &lt;/summary&gt;
+    public string? SourceFile { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Source line number
+    /// &lt;/summary&gt;
+    public int? SourceLine { get; set; }
+    
+    // === MODIFIERS &amp; ATTRIBUTES ===
+    
+    /// &lt;summary&gt;
+    /// Modifiers: [&quot;public&quot;, &quot;async&quot;, &quot;virtual&quot;, &quot;static&quot;, &quot;abstract&quot;]
+    /// &lt;/summary&gt;
+    public string[]? Modifiers { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Attributes: [&quot;Obsolete&quot;, &quot;Required&quot;, &quot;JsonIgnore&quot;]
+    /// &lt;/summary&gt;
+    public string[]? Attributes { get; set; }
+    
+    // === SEARCH ===
+    
+    /// &lt;summary&gt;
+    /// Extracted keywords for search (auto-generated)
+    /// &lt;/summary&gt;
+    public string[]? Keywords { get; set; }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // USER DATA (edited in admin, PRESERVED on re-import)
+    // ═══════════════════════════════════════════════════════════════
+    
+    /// &lt;summary&gt;
+    /// User-added examples (NOT overwritten on import)
+    /// &lt;/summary&gt;
+    public DocExample[]? UserExamples { get; set; }
+    
+    /// &lt;summary&gt;
+    /// User notes/comments (admin can add extra info)
+    /// &lt;/summary&gt;
+    public string? UserNotes { get; set; }
+    
+    /// &lt;summary&gt;
+    /// User-added &quot;see also&quot; links (UIDs)
+    /// &lt;/summary&gt;
+    public string[]? UserSeeAlsoUids { get; set; }
+    
+    /// &lt;summary&gt;
+    /// User-added tags for categorization
+    /// &lt;/summary&gt;
+    public string[]? UserTags { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Is this member featured/highlighted on main page?
+    /// &lt;/summary&gt;
+    public bool IsFeatured { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Is this member deprecated? (user can mark)
+    /// &lt;/summary&gt;
+    public bool IsDeprecated { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Deprecation message
+    /// &lt;/summary&gt;
+    public string? DeprecationMessage { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Custom CSS class for styling
+    /// &lt;/summary&gt;
+    public string? CssClass { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Custom icon (e.g., &quot;star&quot;, &quot;warning&quot;, &quot;new&quot;)
+    /// &lt;/summary&gt;
+    public string? Icon { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Priority for sorting in featured/popular lists
+    /// &lt;/summary&gt;
+    public int? DisplayPriority { get; set; }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // EXTENSIBLE FIELDS (for future use)
+    // ═══════════════════════════════════════════════════════════════
+    
+    /// &lt;summary&gt;
+    /// Custom string field 1 (admin-defined purpose)
+    /// &lt;/summary&gt;
+    public string? Custom1 { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Custom string field 2
+    /// &lt;/summary&gt;
+    public string? Custom2 { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Custom string field 3
+    /// &lt;/summary&gt;
+    public string? Custom3 { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Custom JSON data (flexible extension point)
+    /// &lt;/summary&gt;
+    public string? CustomJson { get; set; }
+}
+
+// redb.Doc.Models/DocParameter.cs
+public class DocParameter
+{
+    public string Name { get; set; } = &quot;&quot;;
+    public string? TypeUid { get; set; }
+    public string? TypeName { get; set; }
+    public string? Description { get; set; }
+    public bool IsOptional { get; set; }
+    public string? DefaultValue { get; set; }
+    public int Order { get; set; }
+}
+
+// redb.Doc.Models/DocTypeParameter.cs
+public class DocTypeParameter
+{
+    public string Name { get; set; } = &quot;&quot;;  // &quot;TProps&quot;
+    public string? Description { get; set; }
+    public string? Constraints { get; set; }  // &quot;where TProps : class, new()&quot;
+    public int Order { get; set; }
+}
+
+// redb.Doc.Models/DocExample.cs
+public class DocExample
+{
+    public string? Title { get; set; }
+    public string? Description { get; set; }
+    public string? Language { get; set; }  // &quot;csharp&quot;, &quot;xml&quot;, &quot;json&quot;, etc.
+    public string Code { get; set; } = &quot;&quot;;
+    public int Order { get; set; }
+    
+    /// &lt;summary&gt;
+    /// Source: &quot;docfx&quot; = from DocFX import, &quot;user&quot; = added in admin
+    /// &lt;/summary&gt;
+    public string Source { get; set; } = &quot;docfx&quot;;
+}
+
+// redb.Doc.Models/DocException.cs
+public class DocException
+{
+    public string? TypeUid { get; set; }
+    public string? TypeName { get; set; }
+    public string? Description { get; set; }
+}
+</code></pre>
+<h3 id="project-structure">Project Structure</h3>
+<pre><code>redb.Doc.Models/
+├── redb.Doc.Models.csproj
+├── DocMemberType.cs
+├── DocMemberProps.cs
+├── DocParameter.cs
+├── DocTypeParameter.cs
+├── DocExample.cs
+└── DocException.cs
+</code></pre>
+<h3 id="dependencies">Dependencies</h3>
+<pre><code class="lang-xml">&lt;Project Sdk=&quot;Microsoft.NET.Sdk&quot;&gt;
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net9.0&lt;/TargetFramework&gt;
+  &lt;/PropertyGroup&gt;
+  &lt;ItemGroup&gt;
+    &lt;ProjectReference Include=&quot;..\redb.Core\redb.Core.csproj&quot; /&gt;
+  &lt;/ItemGroup&gt;
+&lt;/Project&gt;
+</code></pre>
+<hr>
+<h2 id="project-2-redbdocimport">Project 2: redb.Doc.Import</h2>
+<h3 id="purpose-1">Purpose</h3>
+<p>Import documentation from DocFX JSON into REDB.</p>
+<h3 id="source-format-docfx-json-viewmodel">Source Format: DocFX JSON (ViewModel)</h3>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Recommendation</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DocFX JSON</strong></td>
+<td>✅ <strong>Preferred</strong></td>
+<td>Rich data: syntax, inheritance, resolved type names</td>
+</tr>
+<tr>
+<td>XML</td>
+<td>❌ Not recommended</td>
+<td>Only comments, no signatures/inheritance</td>
+</tr>
+<tr>
+<td>YAML</td>
+<td>❌ Not recommended</td>
+<td>Same as JSON but harder to parse</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why DocFX JSON?</strong></p>
+<ul>
+<li>Full method signatures (<code>Task&lt;RedbObject&lt;TProps&gt;&gt; LoadAsync&lt;TProps&gt;(long id)</code>)</li>
+<li>Inheritance chain</li>
+<li>Implemented interfaces</li>
+<li>Resolved generic type names (not <code>{``0}</code> but <code>TProps</code>)</li>
+<li>Source file/line info</li>
+</ul>
+<h3 id="import-process">Import Process</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│  Step 1: DocFX Build                                                     │
+│  docfx metadata + docfx build --exportViewModel                          │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│  *.json files   │────▶│  Deserialize +   │────▶│  List&lt;RedbObject │
+│  (ViewModel)    │     │  Map to REDB     │     │  &lt;DocMemberProps&gt;│
+└─────────────────┘     └──────────────────┘     └────────┬─────────┘
+                                                          │
+                                                          ▼
+                                    ┌──────────────────────────────────┐
+                                    │  DocImportService                 │
+                                    │  1. Build tree (parent-child)     │
+                                    │  2. Compute hashes                │
+                                    │  3. Diff with existing            │
+                                    │  4. Preserve User* fields         │
+                                    │  5. Bulk insert/update            │
+                                    └──────────────────────────────────┘
+                                                          │
+                                                          ▼
+                                              ┌──────────────────┐
+                                              │  REDB Database    │
+                                              │  _objects/_values │
+                                              └──────────────────┘
+</code></pre>
+<h3 id="docfx-configuration">DocFX Configuration</h3>
+<pre><code class="lang-json">// docs/docfx/docfx.json
+{
+  &quot;metadata&quot;: [
+    {
+      &quot;src&quot;: [
+        {
+          &quot;src&quot;: &quot;../../&quot;,
+          &quot;files&quot;: [
+            &quot;redb.Core/redb.Core.csproj&quot;,
+            &quot;redb.Postgres/redb.Postgres.csproj&quot;,
+            &quot;redb.MSSql/redb.MSSql.csproj&quot;
+          ],
+          &quot;exclude&quot;: [&quot;**/bin/**&quot;, &quot;**/obj/**&quot;]
+        }
+      ],
+      &quot;dest&quot;: &quot;api&quot;
+    }
+  ],
+  &quot;build&quot;: {
+    &quot;content&quot;: [
+      { &quot;files&quot;: [&quot;api/**/*.yml&quot;] }
+    ],
+    &quot;dest&quot;: &quot;_site&quot;,
+    &quot;exportViewModel&quot;: true,
+    &quot;viewModelOutputFolder&quot;: &quot;_exportedViewModel&quot;
+  }
+}
+</code></pre>
+<h3 id="docfx-build-commands">DocFX Build Commands</h3>
+<pre><code class="lang-bash"># Generate metadata (YAML from code)
+docfx metadata docs/docfx/docfx.json
+
+# Build and export ViewModel as JSON
+docfx build docs/docfx/docfx.json --exportViewModel
+
+# Result: docs/docfx/_exportedViewModel/*.json
+</code></pre>
+<h3 id="key-classes">Key Classes</h3>
+<pre><code class="lang-csharp">// ═══════════════════════════════════════════════════════════════
+// DocFX DTO (generate via Visual Studio &quot;Paste JSON as Classes&quot;)
+// ═══════════════════════════════════════════════════════════════
+
+// redb.Doc.Import/DocFx/DocFxItem.cs
+// Структура DocFX ViewModel - генерируется из JSON
+public class DocFxItem
+{
+    public string Uid { get; set; }
+    public string Name { get; set; }
+    public string FullName { get; set; }
+    public string Type { get; set; }  // &quot;Class&quot;, &quot;Method&quot;, &quot;Property&quot;...
+    public string Namespace { get; set; }
+    public string[] Assemblies { get; set; }
+    public string Summary { get; set; }
+    public string Remarks { get; set; }
+    public DocFxSyntax Syntax { get; set; }
+    public string[] Inheritance { get; set; }
+    public string[] Implements { get; set; }
+    public DocFxSource Source { get; set; }
+    public string[] Modifiers { get; set; }
+    // ... остальные поля DocFX
+}
+
+public class DocFxSyntax
+{
+    public string Content { get; set; }
+    public DocFxParameter[] Parameters { get; set; }
+    public DocFxParameter[] TypeParameters { get; set; }
+    public DocFxReturn Return { get; set; }
+}
+
+public class DocFxSource
+{
+    public string Path { get; set; }
+    public int StartLine { get; set; }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAPPER: DocFxItem → RedbObject&lt;DocMemberProps&gt;
+// ═══════════════════════════════════════════════════════════════
+
+// redb.Doc.Import/Mapping/DocFxMapper.cs
+public static class DocFxMapper
+{
+    public static RedbObject&lt;DocMemberProps&gt; ToRedbObject(DocFxItem item)
+    {
+        return new RedbObject&lt;DocMemberProps&gt;
+        {
+            Name = item.Name,
+            ValueString = item.Uid,
+            ValueLong = (long)ParseMemberType(item.Type),
+            Hash = ComputeHash(item),
+            Props = new DocMemberProps
+            {
+                FullName = item.FullName,
+                Namespace = item.Namespace,
+                Assembly = item.Assemblies?.FirstOrDefault(),
+                Summary = item.Summary,
+                Remarks = item.Remarks,
+                Syntax = item.Syntax?.Content,
+                InheritanceChain = item.Inheritance,
+                ImplementsUids = item.Implements,
+                SourceFile = item.Source?.Path,
+                SourceLine = item.Source?.StartLine,
+                Modifiers = item.Modifiers,
+                // ... map all fields
+            }
+        };
+    }
+    
+    private static DocMemberType ParseMemberType(string type) =&gt; type switch
+    {
+        &quot;Namespace&quot; =&gt; DocMemberType.Namespace,
+        &quot;Interface&quot; =&gt; DocMemberType.Interface,
+        &quot;Class&quot; =&gt; DocMemberType.Class,
+        &quot;Struct&quot; =&gt; DocMemberType.Struct,
+        &quot;Enum&quot; =&gt; DocMemberType.Enum,
+        &quot;Method&quot; =&gt; DocMemberType.Method,
+        &quot;Property&quot; =&gt; DocMemberType.Property,
+        &quot;Field&quot; =&gt; DocMemberType.Field,
+        &quot;Event&quot; =&gt; DocMemberType.Event,
+        &quot;Constructor&quot; =&gt; DocMemberType.Constructor,
+        _ =&gt; DocMemberType.Class
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORT SERVICE
+// ═══════════════════════════════════════════════════════════════
+
+// redb.Doc.Import/DocImportService.cs
+public class DocImportService
+{
+    private readonly IRedbService _redb;
+    
+    /// &lt;summary&gt;
+    /// Import from DocFX ViewModel folder.
+    /// Deserialize JSON → Map to REDB → Save
+    /// &lt;/summary&gt;
+    public Task&lt;ImportResult&gt; ImportAsync(string viewModelFolder, ImportOptions? options = null);
+    
+    /// &lt;summary&gt;
+    /// Full pipeline: run DocFX + import.
+    /// &lt;/summary&gt;
+    public Task&lt;ImportResult&gt; BuildAndImportAsync(string docfxJsonPath, ImportOptions? options = null);
+}
+
+// redb.Doc.Import/ImportOptions.cs
+public class ImportOptions
+{
+    public bool IncrementalMode { get; set; } = true;
+    public bool ExtractKeywords { get; set; } = true;
+    public string[]? AssemblyFilter { get; set; }  // null = all
+    public bool PreserveUserData { get; set; } = true;  // Keep User* fields
+    public bool RunDocFxBuild { get; set; } = false;    // Auto-run docfx
+}
+
+// redb.Doc.Import/ImportResult.cs
+public class ImportResult
+{
+    public int TotalParsed { get; set; }
+    public int Inserted { get; set; }
+    public int Updated { get; set; }
+    public int Unchanged { get; set; }
+    public int Deleted { get; set; }
+    public int UserDataPreserved { get; set; }  // Count of preserved user edits
+    public TimeSpan Duration { get; set; }
+    public List&lt;string&gt; Errors { get; set; } = new();
+}
+</code></pre>
+<h3 id="docfx-viewmodel-json-structure">DocFX ViewModel JSON Structure</h3>
+<pre><code class="lang-json">// _exportedViewModel/redb.Core.IRedbService.json (example)
+{
+  &quot;uid&quot;: &quot;redb.Core.IRedbService&quot;,
+  &quot;name&quot;: &quot;IRedbService&quot;,
+  &quot;fullName&quot;: &quot;redb.Core.IRedbService&quot;,
+  &quot;type&quot;: &quot;Interface&quot;,
+  &quot;namespace&quot;: &quot;redb.Core&quot;,
+  &quot;assemblies&quot;: [&quot;redb.Core&quot;],
+  &quot;summary&quot;: &quot;Main service interface for REDB operations.&quot;,
+  &quot;syntax&quot;: {
+    &quot;content&quot;: &quot;public interface IRedbService&quot;
+  },
+  &quot;methods&quot;: [
+    {
+      &quot;uid&quot;: &quot;redb.Core.IRedbService.LoadAsync``1(System.Int64)&quot;,
+      &quot;name&quot;: &quot;LoadAsync&lt;TProps&gt;(long)&quot;,
+      &quot;fullName&quot;: &quot;redb.Core.IRedbService.LoadAsync&lt;TProps&gt;(long)&quot;,
+      &quot;summary&quot;: &quot;Loads object by ID.&quot;,
+      &quot;syntax&quot;: {
+        &quot;content&quot;: &quot;Task&lt;RedbObject&lt;TProps&gt;&gt; LoadAsync&lt;TProps&gt;(long id) where TProps : class, new()&quot;,
+        &quot;parameters&quot;: [
+          { &quot;id&quot;: &quot;id&quot;, &quot;type&quot;: &quot;System.Int64&quot;, &quot;description&quot;: &quot;Object ID&quot; }
+        ],
+        &quot;typeParameters&quot;: [
+          { &quot;id&quot;: &quot;TProps&quot;, &quot;description&quot;: &quot;Props type&quot; }
+        ],
+        &quot;return&quot;: {
+          &quot;type&quot;: &quot;System.Threading.Tasks.Task{redb.Core.RedbObject{``0}}&quot;,
+          &quot;description&quot;: &quot;Object with props&quot;
+        }
+      }
+    }
+  ]
+}
+</code></pre>
+<h3 id="url-building-we-ignore-docfx-urls">URL Building (we ignore DocFX URLs)</h3>
+<pre><code class="lang-csharp">// We store UID, build our own URLs
+public static class UrlBuilder
+{
+    /// &lt;summary&gt;
+    /// Build site URL from UID.
+    /// UID: &quot;redb.Core.IRedbService.LoadAsync``1&quot;
+    /// URL: &quot;/docs/redb.Core/IRedbService/LoadAsync&quot;
+    /// &lt;/summary&gt;
+    public static string FromUid(string uid)
+    {
+        // Remove generic markers
+        var clean = Regex.Replace(uid, @&quot;``\d+&quot;, &quot;&quot;);
+        clean = Regex.Replace(clean, @&quot;\(.*\)&quot;, &quot;&quot;); // remove params
+        
+        var parts = clean.Split('.');
+        if (parts.Length &lt; 2) return $&quot;/docs/{clean}&quot;;
+        
+        var ns = string.Join(&quot;.&quot;, parts.Take(parts.Length - 1));
+        var name = parts.Last();
+        
+        return $&quot;/docs/{ns}/{name}&quot;;
+    }
+}
+</code></pre>
+<h3 id="project-structure-1">Project Structure</h3>
+<pre><code>redb.Doc.Import/
+├── redb.Doc.Import.csproj
+├── Configuration/
+│   ├── DocImportConfiguration.cs
+│   └── DocFxConfig.cs
+├── DocFx/                        # DTO for DocFX JSON (from &quot;Paste JSON as Classes&quot;)
+│   ├── DocFxItem.cs
+│   ├── DocFxSyntax.cs
+│   ├── DocFxParameter.cs
+│   ├── DocFxSource.cs
+│   └── DocFxReturn.cs
+├── Mapping/
+│   └── DocFxMapper.cs            # DocFxItem → RedbObject&lt;DocMemberProps&gt;
+├── Services/
+│   ├── DocImportService.cs       # Main import logic
+│   ├── DocFxRunner.cs            # Runs docfx CLI
+│   ├── TreeBuilder.cs            # Builds parent-child relationships
+│   └── KeywordExtractor.cs
+├── Models/
+│   ├── ImportOptions.cs
+│   └── ImportResult.cs
+└── Helpers/
+    └── UrlBuilder.cs
+</code></pre>
+<h3 id="import-configuration">Import Configuration</h3>
+<pre><code class="lang-json">// appsettings.json or doc-import.json
+{
+  &quot;DocImport&quot;: {
+    // DocFX configuration
+    &quot;DocFx&quot;: {
+      &quot;ConfigPath&quot;: &quot;./docs/docfx/docfx.json&quot;,
+      &quot;ViewModelFolder&quot;: &quot;./docs/docfx/_exportedViewModel&quot;,
+      &quot;RunDocFxOnImport&quot;: true  // Auto-run docfx before import
+    },
+    
+    // Projects to include in docfx.json
+    &quot;Projects&quot;: [
+      { &quot;Name&quot;: &quot;redb.Core&quot;, &quot;Path&quot;: &quot;redb.Core/redb.Core.csproj&quot;, &quot;Enabled&quot;: true },
+      { &quot;Name&quot;: &quot;redb.Postgres&quot;, &quot;Path&quot;: &quot;redb.Postgres/redb.Postgres.csproj&quot;, &quot;Enabled&quot;: true },
+      { &quot;Name&quot;: &quot;redb.MSSql&quot;, &quot;Path&quot;: &quot;redb.MSSql/redb.MSSql.csproj&quot;, &quot;Enabled&quot;: true },
+      { &quot;Name&quot;: &quot;redb.Core.Pro&quot;, &quot;Path&quot;: &quot;redb.Core.Pro/redb.Core.Pro.csproj&quot;, &quot;Enabled&quot;: true }
+    ],
+    
+    // Import behavior
+    &quot;Options&quot;: {
+      &quot;PreserveUserData&quot;: true,      // Keep User* fields on re-import
+      &quot;ExtractKeywords&quot;: true,
+      &quot;IncrementalByHash&quot;: true      // Skip unchanged (by hash)
+    }
+  }
+}
+</code></pre>
+<pre><code class="lang-csharp">// redb.Doc.Import/Configuration/DocImportConfiguration.cs
+public class DocImportConfiguration
+{
+    public DocFxConfig DocFx { get; set; } = new();
+    public List&lt;ProjectSource&gt; Projects { get; set; } = new();
+    public ImportOptionsConfig Options { get; set; } = new();
+}
+
+public class DocFxConfig
+{
+    public string ConfigPath { get; set; } = &quot;./docs/docfx/docfx.json&quot;;
+    public string ViewModelFolder { get; set; } = &quot;./docs/docfx/_exportedViewModel&quot;;
+    public bool RunDocFxOnImport { get; set; } = true;
+}
+
+public class ProjectSource
+{
+    public string Name { get; set; } = &quot;&quot;;
+    public string Path { get; set; } = &quot;&quot;;
+    public bool Enabled { get; set; } = true;
+}
+
+public class ImportOptionsConfig
+{
+    public bool PreserveUserData { get; set; } = true;
+    public bool ExtractKeywords { get; set; } = true;
+    public bool IncrementalByHash { get; set; } = true;
+}
+</code></pre>
+<h3 id="docfxrunner-service">DocFxRunner Service</h3>
+<pre><code class="lang-csharp">// redb.Doc.Import/Services/DocFxRunner.cs
+public class DocFxRunner
+{
+    /// &lt;summary&gt;
+    /// Run DocFX to generate ViewModel JSON.
+    /// &lt;/summary&gt;
+    public async Task&lt;bool&gt; RunAsync(string docfxJsonPath)
+    {
+        // Step 1: Generate metadata (YAML from code)
+        var metadataResult = await RunProcessAsync(&quot;docfx&quot;, $&quot;metadata \&quot;{docfxJsonPath}\&quot;&quot;);
+        if (!metadataResult.Success) return false;
+        
+        // Step 2: Build and export ViewModel
+        var buildResult = await RunProcessAsync(&quot;docfx&quot;, $&quot;build \&quot;{docfxJsonPath}\&quot; --exportViewModel&quot;);
+        return buildResult.Success;
+    }
+    
+    private async Task&lt;ProcessResult&gt; RunProcessAsync(string command, string args)
+    {
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = command,
+                Arguments = args,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            }
+        };
+        
+        process.Start();
+        await process.WaitForExitAsync();
+        
+        return new ProcessResult
+        {
+            Success = process.ExitCode == 0,
+            Output = await process.StandardOutput.ReadToEndAsync(),
+            Error = await process.StandardError.ReadToEndAsync()
+        };
+    }
+}
+</code></pre>
+<h3 id="import-service-with-user-data-preservation">Import Service with User Data Preservation</h3>
+<pre><code class="lang-csharp">// Key logic: Deserialize → Map → Preserve User data → Save
+public async Task&lt;ImportResult&gt; ImportAsync(string viewModelFolder, ImportOptions? options)
+{
+    var jsonFiles = Directory.GetFiles(viewModelFolder, &quot;*.json&quot;);
+    var existing = await LoadExistingByUid();
+    var result = new ImportResult();
+    
+    foreach (var file in jsonFiles)
+    {
+        // 1. Deserialize DocFX JSON
+        var json = await File.ReadAllTextAsync(file);
+        var docFxItem = JsonSerializer.Deserialize&lt;DocFxItem&gt;(json);
+        if (docFxItem == null) continue;
+        
+        // 2. Map to RedbObject
+        var member = DocFxMapper.ToRedbObject(docFxItem);
+        
+        // 3. Check existing &amp; preserve user data
+        if (existing.TryGetValue(member.ValueString, out var existingObj))
+        {
+            // Check if changed (by hash)
+            if (existingObj.Hash == member.Hash)
+            {
+                result.Unchanged++;
+                continue;
+            }
+            
+            // PRESERVE user data!
+            member.Props.UserExamples = existingObj.Props.UserExamples;
+            member.Props.UserNotes = existingObj.Props.UserNotes;
+            member.Props.UserSeeAlsoUids = existingObj.Props.UserSeeAlsoUids;
+            member.Props.UserTags = existingObj.Props.UserTags;
+            member.Props.IsFeatured = existingObj.Props.IsFeatured;
+            member.Props.IsDeprecated = existingObj.Props.IsDeprecated;
+            member.Props.DeprecationMessage = existingObj.Props.DeprecationMessage;
+            member.Props.CssClass = existingObj.Props.CssClass;
+            member.Props.Icon = existingObj.Props.Icon;
+            member.Props.DisplayPriority = existingObj.Props.DisplayPriority;
+            member.Props.Custom1 = existingObj.Props.Custom1;
+            member.Props.Custom2 = existingObj.Props.Custom2;
+            member.Props.Custom3 = existingObj.Props.Custom3;
+            member.Props.CustomJson = existingObj.Props.CustomJson;
+            
+            result.UserDataPreserved++;
+            member.Id = existingObj.Id;
+            await _redb.SaveAsync(member);
+            result.Updated++;
+        }
+        else
+        {
+            await _redb.SaveAsync(member);
+            result.Inserted++;
+        }
+    }
+    
+    return result;
+}
+
+/// &lt;summary&gt;
+/// Full pipeline: run DocFX + import to REDB.
+/// &lt;/summary&gt;
+public async Task&lt;ImportResult&gt; BuildAndImportAsync(string docfxJsonPath)
+{
+    // Step 1: Run DocFX
+    var runner = new DocFxRunner();
+    var docfxSuccess = await runner.RunAsync(docfxJsonPath);
+    if (!docfxSuccess)
+        throw new Exception(&quot;DocFX build failed&quot;);
+    
+    // Step 2: Import from generated ViewModel
+    var viewModelFolder = Path.Combine(
+        Path.GetDirectoryName(docfxJsonPath)!, 
+        &quot;_exportedViewModel&quot;);
+    
+    return await ImportAsync(viewModelFolder);
+}
+</code></pre>
+<h3 id="cli-tool">CLI Tool</h3>
+<pre><code class="lang-bash"># Full pipeline: DocFX build + import
+dotnet redb-doc-import --docfx ./docs/docfx/docfx.json
+
+# Import from existing ViewModel folder (skip DocFX)
+dotnet redb-doc-import --viewmodel ./docs/docfx/_exportedViewModel
+
+# Using config file
+dotnet redb-doc-import --config ./appsettings.json
+
+# Full reimport (WARNING: clears user data!)
+dotnet redb-doc-import --docfx ./docs/docfx/docfx.json --full --force
+</code></pre>
+<hr>
+<h2 id="project-3-redbdocweb">Project 3: redb.Doc.Web</h2>
+<h3 id="purpose-2">Purpose</h3>
+<p>Documentation website with search, navigation, and API reference.</p>
+<h3 id="technology-stack">Technology Stack</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Technology</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backend</td>
+<td>ASP.NET Core Minimal API</td>
+<td>Simple, fast, native</td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td>Blazor Server or React</td>
+<td>Rich UI</td>
+</tr>
+<tr>
+<td>Search</td>
+<td>REDB Query API</td>
+<td>Full-text on all fields</td>
+</tr>
+<tr>
+<td>Styling</td>
+<td>Tailwind CSS</td>
+<td>Modern, customizable</td>
+</tr>
+</tbody>
+</table>
+<h3 id="key-features">Key Features</h3>
+<ol>
+<li><strong>Tree Navigation</strong> - Namespace → Type → Members</li>
+<li><strong>Full-Text Search</strong> - By Summary, Remarks, Parameters, Examples</li>
+<li><strong>Type Filtering</strong> - Show only Methods, Properties, etc.</li>
+<li><strong>Cross-References</strong> - Clickable links between types</li>
+<li><strong>Syntax Highlighting</strong> - For code examples</li>
+<li><strong>Responsive Design</strong> - Mobile-friendly</li>
+</ol>
+<h3 id="api-endpoints">API Endpoints</h3>
+<pre><code class="lang-csharp">// redb.Doc.Web/Endpoints/DocEndpoints.cs
+
+app.MapGet(&quot;/api/tree&quot;, async (IRedbService redb) =&gt;
+{
+    // Return tree structure for navigation
+    var roots = await redb.Query&lt;DocMemberProps&gt;()
+        .WhereRedb(x =&gt; x.ParentId == null)
+        .WhereRedb(x =&gt; x.ValueLong == (long)DocMemberType.Namespace)
+        .OrderByRedb(x =&gt; x.Name)
+        .ToListAsync();
+    
+    return roots.Select(r =&gt; new TreeNode(r));
+});
+
+app.MapGet(&quot;/api/member/{uid}&quot;, async (string uid, IRedbService redb) =&gt;
+{
+    // Get member by UID
+    var member = await redb.Query&lt;DocMemberProps&gt;()
+        .WhereRedb(x =&gt; x.ValueString == uid)
+        .FirstOrDefaultAsync();
+    
+    return member is null ? Results.NotFound() : Results.Ok(MapToDto(member));
+});
+
+app.MapGet(&quot;/api/children/{id:long}&quot;, async (long id, IRedbService redb) =&gt;
+{
+    // Get direct children
+    var children = await redb.Query&lt;DocMemberProps&gt;()
+        .WhereChildrenOf(id)
+        .OrderByRedb(x =&gt; x.Key)  // sort order
+        .ThenByRedb(x =&gt; x.Name)
+        .ToListAsync();
+    
+    return children.Select(MapToDto);
+});
+
+app.MapGet(&quot;/api/search&quot;, async (string q, DocMemberType? type, IRedbService redb) =&gt;
+{
+    var query = redb.Query&lt;DocMemberProps&gt;();
+    
+    // Search in note (summary)
+    query = query.WhereRedb(x =&gt; x.Note!.Contains(q));
+    
+    // Or search in Props fields
+    // query = query.Where(x =&gt; x.Remarks!.Contains(q) || x.Syntax!.Contains(q));
+    
+    // Filter by type
+    if (type.HasValue)
+        query = query.WhereRedb(x =&gt; x.ValueLong == (long)type.Value);
+    
+    var results = await query
+        .Take(50)
+        .ToListAsync();
+    
+    return results.Select(MapToSearchResult);
+});
+
+app.MapGet(&quot;/api/descendants/{id:long}&quot;, async (long id, IRedbService redb) =&gt;
+{
+    // Get all descendants (for expanded tree view)
+    var descendants = await redb.Query&lt;DocMemberProps&gt;()
+        .WhereDescendantsOf(id)
+        .ToListAsync();
+    
+    return descendants.Select(MapToDto);
+});
+</code></pre>
+<h3 id="frontend-pages">Frontend Pages</h3>
+<pre><code>/ (home)
+  - Search bar
+  - Featured members (IsFeatured = true)
+  - Popular namespaces
+  - Recent updates
+
+/docs/{namespace}
+  - Namespace overview
+  - List of types
+
+/docs/{namespace}/{type}
+  - Type documentation
+  - Members list
+  - Inheritance
+  - Implements
+
+/docs/{namespace}/{type}/{member}
+  - Member documentation
+  - Parameters
+  - Examples (ImportedExamples + UserExamples merged)
+  - Return type
+  - User notes (if any)
+
+/search?q={query}&amp;type={type}
+  - Search results
+  - Filters by type, namespace, tags
+
+/admin (protected)
+  - Edit member: add UserExamples, UserNotes, UserTags
+  - Mark as Featured/Deprecated
+  - Custom fields editor
+  - Import trigger button
+</code></pre>
+<h3 id="examples-display-logic">Examples Display Logic</h3>
+<pre><code class="lang-csharp">// Merge imported + user examples for display
+public IEnumerable&lt;DocExample&gt; GetAllExamples(DocMemberProps props)
+{
+    var all = new List&lt;DocExample&gt;();
+    
+    // Imported examples first
+    if (props.ImportedExamples != null)
+        all.AddRange(props.ImportedExamples);
+    
+    // User examples after (or mark visually)
+    if (props.UserExamples != null)
+        all.AddRange(props.UserExamples);
+    
+    return all.OrderBy(e =&gt; e.Order);
+}
+
+// In Razor/Blazor
+@foreach (var example in GetAllExamples(member.Props))
+{
+    &lt;div class=&quot;example @(example.Source == &quot;user&quot; ? &quot;user-example&quot; : &quot;&quot;)&quot;&gt;
+        @if (example.Source == &quot;user&quot;)
+        {
+            &lt;span class=&quot;badge&quot;&gt;User Added&lt;/span&gt;
+        }
+        &lt;h4&gt;@example.Title&lt;/h4&gt;
+        &lt;pre&gt;&lt;code class=&quot;@example.Language&quot;&gt;@example.Code&lt;/code&gt;&lt;/pre&gt;
+    &lt;/div&gt;
+}
+</code></pre>
+<h3 id="admin-editor">Admin Editor</h3>
+<pre><code class="lang-csharp">// Admin endpoint to update user data only
+app.MapPut(&quot;/admin/member/{id:long}&quot;, async (long id, UpdateMemberRequest req, IRedbService redb) =&gt;
+{
+    var member = await redb.LoadAsync&lt;DocMemberProps&gt;(id);
+    if (member is null) return Results.NotFound();
+    
+    // Update only user fields (imported fields are readonly in admin)
+    member.Props.UserExamples = req.UserExamples;
+    member.Props.UserNotes = req.UserNotes;
+    member.Props.UserTags = req.UserTags;
+    member.Props.UserSeeAlsoUids = req.UserSeeAlsoUids;
+    member.Props.IsFeatured = req.IsFeatured;
+    member.Props.IsDeprecated = req.IsDeprecated;
+    member.Props.DeprecationMessage = req.DeprecationMessage;
+    member.Props.CssClass = req.CssClass;
+    member.Props.Icon = req.Icon;
+    member.Props.DisplayPriority = req.DisplayPriority;
+    member.Props.Custom1 = req.Custom1;
+    member.Props.Custom2 = req.Custom2;
+    member.Props.Custom3 = req.Custom3;
+    member.Props.CustomJson = req.CustomJson;
+    
+    await redb.SaveAsync(member);
+    return Results.Ok();
+});
+
+// Trigger re-import
+app.MapPost(&quot;/admin/import&quot;, async (DocImportService importService) =&gt;
+{
+    var result = await importService.ImportFromConfigAsync();
+    return Results.Ok(result);
+});
+</code></pre>
+<h3 id="project-structure-2">Project Structure</h3>
+<pre><code>redb.Doc.Web/
+├── redb.Doc.Web.csproj
+├── Program.cs
+├── appsettings.json              # includes DocImport config
+├── Endpoints/
+│   ├── DocEndpoints.cs           # public API
+│   ├── SearchEndpoints.cs
+│   └── AdminEndpoints.cs         # protected admin API
+├── Services/
+│   ├── DocService.cs
+│   ├── SearchService.cs
+│   └── ExampleMergeService.cs
+├── Models/
+│   ├── TreeNodeDto.cs
+│   ├── MemberDto.cs
+│   ├── SearchResultDto.cs
+│   └── UpdateMemberRequest.cs
+├── wwwroot/
+│   ├── css/
+│   └── js/
+└── Pages/ (if Blazor)
+    ├── Index.razor
+    ├── Member.razor
+    ├── Search.razor
+    └── Admin/
+        ├── MemberEditor.razor
+        ├── ExampleEditor.razor
+        └── ImportDashboard.razor
+</code></pre>
+<hr>
+<h2 id="implementation-order">Implementation Order</h2>
+<h3 id="phase-1-foundation">Phase 1: Foundation</h3>
+<ol>
+<li>Create <code>redb.Doc.Models</code> project</li>
+<li>Define <code>DocMemberProps</code> and related classes</li>
+<li>Add to solution</li>
+</ol>
+<h3 id="phase-2-import">Phase 2: Import</h3>
+<ol>
+<li>Create <code>redb.Doc.Import</code> project</li>
+<li>Setup DocFX configuration (<code>docfx.json</code>)</li>
+<li>Generate DocFX DTO classes (Visual Studio &quot;Paste JSON as Classes&quot;)</li>
+<li>Implement <code>DocFxMapper</code> (DocFxItem → RedbObject<docmemberprops>)</docmemberprops></li>
+<li>Implement <code>DocFxRunner</code> (CLI wrapper)</li>
+<li>Implement <code>DocImportService</code></li>
+<li>Test with redb.Core project</li>
+</ol>
+<h3 id="phase-3-web">Phase 3: Web</h3>
+<ol>
+<li>Create <code>redb.Doc.Web</code> project</li>
+<li>Implement API endpoints</li>
+<li>Basic UI (tree + member view)</li>
+<li>Search functionality</li>
+</ol>
+<h3 id="phase-4-polish">Phase 4: Polish</h3>
+<ol>
+<li>Syntax highlighting</li>
+<li>Cross-reference links</li>
+<li>Responsive design</li>
+<li>Performance optimization</li>
+</ol>
+<hr>
+<h2 id="usage-examples">Usage Examples</h2>
+<h3 id="import-documentation">Import Documentation</h3>
+<pre><code class="lang-csharp">// In console app or startup
+var redb = serviceProvider.GetRequiredService&lt;IRedbService&gt;();
+var importService = new DocImportService(redb);
+
+// Option 1: Full pipeline (DocFX build + import)
+var result = await importService.BuildAndImportAsync(&quot;docs/docfx/docfx.json&quot;);
+
+// Option 2: Import from existing ViewModel folder
+var result = await importService.ImportAsync(&quot;docs/docfx/_exportedViewModel&quot;);
+
+Console.WriteLine($&quot;Imported: {result.Inserted} new, {result.Updated} updated, {result.UserDataPreserved} user edits preserved&quot;);
+</code></pre>
+<h3 id="query-documentation">Query Documentation</h3>
+<pre><code class="lang-csharp">// Search by summary (now in Props, not Note)
+var asyncMethods = await redb.Query&lt;DocMemberProps&gt;()
+    .Where(x =&gt; x.Summary!.Contains(&quot;async&quot;))
+    .WhereRedb(x =&gt; x.ValueLong == (long)DocMemberType.Method)
+    .ToListAsync();
+
+// Get interface with all members
+var interfaceId = await redb.Query&lt;DocMemberProps&gt;()
+    .WhereRedb(x =&gt; x.ValueString == &quot;redb.Core.IRedbService&quot;)  // UID without prefix
+    .Select(x =&gt; x.Id)
+    .FirstOrDefaultAsync();
+
+var members = await redb.Query&lt;DocMemberProps&gt;()
+    .WhereDescendantsOf(interfaceId)
+    .OrderByRedb(x =&gt; x.ValueLong)  // group by type
+    .ThenByRedb(x =&gt; x.Name)
+    .ToListAsync();
+
+// Find all implementations of interface
+var implementations = await redb.Query&lt;DocMemberProps&gt;()
+    .Where(x =&gt; x.ImplementsUids!.Contains(&quot;redb.Core.IRedbService&quot;))
+    .ToListAsync();
+
+// Search featured items
+var featured = await redb.Query&lt;DocMemberProps&gt;()
+    .Where(x =&gt; x.IsFeatured)
+    .OrderBy(x =&gt; x.DisplayPriority)
+    .ToListAsync();
+</code></pre>
+<hr>
+<h2 id="summary">Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Purpose</th>
+<th>Key Files</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>redb.Doc.Models</code></td>
+<td>Shared data model</td>
+<td><code>DocMemberProps.cs</code>, <code>DocExample.cs</code></td>
+</tr>
+<tr>
+<td><code>redb.Doc.Import</code></td>
+<td>DocFX JSON → REDB import</td>
+<td><code>DocFxMapper.cs</code>, <code>DocFxRunner.cs</code>, <code>DocImportService.cs</code></td>
+</tr>
+<tr>
+<td><code>redb.Doc.Web</code></td>
+<td>Documentation website + Admin</td>
+<td>Endpoints, Pages, Admin</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Source format:</strong> DocFX ViewModel JSON (rich metadata: syntax, inheritance, interfaces).</p>
+<p><strong>Storage:</strong> Single <code>DocMember</code> scheme with tree structure via <code>parent_id</code>.</p>
+<p><strong>Search:</strong> Full EAV Query API - search by any field.</p>
+<p><strong>User data preservation:</strong> User* fields (examples, notes, tags) preserved on re-import.</p>
+<hr>
+<h2 id="key-design-decisions-1">Key Design Decisions</h2>
+<h3 id="1-separation-of-imported-vs-user-data">1. Separation of Imported vs User Data</h3>
+<table>
+<thead>
+<tr>
+<th>Field Type</th>
+<th>On Re-import</th>
+<th>Editable in Admin</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Summary</code>, <code>Remarks</code>, <code>Syntax</code></td>
+<td>Overwritten</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>ImportedExamples</code>, <code>Parameters</code>, <code>Exceptions</code></td>
+<td>Overwritten</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>InheritanceChain</code>, <code>ImplementsUids</code>, <code>Modifiers</code></td>
+<td>Overwritten</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>SourceFile</code>, <code>SourceLine</code>, <code>Attributes</code></td>
+<td>Overwritten</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>UserExamples</code>, <code>UserNotes</code>, <code>UserTags</code></td>
+<td><strong>Preserved</strong></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>IsFeatured</code>, <code>IsDeprecated</code></td>
+<td><strong>Preserved</strong></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>Custom1</code>, <code>Custom2</code>, <code>CustomJson</code></td>
+<td><strong>Preserved</strong></td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-_objects-fields--metadata-only">2. _objects Fields = Metadata Only</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Usage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Short display name</td>
+</tr>
+<tr>
+<td><code>value_string</code></td>
+<td>UID for lookups</td>
+</tr>
+<tr>
+<td><code>value_long</code></td>
+<td>MemberType enum</td>
+</tr>
+<tr>
+<td><code>parent_id</code></td>
+<td>Tree structure</td>
+</tr>
+<tr>
+<td><code>hash</code></td>
+<td>Change detection</td>
+</tr>
+</tbody>
+</table>
+<p><strong>All documentation content in Props</strong> (Summary, Remarks, Examples).</p>
+<h3 id="3-import-configuration">3. Import Configuration</h3>
+<ul>
+<li>DocFX ViewModel JSON as source (rich metadata)</li>
+<li>Auto-run DocFX before import (optional)</li>
+<li>Incremental import by hash comparison</li>
+<li>User data preservation on re-import</li>
+</ul>
+<h3 id="4-extensibility">4. Extensibility</h3>
+<ul>
+<li><code>Custom1</code>, <code>Custom2</code>, <code>Custom3</code> - free string fields</li>
+<li><code>CustomJson</code> - flexible JSON for future needs</li>
+<li><code>UserTags</code> - custom categorization</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/docs/docfx/REDB_DOC_PROJECT_PLAN.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class RedbProjectedQueryable&lt;TProps, TResult&gt; </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class RedbProjectedQueryable&lt;TProps, TResult&gt; ">
+      
+      <meta name="description" content="Implementation of LINQ query projections in REDB with filtering and sorting support ⭐ OPTIMIZED: Uses ProjectionFieldExtractor to load only required fields">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Query_RedbProjectedQueryable_2.md&amp;value=---%0Auid%3A%20redb.Core.Query.RedbProjectedQueryable%602%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Query.RedbProjectedQueryable`2">
+
+
+
+  <h1 id="redb_Core_Query_RedbProjectedQueryable_2" data-uid="redb.Core.Query.RedbProjectedQueryable`2" class="text-break">
+Class RedbProjectedQueryable&lt;TProps, TResult&gt;  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L15"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Query.html">Query</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Implementation of LINQ query projections in REDB with filtering and sorting support
+⭐ OPTIMIZED: Uses ProjectionFieldExtractor to load only required fields</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class RedbProjectedQueryable&lt;TProps, TResult&gt; : IRedbProjectedQueryable&lt;TResult&gt; where TProps : class, new()</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+    <dt><code>TResult</code></dt>
+    <dd></dd>
+  </dl>
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">RedbProjectedQueryable&lt;TProps, TResult&gt;</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Query.IRedbProjectedQueryable-1.html">IRedbProjectedQueryable</a>&lt;TResult&gt;</div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2__ctor_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.#ctor*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2__ctor_redb_Core_Query_IRedbQueryable__0__System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject__0___1___" data-uid="redb.Core.Query.RedbProjectedQueryable`2.#ctor(redb.Core.Query.IRedbQueryable{`0},System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Entities.RedbObject{`0},`1}})">
+  RedbProjectedQueryable(IRedbQueryable&lt;TProps&gt;, Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RedbProjectedQueryable(IRedbQueryable&lt;TProps&gt; sourceQuery, Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt; projection)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sourceQuery</code> <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>projection</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;, TResult&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2__ctor_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.#ctor*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2__ctor_redb_Core_Query_IRedbQueryable__0__System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject__0___1___redb_Core_Query_IRedbQueryProvider_System_Int64_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.#ctor(redb.Core.Query.IRedbQueryable{`0},System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Entities.RedbObject{`0},`1}},redb.Core.Query.IRedbQueryProvider,System.Int64)">
+  RedbProjectedQueryable(IRedbQueryable&lt;TProps&gt;, Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;, IRedbQueryProvider, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L47"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>⭐ Constructor with provider for optimized loading</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RedbProjectedQueryable(IRedbQueryable&lt;TProps&gt; sourceQuery, Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt; projection, IRedbQueryProvider provider, long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sourceQuery</code> <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>projection</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;, TResult&gt;&gt;</dt>
+    <dd></dd>
+    <dt><code>provider</code> <a class="xref" href="redb.Core.Query.IRedbQueryProvider.html">IRedbQueryProvider</a></dt>
+    <dd></dd>
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_ProjectedFieldPaths_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.ProjectedFieldPaths*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_ProjectedFieldPaths" data-uid="redb.Core.Query.RedbProjectedQueryable`2.ProjectedFieldPaths">
+  ProjectedFieldPaths
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L90"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>⭐ Text field paths for SQL function search_objects_with_projection_by_paths</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public List&lt;string&gt;? ProjectedFieldPaths { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_ProjectedStructureIds_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.ProjectedStructureIds*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_ProjectedStructureIds" data-uid="redb.Core.Query.RedbProjectedQueryable`2.ProjectedStructureIds">
+  ProjectedStructureIds
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L85"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>⭐ Extracted structure_ids for optimization (for provider access)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HashSet&lt;long&gt;? ProjectedStructureIds { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1">HashSet</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_Projection_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Projection*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_Projection" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Projection">
+  Projection
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L95"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>⭐ Projection expression (for provider access)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt; Projection { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;, TResult&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_CountAsync_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.CountAsync*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_CountAsync" data-uid="redb.Core.Query.RedbProjectedQueryable`2.CountAsync">
+  CountAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L306"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Count results.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; CountAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_Distinct_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Distinct*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_Distinct" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Distinct">
+  Distinct()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L182"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Distinct values.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbProjectedQueryable&lt;TResult&gt; Distinct()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbProjectedQueryable-1.html">IRedbProjectedQueryable</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_FirstOrDefaultAsync_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.FirstOrDefaultAsync*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_FirstOrDefaultAsync" data-uid="redb.Core.Query.RedbProjectedQueryable`2.FirstOrDefaultAsync">
+  FirstOrDefaultAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L319"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get first result or default value.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TResult?&gt; FirstOrDefaultAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_GetProjectionInfoAsync_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.GetProjectionInfoAsync*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_GetProjectionInfoAsync" data-uid="redb.Core.Query.RedbProjectedQueryable`2.GetProjectionInfoAsync">
+  GetProjectionInfoAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L329"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get projection info: SQL function and structure_ids that will be loaded.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;string&gt; GetProjectionInfoAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_OrderByDescending_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.OrderByDescending*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_OrderByDescending__1_System_Linq_Expressions_Expression_System_Func__1___0___" data-uid="redb.Core.Query.RedbProjectedQueryable`2.OrderByDescending``1(System.Linq.Expressions.Expression{System.Func{`1,``0}})">
+  OrderByDescending&lt;TKey&gt;(Expression&lt;Func&lt;TResult, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L135"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Sort projected results descending.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbProjectedQueryable&lt;TResult&gt; OrderByDescending&lt;TKey&gt;(Expression&lt;Func&lt;TResult, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TResult, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbProjectedQueryable-1.html">IRedbProjectedQueryable</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_OrderBy_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.OrderBy*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_OrderBy__1_System_Linq_Expressions_Expression_System_Func__1___0___" data-uid="redb.Core.Query.RedbProjectedQueryable`2.OrderBy``1(System.Linq.Expressions.Expression{System.Func{`1,``0}})">
+  OrderBy&lt;TKey&gt;(Expression&lt;Func&lt;TResult, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L116"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Sort projected results.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbProjectedQueryable&lt;TResult&gt; OrderBy&lt;TKey&gt;(Expression&lt;Func&lt;TResult, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TResult, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbProjectedQueryable-1.html">IRedbProjectedQueryable</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_Skip_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Skip*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_Skip_System_Int32_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Skip(System.Int32)">
+  Skip(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L168"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Skip results.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbProjectedQueryable&lt;TResult&gt; Skip(int count)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>count</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbProjectedQueryable-1.html">IRedbProjectedQueryable</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_Take_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Take*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_Take_System_Int32_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Take(System.Int32)">
+  Take(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L154"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Limit number of results.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbProjectedQueryable&lt;TResult&gt; Take(int count)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>count</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbProjectedQueryable-1.html">IRedbProjectedQueryable</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_ToListAsync_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.ToListAsync*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_ToListAsync" data-uid="redb.Core.Query.RedbProjectedQueryable`2.ToListAsync">
+  ToListAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L197"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query and get list of results.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;TResult&gt;&gt; ToListAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;TResult&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_RedbProjectedQueryable_2_Where_" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Where*"></a>
+
+  <h3 id="redb_Core_Query_RedbProjectedQueryable_2_Where_System_Linq_Expressions_Expression_System_Func__1_System_Boolean___" data-uid="redb.Core.Query.RedbProjectedQueryable`2.Where(System.Linq.Expressions.Expression{System.Func{`1,System.Boolean}})">
+  Where(Expression&lt;Func&lt;TResult, bool&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L97"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Additional filtering of projected results.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbProjectedQueryable&lt;TResult&gt; Where(Expression&lt;Func&lt;TResult, bool&gt;&gt; predicate)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>predicate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TResult, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbProjectedQueryable-1.html">IRedbProjectedQueryable</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/RedbProjectedQueryable.cs/#L15" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface ICompositeMetadataCache </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface ICompositeMetadataCache ">
+      
+      <meta name="description" content="Composite metadata cache combining schemes, structures and types. Provides unified interface for all metadata caching operations.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Caching_ICompositeMetadataCache.md&amp;value=---%0Auid%3A%20redb.Core.Caching.ICompositeMetadataCache%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Caching.ICompositeMetadataCache">
+
+
+
+  <h1 id="redb_Core_Caching_ICompositeMetadataCache" data-uid="redb.Core.Caching.ICompositeMetadataCache" class="text-break">
+Interface ICompositeMetadataCache  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L13"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Caching.html">Caching</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Composite metadata cache combining schemes, structures and types.
+Provides unified interface for all metadata caching operations.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface ICompositeMetadataCache</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_Schemes_" data-uid="redb.Core.Caching.ICompositeMetadataCache.Schemes*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_Schemes" data-uid="redb.Core.Caching.ICompositeMetadataCache.Schemes">
+  Schemes
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L20"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object schemes cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ISchemeMetadataCache Schemes { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.ISchemeMetadataCache.html">ISchemeMetadataCache</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_Structures_" data-uid="redb.Core.Caching.ICompositeMetadataCache.Structures*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_Structures" data-uid="redb.Core.Caching.ICompositeMetadataCache.Structures">
+  Structures
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L25"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Field structures cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IStructureMetadataCache Structures { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.IStructureMetadataCache.html">IStructureMetadataCache</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_Types_" data-uid="redb.Core.Caching.ICompositeMetadataCache.Types*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_Types" data-uid="redb.Core.Caching.ICompositeMetadataCache.Types">
+  Types
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L30"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Data types cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ITypeMetadataCache Types { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.ITypeMetadataCache.html">ITypeMetadataCache</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_ExportCacheState_" data-uid="redb.Core.Caching.ICompositeMetadataCache.ExportCacheState*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_ExportCacheState" data-uid="redb.Core.Caching.ICompositeMetadataCache.ExportCacheState">
+  ExportCacheState()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L136"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Export cache state for analysis.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">CacheExportData ExportCacheState()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.CacheExportData.html">CacheExportData</a></dt>
+    <dd><p>Exported cache state.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_GetCompleteMetadataAsync_" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetCompleteMetadataAsync*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_GetCompleteMetadataAsync_System_Int64_" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetCompleteMetadataAsync(System.Int64)">
+  GetCompleteMetadataAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L54"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get complete metadata by scheme ID.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;CompleteSchemeMetadata?&gt; GetCompleteMetadataAsync(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Scheme ID.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Caching.CompleteSchemeMetadata.html">CompleteSchemeMetadata</a>&gt;</dt>
+    <dd><p>Complete metadata or null if scheme not found.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_GetCompleteMetadataAsync_" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetCompleteMetadataAsync*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_GetCompleteMetadataAsync_System_Type_" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetCompleteMetadataAsync(System.Type)">
+  GetCompleteMetadataAsync(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L47"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get complete metadata for .NET type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;CompleteSchemeMetadata?&gt; GetCompleteMetadataAsync(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd><p>Object type.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Caching.CompleteSchemeMetadata.html">CompleteSchemeMetadata</a>&gt;</dt>
+    <dd><p>Complete metadata or null if scheme not found.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_GetCompleteMetadataAsync_" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetCompleteMetadataAsync*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_GetCompleteMetadataAsync__1" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetCompleteMetadataAsync``1">
+  GetCompleteMetadataAsync&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L40"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get complete metadata for .NET type (scheme + structures + types).
+Most frequently used operation - get everything in one call.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;CompleteSchemeMetadata?&gt; GetCompleteMetadataAsync&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Caching.CompleteSchemeMetadata.html">CompleteSchemeMetadata</a>&gt;</dt>
+    <dd><p>Complete metadata or null if scheme not found.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd><p>Object properties type.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_GetDetailedStatistics_" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetDetailedStatistics*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_GetDetailedStatistics" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetDetailedStatistics">
+  GetDetailedStatistics()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L122"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get detailed statistics for each component.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">DetailedCacheStatistics GetDetailedStatistics()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.DetailedCacheStatistics.html">DetailedCacheStatistics</a></dt>
+    <dd><p>Detailed statistics by component.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_GetDiagnosticInfo_" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetDiagnosticInfo*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_GetDiagnosticInfo" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetDiagnosticInfo">
+  GetDiagnosticInfo()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L130"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get cache state diagnostic information.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">CacheDiagnosticInfo GetDiagnosticInfo()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.CacheDiagnosticInfo.html">CacheDiagnosticInfo</a></dt>
+    <dd><p>Diagnostic info.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_GetStatistics_" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetStatistics*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_GetStatistics" data-uid="redb.Core.Caching.ICompositeMetadataCache.GetStatistics">
+  GetStatistics()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L116"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get combined statistics from all caches.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">CompositeMetadataCacheStatistics GetStatistics()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.CompositeMetadataCacheStatistics.html">CompositeMetadataCacheStatistics</a></dt>
+    <dd><p>Summary statistics.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_InvalidateAll_" data-uid="redb.Core.Caching.ICompositeMetadataCache.InvalidateAll*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_InvalidateAll" data-uid="redb.Core.Caching.ICompositeMetadataCache.InvalidateAll">
+  InvalidateAll()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L108"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Clear all caches completely.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateAll()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_InvalidateSchemeCompletely_" data-uid="redb.Core.Caching.ICompositeMetadataCache.InvalidateSchemeCompletely*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_InvalidateSchemeCompletely_System_Int64_" data-uid="redb.Core.Caching.ICompositeMetadataCache.InvalidateSchemeCompletely(System.Int64)">
+  InvalidateSchemeCompletely(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L91"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invalidate all related caches for scheme.
+Removes scheme, its structures and clears type bindings.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateSchemeCompletely(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Scheme ID.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_InvalidateTypeCompletely_" data-uid="redb.Core.Caching.ICompositeMetadataCache.InvalidateTypeCompletely*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_InvalidateTypeCompletely_System_Type_" data-uid="redb.Core.Caching.ICompositeMetadataCache.InvalidateTypeCompletely(System.Type)">
+  InvalidateTypeCompletely(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L103"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invalidate cache for .NET type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateTypeCompletely(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd><p>Type to invalidate.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_InvalidateTypeCompletely_" data-uid="redb.Core.Caching.ICompositeMetadataCache.InvalidateTypeCompletely*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_InvalidateTypeCompletely__1" data-uid="redb.Core.Caching.ICompositeMetadataCache.InvalidateTypeCompletely``1">
+  InvalidateTypeCompletely&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L97"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invalidate cache for .NET type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateTypeCompletely&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd><p>Type to invalidate.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_SetCompleteMetadata_" data-uid="redb.Core.Caching.ICompositeMetadataCache.SetCompleteMetadata*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_SetCompleteMetadata_redb_Core_Caching_CompleteSchemeMetadata_" data-uid="redb.Core.Caching.ICompositeMetadataCache.SetCompleteMetadata(redb.Core.Caching.CompleteSchemeMetadata)">
+  SetCompleteMetadata(CompleteSchemeMetadata)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L60"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Set complete metadata in cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetCompleteMetadata(CompleteSchemeMetadata metadata)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>metadata</code> <a class="xref" href="redb.Core.Caching.CompleteSchemeMetadata.html">CompleteSchemeMetadata</a></dt>
+    <dd><p>Complete metadata to cache.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_SetCompleteMetadataForType_" data-uid="redb.Core.Caching.ICompositeMetadataCache.SetCompleteMetadataForType*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_SetCompleteMetadataForType__1_redb_Core_Caching_CompleteSchemeMetadata_" data-uid="redb.Core.Caching.ICompositeMetadataCache.SetCompleteMetadataForType``1(redb.Core.Caching.CompleteSchemeMetadata)">
+  SetCompleteMetadataForType&lt;TProps&gt;(CompleteSchemeMetadata)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L67"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Set complete metadata in cache with type binding.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetCompleteMetadataForType&lt;TProps&gt;(CompleteSchemeMetadata metadata) where TProps : class</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>metadata</code> <a class="xref" href="redb.Core.Caching.CompleteSchemeMetadata.html">CompleteSchemeMetadata</a></dt>
+    <dd><p>Complete metadata to cache.</p>
+</dd>
+  </dl>
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd><p>Type to bind.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_WarmupAllSchemesAsync_" data-uid="redb.Core.Caching.ICompositeMetadataCache.WarmupAllSchemesAsync*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_WarmupAllSchemesAsync_System_Func_System_Threading_Tasks_Task_System_Collections_Generic_List_redb_Core_Caching_CompleteSchemeMetadata____" data-uid="redb.Core.Caching.ICompositeMetadataCache.WarmupAllSchemesAsync(System.Func{System.Threading.Tasks.Task{System.Collections.Generic.List{redb.Core.Caching.CompleteSchemeMetadata}}})">
+  WarmupAllSchemesAsync(Func&lt;Task&lt;List&lt;CompleteSchemeMetadata&gt;&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L82"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Warm up cache for all schemes.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task WarmupAllSchemesAsync(Func&lt;Task&lt;List&lt;CompleteSchemeMetadata&gt;&gt;&gt; loadFromDatabase)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>loadFromDatabase</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-1">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Caching.CompleteSchemeMetadata.html">CompleteSchemeMetadata</a>&gt;&gt;&gt;</dt>
+    <dd><p>Function to load from DB.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Caching_ICompositeMetadataCache_WarmupCacheAsync_" data-uid="redb.Core.Caching.ICompositeMetadataCache.WarmupCacheAsync*"></a>
+
+  <h3 id="redb_Core_Caching_ICompositeMetadataCache_WarmupCacheAsync_System_Type___System_Func_System_Type_System_Threading_Tasks_Task_redb_Core_Caching_CompleteSchemeMetadata___" data-uid="redb.Core.Caching.ICompositeMetadataCache.WarmupCacheAsync(System.Type[],System.Func{System.Type,System.Threading.Tasks.Task{redb.Core.Caching.CompleteSchemeMetadata}})">
+  WarmupCacheAsync(Type[], Func&lt;Type, Task&lt;CompleteSchemeMetadata?&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L76"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Warm up cache for list of types.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task WarmupCacheAsync(Type[] types, Func&lt;Type, Task&lt;CompleteSchemeMetadata?&gt;&gt; loadFromDatabase)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>types</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a>[]</dt>
+    <dd><p>Types to preload.</p>
+</dd>
+    <dt><code>loadFromDatabase</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Caching.CompleteSchemeMetadata.html">CompleteSchemeMetadata</a>&gt;&gt;</dt>
+    <dd><p>Function to load from DB.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Caching/ICompositeMetadataCache.cs/#L13" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class ProMsSqlDialect </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class ProMsSqlDialect ">
+      
+      <meta name="description" content="Pro version of MS SQL Server dialect. Inherits all OpenSource SQL from MsSqlDialect and adds Pro-specific SQL. Uses ,  parameters and STRING_SPLIT for arrays.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_MSSql_Pro_Sql_ProMsSqlDialect.md&amp;value=---%0Auid%3A%20redb.MSSql.Pro.Sql.ProMsSqlDialect%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect">
+
+
+
+  <h1 id="redb_MSSql_Pro_Sql_ProMsSqlDialect" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect" class="text-break">
+Class ProMsSqlDialect  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L11"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.MSSql.html">MSSql</a>.<a class="xref" href="redb.MSSql.Pro.html">Pro</a>.<a class="xref" href="redb.MSSql.Pro.Sql.html">Sql</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.MSSql.Pro.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Pro version of MS SQL Server dialect.
+Inherits all OpenSource SQL from MsSqlDialect and adds Pro-specific SQL.
+Uses @p0, @p1 parameters and STRING_SPLIT for arrays.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class ProMsSqlDialect : MsSqlDialect, ISqlDialectPro, ISqlDialect</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html">MsSqlDialect</a></div>
+      <div><span class="xref">ProMsSqlDialect</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Pro.Query.ISqlDialectPro.html">ISqlDialectPro</a></div>
+      <div><a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ProviderName">MsSqlDialect.ProviderName</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_FormatPagination_System_Nullable_System_Int32__System_Nullable_System_Int32__">MsSqlDialect.FormatPagination(int?, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_WrapSubquery_System_String_System_String_">MsSqlDialect.WrapSubquery(string, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_FormatPvtColumn_System_Int64_System_String_System_String_">MsSqlDialect.FormatPvtColumn(long, string, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_FormatArrayContains_System_String_System_String_">MsSqlDialect.FormatArrayContains(string, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_GetDbTypeName_System_String_">MsSqlDialect.GetDbTypeName(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_FormatParameter_System_Int32_">MsSqlDialect.FormatParameter(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_QuoteIdentifier_System_String_">MsSqlDialect.QuoteIdentifier(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_SelectById">MsSqlDialect.Roles_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_SelectByName">MsSqlDialect.Roles_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_SelectAll">MsSqlDialect.Roles_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_Insert">MsSqlDialect.Roles_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_UpdateName">MsSqlDialect.Roles_UpdateName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_Delete">MsSqlDialect.Roles_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_ExistsByName">MsSqlDialect.Roles_ExistsByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_ExistsByNameExcluding">MsSqlDialect.Roles_ExistsByNameExcluding()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_Count">MsSqlDialect.Roles_Count()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_UpdateConfiguration">MsSqlDialect.Roles_UpdateConfiguration()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_SelectConfigurationId">MsSqlDialect.Roles_SelectConfigurationId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_UsersRoles_Insert">MsSqlDialect.UsersRoles_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_UsersRoles_Delete">MsSqlDialect.UsersRoles_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_UsersRoles_DeleteByUser">MsSqlDialect.UsersRoles_DeleteByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_UsersRoles_DeleteByRole">MsSqlDialect.UsersRoles_DeleteByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_UsersRoles_Exists">MsSqlDialect.UsersRoles_Exists()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_UsersRoles_SelectRolesByUser">MsSqlDialect.UsersRoles_SelectRolesByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_UsersRoles_SelectUsersByRole">MsSqlDialect.UsersRoles_SelectUsersByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_UsersRoles_CountByRole">MsSqlDialect.UsersRoles_CountByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_ExistsById">MsSqlDialect.Users_ExistsById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_SelectIdByLogin">MsSqlDialect.Users_SelectIdByLogin()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_DeleteByRole">MsSqlDialect.Permissions_DeleteByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_GetEffectiveForObject">MsSqlDialect.Permissions_GetEffectiveForObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_SelectReadableObjectIds">MsSqlDialect.Permissions_SelectReadableObjectIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_Insert">MsSqlDialect.Permissions_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_Update">MsSqlDialect.Permissions_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_Delete">MsSqlDialect.Permissions_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_SelectById">MsSqlDialect.Permissions_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_SelectByUser">MsSqlDialect.Permissions_SelectByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_SelectByRole">MsSqlDialect.Permissions_SelectByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_SelectByObject">MsSqlDialect.Permissions_SelectByObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_SelectByUserRoleObject">MsSqlDialect.Permissions_SelectByUserRoleObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_DeleteByUserRoleObject">MsSqlDialect.Permissions_DeleteByUserRoleObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_DeleteByUser">MsSqlDialect.Permissions_DeleteByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_Count">MsSqlDialect.Permissions_Count()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_CountByUser">MsSqlDialect.Permissions_CountByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_CountByRole">MsSqlDialect.Permissions_CountByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Permissions_SelectUserRoleIds">MsSqlDialect.Permissions_SelectUserRoleIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_SelectById">MsSqlDialect.Users_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_SelectByLogin">MsSqlDialect.Users_SelectByLogin()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_Insert">MsSqlDialect.Users_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_Update">MsSqlDialect.Users_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_SoftDelete">MsSqlDialect.Users_SoftDelete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_UpdatePassword">MsSqlDialect.Users_UpdatePassword()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_UpdateStatus">MsSqlDialect.Users_UpdateStatus()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_ExistsByLogin">MsSqlDialect.Users_ExistsByLogin()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_ExistsByLoginExcluding">MsSqlDialect.Users_ExistsByLoginExcluding()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_ExistsByEmail">MsSqlDialect.Users_ExistsByEmail()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_Count">MsSqlDialect.Users_Count()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_CountEnabled">MsSqlDialect.Users_CountEnabled()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_SelectConfigurationId">MsSqlDialect.Users_SelectConfigurationId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Users_UpdateConfiguration">MsSqlDialect.Users_UpdateConfiguration()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_SelectIdByName">MsSqlDialect.Roles_SelectIdByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Roles_ExistsById">MsSqlDialect.Roles_ExistsById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_SelectByName">MsSqlDialect.Schemes_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_SelectById">MsSqlDialect.Schemes_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_SelectAll">MsSqlDialect.Schemes_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_Insert">MsSqlDialect.Schemes_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_UpdateHash">MsSqlDialect.Schemes_UpdateHash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_UpdateName">MsSqlDialect.Schemes_UpdateName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_SelectHashById">MsSqlDialect.Schemes_SelectHashById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_ExistsByName">MsSqlDialect.Schemes_ExistsByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_SelectObjectByName">MsSqlDialect.Schemes_SelectObjectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_InsertObject">MsSqlDialect.Schemes_InsertObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_SelectByScheme">MsSqlDialect.Structures_SelectByScheme()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_SelectBySchemeShort">MsSqlDialect.Structures_SelectBySchemeShort()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_SelectBySchemeCacheable">MsSqlDialect.Structures_SelectBySchemeCacheable()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_Insert">MsSqlDialect.Structures_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_UpdateType">MsSqlDialect.Structures_UpdateType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_UpdateCollectionType">MsSqlDialect.Structures_UpdateCollectionType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_UpdateKeyType">MsSqlDialect.Structures_UpdateKeyType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_UpdateAlias">MsSqlDialect.Structures_UpdateAlias()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_UpdateAllowNotNull">MsSqlDialect.Structures_UpdateAllowNotNull()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Structures_DeleteByIds_System_Collections_Generic_IEnumerable_System_Int64__">MsSqlDialect.Structures_DeleteByIds(IEnumerable&lt;long&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Types_SelectByName">MsSqlDialect.Types_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Types_SelectAll">MsSqlDialect.Types_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_SyncMetadataCache">MsSqlDialect.Schemes_SyncMetadataCache()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_MigrateStructureType">MsSqlDialect.Schemes_MigrateStructureType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Schemes_GetStructureTree">MsSqlDialect.Schemes_GetStructureTree()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_GetObjectJson">MsSqlDialect.Tree_GetObjectJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_SelectChildrenJson">MsSqlDialect.Tree_SelectChildrenJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_SelectPolymorphicChildren">MsSqlDialect.Tree_SelectPolymorphicChildren()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_SelectSchemeAndJson">MsSqlDialect.Tree_SelectSchemeAndJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_SelectChildrenBySchemeBase">MsSqlDialect.Tree_SelectChildrenBySchemeBase()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_SelectChildrenBase">MsSqlDialect.Tree_SelectChildrenBase()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_ObjectExists">MsSqlDialect.Tree_ObjectExists()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_SelectParentId">MsSqlDialect.Tree_SelectParentId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_UpdateParent">MsSqlDialect.Tree_UpdateParent()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_DeleteValuesByObjectIds">MsSqlDialect.Tree_DeleteValuesByObjectIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Tree_DeleteObjectsByIds">MsSqlDialect.Tree_DeleteObjectsByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectObjectById">MsSqlDialect.ObjectStorage_SelectObjectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectIdHash">MsSqlDialect.ObjectStorage_SelectIdHash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectIdHashScheme">MsSqlDialect.ObjectStorage_SelectIdHashScheme()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectObjectsByIds">MsSqlDialect.ObjectStorage_SelectObjectsByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_DeleteById">MsSqlDialect.ObjectStorage_DeleteById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_DeleteByIds">MsSqlDialect.ObjectStorage_DeleteByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_InsertObject">MsSqlDialect.ObjectStorage_InsertObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_UpdateObject">MsSqlDialect.ObjectStorage_UpdateObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_DeleteValuesByObjectId">MsSqlDialect.ObjectStorage_DeleteValuesByObjectId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_GetObjectJson">MsSqlDialect.ObjectStorage_GetObjectJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_GetObjectsJsonBulk">MsSqlDialect.ObjectStorage_GetObjectsJsonBulk()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectStructuresWithMetadata">MsSqlDialect.ObjectStorage_SelectStructuresWithMetadata()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectValuesWithTypes">MsSqlDialect.ObjectStorage_SelectValuesWithTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectStructureTypes">MsSqlDialect.ObjectStorage_SelectStructureTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectTypeById">MsSqlDialect.ObjectStorage_SelectTypeById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_CheckObjectExists">MsSqlDialect.ObjectStorage_CheckObjectExists()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectSchemeById">MsSqlDialect.ObjectStorage_SelectSchemeById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectValuesForObjects">MsSqlDialect.ObjectStorage_SelectValuesForObjects()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectSchemeIdsForObjects">MsSqlDialect.ObjectStorage_SelectSchemeIdsForObjects()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectValueById">MsSqlDialect.ObjectStorage_SelectValueById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectAllTypes">MsSqlDialect.ObjectStorage_SelectAllTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectExistingIds">MsSqlDialect.ObjectStorage_SelectExistingIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectSchemesByIds">MsSqlDialect.ObjectStorage_SelectSchemesByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_LockObjectsForUpdate">MsSqlDialect.ObjectStorage_LockObjectsForUpdate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ObjectStorage_SelectSchemeIdByObjectId">MsSqlDialect.ObjectStorage_SelectSchemeIdByObjectId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Lists_SelectById">MsSqlDialect.Lists_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Lists_SelectByName">MsSqlDialect.Lists_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Lists_SelectAll">MsSqlDialect.Lists_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Lists_Insert">MsSqlDialect.Lists_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Lists_Update">MsSqlDialect.Lists_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Lists_Delete">MsSqlDialect.Lists_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Lists_IsUsedInStructures">MsSqlDialect.Lists_IsUsedInStructures()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ListItems_SelectById">MsSqlDialect.ListItems_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ListItems_SelectByListId">MsSqlDialect.ListItems_SelectByListId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ListItems_SelectByListIdAndValue">MsSqlDialect.ListItems_SelectByListIdAndValue()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ListItems_Insert">MsSqlDialect.ListItems_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ListItems_UpdateAliasAndObject">MsSqlDialect.ListItems_UpdateAliasAndObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ListItems_Update">MsSqlDialect.ListItems_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ListItems_Delete">MsSqlDialect.ListItems_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_ListItems_SelectByObjectId">MsSqlDialect.ListItems_SelectByObjectId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Validation_SelectAllTypes">MsSqlDialect.Validation_SelectAllTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Validation_SelectSchemeByName">MsSqlDialect.Validation_SelectSchemeByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Validation_SelectStructuresBySchemeId">MsSqlDialect.Validation_SelectStructuresBySchemeId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_LazyLoader_SelectObjectBase">MsSqlDialect.LazyLoader_SelectObjectBase()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_LazyLoader_GetObjectJson">MsSqlDialect.LazyLoader_GetObjectJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_LazyLoader_GetObjectJsonBatch">MsSqlDialect.LazyLoader_GetObjectJsonBatch()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_LazyLoader_SelectObjectHash">MsSqlDialect.LazyLoader_SelectObjectHash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchObjectsFunction">MsSqlDialect.Query_SearchObjectsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchObjectsBaseFunction">MsSqlDialect.Query_SearchObjectsBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchObjectsProjectionByPathsFunction">MsSqlDialect.Query_SearchObjectsProjectionByPathsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchObjectsProjectionByIdsFunction">MsSqlDialect.Query_SearchObjectsProjectionByIdsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchTreeObjectsFunction">MsSqlDialect.Query_SearchTreeObjectsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchTreeObjectsBaseFunction">MsSqlDialect.Query_SearchTreeObjectsBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_CountTemplate">MsSqlDialect.Query_CountTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchTemplate">MsSqlDialect.Query_SearchTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchWithDistinctTemplate">MsSqlDialect.Query_SearchWithDistinctTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchFullTemplate">MsSqlDialect.Query_SearchFullTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_JsonCast">MsSqlDialect.Query_JsonCast()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_TextArrayCast">MsSqlDialect.Query_TextArrayCast()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_BigintArrayCast">MsSqlDialect.Query_BigintArrayCast()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_ProjectionByPathsTemplate">MsSqlDialect.Query_ProjectionByPathsTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_ProjectionByIdsTemplate_System_String_">MsSqlDialect.Query_ProjectionByIdsTemplate(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_CheckPermissionSql">MsSqlDialect.Query_CheckPermissionSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_AggregateBatchPreviewSql">MsSqlDialect.Query_AggregateBatchPreviewSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_AggregateFieldSql">MsSqlDialect.Query_AggregateFieldSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SqlPreviewTemplate">MsSqlDialect.Query_SqlPreviewTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_AggregateBatchSql">MsSqlDialect.Query_AggregateBatchSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SearchObjectsSimpleSql">MsSqlDialect.Query_SearchObjectsSimpleSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_AggregateGroupedSql">MsSqlDialect.Query_AggregateGroupedSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_AggregateArrayGroupedSql">MsSqlDialect.Query_AggregateArrayGroupedSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_WindowSql">MsSqlDialect.Query_WindowSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_TreeCountNormalSql_System_String_">MsSqlDialect.Query_TreeCountNormalSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_TreeSearchNormalSql_System_String_">MsSqlDialect.Query_TreeSearchNormalSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_TreeSearchWithParentIdsSql_System_String_">MsSqlDialect.Query_TreeSearchWithParentIdsSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_HasAncestorTreeSql_System_String_">MsSqlDialect.Query_HasAncestorTreeSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_HasAncestorNormalSql_System_String_">MsSqlDialect.Query_HasAncestorNormalSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_HasDescendantSql_System_String_">MsSqlDialect.Query_HasDescendantSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_GetParentIdsFromDescendantsSql_System_String_System_Int32_">MsSqlDialect.Query_GetParentIdsFromDescendantsSql(string, int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_TreeCountWithParentIdsSql_System_String_">MsSqlDialect.Query_TreeCountWithParentIdsSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_GetIdsWithAncestorsSql_System_String_">MsSqlDialect.Query_GetIdsWithAncestorsSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_LoadObjectsByIdsSql_System_String_System_Int32_">MsSqlDialect.Query_LoadObjectsByIdsSql(string, int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_TreeSqlPreviewTemplate_System_String_">MsSqlDialect.Query_TreeSqlPreviewTemplate(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SqlPreviewFunction">MsSqlDialect.Query_SqlPreviewFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_SqlPreviewBaseFunction">MsSqlDialect.Query_SqlPreviewBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_TreeSqlPreviewFunction">MsSqlDialect.Query_TreeSqlPreviewFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Query_TreeSqlPreviewBaseFunction">MsSqlDialect.Query_TreeSqlPreviewBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_SoftDelete_MarkForDeletion">MsSqlDialect.SoftDelete_MarkForDeletion()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_SoftDelete_PurgeTrash">MsSqlDialect.SoftDelete_PurgeTrash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_SoftDelete_GetDeletionProgress">MsSqlDialect.SoftDelete_GetDeletionProgress()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_SoftDelete_GetUserActiveDeletions">MsSqlDialect.SoftDelete_GetUserActiveDeletions()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_SoftDelete_GetOrphanedTasks">MsSqlDialect.SoftDelete_GetOrphanedTasks()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_SoftDelete_ClaimOrphanedTask">MsSqlDialect.SoftDelete_ClaimOrphanedTask()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.MSSql.Sql.MsSqlDialect.html#redb_MSSql_Sql_MsSqlDialect_Warmup_AllMetadataCaches">MsSqlDialect.Warmup_AllMetadataCaches()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectListItemsByIds_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectListItemsByIds*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectListItemsByIds" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectListItemsByIds">
+  Materialization_SelectListItemsByIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L77"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select list items by IDs.
+Params: itemIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectListItemsByIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectObjectById_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectObjectById*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectObjectById" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectObjectById">
+  Materialization_SelectObjectById()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L58"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select object by ID with all base fields.
+Params: objectId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectObjectById()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectObjectsByIds_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectObjectsByIds*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectObjectsByIds" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectObjectsByIds">
+  Materialization_SelectObjectsByIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L82"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select objects by IDs (for nested objects).
+Params: objectIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectObjectsByIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectValuesByObjectAndStructureIds_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectValuesByObjectAndStructureIds*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectValuesByObjectAndStructureIds" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectValuesByObjectAndStructureIds">
+  Materialization_SelectValuesByObjectAndStructureIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L94"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select values by object IDs and structure IDs.
+Params: objectIds array, structureIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectValuesByObjectAndStructureIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectValuesByObjectIds_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectValuesByObjectIds*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Materialization_SelectValuesByObjectIds" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Materialization_SelectValuesByObjectIds">
+  Materialization_SelectValuesByObjectIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L69"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select values by object IDs.
+Params: objectIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Materialization_SelectValuesByObjectIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Migration_Insert_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Migration_Insert*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Migration_Insert" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Migration_Insert">
+  Migration_Insert()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L47"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Insert migration record.
+Params: id, migrationId, schemeId, propertyName, expressionHash, sql, propsType, error, affectedRows, durationMs, dryRun, executedAt</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Migration_Insert()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Migration_SelectExisting_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Migration_SelectExisting*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Migration_SelectExisting" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Migration_SelectExisting">
+  Migration_SelectExisting()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L39"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if migration exists.
+Params: schemeId, migrationId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Migration_SelectExisting()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Migration_SelectExpressionHash_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Migration_SelectExpressionHash*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_Migration_SelectExpressionHash" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.Migration_SelectExpressionHash">
+  Migration_SelectExpressionHash()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L43"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get expression hash for migration.
+Params: schemeId, migrationId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Migration_SelectExpressionHash()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_SchemeResolver_SelectChildField_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.SchemeResolver_SelectChildField*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_SchemeResolver_SelectChildField" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.SchemeResolver_SelectChildField">
+  SchemeResolver_SelectChildField()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L22"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select field metadata by scheme, name, and parent structure.
+Params: $1=schemeId, $2=fieldName, $3=parentStructureId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string SchemeResolver_SelectChildField()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_SchemeResolver_SelectRootField_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.SchemeResolver_SelectRootField*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_SchemeResolver_SelectRootField" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.SchemeResolver_SelectRootField">
+  SchemeResolver_SelectRootField()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L17"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select field metadata by scheme, name, and no parent (root field).
+Params: $1=schemeId, $2=fieldName</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string SchemeResolver_SelectRootField()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Sql_ProMsSqlDialect_SchemeResolver_SelectRootFieldsIn_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.SchemeResolver_SelectRootFieldsIn*"></a>
+
+  <h3 id="redb_MSSql_Pro_Sql_ProMsSqlDialect_SchemeResolver_SelectRootFieldsIn_System_Int32_" data-uid="redb.MSSql.Pro.Sql.ProMsSqlDialect.SchemeResolver_SelectRootFieldsIn(System.Int32)">
+  SchemeResolver_SelectRootFieldsIn(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L27"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select multiple root fields by names (IN clause).
+Returns SQL with $1=schemeId, and remaining params for field names.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string SchemeResolver_SelectRootFieldsIn(int fieldCount)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fieldCount</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Sql/ProMsSqlDialect.cs/#L11" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

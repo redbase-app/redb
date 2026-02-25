@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class RedbObject&lt;TProps&gt; </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class RedbObject&lt;TProps&gt; ">
+      
+      <meta name="description" content="Generic wrapper for JSON from get_object_json with typed interface. Field names match JSON/DB (snake_case) to work without attributes and settings. Inherits from base RedbObject for API unification. Implements typed interface IRedbObject&amp;lt;TProps&amp;gt; for type safety. Object saving uses ChangeTracking strategy by default - compares with DB and updates only changed properties.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Models_Entities_RedbObject_1.md&amp;value=---%0Auid%3A%20redb.Core.Models.Entities.RedbObject%601%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Models.Entities.RedbObject`1">
+
+
+
+  <h1 id="redb_Core_Models_Entities_RedbObject_1" data-uid="redb.Core.Models.Entities.RedbObject`1" class="text-break">
+Class RedbObject&lt;TProps&gt;  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L23"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Models.html">Models</a>.<a class="xref" href="redb.Core.Models.Entities.html">Entities</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Generic wrapper for JSON from get_object_json with typed interface.
+Field names match JSON/DB (snake_case) to work without attributes and settings.
+Inherits from base RedbObject for API unification.
+Implements typed interface IRedbObject&lt;TProps&gt; for type safety.</p>
+<p>Object saving uses ChangeTracking strategy by default -
+compares with DB and updates only changed properties.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class RedbObject&lt;TProps&gt; : RedbObject, IRedbObject&lt;TProps&gt;, IRedbObject where TProps : class, new()</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd><p>Type of object properties.</p>
+</dd>
+  </dl>
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="redb.Core.Models.Entities.RedbObject.html">RedbObject</a></div>
+      <div><span class="xref">RedbObject&lt;TProps&gt;</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Models.Contracts.IRedbObject-1.html">IRedbObject</a>&lt;TProps&gt;</div>
+      <div><a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject&lt;TProps&gt;</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_SetSchemeSyncProvider_redb_Core_Providers_ISchemeSyncProvider_">RedbObject.SetSchemeSyncProvider(ISchemeSyncProvider)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_GetSchemeSyncProvider">RedbObject.GetSchemeSyncProvider()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_IsProviderAvailable">RedbObject.IsProviderAvailable</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_id">RedbObject.id</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_parent_id">RedbObject.parent_id</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_scheme_id">RedbObject.scheme_id</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_owner_id">RedbObject.owner_id</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_who_change_id">RedbObject.who_change_id</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_date_create">RedbObject.date_create</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_date_modify">RedbObject.date_modify</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_date_begin">RedbObject.date_begin</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_date_complete">RedbObject.date_complete</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_key">RedbObject.key</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_value_long">RedbObject.value_long</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_value_string">RedbObject.value_string</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_value_guid">RedbObject.value_guid</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_value_bool">RedbObject.value_bool</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_value_double">RedbObject.value_double</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_value_numeric">RedbObject.value_numeric</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_value_datetime">RedbObject.value_datetime</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_value_bytes">RedbObject.value_bytes</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_name">RedbObject.name</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_note">RedbObject.note</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_hash">RedbObject.hash</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ResetId_System_Int64_">RedbObject.ResetId(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_Id">RedbObject.Id</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_SchemeId">RedbObject.SchemeId</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_Name">RedbObject.Name</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ParentId">RedbObject.ParentId</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_HasParent">RedbObject.HasParent</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_IsRoot">RedbObject.IsRoot</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_DateCreate">RedbObject.DateCreate</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_DateModify">RedbObject.DateModify</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_DateBegin">RedbObject.DateBegin</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_DateComplete">RedbObject.DateComplete</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_OwnerId">RedbObject.OwnerId</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_WhoChangeId">RedbObject.WhoChangeId</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_Key">RedbObject.Key</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ValueLong">RedbObject.ValueLong</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ValueString">RedbObject.ValueString</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ValueGuid">RedbObject.ValueGuid</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ValueBool">RedbObject.ValueBool</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ValueDouble">RedbObject.ValueDouble</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ValueNumeric">RedbObject.ValueNumeric</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ValueDatetime">RedbObject.ValueDatetime</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ValueBytes">RedbObject.ValueBytes</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_Note">RedbObject.Note</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_Hash">RedbObject.Hash</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_GetSchemeAsync">RedbObject.GetSchemeAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_GetStructuresAsync">RedbObject.GetStructuresAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_InvalidateSchemeCache">RedbObject.InvalidateSchemeCache()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Entities.RedbObject.html#redb_Core_Models_Entities_RedbObject_ResetId_System_Boolean_">RedbObject.ResetId(bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetAge_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.GetAge(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetChildrenCountAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.GetChildrenCountAsync&lt;T&gt;(IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetDebugInfo_redb_Core_Models_Contracts_IRedbObject_">RedbObjectExtensions.GetDebugInfo(IRedbObject)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetDescendantsCountAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_System_Nullable_System_Int32__">RedbObjectExtensions.GetDescendantsCountAsync&lt;T&gt;(IRedbObject, ITreeProvider, int?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetDisplayName_redb_Core_Models_Contracts_IRedbObject_System_Boolean_">RedbObjectExtensions.GetDisplayName(IRedbObject, bool)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetTimeSinceLastModification_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.GetTimeSinceLastModification(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetTreeLevelAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.GetTreeLevelAsync&lt;T&gt;(IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_HasStarted_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.HasStarted(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsActiveAt_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.IsActiveAt(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsAncestorOfAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.IsAncestorOfAsync&lt;T&gt;(IRedbObject, IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsDescendantOfAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.IsDescendantOfAsync&lt;T&gt;(IRedbObject, IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsExpired_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.IsExpired(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsLeafAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.IsLeafAsync&lt;T&gt;(IRedbObject, ITreeProvider)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1__ctor_" data-uid="redb.Core.Models.Entities.RedbObject`1.#ctor*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1__ctor" data-uid="redb.Core.Models.Entities.RedbObject`1.#ctor">
+  RedbObject()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L28"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Default constructor for deserialization.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RedbObject()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1__ctor_" data-uid="redb.Core.Models.Entities.RedbObject`1.#ctor*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1__ctor__0_" data-uid="redb.Core.Models.Entities.RedbObject`1.#ctor(`0)">
+  RedbObject(TProps)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Constructor with properties.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RedbObject(TProps props)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>props</code> <span class="xref">TProps</span></dt>
+    <dd><p>Initial properties object.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1__lazyLoader" data-uid="redb.Core.Models.Entities.RedbObject`1._lazyLoader">
+  _lazyLoader
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L63"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Props loader (set during lazy loading) - public for Provider access.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[JsonIgnore]
+public ILazyPropsLoader? _lazyLoader</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.ILazyPropsLoader.html">ILazyPropsLoader</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1__propsLoaded" data-uid="redb.Core.Models.Entities.RedbObject`1._propsLoaded">
+  _propsLoaded
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L68"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Props loaded flag (public for Provider access).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool _propsLoaded</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_Props_" data-uid="redb.Core.Models.Entities.RedbObject`1.Props*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_Props" data-uid="redb.Core.Models.Entities.RedbObject`1.Props">
+  Props
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L78"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Object properties with lazy loading support.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[JsonPropertyName(&quot;properties&quot;)]
+public TProps Props { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><span class="xref">TProps</span></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_CloneWithProperties_" data-uid="redb.Core.Models.Entities.RedbObject`1.CloneWithProperties*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_CloneWithProperties__0_" data-uid="redb.Core.Models.Entities.RedbObject`1.CloneWithProperties(`0)">
+  CloneWithProperties(TProps)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L247"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create object copy with same metadata but new properties.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbObject&lt;TProps&gt; CloneWithProperties(TProps newProperties)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>newProperties</code> <span class="xref">TProps</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Contracts.IRedbObject-1.html">IRedbObject</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_ComputeHash_" data-uid="redb.Core.Models.Entities.RedbObject`1.ComputeHash*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_ComputeHash" data-uid="redb.Core.Models.Entities.RedbObject`1.ComputeHash">
+  ComputeHash()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L145"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get MD5 hash from Props values without changing hash field.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override Guid ComputeHash()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_ComputeHashForType_" data-uid="redb.Core.Models.Entities.RedbObject`1.ComputeHashForType*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_ComputeHashForType" data-uid="redb.Core.Models.Entities.RedbObject`1.ComputeHashForType">
+  ComputeHashForType()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L227"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get new hash based on current properties without changing object.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Guid ComputeHashForType()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_GetPropsDirectly_" data-uid="redb.Core.Models.Entities.RedbObject`1.GetPropsDirectly*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_GetPropsDirectly" data-uid="redb.Core.Models.Entities.RedbObject`1.GetPropsDirectly">
+  GetPropsDirectly()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L116"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get Props without triggering lazy loading (for internal use in cache).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TProps? GetPropsDirectly()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">TProps</span></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_GetSchemeForTypeAsync_" data-uid="redb.Core.Models.Entities.RedbObject`1.GetSchemeForTypeAsync*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_GetSchemeForTypeAsync" data-uid="redb.Core.Models.Entities.RedbObject`1.GetSchemeForTypeAsync">
+  GetSchemeForTypeAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L153"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme for type TProps (using cache and provider).
+Tries cache first, then provider, and only then throws exception.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme&gt; GetSchemeForTypeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_GetStructureByNameAsync_" data-uid="redb.Core.Models.Entities.RedbObject`1.GetStructureByNameAsync*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_GetStructureByNameAsync_System_String_" data-uid="redb.Core.Models.Entities.RedbObject`1.GetStructureByNameAsync(System.String)">
+  GetStructureByNameAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L210"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get structure by field name for type TProps.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbStructure?&gt; GetStructureByNameAsync(string fieldName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fieldName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbStructure.html">IRedbStructure</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_GetStructuresForTypeAsync_" data-uid="redb.Core.Models.Entities.RedbObject`1.GetStructuresForTypeAsync*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_GetStructuresForTypeAsync" data-uid="redb.Core.Models.Entities.RedbObject`1.GetStructuresForTypeAsync">
+  GetStructuresForTypeAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L201"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme structures for type TProps.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IReadOnlyCollection&lt;IRedbStructure&gt;&gt; GetStructuresForTypeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1">IReadOnlyCollection</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbStructure.html">IRedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_InvalidateCacheForType_" data-uid="redb.Core.Models.Entities.RedbObject`1.InvalidateCacheForType*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_InvalidateCacheForType" data-uid="redb.Core.Models.Entities.RedbObject`1.InvalidateCacheForType">
+  InvalidateCacheForType()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L277"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Clear metadata cache for type TProps.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void InvalidateCacheForType()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_IsHashValidForType_" data-uid="redb.Core.Models.Entities.RedbObject`1.IsHashValidForType*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_IsHashValidForType" data-uid="redb.Core.Models.Entities.RedbObject`1.IsHashValidForType">
+  IsHashValidForType()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L235"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if current hash matches TProps properties.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsHashValidForType()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_LoadPropsAsync_" data-uid="redb.Core.Models.Entities.RedbObject`1.LoadPropsAsync*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_LoadPropsAsync" data-uid="redb.Core.Models.Entities.RedbObject`1.LoadPropsAsync">
+  LoadPropsAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L124"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Explicit async Props preloading (for eager loading scenarios).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LoadPropsAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_RecomputeHash_" data-uid="redb.Core.Models.Entities.RedbObject`1.RecomputeHash*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_RecomputeHash" data-uid="redb.Core.Models.Entities.RedbObject`1.RecomputeHash">
+  RecomputeHash()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L137"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Recompute MD5 hash from Props values and write to hash field.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override void RecomputeHash()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_RecomputeHashForType_" data-uid="redb.Core.Models.Entities.RedbObject`1.RecomputeHashForType*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_RecomputeHashForType" data-uid="redb.Core.Models.Entities.RedbObject`1.RecomputeHashForType">
+  RecomputeHashForType()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L219"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Recompute hash based on current TProps properties.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RecomputeHashForType()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_ResetIds_" data-uid="redb.Core.Models.Entities.RedbObject`1.ResetIds*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_ResetIds_System_Boolean_" data-uid="redb.Core.Models.Entities.RedbObject`1.ResetIds(System.Boolean)">
+  ResetIds(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L303"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Override with recursive Props processing.
+Resets ID and ParentId for current object and all nested IRedbObject.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override void ResetIds(bool recursive = false)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If true, recursively processes all nested IRedbObject in Props.</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_WarmupCacheForTypeAsync_" data-uid="redb.Core.Models.Entities.RedbObject`1.WarmupCacheForTypeAsync*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_WarmupCacheForTypeAsync" data-uid="redb.Core.Models.Entities.RedbObject`1.WarmupCacheForTypeAsync">
+  WarmupCacheForTypeAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L289"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Preload metadata cache for type TProps.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task WarmupCacheForTypeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="operators">Operators
+</h2>
+
+
+  <a id="redb_Core_Models_Entities_RedbObject_1_op_Explicit_" data-uid="redb.Core.Models.Entities.RedbObject`1.op_Explicit*"></a>
+
+  <h3 id="redb_Core_Models_Entities_RedbObject_1_op_Explicit_redb_Core_Models_Entities_RedbObject__0____0" data-uid="redb.Core.Models.Entities.RedbObject`1.op_Explicit(redb.Core.Models.Entities.RedbObject{`0})~`0">
+  explicit operator TProps(RedbObject&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L45"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Explicit cast to TProps.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static explicit operator TProps(RedbObject&lt;TProps&gt; obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">TProps</span></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Entities/RedbObject.cs/#L23" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

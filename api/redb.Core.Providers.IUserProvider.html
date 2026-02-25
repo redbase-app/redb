@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IUserProvider </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IUserProvider ">
+      
+      <meta name="description" content="Provider for user management. Provides CRUD operations and business logic for working with users.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Providers_IUserProvider.md&amp;value=---%0Auid%3A%20redb.Core.Providers.IUserProvider%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Providers.IUserProvider">
+
+
+
+  <h1 id="redb_Core_Providers_IUserProvider" data-uid="redb.Core.Providers.IUserProvider" class="text-break">
+Interface IUserProvider  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L13"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Providers.html">Providers</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Provider for user management.
+Provides CRUD operations and business logic for working with users.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IUserProvider</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Providers_IUserProvider_ChangePasswordAsync_" data-uid="redb.Core.Providers.IUserProvider.ChangePasswordAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_ChangePasswordAsync_redb_Core_Models_Contracts_IRedbUser_System_String_System_String_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IUserProvider.ChangePasswordAsync(redb.Core.Models.Contracts.IRedbUser,System.String,System.String,redb.Core.Models.Contracts.IRedbUser)">
+  ChangePasswordAsync(IRedbUser, string, string, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L100"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Change user password.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; ChangePasswordAsync(IRedbUser user, string currentPassword, string newPassword, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>currentPassword</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Current password (for verification)</p>
+</dd>
+    <dt><code>newPassword</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>New password</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if password changed</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_CreateUserAsync_" data-uid="redb.Core.Providers.IUserProvider.CreateUserAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_CreateUserAsync_redb_Core_Models_Users_CreateUserRequest_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IUserProvider.CreateUserAsync(redb.Core.Models.Users.CreateUserRequest,redb.Core.Models.Contracts.IRedbUser)">
+  CreateUserAsync(CreateUserRequest, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L23"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create new user.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbUser&gt; CreateUserAsync(CreateUserRequest request, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>request</code> <a class="xref" href="redb.Core.Models.Users.CreateUserRequest.html">CreateUserRequest</a></dt>
+    <dd><p>User creation data</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a>&gt;</dt>
+    <dd><p>Created user</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_DeleteUserAsync_" data-uid="redb.Core.Providers.IUserProvider.DeleteUserAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_DeleteUserAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IUserProvider.DeleteUserAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbUser)">
+  DeleteUserAsync(IRedbUser, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L41"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete user (soft delete - deactivation).
+System users (ID 0, 1) cannot be deleted.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; DeleteUserAsync(IRedbUser user, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User to delete</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if user deleted</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_DisableUserAsync_" data-uid="redb.Core.Providers.IUserProvider.DisableUserAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_DisableUserAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IUserProvider.DisableUserAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbUser)">
+  DisableUserAsync(IRedbUser, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L129"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Deactivate user.
+System users (ID 0, 1) cannot be deactivated.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; DisableUserAsync(IRedbUser user, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if user deactivated</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_EnableUserAsync_" data-uid="redb.Core.Providers.IUserProvider.EnableUserAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_EnableUserAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IUserProvider.EnableUserAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbUser)">
+  EnableUserAsync(IRedbUser, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L120"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Activate user.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; EnableUserAsync(IRedbUser user, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if user activated</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_GetActiveUserCountAsync_" data-uid="redb.Core.Providers.IUserProvider.GetActiveUserCountAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_GetActiveUserCountAsync_System_DateTimeOffset_System_DateTimeOffset_" data-uid="redb.Core.Providers.IUserProvider.GetActiveUserCountAsync(System.DateTimeOffset,System.DateTimeOffset)">
+  GetActiveUserCountAsync(DateTimeOffset, DateTimeOffset)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L163"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get active user count for period.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; GetActiveUserCountAsync(DateTimeOffset fromDate, DateTimeOffset toDate)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fromDate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a></dt>
+    <dd><p>Start date</p>
+</dd>
+    <dt><code>toDate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a></dt>
+    <dd><p>End date</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Number of active users</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_GetUserByIdAsync_" data-uid="redb.Core.Providers.IUserProvider.GetUserByIdAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_GetUserByIdAsync_System_Int64_" data-uid="redb.Core.Providers.IUserProvider.GetUserByIdAsync(System.Int64)">
+  GetUserByIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L50"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get user by ID.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbUser?&gt; GetUserByIdAsync(long userId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>User ID</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a>&gt;</dt>
+    <dd><p>User or null if not found</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_GetUserByLoginAsync_" data-uid="redb.Core.Providers.IUserProvider.GetUserByLoginAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_GetUserByLoginAsync_System_String_" data-uid="redb.Core.Providers.IUserProvider.GetUserByLoginAsync(System.String)">
+  GetUserByLoginAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L57"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get user by login.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbUser?&gt; GetUserByLoginAsync(string login)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>login</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>User login</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a>&gt;</dt>
+    <dd><p>User or null if not found</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_GetUserConfigurationIdAsync_" data-uid="redb.Core.Providers.IUserProvider.GetUserConfigurationIdAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_GetUserConfigurationIdAsync_System_Int64_" data-uid="redb.Core.Providers.IUserProvider.GetUserConfigurationIdAsync(System.Int64)">
+  GetUserConfigurationIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L172"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get user configuration ID.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;long?&gt; GetUserConfigurationIdAsync(long userId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>User ID</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?&gt;</dt>
+    <dd><p>Configuration ID or null if not set</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_GetUserCountAsync_" data-uid="redb.Core.Providers.IUserProvider.GetUserCountAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_GetUserCountAsync_System_Boolean_" data-uid="redb.Core.Providers.IUserProvider.GetUserCountAsync(System.Boolean)">
+  GetUserCountAsync(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L155"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get user count.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; GetUserCountAsync(bool includeDisabled = false)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>includeDisabled</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Include deactivated users</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Number of users</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_GetUserRolesAsync_" data-uid="redb.Core.Providers.IUserProvider.GetUserRolesAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_GetUserRolesAsync_System_Int64_" data-uid="redb.Core.Providers.IUserProvider.GetUserRolesAsync(System.Int64)">
+  GetUserRolesAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L187"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get user roles.
+Used for building effective configuration.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;IRedbRole&gt;&gt; GetUserRolesAsync(long userId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>User ID</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>&gt;&gt;</dt>
+    <dd><p>List of user roles</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_GetUsersAsync_" data-uid="redb.Core.Providers.IUserProvider.GetUsersAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_GetUsersAsync_redb_Core_Models_Users_UserSearchCriteria_" data-uid="redb.Core.Providers.IUserProvider.GetUsersAsync(redb.Core.Models.Users.UserSearchCriteria)">
+  GetUsersAsync(UserSearchCriteria?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L80"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get list of users with filtering.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;IRedbUser&gt;&gt; GetUsersAsync(UserSearchCriteria? criteria = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>criteria</code> <a class="xref" href="redb.Core.Models.Users.UserSearchCriteria.html">UserSearchCriteria</a></dt>
+    <dd><p>Search criteria (can be null)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a>&gt;&gt;</dt>
+    <dd><p>List of users</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_IsLoginAvailableAsync_" data-uid="redb.Core.Providers.IUserProvider.IsLoginAvailableAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_IsLoginAvailableAsync_System_String_System_Nullable_System_Int64__" data-uid="redb.Core.Providers.IUserProvider.IsLoginAvailableAsync(System.String,System.Nullable{System.Int64})">
+  IsLoginAvailableAsync(string, long?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L146"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check login availability.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; IsLoginAvailableAsync(string login, long? excludeUserId = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>login</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Login to check</p>
+</dd>
+    <dt><code>excludeUserId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd><p>User ID to exclude (for update)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if login available</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_LoadUserAsync_" data-uid="redb.Core.Providers.IUserProvider.LoadUserAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_LoadUserAsync_System_Int64_" data-uid="redb.Core.Providers.IUserProvider.LoadUserAsync(System.Int64)">
+  LoadUserAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L73"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load user by ID (throws exception if not found).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbUser&gt; LoadUserAsync(long userId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>User ID</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a>&gt;</dt>
+    <dd><p>User</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>If user not found</p>
+</dd>
+  </dl>
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_LoadUserAsync_" data-uid="redb.Core.Providers.IUserProvider.LoadUserAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_LoadUserAsync_System_String_" data-uid="redb.Core.Providers.IUserProvider.LoadUserAsync(System.String)">
+  LoadUserAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L65"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load user by login (throws exception if not found).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbUser&gt; LoadUserAsync(string login)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>login</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>User login</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a>&gt;</dt>
+    <dd><p>User</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>If user not found</p>
+</dd>
+  </dl>
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_SetPasswordAsync_" data-uid="redb.Core.Providers.IUserProvider.SetPasswordAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_SetPasswordAsync_redb_Core_Models_Contracts_IRedbUser_System_String_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IUserProvider.SetPasswordAsync(redb.Core.Models.Contracts.IRedbUser,System.String,redb.Core.Models.Contracts.IRedbUser)">
+  SetPasswordAsync(IRedbUser, string, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L110"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Set new password for user (without checking old password).
+For administrators only.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; SetPasswordAsync(IRedbUser user, string newPassword, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>newPassword</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>New password</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if password set</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_SetUserConfigurationAsync_" data-uid="redb.Core.Providers.IUserProvider.SetUserConfigurationAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_SetUserConfigurationAsync_System_Int64_System_Nullable_System_Int64__" data-uid="redb.Core.Providers.IUserProvider.SetUserConfigurationAsync(System.Int64,System.Nullable{System.Int64})">
+  SetUserConfigurationAsync(long, long?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L179"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Set user configuration.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task SetUserConfigurationAsync(long userId, long? configId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>User ID</p>
+</dd>
+    <dt><code>configId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd><p>Configuration ID (RedbObject&lt;UserConfigurationProps&gt;) or null to reset</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_UpdateUserAsync_" data-uid="redb.Core.Providers.IUserProvider.UpdateUserAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_UpdateUserAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Users_UpdateUserRequest_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IUserProvider.UpdateUserAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Users.UpdateUserRequest,redb.Core.Models.Contracts.IRedbUser)">
+  UpdateUserAsync(IRedbUser, UpdateUserRequest, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L32"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Update user data.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbUser&gt; UpdateUserAsync(IRedbUser user, UpdateUserRequest request, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User to update</p>
+</dd>
+    <dt><code>request</code> <a class="xref" href="redb.Core.Models.Users.UpdateUserRequest.html">UpdateUserRequest</a></dt>
+    <dd><p>New user data</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a>&gt;</dt>
+    <dd><p>Updated user</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_ValidateUserAsync_" data-uid="redb.Core.Providers.IUserProvider.ValidateUserAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_ValidateUserAsync_System_String_System_String_" data-uid="redb.Core.Providers.IUserProvider.ValidateUserAsync(System.String,System.String)">
+  ValidateUserAsync(string, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L90"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Validate user login and password.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbUser?&gt; ValidateUserAsync(string login, string password)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>login</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Login</p>
+</dd>
+    <dt><code>password</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Password (plain text)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a>&gt;</dt>
+    <dd><p>User if credentials valid, null if invalid</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IUserProvider_ValidateUserDataAsync_" data-uid="redb.Core.Providers.IUserProvider.ValidateUserDataAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IUserProvider_ValidateUserDataAsync_redb_Core_Models_Users_CreateUserRequest_" data-uid="redb.Core.Providers.IUserProvider.ValidateUserDataAsync(redb.Core.Models.Users.CreateUserRequest)">
+  ValidateUserDataAsync(CreateUserRequest)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L138"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Validate user data correctness.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;UserValidationResult&gt; ValidateUserDataAsync(CreateUserRequest request)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>request</code> <a class="xref" href="redb.Core.Models.Users.CreateUserRequest.html">CreateUserRequest</a></dt>
+    <dd><p>Data to validate</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Users.UserValidationResult.html">UserValidationResult</a>&gt;</dt>
+    <dd><p>Validation result</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IUserProvider.cs/#L13" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

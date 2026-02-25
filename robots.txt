@@ -1,0 +1,4 @@
+﻿User-agent: *
+Allow: /
+
+Sitemap: https://redbase-app.github.io/redb/sitemap.xml

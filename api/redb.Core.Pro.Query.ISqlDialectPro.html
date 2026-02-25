@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface ISqlDialectPro </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface ISqlDialectPro ">
+      
+      <meta name="description" content="Pro extension of ISqlDialect with additional SQL methods for Pro features. Implementations inherit from database-specific ISqlDialect and add Pro SQL.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Pro_Query_ISqlDialectPro.md&amp;value=---%0Auid%3A%20redb.Core.Pro.Query.ISqlDialectPro%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Pro.Query.ISqlDialectPro">
+
+
+
+  <h1 id="redb_Core_Pro_Query_ISqlDialectPro" data-uid="redb.Core.Pro.Query.ISqlDialectPro" class="text-break">
+Interface ISqlDialectPro  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L9"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Pro.html">Pro</a>.<a class="xref" href="redb.Core.Pro.Query.html">Query</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.Pro.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Pro extension of ISqlDialect with additional SQL methods for Pro features.
+Implementations inherit from database-specific ISqlDialect and add Pro SQL.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface ISqlDialectPro : ISqlDialect</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ProviderName">ISqlDialect.ProviderName</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_FormatPagination_System_Nullable_System_Int32__System_Nullable_System_Int32__">ISqlDialect.FormatPagination(int?, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_WrapSubquery_System_String_System_String_">ISqlDialect.WrapSubquery(string, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_FormatPvtColumn_System_Int64_System_String_System_String_">ISqlDialect.FormatPvtColumn(long, string, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_FormatArrayContains_System_String_System_String_">ISqlDialect.FormatArrayContains(string, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_GetDbTypeName_System_String_">ISqlDialect.GetDbTypeName(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_FormatParameter_System_Int32_">ISqlDialect.FormatParameter(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_QuoteIdentifier_System_String_">ISqlDialect.QuoteIdentifier(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_SelectById">ISqlDialect.Roles_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_SelectByName">ISqlDialect.Roles_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_SelectAll">ISqlDialect.Roles_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_Insert">ISqlDialect.Roles_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_UpdateName">ISqlDialect.Roles_UpdateName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_Delete">ISqlDialect.Roles_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_ExistsByName">ISqlDialect.Roles_ExistsByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_ExistsByNameExcluding">ISqlDialect.Roles_ExistsByNameExcluding()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_Count">ISqlDialect.Roles_Count()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_UpdateConfiguration">ISqlDialect.Roles_UpdateConfiguration()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_SelectConfigurationId">ISqlDialect.Roles_SelectConfigurationId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_UsersRoles_Insert">ISqlDialect.UsersRoles_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_UsersRoles_Delete">ISqlDialect.UsersRoles_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_UsersRoles_DeleteByUser">ISqlDialect.UsersRoles_DeleteByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_UsersRoles_DeleteByRole">ISqlDialect.UsersRoles_DeleteByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_UsersRoles_Exists">ISqlDialect.UsersRoles_Exists()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_UsersRoles_SelectRolesByUser">ISqlDialect.UsersRoles_SelectRolesByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_UsersRoles_SelectUsersByRole">ISqlDialect.UsersRoles_SelectUsersByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_UsersRoles_CountByRole">ISqlDialect.UsersRoles_CountByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_ExistsById">ISqlDialect.Users_ExistsById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_SelectIdByLogin">ISqlDialect.Users_SelectIdByLogin()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_DeleteByRole">ISqlDialect.Permissions_DeleteByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_GetEffectiveForObject">ISqlDialect.Permissions_GetEffectiveForObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_SelectReadableObjectIds">ISqlDialect.Permissions_SelectReadableObjectIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_Insert">ISqlDialect.Permissions_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_Update">ISqlDialect.Permissions_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_Delete">ISqlDialect.Permissions_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_SelectById">ISqlDialect.Permissions_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_SelectByUser">ISqlDialect.Permissions_SelectByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_SelectByRole">ISqlDialect.Permissions_SelectByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_SelectByObject">ISqlDialect.Permissions_SelectByObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_SelectByUserRoleObject">ISqlDialect.Permissions_SelectByUserRoleObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_DeleteByUserRoleObject">ISqlDialect.Permissions_DeleteByUserRoleObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_DeleteByUser">ISqlDialect.Permissions_DeleteByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_Count">ISqlDialect.Permissions_Count()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_CountByUser">ISqlDialect.Permissions_CountByUser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_CountByRole">ISqlDialect.Permissions_CountByRole()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Permissions_SelectUserRoleIds">ISqlDialect.Permissions_SelectUserRoleIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_SelectById">ISqlDialect.Users_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_SelectByLogin">ISqlDialect.Users_SelectByLogin()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_Insert">ISqlDialect.Users_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_Update">ISqlDialect.Users_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_SoftDelete">ISqlDialect.Users_SoftDelete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_UpdatePassword">ISqlDialect.Users_UpdatePassword()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_UpdateStatus">ISqlDialect.Users_UpdateStatus()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_ExistsByLogin">ISqlDialect.Users_ExistsByLogin()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_ExistsByLoginExcluding">ISqlDialect.Users_ExistsByLoginExcluding()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_ExistsByEmail">ISqlDialect.Users_ExistsByEmail()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_Count">ISqlDialect.Users_Count()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_CountEnabled">ISqlDialect.Users_CountEnabled()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_SelectConfigurationId">ISqlDialect.Users_SelectConfigurationId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Users_UpdateConfiguration">ISqlDialect.Users_UpdateConfiguration()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_SelectIdByName">ISqlDialect.Roles_SelectIdByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Roles_ExistsById">ISqlDialect.Roles_ExistsById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_SelectByName">ISqlDialect.Schemes_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_SelectById">ISqlDialect.Schemes_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_SelectAll">ISqlDialect.Schemes_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_Insert">ISqlDialect.Schemes_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_UpdateHash">ISqlDialect.Schemes_UpdateHash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_UpdateName">ISqlDialect.Schemes_UpdateName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_SelectHashById">ISqlDialect.Schemes_SelectHashById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_ExistsByName">ISqlDialect.Schemes_ExistsByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_SelectObjectByName">ISqlDialect.Schemes_SelectObjectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_InsertObject">ISqlDialect.Schemes_InsertObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_SelectByScheme">ISqlDialect.Structures_SelectByScheme()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_SelectBySchemeShort">ISqlDialect.Structures_SelectBySchemeShort()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_SelectBySchemeCacheable">ISqlDialect.Structures_SelectBySchemeCacheable()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_Insert">ISqlDialect.Structures_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_UpdateType">ISqlDialect.Structures_UpdateType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_UpdateCollectionType">ISqlDialect.Structures_UpdateCollectionType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_UpdateKeyType">ISqlDialect.Structures_UpdateKeyType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_UpdateAlias">ISqlDialect.Structures_UpdateAlias()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_UpdateAllowNotNull">ISqlDialect.Structures_UpdateAllowNotNull()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Structures_DeleteByIds_System_Collections_Generic_IEnumerable_System_Int64__">ISqlDialect.Structures_DeleteByIds(IEnumerable&lt;long&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Types_SelectByName">ISqlDialect.Types_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Types_SelectAll">ISqlDialect.Types_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_SyncMetadataCache">ISqlDialect.Schemes_SyncMetadataCache()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_MigrateStructureType">ISqlDialect.Schemes_MigrateStructureType()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Schemes_GetStructureTree">ISqlDialect.Schemes_GetStructureTree()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_GetObjectJson">ISqlDialect.Tree_GetObjectJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_SelectChildrenJson">ISqlDialect.Tree_SelectChildrenJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_SelectPolymorphicChildren">ISqlDialect.Tree_SelectPolymorphicChildren()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_SelectSchemeAndJson">ISqlDialect.Tree_SelectSchemeAndJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_SelectChildrenBySchemeBase">ISqlDialect.Tree_SelectChildrenBySchemeBase()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_SelectChildrenBase">ISqlDialect.Tree_SelectChildrenBase()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_ObjectExists">ISqlDialect.Tree_ObjectExists()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_SelectParentId">ISqlDialect.Tree_SelectParentId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_UpdateParent">ISqlDialect.Tree_UpdateParent()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_DeleteValuesByObjectIds">ISqlDialect.Tree_DeleteValuesByObjectIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Tree_DeleteObjectsByIds">ISqlDialect.Tree_DeleteObjectsByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectObjectById">ISqlDialect.ObjectStorage_SelectObjectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectIdHash">ISqlDialect.ObjectStorage_SelectIdHash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectIdHashScheme">ISqlDialect.ObjectStorage_SelectIdHashScheme()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectObjectsByIds">ISqlDialect.ObjectStorage_SelectObjectsByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_DeleteById">ISqlDialect.ObjectStorage_DeleteById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_DeleteByIds">ISqlDialect.ObjectStorage_DeleteByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_InsertObject">ISqlDialect.ObjectStorage_InsertObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_UpdateObject">ISqlDialect.ObjectStorage_UpdateObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_DeleteValuesByObjectId">ISqlDialect.ObjectStorage_DeleteValuesByObjectId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_GetObjectJson">ISqlDialect.ObjectStorage_GetObjectJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_GetObjectsJsonBulk">ISqlDialect.ObjectStorage_GetObjectsJsonBulk()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectStructuresWithMetadata">ISqlDialect.ObjectStorage_SelectStructuresWithMetadata()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectValuesWithTypes">ISqlDialect.ObjectStorage_SelectValuesWithTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectStructureTypes">ISqlDialect.ObjectStorage_SelectStructureTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectTypeById">ISqlDialect.ObjectStorage_SelectTypeById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_CheckObjectExists">ISqlDialect.ObjectStorage_CheckObjectExists()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectSchemeById">ISqlDialect.ObjectStorage_SelectSchemeById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectValuesForObjects">ISqlDialect.ObjectStorage_SelectValuesForObjects()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectSchemeIdsForObjects">ISqlDialect.ObjectStorage_SelectSchemeIdsForObjects()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectValueById">ISqlDialect.ObjectStorage_SelectValueById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectAllTypes">ISqlDialect.ObjectStorage_SelectAllTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectExistingIds">ISqlDialect.ObjectStorage_SelectExistingIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectSchemesByIds">ISqlDialect.ObjectStorage_SelectSchemesByIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_LockObjectsForUpdate">ISqlDialect.ObjectStorage_LockObjectsForUpdate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ObjectStorage_SelectSchemeIdByObjectId">ISqlDialect.ObjectStorage_SelectSchemeIdByObjectId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Lists_SelectById">ISqlDialect.Lists_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Lists_SelectByName">ISqlDialect.Lists_SelectByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Lists_SelectAll">ISqlDialect.Lists_SelectAll()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Lists_Insert">ISqlDialect.Lists_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Lists_Update">ISqlDialect.Lists_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Lists_Delete">ISqlDialect.Lists_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Lists_IsUsedInStructures">ISqlDialect.Lists_IsUsedInStructures()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ListItems_SelectById">ISqlDialect.ListItems_SelectById()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ListItems_SelectByListId">ISqlDialect.ListItems_SelectByListId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ListItems_SelectByListIdAndValue">ISqlDialect.ListItems_SelectByListIdAndValue()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ListItems_Insert">ISqlDialect.ListItems_Insert()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ListItems_UpdateAliasAndObject">ISqlDialect.ListItems_UpdateAliasAndObject()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ListItems_Update">ISqlDialect.ListItems_Update()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ListItems_Delete">ISqlDialect.ListItems_Delete()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_ListItems_SelectByObjectId">ISqlDialect.ListItems_SelectByObjectId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Validation_SelectAllTypes">ISqlDialect.Validation_SelectAllTypes()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Validation_SelectSchemeByName">ISqlDialect.Validation_SelectSchemeByName()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Validation_SelectStructuresBySchemeId">ISqlDialect.Validation_SelectStructuresBySchemeId()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_LazyLoader_SelectObjectBase">ISqlDialect.LazyLoader_SelectObjectBase()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_LazyLoader_GetObjectJson">ISqlDialect.LazyLoader_GetObjectJson()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_LazyLoader_GetObjectJsonBatch">ISqlDialect.LazyLoader_GetObjectJsonBatch()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_LazyLoader_SelectObjectHash">ISqlDialect.LazyLoader_SelectObjectHash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchObjectsFunction">ISqlDialect.Query_SearchObjectsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchObjectsBaseFunction">ISqlDialect.Query_SearchObjectsBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchObjectsProjectionByPathsFunction">ISqlDialect.Query_SearchObjectsProjectionByPathsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchObjectsProjectionByIdsFunction">ISqlDialect.Query_SearchObjectsProjectionByIdsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchTreeObjectsFunction">ISqlDialect.Query_SearchTreeObjectsFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchTreeObjectsBaseFunction">ISqlDialect.Query_SearchTreeObjectsBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_CountTemplate">ISqlDialect.Query_CountTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchTemplate">ISqlDialect.Query_SearchTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchWithDistinctTemplate">ISqlDialect.Query_SearchWithDistinctTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchFullTemplate">ISqlDialect.Query_SearchFullTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_JsonCast">ISqlDialect.Query_JsonCast()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_TextArrayCast">ISqlDialect.Query_TextArrayCast()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_BigintArrayCast">ISqlDialect.Query_BigintArrayCast()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_ProjectionByPathsTemplate">ISqlDialect.Query_ProjectionByPathsTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_ProjectionByIdsTemplate_System_String_">ISqlDialect.Query_ProjectionByIdsTemplate(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_CheckPermissionSql">ISqlDialect.Query_CheckPermissionSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_AggregateBatchPreviewSql">ISqlDialect.Query_AggregateBatchPreviewSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_AggregateFieldSql">ISqlDialect.Query_AggregateFieldSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SqlPreviewTemplate">ISqlDialect.Query_SqlPreviewTemplate()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_AggregateBatchSql">ISqlDialect.Query_AggregateBatchSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SearchObjectsSimpleSql">ISqlDialect.Query_SearchObjectsSimpleSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_AggregateGroupedSql">ISqlDialect.Query_AggregateGroupedSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_AggregateArrayGroupedSql">ISqlDialect.Query_AggregateArrayGroupedSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_WindowSql">ISqlDialect.Query_WindowSql()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_TreeCountNormalSql_System_String_">ISqlDialect.Query_TreeCountNormalSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_TreeSearchNormalSql_System_String_">ISqlDialect.Query_TreeSearchNormalSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_TreeSearchWithParentIdsSql_System_String_">ISqlDialect.Query_TreeSearchWithParentIdsSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_HasAncestorTreeSql_System_String_">ISqlDialect.Query_HasAncestorTreeSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_HasAncestorNormalSql_System_String_">ISqlDialect.Query_HasAncestorNormalSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_HasDescendantSql_System_String_">ISqlDialect.Query_HasDescendantSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_GetParentIdsFromDescendantsSql_System_String_System_Int32_">ISqlDialect.Query_GetParentIdsFromDescendantsSql(string, int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_TreeCountWithParentIdsSql_System_String_">ISqlDialect.Query_TreeCountWithParentIdsSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_GetIdsWithAncestorsSql_System_String_">ISqlDialect.Query_GetIdsWithAncestorsSql(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_LoadObjectsByIdsSql_System_String_System_Int32_">ISqlDialect.Query_LoadObjectsByIdsSql(string, int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_TreeSqlPreviewTemplate_System_String_">ISqlDialect.Query_TreeSqlPreviewTemplate(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SqlPreviewFunction">ISqlDialect.Query_SqlPreviewFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_SqlPreviewBaseFunction">ISqlDialect.Query_SqlPreviewBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_TreeSqlPreviewFunction">ISqlDialect.Query_TreeSqlPreviewFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Query_TreeSqlPreviewBaseFunction">ISqlDialect.Query_TreeSqlPreviewBaseFunction()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_SoftDelete_MarkForDeletion">ISqlDialect.SoftDelete_MarkForDeletion()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_SoftDelete_PurgeTrash">ISqlDialect.SoftDelete_PurgeTrash()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_SoftDelete_GetDeletionProgress">ISqlDialect.SoftDelete_GetDeletionProgress()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_SoftDelete_GetUserActiveDeletions">ISqlDialect.SoftDelete_GetUserActiveDeletions()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_SoftDelete_GetOrphanedTasks">ISqlDialect.SoftDelete_GetOrphanedTasks()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_SoftDelete_ClaimOrphanedTask">ISqlDialect.SoftDelete_ClaimOrphanedTask()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.ISqlDialect.html#redb_Core_Query_ISqlDialect_Warmup_AllMetadataCaches">ISqlDialect.Warmup_AllMetadataCaches()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectListItemsByIds_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectListItemsByIds*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectListItemsByIds" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectListItemsByIds">
+  Materialization_SelectListItemsByIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L75"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select list items by IDs.
+Params: itemIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string Materialization_SelectListItemsByIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectObjectById_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectObjectById*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectObjectById" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectObjectById">
+  Materialization_SelectObjectById()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L63"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select object by ID with all base fields.
+Params: objectId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string Materialization_SelectObjectById()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectObjectsByIds_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectObjectsByIds*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectObjectsByIds" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectObjectsByIds">
+  Materialization_SelectObjectsByIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L81"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select objects by IDs (for nested objects).
+Params: objectIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string Materialization_SelectObjectsByIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectValuesByObjectAndStructureIds_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectValuesByObjectAndStructureIds*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectValuesByObjectAndStructureIds" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectValuesByObjectAndStructureIds">
+  Materialization_SelectValuesByObjectAndStructureIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L87"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select values by object IDs and structure IDs.
+Params: objectIds array, structureIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string Materialization_SelectValuesByObjectAndStructureIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectValuesByObjectIds_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectValuesByObjectIds*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_Materialization_SelectValuesByObjectIds" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Materialization_SelectValuesByObjectIds">
+  Materialization_SelectValuesByObjectIds()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L69"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Bulk select values by object IDs.
+Params: objectIds array</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string Materialization_SelectValuesByObjectIds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_Migration_Insert_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Migration_Insert*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_Migration_Insert" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Migration_Insert">
+  Migration_Insert()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L53"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Insert migration record.
+Params: id, migrationId, schemeId, propertyName, expressionHash, sql, propsType, error, affectedRows, durationMs, dryRun, executedAt</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string Migration_Insert()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_Migration_SelectExisting_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Migration_SelectExisting*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_Migration_SelectExisting" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Migration_SelectExisting">
+  Migration_SelectExisting()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L41"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if migration exists.
+Params: schemeId, migrationId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string Migration_SelectExisting()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_Migration_SelectExpressionHash_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Migration_SelectExpressionHash*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_Migration_SelectExpressionHash" data-uid="redb.Core.Pro.Query.ISqlDialectPro.Migration_SelectExpressionHash">
+  Migration_SelectExpressionHash()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L47"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get expression hash for migration.
+Params: schemeId, migrationId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string Migration_SelectExpressionHash()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_SchemeResolver_SelectChildField_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.SchemeResolver_SelectChildField*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_SchemeResolver_SelectChildField" data-uid="redb.Core.Pro.Query.ISqlDialectPro.SchemeResolver_SelectChildField">
+  SchemeResolver_SelectChildField()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L25"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select field metadata by scheme, name, and parent structure.
+Params: $1=schemeId, $2=fieldName, $3=parentStructureId</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string SchemeResolver_SelectChildField()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_SchemeResolver_SelectRootField_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.SchemeResolver_SelectRootField*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_SchemeResolver_SelectRootField" data-uid="redb.Core.Pro.Query.ISqlDialectPro.SchemeResolver_SelectRootField">
+  SchemeResolver_SelectRootField()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L19"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select field metadata by scheme, name, and no parent (root field).
+Params: $1=schemeId, $2=fieldName</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string SchemeResolver_SelectRootField()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Query_ISqlDialectPro_SchemeResolver_SelectRootFieldsIn_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.SchemeResolver_SelectRootFieldsIn*"></a>
+
+  <h3 id="redb_Core_Pro_Query_ISqlDialectPro_SchemeResolver_SelectRootFieldsIn_System_Int32_" data-uid="redb.Core.Pro.Query.ISqlDialectPro.SchemeResolver_SelectRootFieldsIn(System.Int32)">
+  SchemeResolver_SelectRootFieldsIn(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L31"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Select multiple root fields by names (IN clause).
+Returns SQL with $1=schemeId, and remaining params for field names.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string SchemeResolver_SelectRootFieldsIn(int fieldCount)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fieldCount</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Query/ISqlDialectPro.cs/#L9" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

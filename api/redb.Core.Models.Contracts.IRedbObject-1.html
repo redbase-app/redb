@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IRedbObject&lt;TProps&gt; </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IRedbObject&lt;TProps&gt; ">
+      
+      <meta name="description" content="Typed interface for REDB objects with specific properties type Extends base IRedbObject adding type-safe access to properties Provides IntelliSense and compile-time type checking">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Models_Contracts_IRedbObject_1.md&amp;value=---%0Auid%3A%20redb.Core.Models.Contracts.IRedbObject%601%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Models.Contracts.IRedbObject`1">
+
+
+
+  <h1 id="redb_Core_Models_Contracts_IRedbObject_1" data-uid="redb.Core.Models.Contracts.IRedbObject`1" class="text-break">
+Interface IRedbObject&lt;TProps&gt;  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L12"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Models.html">Models</a>.<a class="xref" href="redb.Core.Models.Contracts.html">Contracts</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Typed interface for REDB objects with specific properties type
+Extends base IRedbObject adding type-safe access to properties
+Provides IntelliSense and compile-time type checking</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IRedbObject&lt;TProps&gt; : IRedbObject where TProps : class</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd><p>Type of object properties class</p>
+</dd>
+  </dl>
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_Id">IRedbObject.Id</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_SchemeId">IRedbObject.SchemeId</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_Name">IRedbObject.Name</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ParentId">IRedbObject.ParentId</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_HasParent">IRedbObject.HasParent</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_IsRoot">IRedbObject.IsRoot</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_DateCreate">IRedbObject.DateCreate</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_DateModify">IRedbObject.DateModify</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_DateBegin">IRedbObject.DateBegin</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_DateComplete">IRedbObject.DateComplete</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_OwnerId">IRedbObject.OwnerId</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_WhoChangeId">IRedbObject.WhoChangeId</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_Key">IRedbObject.Key</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ValueLong">IRedbObject.ValueLong</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ValueString">IRedbObject.ValueString</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ValueGuid">IRedbObject.ValueGuid</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ValueBool">IRedbObject.ValueBool</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ValueDouble">IRedbObject.ValueDouble</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ValueNumeric">IRedbObject.ValueNumeric</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ValueDatetime">IRedbObject.ValueDatetime</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ValueBytes">IRedbObject.ValueBytes</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_Note">IRedbObject.Note</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_Hash">IRedbObject.Hash</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ResetId_System_Boolean_">IRedbObject.ResetId(bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html#redb_Core_Models_Contracts_IRedbObject_ResetIds_System_Boolean_">IRedbObject.ResetIds(bool)</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetAge_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.GetAge(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetChildrenCountAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.GetChildrenCountAsync&lt;T&gt;(IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetDebugInfo_redb_Core_Models_Contracts_IRedbObject_">RedbObjectExtensions.GetDebugInfo(IRedbObject)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetDescendantsCountAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_System_Nullable_System_Int32__">RedbObjectExtensions.GetDescendantsCountAsync&lt;T&gt;(IRedbObject, ITreeProvider, int?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetDisplayName_redb_Core_Models_Contracts_IRedbObject_System_Boolean_">RedbObjectExtensions.GetDisplayName(IRedbObject, bool)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetTimeSinceLastModification_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.GetTimeSinceLastModification(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_GetTreeLevelAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.GetTreeLevelAsync&lt;T&gt;(IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_HasStarted_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.HasStarted(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsActiveAt_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.IsActiveAt(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsAncestorOfAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.IsAncestorOfAsync&lt;T&gt;(IRedbObject, IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsDescendantOfAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.IsDescendantOfAsync&lt;T&gt;(IRedbObject, IRedbObject, ITreeProvider)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsExpired_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_DateTime__">RedbObjectExtensions.IsExpired(IRedbObject, DateTime?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbObjectExtensions.html#redb_Core_Extensions_RedbObjectExtensions_IsLeafAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Providers_ITreeProvider_">RedbObjectExtensions.IsLeafAsync&lt;T&gt;(IRedbObject, ITreeProvider)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_Props_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.Props*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_Props" data-uid="redb.Core.Models.Contracts.IRedbObject`1.Props">
+  Props
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L18"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Typed access to object properties
+Replaces the need to work with raw JSON or type casting</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">TProps Props { get; set; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><span class="xref">TProps</span></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_CloneWithProperties_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.CloneWithProperties*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_CloneWithProperties__0_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.CloneWithProperties(`0)">
+  CloneWithProperties(TProps)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L60"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create object copy with same metadata but new properties
+Useful for creating similar objects</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbObject&lt;TProps&gt; CloneWithProperties(TProps newProperties)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>newProperties</code> <span class="xref">TProps</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Contracts.IRedbObject-1.html">IRedbObject</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_ComputeHashForType_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.ComputeHashForType*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_ComputeHashForType" data-uid="redb.Core.Models.Contracts.IRedbObject`1.ComputeHashForType">
+  ComputeHashForType()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L48"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get new hash based on current properties without changing object
+Typed version of GetComputedHash()</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Guid ComputeHashForType()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_GetSchemeForTypeAsync_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.GetSchemeForTypeAsync*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_GetSchemeForTypeAsync" data-uid="redb.Core.Models.Contracts.IRedbObject`1.GetSchemeForTypeAsync">
+  GetSchemeForTypeAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L24"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme for TProps type (with cache usage)
+Convenient method for getting metadata of specific type</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbScheme&gt; GetSchemeForTypeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_GetStructureByNameAsync_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.GetStructureByNameAsync*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_GetStructureByNameAsync_System_String_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.GetStructureByNameAsync(System.String)">
+  GetStructureByNameAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get structure by field name for TProps type
+Uses fast name lookup in encapsulated scheme</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbStructure?&gt; GetStructureByNameAsync(string fieldName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fieldName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbStructure.html">IRedbStructure</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_GetStructuresForTypeAsync_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.GetStructuresForTypeAsync*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_GetStructuresForTypeAsync" data-uid="redb.Core.Models.Contracts.IRedbObject`1.GetStructuresForTypeAsync">
+  GetStructuresForTypeAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L30"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme structures for TProps type (with cache usage)
+Returns encapsulated structures from scheme</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IReadOnlyCollection&lt;IRedbStructure&gt;&gt; GetStructuresForTypeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1">IReadOnlyCollection</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbStructure.html">IRedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_InvalidateCacheForType_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.InvalidateCacheForType*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_InvalidateCacheForType" data-uid="redb.Core.Models.Contracts.IRedbObject`1.InvalidateCacheForType">
+  InvalidateCacheForType()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L66"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Clear metadata cache for TProps type
+Convenient method for cache invalidation at object level</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void InvalidateCacheForType()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_IsHashValidForType_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.IsHashValidForType*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_IsHashValidForType" data-uid="redb.Core.Models.Contracts.IRedbObject`1.IsHashValidForType">
+  IsHashValidForType()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L54"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if current hash matches TProps type properties
+Typed data integrity check</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool IsHashValidForType()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_RecomputeHashForType_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.RecomputeHashForType*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_RecomputeHashForType" data-uid="redb.Core.Models.Contracts.IRedbObject`1.RecomputeHashForType">
+  RecomputeHashForType()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L42"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Recompute hash based on current TProps type properties
+Typed version of RecomputeHash() considering specific type</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void RecomputeHashForType()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Models_Contracts_IRedbObject_1_WarmupCacheForTypeAsync_" data-uid="redb.Core.Models.Contracts.IRedbObject`1.WarmupCacheForTypeAsync*"></a>
+
+  <h3 id="redb_Core_Models_Contracts_IRedbObject_1_WarmupCacheForTypeAsync" data-uid="redb.Core.Models.Contracts.IRedbObject`1.WarmupCacheForTypeAsync">
+  WarmupCacheForTypeAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L72"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Preload metadata cache for TProps type
+Useful for performance optimization</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task WarmupCacheForTypeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Models/Contracts/IRedbObjectGeneric.cs/#L12" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

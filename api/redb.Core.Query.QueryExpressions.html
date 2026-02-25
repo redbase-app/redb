@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace redb.Core.Query.QueryExpressions </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace redb.Core.Query.QueryExpressions ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Query.QueryExpressions">
+
+  <h1 id="redb_Core_Query_QueryExpressions" data-uid="redb.Core.Query.QueryExpressions" class="text-break">Namespace redb.Core.Query.QueryExpressions</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ArithmeticExpression.html">ArithmeticExpression</a></dt>
+      <dd><p>Arithmetic expression (Pro Only)
+Examples: p.Price * 2, p.Stock - p.Reserved</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ComparisonExpression.html">ComparisonExpression</a></dt>
+      <dd><p>Comparison expression (property operator value)
+Backward compatibility: Left can be PropertyInfo directly</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ConstantValueExpression.html">ConstantValueExpression</a></dt>
+      <dd><p>Constant value</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.CustomFunctionExpression.html">CustomFunctionExpression</a></dt>
+      <dd><p>Custom SQL function (Pro Only)
+Examples: Sql.Function(&quot;COALESCE&quot;, p.Stock, 0), Sql.Function(&quot;POWER&quot;, p.Age, 2)</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+      <dd><p>Base class for filter expressions</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FunctionCallExpression.html">FunctionCallExpression</a></dt>
+      <dd><p>Function call on value (Pro Only)
+Examples: LOWER(p.Name), EXTRACT(YEAR FROM p.Date)</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.InExpression.html">InExpression</a></dt>
+      <dd><p>Expression for checking inclusion in list</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.LogicalExpression.html">LogicalExpression</a></dt>
+      <dd><p>Logical expression (AND, OR, NOT)</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.NullCheckExpression.html">NullCheckExpression</a></dt>
+      <dd><p>Expression for null check</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.OrderingExpression.html">OrderingExpression</a></dt>
+      <dd><p>Sorting information.
+Supports simple property sorting and complex expressions (arithmetic, functions).</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.PropertyInfo.html">PropertyInfo</a></dt>
+      <dd><p>Field information in expression</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.PropertyValueExpression.html">PropertyValueExpression</a></dt>
+      <dd><p>Reference to object property</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ValueExpression.html">ValueExpression</a></dt>
+      <dd><p>Base class for value expressions (Pro version)
+Used for arithmetic, functions and complex expressions</p>
+</dd>
+    </dl>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IExpressionVisitor-1.html">IExpressionVisitor&lt;TResult&gt;</a></dt>
+      <dd><p>Interface for processing Expression Tree</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IFilterExpressionParser.html">IFilterExpressionParser</a></dt>
+      <dd><p>Parser for converting Where expressions to FilterExpression</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IOrderingExpressionParser.html">IOrderingExpressionParser</a></dt>
+      <dd><p>Parser for converting OrderBy expressions to OrderingExpression</p>
+</dd>
+    </dl>
+    <h3 id="enums">
+Enums
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ArithmeticOperator.html">ArithmeticOperator</a></dt>
+      <dd><p>Arithmetic operators (Pro Only).</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ComparisonOperator.html">ComparisonOperator</a></dt>
+      <dd><p>Comparison operators
+UPDATED: Support for new paradigm with 25+ array operators</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.LogicalOperator.html">LogicalOperator</a></dt>
+      <dd><p>Logical operators</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.PropertyFunction.html">PropertyFunction</a></dt>
+      <dd><p>Functions that can be applied to property</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Query.QueryExpressions.SortDirection.html">SortDirection</a></dt>
+      <dd><p>Sort direction</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

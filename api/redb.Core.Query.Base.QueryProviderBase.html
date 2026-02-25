@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class QueryProviderBase </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class QueryProviderBase ">
+      
+      <meta name="description" content="Base query provider for executing LINQ queries via search_objects_with_facets. Database-specific implementations should inherit and provide ISqlDialect.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Query_Base_QueryProviderBase.md&amp;value=---%0Auid%3A%20redb.Core.Query.Base.QueryProviderBase%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Query.Base.QueryProviderBase">
+
+
+
+  <h1 id="redb_Core_Query_Base_QueryProviderBase" data-uid="redb.Core.Query.Base.QueryProviderBase" class="text-break">
+Class QueryProviderBase  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.Window.cs/#L11"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Query.html">Query</a>.<a class="xref" href="redb.Core.Query.Base.html">Base</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Base query provider for executing LINQ queries via search_objects_with_facets.
+Database-specific implementations should inherit and provide ISqlDialect.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class QueryProviderBase : IRedbQueryProvider</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">QueryProviderBase</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Query.IRedbQueryProvider.html">IRedbQueryProvider</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="redb.MSSql.Query.MssqlQueryProvider.html">MssqlQueryProvider</a></div>
+      <div><a class="xref" href="redb.Postgres.Query.PostgresQueryProvider.html">PostgresQueryProvider</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase__ctor_" data-uid="redb.Core.Query.Base.QueryProviderBase.#ctor*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__ctor_redb_Core_Data_IRedbContext_redb_Core_Serialization_IRedbObjectSerializer_redb_Core_Query_ISqlDialect_redb_Core_Providers_ILazyPropsLoader_redb_Core_Models_Configuration_RedbServiceConfiguration_Microsoft_Extensions_Logging_ILogger_redb_Core_Providers_ISchemeSyncProvider_" data-uid="redb.Core.Query.Base.QueryProviderBase.#ctor(redb.Core.Data.IRedbContext,redb.Core.Serialization.IRedbObjectSerializer,redb.Core.Query.ISqlDialect,redb.Core.Providers.ILazyPropsLoader,redb.Core.Models.Configuration.RedbServiceConfiguration,Microsoft.Extensions.Logging.ILogger,redb.Core.Providers.ISchemeSyncProvider)">
+  QueryProviderBase(IRedbContext, IRedbObjectSerializer, ISqlDialect, ILazyPropsLoader?, RedbServiceConfiguration?, ILogger?, ISchemeSyncProvider?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L38"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected QueryProviderBase(IRedbContext context, IRedbObjectSerializer serializer, ISqlDialect dialect, ILazyPropsLoader? lazyPropsLoader = null, RedbServiceConfiguration? configuration = null, ILogger? logger = null, ISchemeSyncProvider? schemeSync = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+    <dt><code>serializer</code> <a class="xref" href="redb.Core.Serialization.IRedbObjectSerializer.html">IRedbObjectSerializer</a></dt>
+    <dd></dd>
+    <dt><code>dialect</code> <a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+    <dd></dd>
+    <dt><code>lazyPropsLoader</code> <a class="xref" href="redb.Core.Providers.ILazyPropsLoader.html">ILazyPropsLoader</a></dt>
+    <dd></dd>
+    <dt><code>configuration</code> <a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+    <dt><code>schemeSync</code> <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html">ISchemeSyncProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__configuration" data-uid="redb.Core.Query.Base.QueryProviderBase._configuration">
+  _configuration
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L34"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly RedbServiceConfiguration _configuration</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__context" data-uid="redb.Core.Query.Base.QueryProviderBase._context">
+  _context
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L27"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IRedbContext _context</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__facetBuilder" data-uid="redb.Core.Query.Base.QueryProviderBase._facetBuilder">
+  _facetBuilder
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L31"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IFacetFilterBuilder _facetBuilder</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.FacetFilters.IFacetFilterBuilder.html">IFacetFilterBuilder</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__filterParser" data-uid="redb.Core.Query.Base.QueryProviderBase._filterParser">
+  _filterParser
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L29"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IFilterExpressionParser _filterParser</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IFilterExpressionParser.html">IFilterExpressionParser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__lazyPropsLoader" data-uid="redb.Core.Query.Base.QueryProviderBase._lazyPropsLoader">
+  _lazyPropsLoader
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L33"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ILazyPropsLoader? _lazyPropsLoader</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.ILazyPropsLoader.html">ILazyPropsLoader</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__logger" data-uid="redb.Core.Query.Base.QueryProviderBase._logger">
+  _logger
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L32"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ILogger? _logger</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__orderingParser" data-uid="redb.Core.Query.Base.QueryProviderBase._orderingParser">
+  _orderingParser
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L30"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IOrderingExpressionParser _orderingParser</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IOrderingExpressionParser.html">IOrderingExpressionParser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__schemeSync" data-uid="redb.Core.Query.Base.QueryProviderBase._schemeSync">
+  _schemeSync
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L35"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ISchemeSyncProvider? _schemeSync</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html">ISchemeSyncProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__serializer" data-uid="redb.Core.Query.Base.QueryProviderBase._serializer">
+  _serializer
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L28"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IRedbObjectSerializer _serializer</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Serialization.IRedbObjectSerializer.html">IRedbObjectSerializer</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase__sql" data-uid="redb.Core.Query.Base.QueryProviderBase._sql">
+  _sql
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ISqlDialect _sql</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_CheckProOnlyDistinctFeatures_" data-uid="redb.Core.Query.Base.QueryProviderBase.CheckProOnlyDistinctFeatures*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_CheckProOnlyDistinctFeatures__1_redb_Core_Query_QueryContext___0__" data-uid="redb.Core.Query.Base.QueryProviderBase.CheckProOnlyDistinctFeatures``1(redb.Core.Query.QueryContext{``0})">
+  CheckProOnlyDistinctFeatures&lt;TProps&gt;(QueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L101"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check for Pro-only Distinct features</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual void CheckProOnlyDistinctFeatures&lt;TProps&gt;(QueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_CreateFacetBuilder_" data-uid="redb.Core.Query.Base.QueryProviderBase.CreateFacetBuilder*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_CreateFacetBuilder" data-uid="redb.Core.Query.Base.QueryProviderBase.CreateFacetBuilder">
+  CreateFacetBuilder()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L72"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates facet filter builder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual IFacetFilterBuilder CreateFacetBuilder()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.FacetFilters.IFacetFilterBuilder.html">IFacetFilterBuilder</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_CreateFilterParser_" data-uid="redb.Core.Query.Base.QueryProviderBase.CreateFilterParser*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_CreateFilterParser" data-uid="redb.Core.Query.Base.QueryProviderBase.CreateFilterParser">
+  CreateFilterParser()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L62"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates filter expression parser. Override for Pro features.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract IFilterExpressionParser CreateFilterParser()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IFilterExpressionParser.html">IFilterExpressionParser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_CreateOrderingParser_" data-uid="redb.Core.Query.Base.QueryProviderBase.CreateOrderingParser*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_CreateOrderingParser" data-uid="redb.Core.Query.Base.QueryProviderBase.CreateOrderingParser">
+  CreateOrderingParser()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L67"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates ordering expression parser.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual IOrderingExpressionParser CreateOrderingParser()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IOrderingExpressionParser.html">IOrderingExpressionParser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_CreateQuery_" data-uid="redb.Core.Query.Base.QueryProviderBase.CreateQuery*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_CreateQuery__1_System_Int64_System_Nullable_System_Int64__System_Boolean_" data-uid="redb.Core.Query.Base.QueryProviderBase.CreateQuery``1(System.Int64,System.Nullable{System.Int64},System.Boolean)">
+  CreateQuery&lt;TProps&gt;(long, long?, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L91"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create new query for specified scheme.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbQueryable&lt;TProps&gt; CreateQuery&lt;TProps&gt;(long schemeId, long? userId = null, bool checkPermissions = false) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd></dd>
+    <dt><code>checkPermissions</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteAggregateAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteAggregateAsync_System_Int64_System_String_redb_Core_Query_Aggregation_AggregateFunction_System_String_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAggregateAsync(System.Int64,System.String,redb.Core.Query.Aggregation.AggregateFunction,System.String)">
+  ExecuteAggregateAsync(long, string, AggregateFunction, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L988"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Perform aggregation on EAV field (SQL strategy)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;decimal?&gt; ExecuteAggregateAsync(long schemeId, string fieldPath, AggregateFunction function, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>fieldPath</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>function</code> <a class="xref" href="redb.Core.Query.Aggregation.AggregateFunction.html">AggregateFunction</a></dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a>?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteAggregateAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteAggregateAsync_System_Int64_System_String_redb_Core_Query_Aggregation_AggregateFunction_redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAggregateAsync(System.Int64,System.String,redb.Core.Query.Aggregation.AggregateFunction,redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteAggregateAsync(long, string, AggregateFunction, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L1095"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute single-field aggregation with FilterExpression (Pro version).
+Free fallback: converts FilterExpression to facet-JSON.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;decimal?&gt; ExecuteAggregateAsync(long schemeId, string fieldPath, AggregateFunction function, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>fieldPath</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>function</code> <a class="xref" href="redb.Core.Query.Aggregation.AggregateFunction.html">AggregateFunction</a></dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a>?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteAggregateBatchAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAggregateBatchAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteAggregateBatchAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_String_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAggregateBatchAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.String)">
+  ExecuteAggregateBatchAsync(long, IEnumerable&lt;AggregateRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L1037"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Perform batch aggregation — ONE SQL query for all aggregations!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;AggregateResult&gt; ExecuteAggregateBatchAsync(long schemeId, IEnumerable&lt;AggregateRequest&gt; requests, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>requests</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateResult.html">AggregateResult</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteAggregateBatchAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAggregateBatchAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteAggregateBatchAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAggregateBatchAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteAggregateBatchAsync(long, IEnumerable&lt;AggregateRequest&gt;, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L1109"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute batch aggregation with FilterExpression (Pro version).
+Free fallback: converts FilterExpression to facet-JSON.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;AggregateResult&gt; ExecuteAggregateBatchAsync(long schemeId, IEnumerable&lt;AggregateRequest&gt; requests, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>requests</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateResult.html">AggregateResult</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteArrayGroupedAggregateAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteArrayGroupedAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteArrayGroupedAggregateAsync_System_Int64_System_String_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_String_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteArrayGroupedAggregateAsync(System.Int64,System.String,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.String)">
+  ExecuteArrayGroupedAggregateAsync(long, string, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.Grouping.cs/#L80"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Performs GroupBy aggregation on an array via the aggregate_array_grouped SQL function</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteArrayGroupedAggregateAsync(long schemeId, string arrayPath, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>arrayPath</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteAsync_System_Linq_Expressions_Expression_System_Type_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteAsync(System.Linq.Expressions.Expression,System.Type)">
+  ExecuteAsync(Expression, Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L125"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query asynchronously.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;object&gt; ExecuteAsync(Expression expression, Type elementType)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+    <dt><code>elementType</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteCountAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteCountAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteCountAsync__1_redb_Core_Query_QueryContext___0__" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteCountAsync``1(redb.Core.Query.QueryContext{``0})">
+  ExecuteCountAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L181"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Executes COUNT query. Override in Pro for PVT-based count with computed expressions.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual Task&lt;int&gt; ExecuteCountAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteDeleteAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteDeleteAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteDeleteAsync_System_Int64_System_String_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteDeleteAsync(System.Int64,System.String)">
+  ExecuteDeleteAsync(long, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L1131"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete objects by filter.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;int&gt; ExecuteDeleteAsync(long schemeId, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteDeleteAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteDeleteAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteDeleteAsync_System_Int64_redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteDeleteAsync(System.Int64,redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteDeleteAsync(long, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L1173"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete objects by FilterExpression (Pro version uses PVT, OpenSource falls back to facet JSON).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;int&gt; ExecuteDeleteAsync(long schemeId, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteGroupedAggregateAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteGroupedAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteGroupedAggregateAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_String_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteGroupedAggregateAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.String)">
+  ExecuteGroupedAggregateAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.Grouping.cs/#L17"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Performs GroupBy aggregation via the aggregate_grouped SQL function</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteGroupedAggregateAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteGroupedAggregateAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteGroupedAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteGroupedAggregateAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteGroupedAggregateAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteGroupedAggregateAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.Grouping.cs/#L61"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Performs GroupBy aggregation with FilterExpression (Pro version).
+Free version fallback: converts FilterExpression to facet-JSON and calls the string-based method.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteGroupedAggregateAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteGroupedWindowQueryAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteGroupedWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteGroupedWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteGroupedWindowQueryAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String)">
+  ExecuteGroupedWindowQueryAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.GroupedWindow.cs/#L20"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute GroupBy with Window Functions.
+Base implementation: throws NotSupportedException - Pro feature.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteGroupedWindowQueryAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteGroupedWindowQueryAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteGroupedWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteGroupedWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteGroupedWindowQueryAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteGroupedWindowQueryAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.GroupedWindow.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute GroupBy with Window Functions with FilterExpression (Pro version).
+Free fallback: converts FilterExpression to facet-JSON.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteGroupedWindowQueryAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteToListAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteToListAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteToListAsync__1_redb_Core_Query_QueryContext___0__System_Type_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteToListAsync``1(redb.Core.Query.QueryContext{``0},System.Type)">
+  ExecuteToListAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt;, Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L212"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual Task&lt;object&gt; ExecuteToListAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt; context, Type propsType) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>propsType</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteWindowQueryAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_System_String_System_Nullable_System_Int32__System_Nullable_System_Int32__" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteWindowQueryAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String,System.String,System.Nullable{System.Int32},System.Nullable{System.Int32})">
+  ExecuteWindowQueryAsync(long, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?, string?, int?, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.Window.cs/#L13"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query with window functions (SQL function query_with_window).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteWindowQueryAsync(long schemeId, IEnumerable&lt;WindowFieldRequest&gt; selectFields, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? filterJson = null, string? frameJson = null, int? take = null, int? skip = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>selectFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>frameJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>take</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+    <dt><code>skip</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ExecuteWindowQueryAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ExecuteWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__redb_Core_Query_QueryExpressions_FilterExpression_System_String_System_Nullable_System_Int32__System_Nullable_System_Int32__" data-uid="redb.Core.Query.Base.QueryProviderBase.ExecuteWindowQueryAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},redb.Core.Query.QueryExpressions.FilterExpression,System.String,System.Nullable{System.Int32},System.Nullable{System.Int32})">
+  ExecuteWindowQueryAsync(long, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, FilterExpression?, string?, int?, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.Window.cs/#L93"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute window query with FilterExpression (Pro version).
+Free fallback: converts FilterExpression to facet-JSON.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteWindowQueryAsync(long schemeId, IEnumerable&lt;WindowFieldRequest&gt; selectFields, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, FilterExpression? filter, string? frameJson = null, int? take = null, int? skip = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>selectFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+    <dt><code>frameJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>take</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+    <dt><code>skip</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_GetAggregateSqlPreviewAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetAggregateSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_GetAggregateSqlPreviewAsync__2_redb_Core_Query_QueryContext___0__System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject___0____1___" data-uid="redb.Core.Query.Base.QueryProviderBase.GetAggregateSqlPreviewAsync``2(redb.Core.Query.QueryContext{``0},System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Entities.RedbObject{``0},``1}})">
+  GetAggregateSqlPreviewAsync&lt;TProps, TResult&gt;(QueryContext&lt;TProps&gt;, Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L843"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>🔍 Returns SQL query for aggregation (for debugging)
+Similar to ToQueryString() from EF Core</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetAggregateSqlPreviewAsync&lt;TProps, TResult&gt;(QueryContext&lt;TProps&gt; context, Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt; selector) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;, TResult&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+    <dt><code>TResult</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_GetFilterJsonAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetFilterJsonAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_GetFilterJsonAsync__1_redb_Core_Query_QueryContext___0__" data-uid="redb.Core.Query.Base.QueryProviderBase.GetFilterJsonAsync``1(redb.Core.Query.QueryContext{``0})">
+  GetFilterJsonAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L832"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Returns the JSON filter that will be sent to SQL function (for diagnostics)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetFilterJsonAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_GetGroupedWindowSqlPreviewAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetGroupedWindowSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_GetGroupedWindowSqlPreviewAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetGroupedWindowSqlPreviewAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String)">
+  GetGroupedWindowSqlPreviewAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.GroupedWindow.cs/#L53"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>SQL preview for GroupBy + Window query.
+Base implementation returns placeholder (overridden in Pro).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetGroupedWindowSqlPreviewAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_GetGroupedWindowSqlPreviewAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetGroupedWindowSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_GetGroupedWindowSqlPreviewAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetGroupedWindowSqlPreviewAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},redb.Core.Query.QueryExpressions.FilterExpression)">
+  GetGroupedWindowSqlPreviewAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.GroupedWindow.cs/#L75"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>SQL preview for GroupBy + Window query with FilterExpression (Pro version).
+Free fallback: converts FilterExpression to facet-JSON.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetGroupedWindowSqlPreviewAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_GetSchemeAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetSchemeAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_GetSchemeAsync_System_Int64_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetSchemeAsync(System.Int64)">
+  GetSchemeAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L116"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>⭐ Get scheme by ID (for projections)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme?&gt; GetSchemeAsync(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_GetSqlPreviewAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_GetSqlPreviewAsync__1_redb_Core_Query_QueryContext___0__" data-uid="redb.Core.Query.Base.QueryProviderBase.GetSqlPreviewAsync``1(redb.Core.Query.QueryContext{``0})">
+  GetSqlPreviewAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L800"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Returns the SQL query that will be executed (for debugging)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetSqlPreviewAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_GetWindowSqlPreviewAsync_" data-uid="redb.Core.Query.Base.QueryProviderBase.GetWindowSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_GetWindowSqlPreviewAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_System_String_System_Nullable_System_Int32__System_Nullable_System_Int32__" data-uid="redb.Core.Query.Base.QueryProviderBase.GetWindowSqlPreviewAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String,System.String,System.Nullable{System.Int32},System.Nullable{System.Int32})">
+  GetWindowSqlPreviewAsync(long, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?, string?, int?, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.Window.cs/#L74"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>SQL preview for window query.
+Base implementation returns placeholder (overridden in Pro).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetWindowSqlPreviewAsync(long schemeId, IEnumerable&lt;WindowFieldRequest&gt; selectFields, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? filterJson = null, string? frameJson = null, int? take = null, int? skip = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>selectFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>frameJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>take</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+    <dt><code>skip</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ParseAggregateExpressionForPreview_" data-uid="redb.Core.Query.Base.QueryProviderBase.ParseAggregateExpressionForPreview*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ParseAggregateExpressionForPreview__2_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject___0____1___" data-uid="redb.Core.Query.Base.QueryProviderBase.ParseAggregateExpressionForPreview``2(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Entities.RedbObject{``0},``1}})">
+  ParseAggregateExpressionForPreview&lt;TProps, TResult&gt;(Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L878"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Parses aggregate expression for preview (simplified version from RedbQueryable)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected List&lt;(string Alias, string FieldPath, string Function)&gt; ParseAggregateExpressionForPreview&lt;TProps, TResult&gt;(Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt; selector) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;, TResult&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.string,system.string,system.string-.alias">Alias</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.string,system.string,system.string-.fieldpath">FieldPath</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.string,system.string,system.string-.function">Function</a>)&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+    <dt><code>TResult</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_QueryProviderBase_ShouldUseLazyLoading_" data-uid="redb.Core.Query.Base.QueryProviderBase.ShouldUseLazyLoading*"></a>
+
+  <h3 id="redb_Core_Query_Base_QueryProviderBase_ShouldUseLazyLoading__1_redb_Core_Query_QueryContext___0__" data-uid="redb.Core.Query.Base.QueryProviderBase.ShouldUseLazyLoading``1(redb.Core.Query.QueryContext{``0})">
+  ShouldUseLazyLoading&lt;TProps&gt;(QueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.cs/#L77"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Determines if lazy loading should be used for this query</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool ShouldUseLazyLoading&lt;TProps&gt;(QueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/QueryProviderBase.Window.cs/#L11" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

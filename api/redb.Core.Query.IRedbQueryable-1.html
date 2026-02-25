@@ -1,0 +1,2539 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IRedbQueryable&lt;TProps&gt; </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IRedbQueryable&lt;TProps&gt; ">
+      
+      <meta name="description" content="Main interface for type-safe LINQ queries to REDB.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Query_IRedbQueryable_1.md&amp;value=---%0Auid%3A%20redb.Core.Query.IRedbQueryable%601%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Query.IRedbQueryable`1">
+
+
+
+  <h1 id="redb_Core_Query_IRedbQueryable_1" data-uid="redb.Core.Query.IRedbQueryable`1" class="text-break">
+Interface IRedbQueryable&lt;TProps&gt;  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L14"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Query.html">Query</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Main interface for type-safe LINQ queries to REDB.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IRedbQueryable&lt;TProps&gt; where TProps : class, new()</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="redb.Core.Query.RedbQueryableExtensions.html#redb_Core_Query_RedbQueryableExtensions_ToAggregateSqlStringAsync__2_redb_Core_Query_IRedbQueryable___0__System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject___0____1___">RedbQueryableExtensions.ToAggregateSqlStringAsync&lt;TProps, TResult&gt;(IRedbQueryable&lt;TProps&gt;, Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Query.RedbQueryableExtensions.html#redb_Core_Query_RedbQueryableExtensions_ToSqlStringAsync__1_redb_Core_Query_IRedbQueryable___0__">RedbQueryableExtensions.ToSqlStringAsync&lt;TProps&gt;(IRedbQueryable&lt;TProps&gt;)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_AggregateAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.AggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_AggregateAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject__0____0___" data-uid="redb.Core.Query.IRedbQueryable`1.AggregateAsync``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Entities.RedbObject{`0},``0}})">
+  AggregateAsync&lt;TResult&gt;(Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L366"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Flexible aggregation - choose what to aggregate via Agg.Sum/Avg/Min/Max/Count.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TResult&gt; AggregateAsync&lt;TResult&gt;(Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt; selector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;, TResult&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TResult</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_AggregateAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject__0____0____examples">Examples</h4>
+  <p>var result = await query
+.Where(x =&gt; x.Status == &quot;Active&quot;)
+.AggregateAsync(x =&gt; new {
+TotalAmount = Agg.Sum(x.Props.Amount),
+AvgPrice = Agg.Avg(x.Props.Price),
+MinStock = Agg.Min(x.Props.Stock),
+OrderCount = Agg.Count()
+});</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_AggregateRedbAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.AggregateRedbAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_AggregateRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IRedbQueryable`1.AggregateRedbAsync``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  AggregateRedbAsync&lt;TResult&gt;(Expression&lt;Func&lt;IRedbObject, TResult&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L410"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Flexible aggregation for IRedbObject base fields ONLY.
+For aggregating both base AND Props fields - use AggregateAsync.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TResult&gt; AggregateRedbAsync&lt;TResult&gt;(Expression&lt;Func&lt;IRedbObject, TResult&gt;&gt; selector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TResult&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TResult</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_AggregateRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0____examples">Examples</h4>
+  <p>var result = await query
+.AggregateRedbAsync(x =&gt; new {
+MaxId = Agg.Max(x.Id),
+MinDateCreate = Agg.Min(x.DateCreate),
+AvgValue = Agg.Avg(x.ValueLong),
+Count = Agg.Count()
+});</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_AllAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.AllAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_AllAsync_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___" data-uid="redb.Core.Query.IRedbQueryable`1.AllAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}})">
+  AllAsync(Expression&lt;Func&lt;TProps, bool&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L122"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if ALL records match condition.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; AllAsync(Expression&lt;Func&lt;TProps, bool&gt;&gt; predicate)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>predicate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_AnyAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.AnyAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_AnyAsync" data-uid="redb.Core.Query.IRedbQueryable`1.AnyAsync">
+  AnyAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L97"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if any records exist.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; AnyAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_AnyAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.AnyAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_AnyAsync_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___" data-uid="redb.Core.Query.IRedbQueryable`1.AnyAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}})">
+  AnyAsync(Expression&lt;Func&lt;TProps, bool&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L102"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if any records match condition.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; AnyAsync(Expression&lt;Func&lt;TProps, bool&gt;&gt; predicate)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>predicate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_AverageAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.AverageAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_AverageAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IRedbQueryable`1.AverageAsync``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  AverageAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L331"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Average of field values.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;decimal&gt; AverageAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt; selector) where TField : struct</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TField</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_AverageRedbAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.AverageRedbAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_AverageRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IRedbQueryable`1.AverageRedbAsync``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  AverageRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L383"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Average of IRedbObject base field values.
+Uses IRedbObject for compile-time safety - Props not visible!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;decimal&gt; AverageRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt; selector) where TField : struct</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TField</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_CountAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.CountAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_CountAsync" data-uid="redb.Core.Query.IRedbQueryable`1.CountAsync">
+  CountAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L82"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Count records without loading data.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; CountAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_DeleteAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.DeleteAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_DeleteAsync" data-uid="redb.Core.Query.IRedbQueryable`1.DeleteAsync">
+  DeleteAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L315"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete objects without loading data.
+Executes DELETE with filters from query.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; DeleteAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Number of deleted records</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_Distinct_" data-uid="redb.Core.Query.IRedbQueryable`1.Distinct*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_Distinct" data-uid="redb.Core.Query.IRedbQueryable`1.Distinct">
+  Distinct()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L132"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get distinct values (by all object fields).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; Distinct()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_DistinctByRedb_" data-uid="redb.Core.Query.IRedbQueryable`1.DistinctByRedb*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_DistinctByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IRedbQueryable`1.DistinctByRedb``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  DistinctByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L157"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>DISTINCT ON (base_field) - one object per unique IRedbObject base field value.
+Automatically adds field to beginning of ORDER BY (PostgreSQL requirement).
+Uses IRedbObject for compile-time safety - Props not visible!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; DistinctByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_DistinctByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0____examples">Examples</h4>
+  <p>.DistinctByRedb(x =&gt; x.Name)  // one object per unique Name</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_DistinctBy_" data-uid="redb.Core.Query.IRedbQueryable`1.DistinctBy*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_DistinctBy__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IRedbQueryable`1.DistinctBy``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  DistinctBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L147"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>DISTINCT ON (field) - one object per unique Props field value.
+Automatically adds field to beginning of ORDER BY (PostgreSQL requirement).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; DistinctBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_DistinctBy__1_System_Linq_Expressions_Expression_System_Func__0___0____examples">Examples</h4>
+  <p>.DistinctBy(x =&gt; x.Category)  // one object per Category</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_DistinctRedb_" data-uid="redb.Core.Query.IRedbQueryable`1.DistinctRedb*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_DistinctRedb" data-uid="redb.Core.Query.IRedbQueryable`1.DistinctRedb">
+  DistinctRedb()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L138"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>DISTINCT by IRedbObject base fields (Name, ValueLong, ParentId, etc.) excluding Id.
+Used for finding duplicates by base fields.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; DistinctRedb()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_FirstOrDefaultAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.FirstOrDefaultAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_FirstOrDefaultAsync" data-uid="redb.Core.Query.IRedbQueryable`1.FirstOrDefaultAsync">
+  FirstOrDefaultAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L87"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get first object or null.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;RedbObject&lt;TProps&gt;?&gt; FirstOrDefaultAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_FirstOrDefaultAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.FirstOrDefaultAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_FirstOrDefaultAsync_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___" data-uid="redb.Core.Query.IRedbQueryable`1.FirstOrDefaultAsync(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}})">
+  FirstOrDefaultAsync(Expression&lt;Func&lt;TProps, bool&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L92"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get first object matching condition, or null.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;RedbObject&lt;TProps&gt;?&gt; FirstOrDefaultAsync(Expression&lt;Func&lt;TProps, bool&gt;&gt; predicate)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>predicate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_GetStatisticsAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.GetStatisticsAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_GetStatisticsAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IRedbQueryable`1.GetStatisticsAsync``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  GetStatisticsAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L351"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get field statistics (Sum, Avg, Min, Max, Count) in single call.
+All aggregations execute in parallel for maximum performance.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;FieldStatistics&lt;TField&gt;&gt; GetStatisticsAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt; selector) where TField : struct</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.FieldStatistics-1.html">FieldStatistics</a>&lt;TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TField</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_GetStatisticsAsync__1_System_Linq_Expressions_Expression_System_Func__0___0____examples">Examples</h4>
+  <p>var stats = await query.GetStatisticsAsync(x =&gt; x.Price);
+stats.Sum, stats.Average, stats.Min, stats.Max, stats.Count</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_GroupByArray_" data-uid="redb.Core.Query.IRedbQueryable`1.GroupByArray*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_GroupByArray__2_System_Linq_Expressions_Expression_System_Func__0_System_Collections_Generic_IEnumerable___0____System_Linq_Expressions_Expression_System_Func___0___1___" data-uid="redb.Core.Query.IRedbQueryable`1.GroupByArray``2(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}},System.Linq.Expressions.Expression{System.Func{``0,``1}})">
+  GroupByArray&lt;TItem, TKey&gt;(Expression&lt;Func&lt;TProps, IEnumerable&lt;TItem&gt;&gt;&gt;, Expression&lt;Func&lt;TItem, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L461"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Group by array elements (Items[].Property).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbGroupedQueryable&lt;TKey, TItem&gt; GroupByArray&lt;TItem, TKey&gt;(Expression&lt;Func&lt;TProps, IEnumerable&lt;TItem&gt;&gt;&gt; arraySelector, Expression&lt;Func&lt;TItem, TKey&gt;&gt; keySelector) where TItem : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>arraySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;TItem&gt;&gt;&gt;</dt>
+    <dd></dd>
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TItem, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.Grouping.IRedbGroupedQueryable-2.html">IRedbGroupedQueryable</a>&lt;TKey, TItem&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TItem</code></dt>
+    <dd></dd>
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_GroupByArray__2_System_Linq_Expressions_Expression_System_Func__0_System_Collections_Generic_IEnumerable___0____System_Linq_Expressions_Expression_System_Func___0___1____examples">Examples</h4>
+  <p>var result = await query
+.GroupByArray(x =&gt; x.Items, item =&gt; item.Category)
+.SelectAsync(g =&gt; new {
+Category = g.Key,
+TotalPrice = Agg.Sum(g, item =&gt; item.Price)
+});</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_GroupByRedb_" data-uid="redb.Core.Query.IRedbQueryable`1.GroupByRedb*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_GroupByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IRedbQueryable`1.GroupByRedb``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  GroupByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L448"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Group by IRedbObject base fields (id, scheme_id, parent_id, etc.).
+Uses IRedbObject for compile-time safety - Props not visible!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbGroupedQueryable&lt;TKey, TProps&gt; GroupByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.Grouping.IRedbGroupedQueryable-2.html">IRedbGroupedQueryable</a>&lt;TKey, TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_GroupByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0____examples">Examples</h4>
+  <p>var result = await query
+.GroupByRedb(x =&gt; x.SchemeId)
+.SelectAsync(g =&gt; new {
+SchemeId = g.Key,
+Count = Agg.Count(g)
+});
+Multiple base fields:
+var result = await query
+.GroupByRedb(x =&gt; new { x.SchemeId, x.OwnerId })
+.SelectAsync(g =&gt; new {
+g.Key.SchemeId,
+g.Key.OwnerId,
+Count = Agg.Count(g)
+});</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_GroupBy_" data-uid="redb.Core.Query.IRedbQueryable`1.GroupBy*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_GroupBy__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IRedbQueryable`1.GroupBy``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  GroupBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L426"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Group by field with subsequent aggregation.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbGroupedQueryable&lt;TKey, TProps&gt; GroupBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.Grouping.IRedbGroupedQueryable-2.html">IRedbGroupedQueryable</a>&lt;TKey, TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_GroupBy__1_System_Linq_Expressions_Expression_System_Func__0___0____examples">Examples</h4>
+  <p>var result = await query
+.GroupBy(x =&gt; x.Category)
+.SelectAsync(g =&gt; new {
+Category = g.Key,
+Total = Agg.Sum(g, x =&gt; x.Stock),
+Count = Agg.Count(g)
+});</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_MaxAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.MaxAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_MaxAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IRedbQueryable`1.MaxAsync``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  MaxAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L341"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Maximum field value.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TField?&gt; MaxAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt; selector) where TField : struct</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TField?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TField</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_MaxRedbAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.MaxRedbAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_MaxRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IRedbQueryable`1.MaxRedbAsync``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  MaxRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L395"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Maximum IRedbObject base field value (ValueLong, Key, DateCreate, etc.).
+Uses IRedbObject for compile-time safety - Props not visible!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TField?&gt; MaxRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt; selector) where TField : struct</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TField?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TField</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_MinAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.MinAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_MinAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IRedbQueryable`1.MinAsync``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  MinAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L336"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Minimum field value.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TField?&gt; MinAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt; selector) where TField : struct</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TField?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TField</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_MinRedbAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.MinRedbAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_MinRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IRedbQueryable`1.MinRedbAsync``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  MinRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L389"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Minimum IRedbObject base field value (ValueLong, Key, DateCreate, etc.).
+Uses IRedbObject for compile-time safety - Props not visible!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TField?&gt; MinRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt; selector) where TField : struct</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TField?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TField</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_OrderByDescendingRedb_" data-uid="redb.Core.Query.IRedbQueryable`1.OrderByDescendingRedb*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_OrderByDescendingRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IRedbQueryable`1.OrderByDescendingRedb``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  OrderByDescendingRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L62"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Sort descending by IRedbObject base fields.
+Uses IRedbObject for compile-time safety - Props not visible in IntelliSense!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IOrderedRedbQueryable&lt;TProps&gt; OrderByDescendingRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IOrderedRedbQueryable-1.html">IOrderedRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_OrderByDescending_" data-uid="redb.Core.Query.IRedbQueryable`1.OrderByDescending*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_OrderByDescending__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IRedbQueryable`1.OrderByDescending``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  OrderByDescending&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L45"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Sort descending by Props field.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IOrderedRedbQueryable&lt;TProps&gt; OrderByDescending&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IOrderedRedbQueryable-1.html">IOrderedRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_OrderByRedb_" data-uid="redb.Core.Query.IRedbQueryable`1.OrderByRedb*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_OrderByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IRedbQueryable`1.OrderByRedb``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  OrderByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L56"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Sort ascending by IRedbObject base fields (id, name, date_create, etc.).
+Uses IRedbObject for compile-time safety - Props not visible in IntelliSense!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IOrderedRedbQueryable&lt;TProps&gt; OrderByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IOrderedRedbQueryable-1.html">IOrderedRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_OrderByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0____examples">Examples</h4>
+  <p>.OrderByRedb(x =&gt; x.DateCreate)
+.OrderByRedb(x =&gt; x.Name)
+.OrderByRedb(x =&gt; x.Id)</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_OrderBy_" data-uid="redb.Core.Query.IRedbQueryable`1.OrderBy*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_OrderBy__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IRedbQueryable`1.OrderBy``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  OrderBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L40"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Sort ascending by Props field.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IOrderedRedbQueryable&lt;TProps&gt; OrderBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IOrderedRedbQueryable-1.html">IOrderedRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_Select_" data-uid="redb.Core.Query.IRedbQueryable`1.Select*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_Select__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject__0____0___" data-uid="redb.Core.Query.IRedbQueryable`1.Select``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Entities.RedbObject{`0},``0}})">
+  Select&lt;TResult&gt;(Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L127"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Project fields - return only selected properties.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbProjectedQueryable&lt;TResult&gt; Select&lt;TResult&gt;(Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt; selector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;, TResult&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbProjectedQueryable-1.html">IRedbProjectedQueryable</a>&lt;TResult&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TResult</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_Skip_" data-uid="redb.Core.Query.IRedbQueryable`1.Skip*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_Skip_System_Int32_" data-uid="redb.Core.Query.IRedbQueryable`1.Skip(System.Int32)">
+  Skip(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L72"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Skip records.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; Skip(int count)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>count</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_SumAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.SumAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_SumAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IRedbQueryable`1.SumAsync``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  SumAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L326"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Sum of field values.
+Strategy: SQL for simple fields, C# for complex (Class, arrays).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;decimal&gt; SumAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt; selector) where TField : struct</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TField</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_SumAsync__1_System_Linq_Expressions_Expression_System_Func__0___0____examples">Examples</h4>
+  <p>var total = await query.Where(x =&gt; x.Status == &quot;Active&quot;).SumAsync(x =&gt; x.Price);</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_SumRedbAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.SumRedbAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_SumRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IRedbQueryable`1.SumRedbAsync``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  SumRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L377"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Sum of IRedbObject base field values (ValueLong, Key, etc.).
+Uses IRedbObject for compile-time safety - Props not visible!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;decimal&gt; SumRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt; selector) where TField : struct</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TField&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TField</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_SumRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0____examples">Examples</h4>
+  <p>var totalValue = await query.SumRedbAsync(x =&gt; x.ValueLong);</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_Take_" data-uid="redb.Core.Query.IRedbQueryable`1.Take*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_Take_System_Int32_" data-uid="redb.Core.Query.IRedbQueryable`1.Take(System.Int32)">
+  Take(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L67"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Limit the number of records.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; Take(int count)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>count</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_ToFilterJsonAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.ToFilterJsonAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_ToFilterJsonAsync" data-uid="redb.Core.Query.IRedbQueryable`1.ToFilterJsonAsync">
+  ToFilterJsonAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L494"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get JSON filter that will be sent to SQL function (for diagnostics).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;string&gt; ToFilterJsonAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_ToFlatListAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.ToFlatListAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_ToFlatListAsync" data-uid="redb.Core.Query.IRedbQueryable`1.ToFlatListAsync">
+  ToFlatListAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L308"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query and get flat list of tree objects.
+Without loading Parent/Children relationships (for performance).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; ToFlatListAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd><p>Flat list of TreeRedbObject</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_ToListAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.ToListAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_ToListAsync" data-uid="redb.Core.Query.IRedbQueryable`1.ToListAsync">
+  ToListAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L77"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query and return list of objects.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;RedbObject&lt;TProps&gt;&gt;&gt; ToListAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_ToRootListAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.ToRootListAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_ToRootListAsync" data-uid="redb.Core.Query.IRedbQueryable`1.ToRootListAsync">
+  ToRootListAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L301"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query and get list of root tree nodes.
+Loads objects + all their parents to root, establishes relationships and returns roots.
+Children contain only objects from loaded chain (not all children from DB).
+Supports polymorphic trees - each object of its own type via ITreeRedbObject.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;ITreeRedbObject&gt;&gt; ToRootListAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;&gt;</dt>
+    <dd><p>List of root ITreeRedbObject (polymorphic - each of its own TProps type)</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_ToSqlString_" data-uid="redb.Core.Query.IRedbQueryable`1.ToSqlString*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_ToSqlString" data-uid="redb.Core.Query.IRedbQueryable`1.ToSqlString">
+  ToSqlString()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L484"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get SQL representation of query (for debugging).
+Analogous to EF Core ToQueryString().</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string ToSqlString()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>SQL query as string with comments</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_ToSqlStringAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.ToSqlStringAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_ToSqlStringAsync" data-uid="redb.Core.Query.IRedbQueryable`1.ToSqlStringAsync">
+  ToSqlStringAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L489"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Async version of getting SQL (recommended).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;string&gt; ToSqlStringAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_ToTreeListAsync_" data-uid="redb.Core.Query.IRedbQueryable`1.ToTreeListAsync*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_ToTreeListAsync" data-uid="redb.Core.Query.IRedbQueryable`1.ToTreeListAsync">
+  ToTreeListAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L292"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query and return filtered objects with populated Parent/Children chains.
+Loads objects + all their parents to root and establishes relationships.
+Children contain only objects from loaded chain (not all children from DB).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; ToTreeListAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd><p>List of filtered TreeRedbObject with populated relationships</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_Where_" data-uid="redb.Core.Query.IRedbQueryable`1.Where*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_Where_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___" data-uid="redb.Core.Query.IRedbQueryable`1.Where(System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}})">
+  Where(Expression&lt;Func&lt;TProps, bool&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L19"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Filter by Props fields.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; Where(Expression&lt;Func&lt;TProps, bool&gt;&gt; predicate)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>predicate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereChildrenOf_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereChildrenOf*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereChildrenOf_System_Int64_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereChildrenOf(System.Int64)">
+  WhereChildrenOf(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L241"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Direct children of specified object.
+Uses SQL operator $childrenOf.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereChildrenOf(long parentId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Parent object ID</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query for object children</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereChildrenOf_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereChildrenOf*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereChildrenOf_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereChildrenOf(redb.Core.Models.Contracts.IRedbObject)">
+  WhereChildrenOf(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L249"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Direct children of specified object.
+Uses SQL operator $childrenOf.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereChildrenOf(IRedbObject parentObject)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObject</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd><p>Parent object</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query for object children</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereDescendantsOf_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereDescendantsOf*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereDescendantsOf_System_Int64_System_Nullable_System_Int32__" data-uid="redb.Core.Query.IRedbQueryable`1.WhereDescendantsOf(System.Int64,System.Nullable{System.Int32})">
+  WhereDescendantsOf(long, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L258"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>All descendants of specified object (recursive).
+Uses SQL operator $descendantsOf.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereDescendantsOf(long ancestorId, int? maxDepth = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ancestorId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Ancestor ID</p>
+</dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd><p>Maximum search depth (null = unlimited)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query for all object descendants</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereDescendantsOf_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereDescendantsOf*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereDescendantsOf_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__" data-uid="redb.Core.Query.IRedbQueryable`1.WhereDescendantsOf(redb.Core.Models.Contracts.IRedbObject,System.Nullable{System.Int32})">
+  WhereDescendantsOf(IRedbObject, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L267"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>All descendants of specified object (recursive).
+Uses SQL operator $descendantsOf.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereDescendantsOf(IRedbObject ancestorObject, int? maxDepth = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ancestorObject</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd><p>Ancestor object</p>
+</dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd><p>Maximum search depth (null = unlimited)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query for all object descendants</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereHasAncestor_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereHasAncestor*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereHasAncestor__1_System_Linq_Expressions_Expression_System_Func___0_System_Boolean___System_Nullable_System_Int32__" data-uid="redb.Core.Query.IRedbQueryable`1.WhereHasAncestor``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Nullable{System.Int32})">
+  WhereHasAncestor&lt;TTarget&gt;(Expression&lt;Func&lt;TTarget, bool&gt;&gt;, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L186"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Filter by ancestors: find objects that have an ancestor of specified type matching condition.
+Uses SQL operator $hasAncestor.
+Supports polymorphic trees - can search for ancestors of different type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereHasAncestor&lt;TTarget&gt;(Expression&lt;Func&lt;TTarget, bool&gt;&gt; ancestorCondition, int? maxDepth = null) where TTarget : class</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ancestorCondition</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TTarget, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd><p>Condition for ancestor search</p>
+</dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd><p>Maximum depth to search up the tree (null = to root)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query with ancestor filter</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TTarget</code></dt>
+    <dd><p>Ancestor type to search for (may differ from TProps)</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereHasDescendant_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereHasDescendant*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereHasDescendant__1_System_Linq_Expressions_Expression_System_Func___0_System_Boolean___System_Nullable_System_Int32__" data-uid="redb.Core.Query.IRedbQueryable`1.WhereHasDescendant``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}},System.Nullable{System.Int32})">
+  WhereHasDescendant&lt;TTarget&gt;(Expression&lt;Func&lt;TTarget, bool&gt;&gt;, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L200"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Filter by descendants: find objects that have a descendant of specified type matching condition.
+Uses SQL operator $hasDescendant.
+Supports polymorphic trees - can search for descendants of different type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereHasDescendant&lt;TTarget&gt;(Expression&lt;Func&lt;TTarget, bool&gt;&gt; descendantCondition, int? maxDepth = null) where TTarget : class</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>descendantCondition</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TTarget, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd><p>Condition for descendant search</p>
+</dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd><p>Maximum depth to search down the tree (null = to leaves)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query with descendant filter</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TTarget</code></dt>
+    <dd><p>Descendant type to search for (may differ from TProps)</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereInRedb_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereInRedb*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereInRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___System_Collections_Generic_IEnumerable___0__" data-uid="redb.Core.Query.IRedbQueryable`1.WhereInRedb``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}},System.Collections.Generic.IEnumerable{``0})">
+  WhereInRedb&lt;TValue&gt;(Expression&lt;Func&lt;IRedbObject, TValue&gt;&gt;, IEnumerable&lt;TValue&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L117"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Filter by IRedbObject base field in list (WHERE _field IN (...)).
+Uses IRedbObject for compile-time safety - Props not visible!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereInRedb&lt;TValue&gt;(Expression&lt;Func&lt;IRedbObject, TValue&gt;&gt; selector, IEnumerable&lt;TValue&gt; values)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TValue&gt;&gt;</dt>
+    <dd></dd>
+    <dt><code>values</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;TValue&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TValue</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_WhereInRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___System_Collections_Generic_IEnumerable___0___examples">Examples</h4>
+  <p>.WhereInRedb(x =&gt; x.Id, new[] { 1L, 2L, 3L })
+.WhereInRedb(x =&gt; x.Name, new[] { &quot;Alice&quot;, &quot;Bob&quot; })</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereIn_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereIn*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereIn__1_System_Linq_Expressions_Expression_System_Func__0___0___System_Collections_Generic_IEnumerable___0__" data-uid="redb.Core.Query.IRedbQueryable`1.WhereIn``1(System.Linq.Expressions.Expression{System.Func{`0,``0}},System.Collections.Generic.IEnumerable{``0})">
+  WhereIn&lt;TValue&gt;(Expression&lt;Func&lt;TProps, TValue&gt;&gt;, IEnumerable&lt;TValue&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L107"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Filter by value in list (WHERE field IN (...)).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereIn&lt;TValue&gt;(Expression&lt;Func&lt;TProps, TValue&gt;&gt; selector, IEnumerable&lt;TValue&gt; values)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>selector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TValue&gt;&gt;</dt>
+    <dd></dd>
+    <dt><code>values</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;TValue&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TValue</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereLeaves_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereLeaves*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereLeaves" data-uid="redb.Core.Query.IRedbQueryable`1.WhereLeaves">
+  WhereLeaves()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L233"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Leaf nodes only (objects without children).
+Uses SQL operator $isLeaf.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereLeaves()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query for leaf objects only</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereLevel_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereLevel*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereLevel_System_Int32_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereLevel(System.Int32)">
+  WhereLevel(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L211"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Filter by tree level.
+Uses SQL operator $level.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereLevel(int level)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>level</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Tree level (0 = root)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query with level filter</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereLevel_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereLevel*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereLevel_System_Linq_Expressions_Expression_System_Func_System_Int32_System_Boolean___" data-uid="redb.Core.Query.IRedbQueryable`1.WhereLevel(System.Linq.Expressions.Expression{System.Func{System.Int32,System.Boolean}})">
+  WhereLevel(Expression&lt;Func&lt;int, bool&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L219"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Filter by tree level with comparison operator.
+Uses SQL operators $level: {$gt: N}, {$lt: N}, etc.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereLevel(Expression&lt;Func&lt;int, bool&gt;&gt; levelCondition)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>levelCondition</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd><p>Condition for level (e.g.: level =&gt; level &gt; 2)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query with level condition filter</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereRedb_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereRedb*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereRedb_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject_System_Boolean___" data-uid="redb.Core.Query.IRedbQueryable`1.WhereRedb(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,System.Boolean}})">
+  WhereRedb(Expression&lt;Func&lt;IRedbObject, bool&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L35"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Filter by base object fields (Id, Name, ParentId, etc.).
+Allows LINQ queries on IRedbObject fields: Id, ParentId, SchemeId,
+Name, Note, Key, Hash, OwnerId, WhoChangeId,
+DateCreate, DateModify, DateBegin, DateComplete,
+ValueLong, ValueString, ValueGuid, ValueBool, ValueDouble, ValueNumeric, ValueDatetime, ValueBytes.
+Uses IRedbObject for compile-time safety - Props not visible in IntelliSense!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereRedb(Expression&lt;Func&lt;IRedbObject, bool&gt;&gt; predicate)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>predicate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_WhereRedb_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject_System_Boolean____examples">Examples</h4>
+  <p>.WhereRedb(x =&gt; x.Id == 123)
+.WhereRedb(x =&gt; x.ValueLong &gt; 100)
+.WhereRedb(x =&gt; x.Name.Contains(&quot;test&quot;))
+.WhereRedb(x =&gt; x.ParentId == null)  // root objects</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WhereRoots_" data-uid="redb.Core.Query.IRedbQueryable`1.WhereRoots*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WhereRoots" data-uid="redb.Core.Query.IRedbQueryable`1.WhereRoots">
+  WhereRoots()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L226"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Root elements only (parent_id IS NULL).
+Uses SQL operator $isRoot.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WhereRoots()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query for root objects only</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WithLazyLoading_" data-uid="redb.Core.Query.IRedbQueryable`1.WithLazyLoading*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WithLazyLoading_System_Boolean_" data-uid="redb.Core.Query.IRedbQueryable`1.WithLazyLoading(System.Boolean)">
+  WithLazyLoading(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L173"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Enable/disable lazy loading of Props for this query.
+Overrides global EnableLazyLoadingForProps configuration setting.
+With lazy loading: Props loaded in BULK for ALL objects via LoadPropsForManyAsync after ToListAsync.
+Without lazy loading: Props loaded immediately via get_object_json (legacy behavior).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WithLazyLoading(bool enabled = true)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>enabled</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = lazy loading, false = eager loading</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query with configured Props loading mode</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WithMaxDepth_" data-uid="redb.Core.Query.IRedbQueryable`1.WithMaxDepth*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WithMaxDepth_System_Int32_" data-uid="redb.Core.Query.IRedbQueryable`1.WithMaxDepth(System.Int32)">
+  WithMaxDepth(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L273"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Configure maximum tree search depth.
+Default: 50 levels (descendant search), 1 (children search).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WithMaxDepth(int depth)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>depth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WithMaxRecursionDepth_" data-uid="redb.Core.Query.IRedbQueryable`1.WithMaxRecursionDepth*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WithMaxRecursionDepth_System_Int32_" data-uid="redb.Core.Query.IRedbQueryable`1.WithMaxRecursionDepth(System.Int32)">
+  WithMaxRecursionDepth(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L163"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Configure maximum recursion depth for complex queries ($and/$or/$not).
+Default: 10 levels.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WithMaxRecursionDepth(int depth)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>depth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WithPropsDepth_" data-uid="redb.Core.Query.IRedbQueryable`1.WithPropsDepth*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WithPropsDepth_System_Int32_" data-uid="redb.Core.Query.IRedbQueryable`1.WithPropsDepth(System.Int32)">
+  WithPropsDepth(int)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L282"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Configure maximum depth for loading nested RedbObject in Props.
+Controls recursion when Props contain references to other RedbObjects via _values._Object.
+Default: uses global DefaultMaxTreeDepth from config.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbQueryable&lt;TProps&gt; WithPropsDepth(int depth)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>depth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Maximum depth for nested RedbObject loading (1 = only direct references)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Query with configured Props depth</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IRedbQueryable_1_WithWindow_" data-uid="redb.Core.Query.IRedbQueryable`1.WithWindow*"></a>
+
+  <h3 id="redb_Core_Query_IRedbQueryable_1_WithWindow_System_Action_redb_Core_Query_Window_IWindowSpec__0___" data-uid="redb.Core.Query.IRedbQueryable`1.WithWindow(System.Action{redb.Core.Query.Window.IWindowSpec{`0}})">
+  WithWindow(Action&lt;IWindowSpec&lt;TProps&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L475"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Query with window functions.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbWindowedQueryable&lt;TProps&gt; WithWindow(Action&lt;IWindowSpec&lt;TProps&gt;&gt; windowConfig)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>windowConfig</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="redb.Core.Query.Window.IWindowSpec-1.html">IWindowSpec</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.Window.IRedbWindowedQueryable-1.html">IRedbWindowedQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IRedbQueryable_1_WithWindow_System_Action_redb_Core_Query_Window_IWindowSpec__0____examples">Examples</h4>
+  <p>var result = await query
+.WithWindow(w =&gt; w.PartitionBy(x =&gt; x.Category).OrderByDesc(x =&gt; x.Stock))
+.SelectAsync(x =&gt; new { x.name, Rank = Win.RowNumber() });</p>
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L14" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

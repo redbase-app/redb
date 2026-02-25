@@ -1,0 +1,2342 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class SchemeSyncProviderBase </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class SchemeSyncProviderBase ">
+      
+      <meta name="description" content="Base class for scheme synchronization provider. Contains all reflection logic and type mapping which is database-agnostic. SQL queries are delegated to ISqlDialect.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Providers_Base_SchemeSyncProviderBase.md&amp;value=---%0Auid%3A%20redb.Core.Providers.Base.SchemeSyncProviderBase%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase">
+
+
+
+  <h1 id="redb_Core_Providers_Base_SchemeSyncProviderBase" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase" class="text-break">
+Class SchemeSyncProviderBase  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L25"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Providers.html">Providers</a>.<a class="xref" href="redb.Core.Providers.Base.html">Base</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Base class for scheme synchronization provider.
+Contains all reflection logic and type mapping which is database-agnostic.
+SQL queries are delegated to ISqlDialect.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCacheProvider</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SchemeSyncProviderBase</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html">ISchemeSyncProvider</a></div>
+      <div><a class="xref" href="redb.Core.Models.Contracts.ISchemeCacheProvider.html">ISchemeCacheProvider</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="redb.MSSql.Providers.MssqlSchemeSyncProvider.html">MssqlSchemeSyncProvider</a></div>
+      <div><a class="xref" href="redb.Postgres.Providers.PostgresSchemeSyncProvider.html">PostgresSchemeSyncProvider</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase__ctor_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.#ctor*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase__ctor_redb_Core_Data_IRedbContext_redb_Core_Query_ISqlDialect_redb_Core_Models_Configuration_RedbServiceConfiguration_System_String_Microsoft_Extensions_Logging_ILogger_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.#ctor(redb.Core.Data.IRedbContext,redb.Core.Query.ISqlDialect,redb.Core.Models.Configuration.RedbServiceConfiguration,System.String,Microsoft.Extensions.Logging.ILogger)">
+  SchemeSyncProviderBase(IRedbContext, ISqlDialect, RedbServiceConfiguration?, string?, ILogger?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L59"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected SchemeSyncProviderBase(IRedbContext context, ISqlDialect sql, RedbServiceConfiguration? configuration = null, string? cacheDomain = null, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+    <dt><code>sql</code> <a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+    <dd></dd>
+    <dt><code>configuration</code> <a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+    <dt><code>cacheDomain</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_CacheDomain" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.CacheDomain">
+  CacheDomain
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L35"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Cache domain identifier for isolating caches between different database connections.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly string CacheDomain</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_Configuration" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.Configuration">
+  Configuration
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L28"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly RedbServiceConfiguration Configuration</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_Context" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.Context">
+  Context
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L27"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IRedbContext Context</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_Logger" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.Logger">
+  Logger
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L30"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ILogger? Logger</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_Sql" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.Sql">
+  Sql
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L29"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ISqlDialect Sql</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_StructureTreeCache" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.StructureTreeCache">
+  StructureTreeCache
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L53"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected static readonly ConcurrentDictionary&lt;long, List&lt;StructureTreeNode&gt;&gt; StructureTreeCache</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentdictionary-2">ConcurrentDictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.StructureTreeNode.html">StructureTreeNode</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_SubtreeCache" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SubtreeCache">
+  SubtreeCache
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L54"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected static readonly ConcurrentDictionary&lt;(long, long?), List&lt;StructureTreeNode&gt;&gt; SubtreeCache</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentdictionary-2">ConcurrentDictionary</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?), <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.StructureTreeNode.html">StructureTreeNode</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_Cache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.Cache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_Cache" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.Cache">
+  Cache
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L40"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Domain-bound metadata cache for this provider.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public GlobalMetadataCache Cache { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.GlobalMetadataCache.html">GlobalMetadataCache</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_IsCacheEnabled_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.IsCacheEnabled*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_IsCacheEnabled" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.IsCacheEnabled">
+  IsCacheEnabled
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L819"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if caching is enabled</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsCacheEnabled { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_ListCache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.ListCache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_ListCache" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.ListCache">
+  ListCache
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L45"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Domain-bound list cache for this provider.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public GlobalListCache ListCache { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.GlobalListCache.html">GlobalListCache</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_PropsCache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.PropsCache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_PropsCache" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.PropsCache">
+  PropsCache
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L50"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Domain-bound props/object cache for this provider.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public GlobalPropsCache PropsCache { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.GlobalPropsCache.html">GlobalPropsCache</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_EnsureObjectSchemeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.EnsureObjectSchemeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_EnsureObjectSchemeAsync_System_String_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.EnsureObjectSchemeAsync(System.String)">
+  EnsureObjectSchemeAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L769"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get or create scheme for Object type (without Props).
+Used for non-generic RedbObject that stores only base _objects fields.
+Scheme will have _type = Object (not Class).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme&gt; EnsureObjectSchemeAsync(string name)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Scheme name (e.g. &quot;RedbObject&quot; or custom name)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_EnsureSchemeFromTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.EnsureSchemeFromTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_EnsureSchemeFromTypeAsync__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.EnsureSchemeFromTypeAsync``1">
+  EnsureSchemeFromTypeAsync&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L87"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create/get scheme by name from Props type.
+If schemeName = null, uses TProps class name.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme&gt; EnsureSchemeFromTypeAsync&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_EstimateMemoryUsage_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.EstimateMemoryUsage*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_EstimateMemoryUsage" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.EstimateMemoryUsage">
+  EstimateMemoryUsage()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L885"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Estimate current memory consumption by cache in bytes
+Approximate value for monitoring</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long EstimateMemoryUsage()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_FindStructureByPathAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.FindStructureByPathAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_FindStructureByPathAsync_System_Int64_System_String_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.FindStructureByPathAsync(System.Int64,System.String)">
+  FindStructureByPathAsync(long, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L950"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;StructureTreeNode?&gt; FindStructureByPathAsync(long schemeId, string path)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.StructureTreeNode.html">StructureTreeNode</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_FindStructureNodeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.FindStructureNodeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_FindStructureNodeAsync_System_Int64_System_Int64_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.FindStructureNodeAsync(System.Int64,System.Int64)">
+  FindStructureNodeAsync(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L943"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;StructureTreeNode?&gt; FindStructureNodeAsync(long schemeId, long structureId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>structureId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.StructureTreeNode.html">StructureTreeNode</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetCacheDiagnosticInfo_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetCacheDiagnosticInfo*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetCacheDiagnosticInfo" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetCacheDiagnosticInfo">
+  GetCacheDiagnosticInfo()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L875"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get diagnostic information about cache state
+Includes optimization recommendations</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public CacheDiagnosticInfo GetCacheDiagnosticInfo()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.CacheDiagnosticInfo.html">CacheDiagnosticInfo</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetCacheStatistics_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetCacheStatistics*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetCacheStatistics" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetCacheStatistics">
+  GetCacheStatistics()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L831"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get detailed cache performance statistics</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public CacheStatistics GetCacheStatistics()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.CacheStatistics.html">CacheStatistics</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetChildrenStructuresAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetChildrenStructuresAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetChildrenStructuresAsync_System_Int64_System_Int64_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetChildrenStructuresAsync(System.Int64,System.Int64)">
+  GetChildrenStructuresAsync(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L937"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;IRedbStructure&gt;&gt; GetChildrenStructuresAsync(long schemeId, long parentStructureId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>parentStructureId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbStructure.html">IRedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetObjectSchemeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetObjectSchemeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetObjectSchemeAsync_System_String_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetObjectSchemeAsync(System.String)">
+  GetObjectSchemeAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L798"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme for Object type by name.
+Returns null if not found.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme?&gt; GetObjectSchemeAsync(string name)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeAliasForType_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeAliasForType*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeAliasForType_System_Type_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeAliasForType(System.Type)">
+  GetSchemeAliasForType(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L762"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme alias for C# class type.
+Extracts from RedbSchemeAttribute.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? GetSchemeAliasForType(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeAliasForType_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeAliasForType*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeAliasForType__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeAliasForType``1">
+  GetSchemeAliasForType&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L759"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme alias for C# class type.
+Extracts from RedbSchemeAttribute.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? GetSchemeAliasForType&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeByIdAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeByIdAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeByIdAsync_System_Int64_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeByIdAsync(System.Int64)">
+  GetSchemeByIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L586"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme by ID.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme?&gt; GetSchemeByIdAsync(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeByNameAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeByNameAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeByNameAsync_System_String_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeByNameAsync(System.String)">
+  GetSchemeByNameAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L618"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme by name.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme?&gt; GetSchemeByNameAsync(string schemeName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeByTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeByTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeByTypeAsync_System_Type_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeByTypeAsync(System.Type)">
+  GetSchemeByTypeAsync(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L652"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme by C# class type.
+Uses class name for scheme search.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme?&gt; GetSchemeByTypeAsync(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeByTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeByTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeByTypeAsync__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeByTypeAsync``1">
+  GetSchemeByTypeAsync&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L635"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme by C# class type.
+Uses class name for scheme search.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme?&gt; GetSchemeByTypeAsync&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeFromCache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeFromCache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeFromCache_System_String_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeFromCache(System.String)">
+  GetSchemeFromCache(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L682"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme from cache synchronously (no DB call).
+Returns null if not in cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbScheme? GetSchemeFromCache(string schemeName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeFromCache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeFromCache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeFromCache__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeFromCache``1">
+  GetSchemeFromCache&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L673"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme from cache synchronously (no DB call).
+Returns null if not in cache.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbScheme? GetSchemeFromCache&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeNameForType_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeNameForType*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeNameForType_System_Type_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeNameForType(System.Type)">
+  GetSchemeNameForType(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L757"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme name for C# class type.
+Considers attributes and namespaces.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string GetSchemeNameForType(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeNameForType_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeNameForType*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemeNameForType__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemeNameForType``1">
+  GetSchemeNameForType&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L756"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme name for C# class type.
+Considers attributes and namespaces.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string GetSchemeNameForType&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemesAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemesAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSchemesAsync" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSchemesAsync">
+  GetSchemesAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L699"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all schemes.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;IRedbScheme&gt;&gt; GetSchemesAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructureTreeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructureTreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructureTreeAsync_System_Int64_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructureTreeAsync(System.Int64)">
+  GetStructureTreeAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L897"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get structure tree for scheme (cached).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;StructureTreeNode&gt;&gt; GetStructureTreeAsync(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.StructureTreeNode.html">StructureTreeNode</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructureTreeCacheStats_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructureTreeCacheStats*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructureTreeCacheStats" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructureTreeCacheStats">
+  GetStructureTreeCacheStats()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L979"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get structure tree cache statistics.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public (int TreesCount, int SubtreesCount, long MemoryEstimate) GetStructureTreeCacheStats()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.int32,system.int64-.treescount">TreesCount</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.int32,system.int64-.subtreescount">SubtreesCount</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.int32,system.int64-.memoryestimate">MemoryEstimate</a>)</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructureTreeJsonAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructureTreeJsonAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructureTreeJsonAsync_System_Int64_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructureTreeJsonAsync(System.Int64)">
+  GetStructureTreeJsonAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L956"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;string&gt; GetStructureTreeJsonAsync(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructuresAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructuresAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructuresAsync_redb_Core_Models_Contracts_IRedbScheme_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructuresAsync(redb.Core.Models.Contracts.IRedbScheme)">
+  GetStructuresAsync(IRedbScheme)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L705"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme structures.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;IRedbStructure&gt;&gt; GetStructuresAsync(IRedbScheme scheme)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>scheme</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbStructure.html">IRedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructuresByTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructuresByTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructuresByTypeAsync_System_Type_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructuresByTypeAsync(System.Type)">
+  GetStructuresByTypeAsync(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L718"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme structures by C# class type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;IRedbStructure&gt;&gt; GetStructuresByTypeAsync(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbStructure.html">IRedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructuresByTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructuresByTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetStructuresByTypeAsync__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetStructuresByTypeAsync``1">
+  GetStructuresByTypeAsync&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L708"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme structures by C# class type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;IRedbStructure&gt;&gt; GetStructuresByTypeAsync&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbStructure.html">IRedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSubtreeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSubtreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_GetSubtreeAsync_System_Int64_System_Nullable_System_Int64__" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.GetSubtreeAsync(System.Int64,System.Nullable{System.Int64})">
+  GetSubtreeAsync(long, long?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L912"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get subtree starting from parent structure (cached).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;StructureTreeNode&gt;&gt; GetSubtreeAsync(long schemeId, long? parentStructureId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>parentStructureId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.StructureTreeNode.html">StructureTreeNode</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_HasChildrenStructuresAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.HasChildrenStructuresAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_HasChildrenStructuresAsync_System_Int64_System_Int64_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.HasChildrenStructuresAsync(System.Int64,System.Int64)">
+  HasChildrenStructuresAsync(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L988"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; HasChildrenStructuresAsync(long schemeId, long structureId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>structureId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateCache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateCache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateCache" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateCache">
+  InvalidateCache()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L820"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Complete clearing of all metadata caches
+Resets statistics to zero</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void InvalidateCache()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateSchemeCache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateSchemeCache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateSchemeCache_System_Int64_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateSchemeCache(System.Int64)">
+  InvalidateSchemeCache(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L825"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Clear metadata cache for scheme by ID</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void InvalidateSchemeCache(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Scheme ID in database</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateSchemeCache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateSchemeCache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateSchemeCache_System_String_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateSchemeCache(System.String)">
+  InvalidateSchemeCache(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L828"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Clear metadata cache for scheme by name</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void InvalidateSchemeCache(string schemeName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Scheme name</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateSchemeCache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateSchemeCache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateSchemeCache__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateSchemeCache``1">
+  InvalidateSchemeCache&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L822"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Clear metadata cache for specific C# type</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void InvalidateSchemeCache&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd><p>Object properties type</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateStructureTreeCache_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateStructureTreeCache*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_InvalidateStructureTreeCache_System_Int64_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.InvalidateStructureTreeCache(System.Int64)">
+  InvalidateStructureTreeCache(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L968"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Invalidate structure tree cache for scheme.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void InvalidateStructureTreeCache(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_LoadSchemeByTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.LoadSchemeByTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_LoadSchemeByTypeAsync_System_Type_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.LoadSchemeByTypeAsync(System.Type)">
+  LoadSchemeByTypeAsync(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L693"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load scheme by C# class type (throws exception if not found).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme&gt; LoadSchemeByTypeAsync(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_LoadSchemeByTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.LoadSchemeByTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_LoadSchemeByTypeAsync__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.LoadSchemeByTypeAsync``1">
+  LoadSchemeByTypeAsync&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L687"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load scheme by C# class type (throws exception if not found).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme&gt; LoadSchemeByTypeAsync&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_MigrateStructureTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.MigrateStructureTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_MigrateStructureTypeAsync_System_Int64_System_String_System_String_System_Boolean_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.MigrateStructureTypeAsync(System.Int64,System.String,System.String,System.Boolean)">
+  MigrateStructureTypeAsync(long, string, string, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L370"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Migrate data when changing structure type (e.g. String -&gt; Long).
+Moves data from old type column to new type column.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;TypeMigrationResult&gt; MigrateStructureTypeAsync(long structureId, string oldTypeName, string newTypeName, bool dryRun = false)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>structureId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Structure ID to migrate</p>
+</dd>
+    <dt><code>oldTypeName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Old type name (e.g. &quot;String&quot;)</p>
+</dd>
+    <dt><code>newTypeName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>New type name (e.g. &quot;Long&quot;)</p>
+</dd>
+    <dt><code>dryRun</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If true, only returns count without actual migration</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Providers.TypeMigrationResult.html">TypeMigrationResult</a>&gt;</dt>
+    <dd><p>Migration result with affected rows count</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_MigrateStructureTypeInternalAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.MigrateStructureTypeInternalAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_MigrateStructureTypeInternalAsync_System_Int64_System_Int64_System_String_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.MigrateStructureTypeInternalAsync(System.Int64,System.Int64,System.String)">
+  MigrateStructureTypeInternalAsync(long, long, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L362"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Migrate structure type (internal version with oldTypeId).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual Task MigrateStructureTypeInternalAsync(long structureId, long oldTypeId, string newTypeName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>structureId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>oldTypeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>newTypeName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_ResetCacheStatistics_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.ResetCacheStatistics*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_ResetCacheStatistics" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.ResetCacheStatistics">
+  ResetCacheStatistics()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L832"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Reset cache statistics (zero out counters)
+The cache itself remains untouched</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ResetCacheStatistics()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_SchemeExistsByNameAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SchemeExistsByNameAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_SchemeExistsByNameAsync_System_String_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SchemeExistsByNameAsync(System.String)">
+  SchemeExistsByNameAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L746"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if scheme exists by name.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; SchemeExistsByNameAsync(string schemeName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_SchemeExistsForTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SchemeExistsForTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_SchemeExistsForTypeAsync_System_Type_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SchemeExistsForTypeAsync(System.Type)">
+  SchemeExistsForTypeAsync(Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L739"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if scheme exists for C# class type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; SchemeExistsForTypeAsync(Type type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_SchemeExistsForTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SchemeExistsForTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_SchemeExistsForTypeAsync__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SchemeExistsForTypeAsync``1">
+  SchemeExistsForTypeAsync&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L732"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if scheme exists for C# class type.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;bool&gt; SchemeExistsForTypeAsync&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_SetCacheEnabled_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SetCacheEnabled*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_SetCacheEnabled_System_Boolean_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SetCacheEnabled(System.Boolean)">
+  SetCacheEnabled(bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L818"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Enable/disable metadata caching on the fly (hot toggle)
+When disabled, automatically clears all cache</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetCacheEnabled(bool enabled)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>enabled</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true - enable cache, false - disable</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_SyncSchemeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SyncSchemeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_SyncSchemeAsync__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SyncSchemeAsync``1">
+  SyncSchemeAsync&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L199"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Simplified scheme synchronization method with auto-detection of name and alias.
+Scheme name and alias determined from RedbSchemeAttribute.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;IRedbScheme&gt; SyncSchemeAsync&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_SyncStructuresFromTypeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SyncStructuresFromTypeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_SyncStructuresFromTypeAsync__1_redb_Core_Models_Contracts_IRedbScheme_System_Boolean_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.SyncStructuresFromTypeAsync``1(redb.Core.Models.Contracts.IRedbScheme,System.Boolean)">
+  SyncStructuresFromTypeAsync&lt;TProps&gt;(IRedbScheme, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L152"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Synchronize scheme structures from Props type (by default deletes extra fields).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;IRedbStructure&gt;&gt; SyncStructuresFromTypeAsync&lt;TProps&gt;(IRedbScheme scheme, bool strictDeleteExtra = true) where TProps : class</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>scheme</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a></dt>
+    <dd></dd>
+    <dt><code>strictDeleteExtra</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbStructure.html">IRedbStructure</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_ValidateStructureTreeAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.ValidateStructureTreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_ValidateStructureTreeAsync__1_System_Int64_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.ValidateStructureTreeAsync``1(System.Int64)">
+  ValidateStructureTreeAsync&lt;TProps&gt;(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L962"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TreeDiagnosticReport&gt; ValidateStructureTreeAsync&lt;TProps&gt;(long schemeId) where TProps : class</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeDiagnosticReport.html">TreeDiagnosticReport</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_WarmupAllSchemesAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.WarmupAllSchemesAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_WarmupAllSchemesAsync" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.WarmupAllSchemesAsync">
+  WarmupAllSchemesAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L844"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Preload metadata for all known schemes
+Use carefully - can be resource-intensive</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task WarmupAllSchemesAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_WarmupCacheAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.WarmupCacheAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_WarmupCacheAsync_System_Type___" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.WarmupCacheAsync(System.Type[])">
+  WarmupCacheAsync(Type[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L839"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Preload metadata for array of C# types</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task WarmupCacheAsync(Type[] types)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>types</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a>[]</dt>
+    <dd><p>Array of types to preload</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_Base_SchemeSyncProviderBase_WarmupCacheAsync_" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.WarmupCacheAsync*"></a>
+
+  <h3 id="redb_Core_Providers_Base_SchemeSyncProviderBase_WarmupCacheAsync__1" data-uid="redb.Core.Providers.Base.SchemeSyncProviderBase.WarmupCacheAsync``1">
+  WarmupCacheAsync&lt;TProps&gt;()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L834"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Preload metadata for C# type
+Useful for performance optimization during application startup</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task WarmupCacheAsync&lt;TProps&gt;() where TProps : class</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd><p>Object properties type</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/Base/SchemeSyncProviderBase.cs/#L25" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class MssqlTreeQueryProvider </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class MssqlTreeQueryProvider ">
+      
+      <meta name="description" content="MS SQL Server tree query provider implementation. Inherits from TreeQueryProviderBase and provides MSSQL-specific components.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_MSSql_Query_MssqlTreeQueryProvider.md&amp;value=---%0Auid%3A%20redb.MSSql.Query.MssqlTreeQueryProvider%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.MSSql.Query.MssqlTreeQueryProvider">
+
+
+
+  <h1 id="redb_MSSql_Query_MssqlTreeQueryProvider" data-uid="redb.MSSql.Query.MssqlTreeQueryProvider" class="text-break">
+Class MssqlTreeQueryProvider  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql/Query/MssqlTreeQueryProvider.cs/#L18"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.MSSql.html">MSSql</a>.<a class="xref" href="redb.MSSql.Query.html">Query</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.MSSql.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>MS SQL Server tree query provider implementation.
+Inherits from TreeQueryProviderBase and provides MSSQL-specific components.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class MssqlTreeQueryProvider : TreeQueryProviderBase, ITreeQueryProvider, IRedbQueryProvider</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html">TreeQueryProviderBase</a></div>
+      <div><span class="xref">MssqlTreeQueryProvider</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Query.ITreeQueryProvider.html">ITreeQueryProvider</a></div>
+      <div><a class="xref" href="redb.Core.Query.IRedbQueryProvider.html">IRedbQueryProvider</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="redb.MSSql.Pro.Query.ProTreeQueryProvider.html">ProTreeQueryProvider</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__context">TreeQueryProviderBase._context</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__serializer">TreeQueryProviderBase._serializer</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__filterParser">TreeQueryProviderBase._filterParser</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__orderingParser">TreeQueryProviderBase._orderingParser</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__facetBuilder">TreeQueryProviderBase._facetBuilder</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__logger">TreeQueryProviderBase._logger</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__lazyPropsLoader">TreeQueryProviderBase._lazyPropsLoader</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__configuration">TreeQueryProviderBase._configuration</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__sql">TreeQueryProviderBase._sql</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase__schemeSync">TreeQueryProviderBase._schemeSync</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_Cache">TreeQueryProviderBase.Cache</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_CreateOrderingParser">TreeQueryProviderBase.CreateOrderingParser()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_CreateFacetBuilder">TreeQueryProviderBase.CreateFacetBuilder()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ShouldUseLazyLoading__1_redb_Core_Query_QueryContext___0__">TreeQueryProviderBase.ShouldUseLazyLoading&lt;TProps&gt;(QueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ShouldUseLazyLoading__1_redb_Core_Query_Base_TreeQueryContext___0__">TreeQueryProviderBase.ShouldUseLazyLoading&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_CheckProOnlyDistinctFeatures__1_redb_Core_Query_QueryContext___0__">TreeQueryProviderBase.CheckProOnlyDistinctFeatures&lt;TProps&gt;(QueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_CreateQuery__1_System_Int64_System_Nullable_System_Int64__System_Boolean_">TreeQueryProviderBase.CreateQuery&lt;TProps&gt;(long, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateAsync_System_Int64_System_String_redb_Core_Query_Aggregation_AggregateFunction_System_String_">TreeQueryProviderBase.ExecuteAggregateAsync(long, string, AggregateFunction, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateAsync_System_Int64_System_String_redb_Core_Query_Aggregation_AggregateFunction_redb_Core_Query_QueryExpressions_FilterExpression_">TreeQueryProviderBase.ExecuteAggregateAsync(long, string, AggregateFunction, FilterExpression)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateBatchAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_String_">TreeQueryProviderBase.ExecuteAggregateBatchAsync(long, IEnumerable&lt;AggregateRequest&gt;, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateBatchAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__redb_Core_Query_QueryExpressions_FilterExpression_">TreeQueryProviderBase.ExecuteAggregateBatchAsync(long, IEnumerable&lt;AggregateRequest&gt;, FilterExpression)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetSchemeAsync_System_Int64_">TreeQueryProviderBase.GetSchemeAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedAggregateAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_String_">TreeQueryProviderBase.ExecuteGroupedAggregateAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedAggregateAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__redb_Core_Query_QueryExpressions_FilterExpression_">TreeQueryProviderBase.ExecuteGroupedAggregateAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, FilterExpression)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteArrayGroupedAggregateAsync_System_Int64_System_String_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_String_">TreeQueryProviderBase.ExecuteArrayGroupedAggregateAsync(long, string, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_System_String_System_Nullable_System_Int32__System_Nullable_System_Int32__">TreeQueryProviderBase.ExecuteWindowQueryAsync(long, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string, string, int?, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__redb_Core_Query_QueryExpressions_FilterExpression_System_String_System_Nullable_System_Int32__System_Nullable_System_Int32__">TreeQueryProviderBase.ExecuteWindowQueryAsync(long, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, FilterExpression, string, int?, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetWindowSqlPreviewAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_System_String_System_Nullable_System_Int32__System_Nullable_System_Int32__">TreeQueryProviderBase.GetWindowSqlPreviewAsync(long, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string, string, int?, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_">TreeQueryProviderBase.ExecuteGroupedWindowQueryAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__redb_Core_Query_QueryExpressions_FilterExpression_">TreeQueryProviderBase.ExecuteGroupedWindowQueryAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, FilterExpression)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetGroupedWindowSqlPreviewAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_">TreeQueryProviderBase.GetGroupedWindowSqlPreviewAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetGroupedWindowSqlPreviewAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__redb_Core_Query_QueryExpressions_FilterExpression_">TreeQueryProviderBase.GetGroupedWindowSqlPreviewAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, FilterExpression)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_CreateTreeQuery__1_System_Int64_System_Nullable_System_Int64__System_Boolean_System_Nullable_System_Int64__System_Nullable_System_Int32__">TreeQueryProviderBase.CreateTreeQuery&lt;TProps&gt;(long, long?, bool, long?, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAsync_System_Linq_Expressions_Expression_System_Type_">TreeQueryProviderBase.ExecuteAsync(Expression, Type)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeCountAsync__1_redb_Core_Query_Base_TreeQueryContext___0__">TreeQueryProviderBase.ExecuteTreeCountAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeToListAsync__1_redb_Core_Query_Base_TreeQueryContext___0__">TreeQueryProviderBase.ExecuteTreeToListAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetOptimizableHasAncestorFilter__1_redb_Core_Query_Base_TreeQueryContext___0__">TreeQueryProviderBase.GetOptimizableHasAncestorFilter&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetOptimizableHasDescendantFilter__1_redb_Core_Query_Base_TreeQueryContext___0__">TreeQueryProviderBase.GetOptimizableHasDescendantFilter&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteOptimizedWhereHasAncestor__1_redb_Core_Query_Base_TreeQueryContext___0__redb_Core_Query_Base_TreeFilter_">TreeQueryProviderBase.ExecuteOptimizedWhereHasAncestor&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, TreeFilter)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteOptimizedWhereHasDescendant__1_redb_Core_Query_Base_TreeQueryContext___0__redb_Core_Query_Base_TreeFilter_">TreeQueryProviderBase.ExecuteOptimizedWhereHasDescendant&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, TreeFilter)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetIdsWithAncestorsAsync__1_System_Collections_Generic_List_System_Int64__">TreeQueryProviderBase.GetIdsWithAncestorsAsync&lt;TProps&gt;(List&lt;long&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_LoadObjectsByIdsAsync__1_System_Collections_Generic_List_System_Int64__System_Nullable_System_Int32__">TreeQueryProviderBase.LoadObjectsByIdsAsync&lt;TProps&gt;(List&lt;long&gt;, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_LoadObjectsByIdsAsync_System_Collections_Generic_List_System_Int64__System_Nullable_System_Int32__">TreeQueryProviderBase.LoadObjectsByIdsAsync(List&lt;long&gt;, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetSqlPreviewAsync__1_redb_Core_Query_Base_TreeQueryContext___0__">TreeQueryProviderBase.GetSqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetSqlPreviewAsync__1_redb_Core_Query_QueryContext___0__">TreeQueryProviderBase.GetSqlPreviewAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetFilterJsonAsync__1_redb_Core_Query_QueryContext___0__">TreeQueryProviderBase.GetFilterJsonAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteDeleteAsync_System_Int64_System_String_">TreeQueryProviderBase.ExecuteDeleteAsync(long, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteDeleteAsync_System_Int64_redb_Core_Query_QueryExpressions_FilterExpression_">TreeQueryProviderBase.ExecuteDeleteAsync(long, FilterExpression)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeDeleteAsync_System_Int64___">TreeQueryProviderBase.ExecuteTreeDeleteAsync(long[])</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeGroupedAggregateAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__">TreeQueryProviderBase.ExecuteTreeGroupedAggregateAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeWindowQueryAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_">TreeQueryProviderBase.ExecuteTreeWindowQueryAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetTreeWindowSqlPreviewAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_">TreeQueryProviderBase.GetTreeWindowSqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetTreeGroupBySqlPreviewAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__">TreeQueryProviderBase.GetTreeGroupBySqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeGroupedWindowQueryAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__">TreeQueryProviderBase.ExecuteTreeGroupedWindowQueryAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.Base.TreeQueryProviderBase.html#redb_Core_Query_Base_TreeQueryProviderBase_GetTreeGroupedWindowSqlPreviewAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__">TreeQueryProviderBase.GetTreeGroupedWindowSqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_MSSql_Query_MssqlTreeQueryProvider__ctor_" data-uid="redb.MSSql.Query.MssqlTreeQueryProvider.#ctor*"></a>
+
+  <h3 id="redb_MSSql_Query_MssqlTreeQueryProvider__ctor_redb_Core_Data_IRedbContext_redb_Core_Serialization_IRedbObjectSerializer_redb_Core_Providers_ILazyPropsLoader_redb_Core_Models_Configuration_RedbServiceConfiguration_Microsoft_Extensions_Logging_ILogger_redb_Core_Query_ISqlDialect_System_String_redb_Core_Providers_ISchemeSyncProvider_" data-uid="redb.MSSql.Query.MssqlTreeQueryProvider.#ctor(redb.Core.Data.IRedbContext,redb.Core.Serialization.IRedbObjectSerializer,redb.Core.Providers.ILazyPropsLoader,redb.Core.Models.Configuration.RedbServiceConfiguration,Microsoft.Extensions.Logging.ILogger,redb.Core.Query.ISqlDialect,System.String,redb.Core.Providers.ISchemeSyncProvider)">
+  MssqlTreeQueryProvider(IRedbContext, IRedbObjectSerializer, ILazyPropsLoader?, RedbServiceConfiguration?, ILogger?, ISqlDialect?, string?, ISchemeSyncProvider?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql/Query/MssqlTreeQueryProvider.cs/#L20"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public MssqlTreeQueryProvider(IRedbContext context, IRedbObjectSerializer serializer, ILazyPropsLoader? lazyPropsLoader = null, RedbServiceConfiguration? configuration = null, ILogger? logger = null, ISqlDialect? dialect = null, string? cacheDomain = null, ISchemeSyncProvider? schemeSync = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+    <dt><code>serializer</code> <a class="xref" href="redb.Core.Serialization.IRedbObjectSerializer.html">IRedbObjectSerializer</a></dt>
+    <dd></dd>
+    <dt><code>lazyPropsLoader</code> <a class="xref" href="redb.Core.Providers.ILazyPropsLoader.html">ILazyPropsLoader</a></dt>
+    <dd></dd>
+    <dt><code>configuration</code> <a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+    <dt><code>dialect</code> <a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+    <dd></dd>
+    <dt><code>cacheDomain</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>schemeSync</code> <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html">ISchemeSyncProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_MSSql_Query_MssqlTreeQueryProvider_CreateFilterParser_" data-uid="redb.MSSql.Query.MssqlTreeQueryProvider.CreateFilterParser*"></a>
+
+  <h3 id="redb_MSSql_Query_MssqlTreeQueryProvider_CreateFilterParser" data-uid="redb.MSSql.Query.MssqlTreeQueryProvider.CreateFilterParser">
+  CreateFilterParser()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql/Query/MssqlTreeQueryProvider.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates MSSQL-specific filter expression parser.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override IFilterExpressionParser CreateFilterParser()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IFilterExpressionParser.html">IFilterExpressionParser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Query_MssqlTreeQueryProvider_CreateQueryProvider_" data-uid="redb.MSSql.Query.MssqlTreeQueryProvider.CreateQueryProvider*"></a>
+
+  <h3 id="redb_MSSql_Query_MssqlTreeQueryProvider_CreateQueryProvider" data-uid="redb.MSSql.Query.MssqlTreeQueryProvider.CreateQueryProvider">
+  CreateQueryProvider()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql/Query/MssqlTreeQueryProvider.cs/#L44"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates query provider for delegation.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override IRedbQueryProvider CreateQueryProvider()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryProvider.html">IRedbQueryProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Query_MssqlTreeQueryProvider_CreateTreeQueryable_" data-uid="redb.MSSql.Query.MssqlTreeQueryProvider.CreateTreeQueryable*"></a>
+
+  <h3 id="redb_MSSql_Query_MssqlTreeQueryProvider_CreateTreeQueryable__1_redb_Core_Query_Base_TreeQueryContext___0__" data-uid="redb.MSSql.Query.MssqlTreeQueryProvider.CreateTreeQueryable``1(redb.Core.Query.Base.TreeQueryContext{``0})">
+  CreateTreeQueryable&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql/Query/MssqlTreeQueryProvider.cs/#L52"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates tree queryable instance.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override IRedbQueryable&lt;TProps&gt; CreateTreeQueryable&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql/Query/MssqlTreeQueryProvider.cs/#L18" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

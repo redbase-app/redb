@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface ITreeProvider </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface ITreeProvider ">
+      
+      <meta name="description" content="Provider for tree structure operations. Permission checks managed centrally via configuration (similar to IObjectStorageProvider).">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Providers_ITreeProvider.md&amp;value=---%0Auid%3A%20redb.Core.Providers.ITreeProvider%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Providers.ITreeProvider">
+
+
+
+  <h1 id="redb_Core_Providers_ITreeProvider" data-uid="redb.Core.Providers.ITreeProvider" class="text-break">
+Interface ITreeProvider  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L12"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Providers.html">Providers</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Provider for tree structure operations.
+Permission checks managed centrally via configuration (similar to IObjectStorageProvider).</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface ITreeProvider</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Providers_ITreeProvider_CreateChildAsync_" data-uid="redb.Core.Providers.ITreeProvider.CreateChildAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_CreateChildAsync__1_redb_Core_Models_Entities_TreeRedbObject___0__redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.ITreeProvider.CreateChildAsync``1(redb.Core.Models.Entities.TreeRedbObject{``0},redb.Core.Models.Contracts.IRedbObject)">
+  CreateChildAsync&lt;TProps&gt;(TreeRedbObject&lt;TProps&gt;, IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L50"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create child object (uses _securityContext and config.DefaultCheckPermissionsOnSave).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;long&gt; CreateChildAsync&lt;TProps&gt;(TreeRedbObject&lt;TProps&gt; obj, IRedbObject parentObj) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_CreateChildAsync_" data-uid="redb.Core.Providers.ITreeProvider.CreateChildAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_CreateChildAsync__1_redb_Core_Models_Entities_TreeRedbObject___0__redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.ITreeProvider.CreateChildAsync``1(redb.Core.Models.Entities.TreeRedbObject{``0},redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  CreateChildAsync&lt;TProps&gt;(TreeRedbObject&lt;TProps&gt;, IRedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L92"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create child object with explicit user (uses config.DefaultCheckPermissionsOnSave).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;long&gt; CreateChildAsync&lt;TProps&gt;(TreeRedbObject&lt;TProps&gt; obj, IRedbObject parentObj, IRedbUser user) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_DeleteSubtreeAsync_" data-uid="redb.Core.Providers.ITreeProvider.DeleteSubtreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_DeleteSubtreeAsync_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.ITreeProvider.DeleteSubtreeAsync(redb.Core.Models.Contracts.IRedbObject)">
+  DeleteSubtreeAsync(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L55"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete object subtree recursively (uses _securityContext and config.DefaultCheckPermissionsOnDelete).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; DeleteSubtreeAsync(IRedbObject parentObj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_DeleteSubtreeAsync_" data-uid="redb.Core.Providers.ITreeProvider.DeleteSubtreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_DeleteSubtreeAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.ITreeProvider.DeleteSubtreeAsync(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  DeleteSubtreeAsync(IRedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L97"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete object subtree recursively with explicit user (uses config.DefaultCheckPermissionsOnDelete).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; DeleteSubtreeAsync(IRedbObject parentObj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetChildrenAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetChildrenAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetChildrenAsync__1_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.ITreeProvider.GetChildrenAsync``1(redb.Core.Models.Contracts.IRedbObject)">
+  GetChildrenAsync&lt;TProps&gt;(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L30"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get direct children of object (uses _securityContext and config.DefaultCheckPermissionsOnLoad).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; GetChildrenAsync&lt;TProps&gt;(IRedbObject parentObj) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetChildrenAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetChildrenAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetChildrenAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.ITreeProvider.GetChildrenAsync``1(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  GetChildrenAsync&lt;TProps&gt;(IRedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L72"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get direct children of object with explicit user (uses config.DefaultCheckPermissionsOnLoad).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; GetChildrenAsync&lt;TProps&gt;(IRedbObject parentObj, IRedbUser user) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetDescendantsAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetDescendantsAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetDescendantsAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.GetDescendantsAsync``1(redb.Core.Models.Contracts.IRedbObject,System.Nullable{System.Int32})">
+  GetDescendantsAsync&lt;TProps&gt;(IRedbObject, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L40"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all object descendants (uses _securityContext and config.DefaultCheckPermissionsOnLoad).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; GetDescendantsAsync&lt;TProps&gt;(IRedbObject parentObj, int? maxDepth = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetDescendantsAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetDescendantsAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetDescendantsAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.GetDescendantsAsync``1(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser,System.Nullable{System.Int32})">
+  GetDescendantsAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L82"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all object descendants with explicit user (uses config.DefaultCheckPermissionsOnLoad).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; GetDescendantsAsync&lt;TProps&gt;(IRedbObject parentObj, IRedbUser user, int? maxDepth = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetPathToRootAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetPathToRootAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetPathToRootAsync__1_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.ITreeProvider.GetPathToRootAsync``1(redb.Core.Models.Contracts.IRedbObject)">
+  GetPathToRootAsync&lt;TProps&gt;(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L35"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get path from object to root (uses _securityContext and config.DefaultCheckPermissionsOnLoad).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; GetPathToRootAsync&lt;TProps&gt;(IRedbObject obj) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetPathToRootAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetPathToRootAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetPathToRootAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.ITreeProvider.GetPathToRootAsync``1(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  GetPathToRootAsync&lt;TProps&gt;(IRedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L77"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get path from object to root with explicit user (uses config.DefaultCheckPermissionsOnLoad).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; GetPathToRootAsync&lt;TProps&gt;(IRedbObject obj, IRedbUser user) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetPolymorphicChildrenAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicChildrenAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetPolymorphicChildrenAsync_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicChildrenAsync(redb.Core.Models.Contracts.IRedbObject)">
+  GetPolymorphicChildrenAsync(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L111"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all direct children of object regardless of their schemes.
+Uses _securityContext and config.DefaultCheckPermissionsOnLoad.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;ITreeRedbObject&gt;&gt; GetPolymorphicChildrenAsync(IRedbObject parentObj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetPolymorphicChildrenAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicChildrenAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetPolymorphicChildrenAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicChildrenAsync(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  GetPolymorphicChildrenAsync(IRedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L139"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all direct children of object regardless of their schemes with explicit user.
+Uses config.DefaultCheckPermissionsOnLoad.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;ITreeRedbObject&gt;&gt; GetPolymorphicChildrenAsync(IRedbObject parentObj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetPolymorphicDescendantsAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicDescendantsAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetPolymorphicDescendantsAsync_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicDescendantsAsync(redb.Core.Models.Contracts.IRedbObject,System.Nullable{System.Int32})">
+  GetPolymorphicDescendantsAsync(IRedbObject, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L123"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all polymorphic descendants of object regardless of their schemes.
+Uses _securityContext and config.DefaultCheckPermissionsOnLoad.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;ITreeRedbObject&gt;&gt; GetPolymorphicDescendantsAsync(IRedbObject parentObj, int? maxDepth = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetPolymorphicDescendantsAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicDescendantsAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetPolymorphicDescendantsAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicDescendantsAsync(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser,System.Nullable{System.Int32})">
+  GetPolymorphicDescendantsAsync(IRedbObject, IRedbUser, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L151"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all polymorphic descendants of object with explicit user.
+Uses config.DefaultCheckPermissionsOnLoad.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;ITreeRedbObject&gt;&gt; GetPolymorphicDescendantsAsync(IRedbObject parentObj, IRedbUser user, int? maxDepth = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetPolymorphicPathToRootAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicPathToRootAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetPolymorphicPathToRootAsync_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicPathToRootAsync(redb.Core.Models.Contracts.IRedbObject)">
+  GetPolymorphicPathToRootAsync(IRedbObject)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L117"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get polymorphic path from object to root - objects can be of different schemes.
+Uses _securityContext and config.DefaultCheckPermissionsOnLoad.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;ITreeRedbObject&gt;&gt; GetPolymorphicPathToRootAsync(IRedbObject obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_GetPolymorphicPathToRootAsync_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicPathToRootAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_GetPolymorphicPathToRootAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.ITreeProvider.GetPolymorphicPathToRootAsync(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  GetPolymorphicPathToRootAsync(IRedbObject, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L145"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get polymorphic path from object to root with explicit user.
+Uses config.DefaultCheckPermissionsOnLoad.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IEnumerable&lt;ITreeRedbObject&gt;&gt; GetPolymorphicPathToRootAsync(IRedbObject obj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_InitializeTypeRegistryAsync_" data-uid="redb.Core.Providers.ITreeProvider.InitializeTypeRegistryAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_InitializeTypeRegistryAsync" data-uid="redb.Core.Providers.ITreeProvider.InitializeTypeRegistryAsync">
+  InitializeTypeRegistryAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L159"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Initialize AutomaticTypeRegistry for polymorphic operation support.
+Should be called at application startup.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task InitializeTypeRegistryAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_LoadPolymorphicTreeAsync_" data-uid="redb.Core.Providers.ITreeProvider.LoadPolymorphicTreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_LoadPolymorphicTreeAsync_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.LoadPolymorphicTreeAsync(redb.Core.Models.Contracts.IRedbObject,System.Nullable{System.Int32})">
+  LoadPolymorphicTreeAsync(IRedbObject, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L105"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load polymorphic tree/subtree - supports objects of different schemes in one tree.
+Uses _securityContext and config.DefaultCheckPermissionsOnLoad.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;ITreeRedbObject&gt; LoadPolymorphicTreeAsync(IRedbObject rootObj, int? maxDepth = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>rootObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_LoadPolymorphicTreeAsync_" data-uid="redb.Core.Providers.ITreeProvider.LoadPolymorphicTreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_LoadPolymorphicTreeAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.LoadPolymorphicTreeAsync(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser,System.Nullable{System.Int32})">
+  LoadPolymorphicTreeAsync(IRedbObject, IRedbUser, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L133"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load polymorphic tree/subtree with explicit user.
+Uses config.DefaultCheckPermissionsOnLoad.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;ITreeRedbObject&gt; LoadPolymorphicTreeAsync(IRedbObject rootObj, IRedbUser user, int? maxDepth = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>rootObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_LoadTreeAsync_" data-uid="redb.Core.Providers.ITreeProvider.LoadTreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_LoadTreeAsync__1_System_Int64_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.LoadTreeAsync``1(System.Int64,System.Nullable{System.Int32})">
+  LoadTreeAsync&lt;TProps&gt;(long, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L20"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load tree/subtree by root object ID (uses _securityContext and config.DefaultCheckPermissionsOnLoad).
+Loads root object and all its children recursively.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TreeRedbObject&lt;TProps&gt;&gt; LoadTreeAsync&lt;TProps&gt;(long rootObjectId, int? maxDepth = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>rootObjectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_LoadTreeAsync_" data-uid="redb.Core.Providers.ITreeProvider.LoadTreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_LoadTreeAsync__1_System_Int64_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.LoadTreeAsync``1(System.Int64,redb.Core.Models.Contracts.IRedbUser,System.Nullable{System.Int32})">
+  LoadTreeAsync&lt;TProps&gt;(long, IRedbUser, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L62"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load tree/subtree by root object ID with explicit user (uses config.DefaultCheckPermissionsOnLoad).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TreeRedbObject&lt;TProps&gt;&gt; LoadTreeAsync&lt;TProps&gt;(long rootObjectId, IRedbUser user, int? maxDepth = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>rootObjectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_LoadTreeAsync_" data-uid="redb.Core.Providers.ITreeProvider.LoadTreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_LoadTreeAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.LoadTreeAsync``1(redb.Core.Models.Contracts.IRedbObject,System.Nullable{System.Int32})">
+  LoadTreeAsync&lt;TProps&gt;(IRedbObject, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L25"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load tree/subtree (uses _securityContext and config.DefaultCheckPermissionsOnLoad).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TreeRedbObject&lt;TProps&gt;&gt; LoadTreeAsync&lt;TProps&gt;(IRedbObject rootObj, int? maxDepth = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>rootObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_LoadTreeAsync_" data-uid="redb.Core.Providers.ITreeProvider.LoadTreeAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_LoadTreeAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__" data-uid="redb.Core.Providers.ITreeProvider.LoadTreeAsync``1(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser,System.Nullable{System.Int32})">
+  LoadTreeAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L67"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load tree/subtree with explicit user (uses config.DefaultCheckPermissionsOnLoad).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;TreeRedbObject&lt;TProps&gt;&gt; LoadTreeAsync&lt;TProps&gt;(IRedbObject rootObj, IRedbUser user, int? maxDepth = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>rootObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_MoveObjectAsync_" data-uid="redb.Core.Providers.ITreeProvider.MoveObjectAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_MoveObjectAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_" data-uid="redb.Core.Providers.ITreeProvider.MoveObjectAsync(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbObject)">
+  MoveObjectAsync(IRedbObject, IRedbObject?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L45"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Move object in tree (uses _securityContext and config.DefaultCheckPermissionsOnSave).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task MoveObjectAsync(IRedbObject obj, IRedbObject? newParentObj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>newParentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_ITreeProvider_MoveObjectAsync_" data-uid="redb.Core.Providers.ITreeProvider.MoveObjectAsync*"></a>
+
+  <h3 id="redb_Core_Providers_ITreeProvider_MoveObjectAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.ITreeProvider.MoveObjectAsync(redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbObject,redb.Core.Models.Contracts.IRedbUser)">
+  MoveObjectAsync(IRedbObject, IRedbObject?, IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L87"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Move object in tree with explicit user (uses config.DefaultCheckPermissionsOnSave).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task MoveObjectAsync(IRedbObject obj, IRedbObject? newParentObj, IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>newParentObj</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a></dt>
+    <dd></dd>
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/ITreeProvider.cs/#L12" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class LazyPropsLoader </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class LazyPropsLoader ">
+      
+      <meta name="description" content="OpenSource implementation of lazy Props loading for PostgreSQL. Uses get_object_json SQL function for simple and efficient loading. Pro version uses PropsMaterializer with PVT optimizations.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Postgres_Providers_LazyPropsLoader.md&amp;value=---%0Auid%3A%20redb.Postgres.Providers.LazyPropsLoader%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Postgres.Providers.LazyPropsLoader">
+
+
+
+  <h1 id="redb_Postgres_Providers_LazyPropsLoader" data-uid="redb.Postgres.Providers.LazyPropsLoader" class="text-break">
+Class LazyPropsLoader  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L23"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Postgres.html">Postgres</a>.<a class="xref" href="redb.Postgres.Providers.html">Providers</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Postgres.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>OpenSource implementation of lazy Props loading for PostgreSQL.
+Uses get_object_json SQL function for simple and efficient loading.
+Pro version uses PropsMaterializer with PVT optimizations.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class LazyPropsLoader : ILazyPropsLoader</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">LazyPropsLoader</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Providers.ILazyPropsLoader.html">ILazyPropsLoader</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_Postgres_Providers_LazyPropsLoader__ctor_" data-uid="redb.Postgres.Providers.LazyPropsLoader.#ctor*"></a>
+
+  <h3 id="redb_Postgres_Providers_LazyPropsLoader__ctor_redb_Core_Data_IRedbContext_redb_Core_Providers_ISchemeSyncProvider_redb_Core_Serialization_IRedbObjectSerializer_redb_Core_Models_Configuration_RedbServiceConfiguration_redb_Core_Providers_IListProvider_Microsoft_Extensions_Logging_ILogger_" data-uid="redb.Postgres.Providers.LazyPropsLoader.#ctor(redb.Core.Data.IRedbContext,redb.Core.Providers.ISchemeSyncProvider,redb.Core.Serialization.IRedbObjectSerializer,redb.Core.Models.Configuration.RedbServiceConfiguration,redb.Core.Providers.IListProvider,Microsoft.Extensions.Logging.ILogger)">
+  LazyPropsLoader(IRedbContext, ISchemeSyncProvider, IRedbObjectSerializer, RedbServiceConfiguration, IListProvider?, ILogger?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L34"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public LazyPropsLoader(IRedbContext context, ISchemeSyncProvider schemeSync, IRedbObjectSerializer serializer, RedbServiceConfiguration config, IListProvider? listProvider = null, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+    <dt><code>schemeSync</code> <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html">ISchemeSyncProvider</a></dt>
+    <dd></dd>
+    <dt><code>serializer</code> <a class="xref" href="redb.Core.Serialization.IRedbObjectSerializer.html">IRedbObjectSerializer</a></dt>
+    <dd></dd>
+    <dt><code>config</code> <a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+    <dt><code>listProvider</code> <a class="xref" href="redb.Core.Providers.IListProvider.html">IListProvider</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsAsync_" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsAsync*"></a>
+
+  <h3 id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsAsync__1_System_Int64_System_Int64_" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsAsync``1(System.Int64,System.Int64)">
+  LoadPropsAsync&lt;TProps&gt;(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L65"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Async Props loading for single object via get_object_json.
+Simple and efficient for OpenSource version.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TProps&gt; LoadPropsAsync&lt;TProps&gt;(long objectId, long schemeId) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyAsync_" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyAsync*"></a>
+
+  <h3 id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyAsync__1_System_Collections_Generic_List_redb_Core_Models_Entities_RedbObject___0___" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyAsync``1(System.Collections.Generic.List{redb.Core.Models.Entities.RedbObject{``0}})">
+  LoadPropsForManyAsync&lt;TProps&gt;(List&lt;RedbObject&lt;TProps&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L110"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>BULK Props loading for multiple objects via get_object_json batch.
+Uses unnest for efficient batch loading.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LoadPropsForManyAsync&lt;TProps&gt;(List&lt;RedbObject&lt;TProps&gt;&gt; objects) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objects</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyAsync_" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyAsync*"></a>
+
+  <h3 id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyAsync__1_System_Collections_Generic_List_redb_Core_Models_Entities_RedbObject___0___System_Collections_Generic_HashSet_System_Int64__" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyAsync``1(System.Collections.Generic.List{redb.Core.Models.Entities.RedbObject{``0}},System.Collections.Generic.HashSet{System.Int64})">
+  LoadPropsForManyAsync&lt;TProps&gt;(List&lt;RedbObject&lt;TProps&gt;&gt;, HashSet&lt;long&gt;?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L208"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>BULK Props loading with projection filter (for Select projections).
+In OpenSource version, projection is ignored — full objects loaded via get_object_json.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LoadPropsForManyAsync&lt;TProps&gt;(List&lt;RedbObject&lt;TProps&gt;&gt; objects, HashSet&lt;long&gt;? projectedStructureIds) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objects</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+    <dt><code>projectedStructureIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1">HashSet</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyAsync_" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyAsync*"></a>
+
+  <h3 id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyAsync__1_System_Collections_Generic_List_redb_Core_Models_Entities_RedbObject___0___System_Collections_Generic_HashSet_System_Int64__System_Nullable_System_Int32__" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyAsync``1(System.Collections.Generic.List{redb.Core.Models.Entities.RedbObject{``0}},System.Collections.Generic.HashSet{System.Int64},System.Nullable{System.Int32})">
+  LoadPropsForManyAsync&lt;TProps&gt;(List&lt;RedbObject&lt;TProps&gt;&gt;, HashSet&lt;long&gt;?, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L232"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>BULK Props loading with projection filter and custom depth.
+In OpenSource version, both parameters are ignored — full objects loaded via get_object_json.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LoadPropsForManyAsync&lt;TProps&gt;(List&lt;RedbObject&lt;TProps&gt;&gt; objects, HashSet&lt;long&gt;? projectedStructureIds, int? propsDepth) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objects</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+    <dt><code>projectedStructureIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1">HashSet</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>propsDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyAsync_" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyAsync*"></a>
+
+  <h3 id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyAsync__1_System_Collections_Generic_List_redb_Core_Models_Entities_RedbObject___0___System_Nullable_System_Int32__" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyAsync``1(System.Collections.Generic.List{redb.Core.Models.Entities.RedbObject{``0}},System.Nullable{System.Int32})">
+  LoadPropsForManyAsync&lt;TProps&gt;(List&lt;RedbObject&lt;TProps&gt;&gt;, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L220"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>BULK Props loading with custom depth for nested RedbObject.
+In OpenSource version, propsDepth is ignored — uses get_object_json with default depth.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LoadPropsForManyAsync&lt;TProps&gt;(List&lt;RedbObject&lt;TProps&gt;&gt; objects, int? propsDepth) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objects</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject</a>&lt;TProps&gt;&gt;</dt>
+    <dd></dd>
+    <dt><code>propsDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyPolymorphicAsync_" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyPolymorphicAsync*"></a>
+
+  <h3 id="redb_Postgres_Providers_LazyPropsLoader_LoadPropsForManyPolymorphicAsync_System_Collections_Generic_List_redb_Core_Models_Contracts_IRedbObject__" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadPropsForManyPolymorphicAsync(System.Collections.Generic.List{redb.Core.Models.Contracts.IRedbObject})">
+  LoadPropsForManyPolymorphicAsync(List&lt;IRedbObject&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L245"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>BULK loading for polymorphic objects (different schemes).
+Each object is deserialized to its own type based on scheme_id.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task LoadPropsForManyPolymorphicAsync(List&lt;IRedbObject&gt; objects)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objects</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Postgres_Providers_LazyPropsLoader_LoadProps_" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadProps*"></a>
+
+  <h3 id="redb_Postgres_Providers_LazyPropsLoader_LoadProps__1_System_Int64_System_Int64_" data-uid="redb.Postgres.Providers.LazyPropsLoader.LoadProps``1(System.Int64,System.Int64)">
+  LoadProps&lt;TProps&gt;(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L53"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Synchronous Props loading (for getter).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TProps LoadProps&lt;TProps&gt;(long objectId, long schemeId) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">TProps</span></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Postgres/Providers/LazyPropsLoader.cs/#L23" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

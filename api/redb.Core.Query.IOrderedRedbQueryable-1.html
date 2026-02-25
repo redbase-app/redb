@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IOrderedRedbQueryable&lt;TProps&gt; </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IOrderedRedbQueryable&lt;TProps&gt; ">
+      
+      <meta name="description" content="Interface for ordered queries (after OrderBy). Supports cascading sorts: OrderBy().ThenByRedb().ThenBy().">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Query_IOrderedRedbQueryable_1.md&amp;value=---%0Auid%3A%20redb.Core.Query.IOrderedRedbQueryable%601%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Query.IOrderedRedbQueryable`1">
+
+
+
+  <h1 id="redb_Core_Query_IOrderedRedbQueryable_1" data-uid="redb.Core.Query.IOrderedRedbQueryable`1" class="text-break">
+Interface IOrderedRedbQueryable&lt;TProps&gt;  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L501"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Query.html">Query</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Interface for ordered queries (after OrderBy).
+Supports cascading sorts: OrderBy().ThenByRedb().ThenBy().</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IOrderedRedbQueryable&lt;TProps&gt; : IRedbQueryable&lt;TProps&gt; where TProps : class, new()</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_Where_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___">IRedbQueryable&lt;TProps&gt;.Where(Expression&lt;Func&lt;TProps, bool&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereRedb_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject_System_Boolean___">IRedbQueryable&lt;TProps&gt;.WhereRedb(Expression&lt;Func&lt;IRedbObject, bool&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_OrderBy__1_System_Linq_Expressions_Expression_System_Func__0___0___">IRedbQueryable&lt;TProps&gt;.OrderBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_OrderByDescending__1_System_Linq_Expressions_Expression_System_Func__0___0___">IRedbQueryable&lt;TProps&gt;.OrderByDescending&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_OrderByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___">IRedbQueryable&lt;TProps&gt;.OrderByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_OrderByDescendingRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___">IRedbQueryable&lt;TProps&gt;.OrderByDescendingRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_Take_System_Int32_">IRedbQueryable&lt;TProps&gt;.Take(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_Skip_System_Int32_">IRedbQueryable&lt;TProps&gt;.Skip(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_ToListAsync">IRedbQueryable&lt;TProps&gt;.ToListAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_CountAsync">IRedbQueryable&lt;TProps&gt;.CountAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_FirstOrDefaultAsync">IRedbQueryable&lt;TProps&gt;.FirstOrDefaultAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_FirstOrDefaultAsync_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___">IRedbQueryable&lt;TProps&gt;.FirstOrDefaultAsync(Expression&lt;Func&lt;TProps, bool&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_AnyAsync">IRedbQueryable&lt;TProps&gt;.AnyAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_AnyAsync_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___">IRedbQueryable&lt;TProps&gt;.AnyAsync(Expression&lt;Func&lt;TProps, bool&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereIn__1_System_Linq_Expressions_Expression_System_Func__0___0___System_Collections_Generic_IEnumerable___0__">IRedbQueryable&lt;TProps&gt;.WhereIn&lt;TValue&gt;(Expression&lt;Func&lt;TProps, TValue&gt;&gt;, IEnumerable&lt;TValue&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereInRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___System_Collections_Generic_IEnumerable___0__">IRedbQueryable&lt;TProps&gt;.WhereInRedb&lt;TValue&gt;(Expression&lt;Func&lt;IRedbObject, TValue&gt;&gt;, IEnumerable&lt;TValue&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_AllAsync_System_Linq_Expressions_Expression_System_Func__0_System_Boolean___">IRedbQueryable&lt;TProps&gt;.AllAsync(Expression&lt;Func&lt;TProps, bool&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_Select__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject__0____0___">IRedbQueryable&lt;TProps&gt;.Select&lt;TResult&gt;(Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_Distinct">IRedbQueryable&lt;TProps&gt;.Distinct()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_DistinctRedb">IRedbQueryable&lt;TProps&gt;.DistinctRedb()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_DistinctBy__1_System_Linq_Expressions_Expression_System_Func__0___0___">IRedbQueryable&lt;TProps&gt;.DistinctBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_DistinctByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___">IRedbQueryable&lt;TProps&gt;.DistinctByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WithMaxRecursionDepth_System_Int32_">IRedbQueryable&lt;TProps&gt;.WithMaxRecursionDepth(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WithLazyLoading_System_Boolean_">IRedbQueryable&lt;TProps&gt;.WithLazyLoading(bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereHasAncestor__1_System_Linq_Expressions_Expression_System_Func___0_System_Boolean___System_Nullable_System_Int32__">IRedbQueryable&lt;TProps&gt;.WhereHasAncestor&lt;TTarget&gt;(Expression&lt;Func&lt;TTarget, bool&gt;&gt;, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereHasDescendant__1_System_Linq_Expressions_Expression_System_Func___0_System_Boolean___System_Nullable_System_Int32__">IRedbQueryable&lt;TProps&gt;.WhereHasDescendant&lt;TTarget&gt;(Expression&lt;Func&lt;TTarget, bool&gt;&gt;, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereLevel_System_Int32_">IRedbQueryable&lt;TProps&gt;.WhereLevel(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereLevel_System_Linq_Expressions_Expression_System_Func_System_Int32_System_Boolean___">IRedbQueryable&lt;TProps&gt;.WhereLevel(Expression&lt;Func&lt;int, bool&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereRoots">IRedbQueryable&lt;TProps&gt;.WhereRoots()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereLeaves">IRedbQueryable&lt;TProps&gt;.WhereLeaves()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereChildrenOf_System_Int64_">IRedbQueryable&lt;TProps&gt;.WhereChildrenOf(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereChildrenOf_redb_Core_Models_Contracts_IRedbObject_">IRedbQueryable&lt;TProps&gt;.WhereChildrenOf(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereDescendantsOf_System_Int64_System_Nullable_System_Int32__">IRedbQueryable&lt;TProps&gt;.WhereDescendantsOf(long, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WhereDescendantsOf_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">IRedbQueryable&lt;TProps&gt;.WhereDescendantsOf(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WithMaxDepth_System_Int32_">IRedbQueryable&lt;TProps&gt;.WithMaxDepth(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WithPropsDepth_System_Int32_">IRedbQueryable&lt;TProps&gt;.WithPropsDepth(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_ToTreeListAsync">IRedbQueryable&lt;TProps&gt;.ToTreeListAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_ToRootListAsync">IRedbQueryable&lt;TProps&gt;.ToRootListAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_ToFlatListAsync">IRedbQueryable&lt;TProps&gt;.ToFlatListAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_DeleteAsync">IRedbQueryable&lt;TProps&gt;.DeleteAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_SumAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___">IRedbQueryable&lt;TProps&gt;.SumAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_AverageAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___">IRedbQueryable&lt;TProps&gt;.AverageAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_MinAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___">IRedbQueryable&lt;TProps&gt;.MinAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_MaxAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___">IRedbQueryable&lt;TProps&gt;.MaxAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_GetStatisticsAsync__1_System_Linq_Expressions_Expression_System_Func__0___0___">IRedbQueryable&lt;TProps&gt;.GetStatisticsAsync&lt;TField&gt;(Expression&lt;Func&lt;TProps, TField&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_AggregateAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject__0____0___">IRedbQueryable&lt;TProps&gt;.AggregateAsync&lt;TResult&gt;(Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_SumRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___">IRedbQueryable&lt;TProps&gt;.SumRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_AverageRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___">IRedbQueryable&lt;TProps&gt;.AverageRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_MinRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___">IRedbQueryable&lt;TProps&gt;.MinRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_MaxRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___">IRedbQueryable&lt;TProps&gt;.MaxRedbAsync&lt;TField&gt;(Expression&lt;Func&lt;IRedbObject, TField&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_AggregateRedbAsync__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___">IRedbQueryable&lt;TProps&gt;.AggregateRedbAsync&lt;TResult&gt;(Expression&lt;Func&lt;IRedbObject, TResult&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_GroupBy__1_System_Linq_Expressions_Expression_System_Func__0___0___">IRedbQueryable&lt;TProps&gt;.GroupBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_GroupByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___">IRedbQueryable&lt;TProps&gt;.GroupByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_GroupByArray__2_System_Linq_Expressions_Expression_System_Func__0_System_Collections_Generic_IEnumerable___0____System_Linq_Expressions_Expression_System_Func___0___1___">IRedbQueryable&lt;TProps&gt;.GroupByArray&lt;TItem, TKey&gt;(Expression&lt;Func&lt;TProps, IEnumerable&lt;TItem&gt;&gt;&gt;, Expression&lt;Func&lt;TItem, TKey&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_WithWindow_System_Action_redb_Core_Query_Window_IWindowSpec__0___">IRedbQueryable&lt;TProps&gt;.WithWindow(Action&lt;IWindowSpec&lt;TProps&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_ToSqlString">IRedbQueryable&lt;TProps&gt;.ToSqlString()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_ToSqlStringAsync">IRedbQueryable&lt;TProps&gt;.ToSqlStringAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Query.IRedbQueryable-1.html#redb_Core_Query_IRedbQueryable_1_ToFilterJsonAsync">IRedbQueryable&lt;TProps&gt;.ToFilterJsonAsync()</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="redb.Core.Query.RedbQueryableExtensions.html#redb_Core_Query_RedbQueryableExtensions_ToAggregateSqlStringAsync__2_redb_Core_Query_IRedbQueryable___0__System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Entities_RedbObject___0____1___">RedbQueryableExtensions.ToAggregateSqlStringAsync&lt;TProps, TResult&gt;(IRedbQueryable&lt;TProps&gt;, Expression&lt;Func&lt;RedbObject&lt;TProps&gt;, TResult&gt;&gt;)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Query.RedbQueryableExtensions.html#redb_Core_Query_RedbQueryableExtensions_ToSqlStringAsync__1_redb_Core_Query_IRedbQueryable___0__">RedbQueryableExtensions.ToSqlStringAsync&lt;TProps&gt;(IRedbQueryable&lt;TProps&gt;)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Query_IOrderedRedbQueryable_1_ThenByDescendingRedb_" data-uid="redb.Core.Query.IOrderedRedbQueryable`1.ThenByDescendingRedb*"></a>
+
+  <h3 id="redb_Core_Query_IOrderedRedbQueryable_1_ThenByDescendingRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IOrderedRedbQueryable`1.ThenByDescendingRedb``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  ThenByDescendingRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L526"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Additional descending sort by IRedbObject base fields.
+Uses IRedbObject for compile-time safety - Props not visible in IntelliSense!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IOrderedRedbQueryable&lt;TProps&gt; ThenByDescendingRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IOrderedRedbQueryable-1.html">IOrderedRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IOrderedRedbQueryable_1_ThenByDescending_" data-uid="redb.Core.Query.IOrderedRedbQueryable`1.ThenByDescending*"></a>
+
+  <h3 id="redb_Core_Query_IOrderedRedbQueryable_1_ThenByDescending__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IOrderedRedbQueryable`1.ThenByDescending``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  ThenByDescending&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L511"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Additional descending sort by Props field.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IOrderedRedbQueryable&lt;TProps&gt; ThenByDescending&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IOrderedRedbQueryable-1.html">IOrderedRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_IOrderedRedbQueryable_1_ThenByRedb_" data-uid="redb.Core.Query.IOrderedRedbQueryable`1.ThenByRedb*"></a>
+
+  <h3 id="redb_Core_Query_IOrderedRedbQueryable_1_ThenByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0___" data-uid="redb.Core.Query.IOrderedRedbQueryable`1.ThenByRedb``1(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,``0}})">
+  ThenByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L520"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Additional ascending sort by IRedbObject base fields.
+Uses IRedbObject for compile-time safety - Props not visible in IntelliSense!</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IOrderedRedbQueryable&lt;TProps&gt; ThenByRedb&lt;TKey&gt;(Expression&lt;Func&lt;IRedbObject, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IOrderedRedbQueryable-1.html">IOrderedRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+  <h4 class="section" id="redb_Core_Query_IOrderedRedbQueryable_1_ThenByRedb__1_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject___0____examples">Examples</h4>
+  <p>.OrderBy(p =&gt; p.Name).ThenByRedb(x =&gt; x.DateCreate)</p>
+
+
+
+
+
+
+  <a id="redb_Core_Query_IOrderedRedbQueryable_1_ThenBy_" data-uid="redb.Core.Query.IOrderedRedbQueryable`1.ThenBy*"></a>
+
+  <h3 id="redb_Core_Query_IOrderedRedbQueryable_1_ThenBy__1_System_Linq_Expressions_Expression_System_Func__0___0___" data-uid="redb.Core.Query.IOrderedRedbQueryable`1.ThenBy``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})">
+  ThenBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L506"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Additional ascending sort by Props field.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IOrderedRedbQueryable&lt;TProps&gt; ThenBy&lt;TKey&gt;(Expression&lt;Func&lt;TProps, TKey&gt;&gt; keySelector)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>keySelector</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, TKey&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IOrderedRedbQueryable-1.html">IOrderedRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/IRedbQueryable.cs/#L501" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

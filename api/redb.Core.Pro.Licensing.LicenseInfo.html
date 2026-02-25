@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class LicenseInfo </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class LicenseInfo ">
+      
+      <meta name="description" content="License information parsed from JWT token. Contains issuer, features, version limits, and expiration data.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Pro_Licensing_LicenseInfo.md&amp;value=---%0Auid%3A%20redb.Core.Pro.Licensing.LicenseInfo%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Pro.Licensing.LicenseInfo">
+
+
+
+  <h1 id="redb_Core_Pro_Licensing_LicenseInfo" data-uid="redb.Core.Pro.Licensing.LicenseInfo" class="text-break">
+Class LicenseInfo  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L18"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Pro.html">Pro</a>.<a class="xref" href="redb.Core.Pro.Licensing.html">Licensing</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.Pro.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>License information parsed from JWT token.
+Contains issuer, features, version limits, and expiration data.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public record LicenseInfo : IEquatable&lt;LicenseInfo&gt;</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">LicenseInfo</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="redb.Core.Pro.Licensing.LicenseInfo.html">LicenseInfo</a>&gt;</div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo__ctor_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.#ctor*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo__ctor_System_String_System_String_System_String_System_String_System_String_System_String_System_String___System_Version_System_DateTimeOffset_System_Nullable_System_DateTimeOffset__System_String_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.#ctor(System.String,System.String,System.String,System.String,System.String,System.String,System.String[],System.Version,System.DateTimeOffset,System.Nullable{System.DateTimeOffset},System.String)">
+  LicenseInfo(string, string, string, string, string, string?, string[], Version, DateTimeOffset, DateTimeOffset?, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L18"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>License information parsed from JWT token.
+Contains issuer, features, version limits, and expiration data.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public LicenseInfo(string LicenseId, string Issuer, string KeyId, string Licensee, string Email, string? Country, string[] Features, Version MaxVersion, DateTimeOffset IssuedAt, DateTimeOffset? ExpiresAt, string LicenseType = &quot;commercial&quot;)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>LicenseId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Unique license identifier (jti claim) for revocation support</p>
+</dd>
+    <dt><code>Issuer</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>License issuer identifier (e.g., &quot;redbase.app&quot;, &quot;redb.ru&quot;)</p>
+</dd>
+    <dt><code>KeyId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>RSA key identifier for key rotation (e.g., &quot;app-2024-01&quot;)</p>
+</dd>
+    <dt><code>Licensee</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Company or person name the license was issued to</p>
+</dd>
+    <dt><code>Email</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Contact email for the licensee</p>
+</dd>
+    <dt><code>Country</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Optional country code (e.g., &quot;RU&quot;, &quot;US&quot;)</p>
+</dd>
+    <dt><code>Features</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>[]</dt>
+    <dd><p>Licensed features: &quot;core.pro&quot;, &quot;postgres.pro&quot;, &quot;mssql.pro&quot;</p>
+</dd>
+    <dt><code>MaxVersion</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.version">Version</a></dt>
+    <dd><p>Maximum library version this license supports</p>
+</dd>
+    <dt><code>IssuedAt</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a></dt>
+    <dd><p>When the license was issued</p>
+</dd>
+    <dt><code>ExpiresAt</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a>?</dt>
+    <dd><p>When the license expires (null = perpetual)</p>
+</dd>
+    <dt><code>LicenseType</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>License type: &quot;commercial&quot; (default) or &quot;educational&quot;</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_Country_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Country*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_Country" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Country">
+  Country
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L24"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Optional country code (e.g., &quot;RU&quot;, &quot;US&quot;)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? Country { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_Email_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Email*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_Email" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Email">
+  Email
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L23"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Contact email for the licensee</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Email { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_ExpiresAt_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.ExpiresAt*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_ExpiresAt" data-uid="redb.Core.Pro.Licensing.LicenseInfo.ExpiresAt">
+  ExpiresAt
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L28"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>When the license expires (null = perpetual)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DateTimeOffset? ExpiresAt { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_Features_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Features*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_Features" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Features">
+  Features
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L25"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Licensed features: &quot;core.pro&quot;, &quot;postgres.pro&quot;, &quot;mssql.pro&quot;</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string[] Features { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_IsCommercial_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IsCommercial*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_IsCommercial" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IsCommercial">
+  IsCommercial
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L48"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>True if this is a commercial license (default).
+Commercial licenses continue working after expiration (warning only).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsCommercial { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_IsEducational_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IsEducational*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_IsEducational" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IsEducational">
+  IsEducational
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L42"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>True if this is an educational (non-commercial) license.
+Educational licenses are free but require renewal after expiration.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsEducational { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_IsExpired_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IsExpired*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_IsExpired" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IsExpired">
+  IsExpired
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Checks if the license has expired.
+Commercial: warning only, continues working.
+Educational: throws LicenseExpiredException.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsExpired { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_IssuedAt_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IssuedAt*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_IssuedAt" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IssuedAt">
+  IssuedAt
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L27"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>When the license was issued</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DateTimeOffset IssuedAt { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_Issuer_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Issuer*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_Issuer" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Issuer">
+  Issuer
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L20"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>License issuer identifier (e.g., &quot;redbase.app&quot;, &quot;redb.ru&quot;)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Issuer { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_KeyId_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.KeyId*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_KeyId" data-uid="redb.Core.Pro.Licensing.LicenseInfo.KeyId">
+  KeyId
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L21"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>RSA key identifier for key rotation (e.g., &quot;app-2024-01&quot;)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string KeyId { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_LicenseId_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.LicenseId*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_LicenseId" data-uid="redb.Core.Pro.Licensing.LicenseInfo.LicenseId">
+  LicenseId
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L19"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Unique license identifier (jti claim) for revocation support</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string LicenseId { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_LicenseType_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.LicenseType*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_LicenseType" data-uid="redb.Core.Pro.Licensing.LicenseInfo.LicenseType">
+  LicenseType
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L29"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>License type: &quot;commercial&quot; (default) or &quot;educational&quot;</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string LicenseType { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_Licensee_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Licensee*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_Licensee" data-uid="redb.Core.Pro.Licensing.LicenseInfo.Licensee">
+  Licensee
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L22"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Company or person name the license was issued to</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Licensee { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_MaxVersion_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.MaxVersion*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_MaxVersion" data-uid="redb.Core.Pro.Licensing.LicenseInfo.MaxVersion">
+  MaxVersion
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L26"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Maximum library version this license supports</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Version MaxVersion { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.version">Version</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_HasFeature_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.HasFeature*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_HasFeature_System_String_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.HasFeature(System.String)">
+  HasFeature(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L55"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Checks if the license includes a specific feature.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool HasFeature(string feature)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>feature</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Feature name (e.g., &quot;postgres.pro&quot;)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Pro_Licensing_LicenseInfo_IsVersionValid_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IsVersionValid*"></a>
+
+  <h3 id="redb_Core_Pro_Licensing_LicenseInfo_IsVersionValid_System_Version_" data-uid="redb.Core.Pro.Licensing.LicenseInfo.IsVersionValid(System.Version)">
+  IsVersionValid(Version)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L63"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Checks if the license version covers the given library version.
+Comparison is Major.Minor only (patches are always allowed).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsVersionValid(Version assemblyVersion)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>assemblyVersion</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.version">Version</a></dt>
+    <dd><p>Current library version</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core.Pro/Licensing/LicenseInfo.cs/#L18" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

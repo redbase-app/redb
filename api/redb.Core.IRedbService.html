@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IRedbService </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IRedbService ">
+      
+      <meta name="description" content="Main REDB service interface - composition of all providers.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_IRedbService.md&amp;value=---%0Auid%3A%20redb.Core.IRedbService%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.IRedbService">
+
+
+
+  <h1 id="redb_Core_IRedbService" data-uid="redb.Core.IRedbService" class="text-break">
+Interface IRedbService  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L15"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Main REDB service interface - composition of all providers.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IRedbService : ISchemeSyncProvider, IObjectStorageProvider, ITreeProvider, IPermissionProvider, IQueryableProvider, IValidationProvider</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_Cache">ISchemeSyncProvider.Cache</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_ListCache">ISchemeSyncProvider.ListCache</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_PropsCache">ISchemeSyncProvider.PropsCache</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_EnsureSchemeFromTypeAsync__1">ISchemeSyncProvider.EnsureSchemeFromTypeAsync&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_SyncStructuresFromTypeAsync__1_redb_Core_Models_Contracts_IRedbScheme_System_Boolean_">ISchemeSyncProvider.SyncStructuresFromTypeAsync&lt;TProps&gt;(IRedbScheme, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_SyncSchemeAsync__1">ISchemeSyncProvider.SyncSchemeAsync&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeByIdAsync_System_Int64_">ISchemeSyncProvider.GetSchemeByIdAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeByNameAsync_System_String_">ISchemeSyncProvider.GetSchemeByNameAsync(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeByTypeAsync__1">ISchemeSyncProvider.GetSchemeByTypeAsync&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeFromCache__1">ISchemeSyncProvider.GetSchemeFromCache&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeFromCache_System_String_">ISchemeSyncProvider.GetSchemeFromCache(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeByTypeAsync_System_Type_">ISchemeSyncProvider.GetSchemeByTypeAsync(Type)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_LoadSchemeByTypeAsync__1">ISchemeSyncProvider.LoadSchemeByTypeAsync&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_LoadSchemeByTypeAsync_System_Type_">ISchemeSyncProvider.LoadSchemeByTypeAsync(Type)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemesAsync">ISchemeSyncProvider.GetSchemesAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetStructuresAsync_redb_Core_Models_Contracts_IRedbScheme_">ISchemeSyncProvider.GetStructuresAsync(IRedbScheme)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetStructuresByTypeAsync__1">ISchemeSyncProvider.GetStructuresByTypeAsync&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetStructuresByTypeAsync_System_Type_">ISchemeSyncProvider.GetStructuresByTypeAsync(Type)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_SchemeExistsForTypeAsync__1">ISchemeSyncProvider.SchemeExistsForTypeAsync&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_SchemeExistsForTypeAsync_System_Type_">ISchemeSyncProvider.SchemeExistsForTypeAsync(Type)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_SchemeExistsByNameAsync_System_String_">ISchemeSyncProvider.SchemeExistsByNameAsync(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeNameForType__1">ISchemeSyncProvider.GetSchemeNameForType&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeNameForType_System_Type_">ISchemeSyncProvider.GetSchemeNameForType(Type)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeAliasForType__1">ISchemeSyncProvider.GetSchemeAliasForType&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSchemeAliasForType_System_Type_">ISchemeSyncProvider.GetSchemeAliasForType(Type)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_EnsureObjectSchemeAsync_System_String_">ISchemeSyncProvider.EnsureObjectSchemeAsync(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetObjectSchemeAsync_System_String_">ISchemeSyncProvider.GetObjectSchemeAsync(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_MigrateStructureTypeAsync_System_Int64_System_String_System_String_System_Boolean_">ISchemeSyncProvider.MigrateStructureTypeAsync(long, string, string, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetStructureTreeAsync_System_Int64_">ISchemeSyncProvider.GetStructureTreeAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetSubtreeAsync_System_Int64_System_Nullable_System_Int64__">ISchemeSyncProvider.GetSubtreeAsync(long, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_InvalidateStructureTreeCache_System_Int64_">ISchemeSyncProvider.InvalidateStructureTreeCache(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html#redb_Core_Providers_ISchemeSyncProvider_GetStructureTreeCacheStats">ISchemeSyncProvider.GetStructureTreeCacheStats()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadAsync__1_System_Int64_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadAsync&lt;TProps&gt;(long, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadAsync&lt;TProps&gt;(IRedbObject, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadAsync__1_System_Int64_redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadAsync&lt;TProps&gt;(long, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SaveAsync_redb_Core_Models_Contracts_IRedbObject_">IObjectStorageProvider.SaveAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SaveAsync__1_redb_Core_Models_Contracts_IRedbObject___0__">IObjectStorageProvider.SaveAsync&lt;TProps&gt;(IRedbObject&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_DeleteAsync_redb_Core_Models_Contracts_IRedbObject_">IObjectStorageProvider.DeleteAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SaveAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">IObjectStorageProvider.SaveAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SaveAsync__1_redb_Core_Models_Contracts_IRedbObject___0__redb_Core_Models_Contracts_IRedbUser_">IObjectStorageProvider.SaveAsync&lt;TProps&gt;(IRedbObject&lt;TProps&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_DeleteAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">IObjectStorageProvider.DeleteAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_DeleteAsync_System_Int64_">IObjectStorageProvider.DeleteAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_DeleteAsync_System_Int64_redb_Core_Models_Contracts_IRedbUser_">IObjectStorageProvider.DeleteAsync(long, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_DeleteAsync_System_Collections_Generic_IEnumerable_System_Int64__">IObjectStorageProvider.DeleteAsync(IEnumerable&lt;long&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_DeleteAsync_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_">IObjectStorageProvider.DeleteAsync(IEnumerable&lt;long&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_DeleteAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__">IObjectStorageProvider.DeleteAsync(IEnumerable&lt;IRedbObject&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_DeleteAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__redb_Core_Models_Contracts_IRedbUser_">IObjectStorageProvider.DeleteAsync(IEnumerable&lt;IRedbObject&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadAsync_System_Collections_Generic_IEnumerable_System_Int64__System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadAsync(IEnumerable&lt;long&gt;, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadAsync_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadAsync(IEnumerable&lt;long&gt;, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SaveAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__">IObjectStorageProvider.SaveAsync(IEnumerable&lt;IRedbObject&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SaveAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__redb_Core_Models_Contracts_IRedbUser_">IObjectStorageProvider.SaveAsync(IEnumerable&lt;IRedbObject&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SoftDeleteAsync_System_Collections_Generic_IEnumerable_System_Int64__System_Nullable_System_Int64__">IObjectStorageProvider.SoftDeleteAsync(IEnumerable&lt;long&gt;, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SoftDeleteAsync_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int64__">IObjectStorageProvider.SoftDeleteAsync(IEnumerable&lt;long&gt;, IRedbUser, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SoftDeleteAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__System_Nullable_System_Int64__">IObjectStorageProvider.SoftDeleteAsync(IEnumerable&lt;IRedbObject&gt;, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_SoftDeleteAsync_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int64__">IObjectStorageProvider.SoftDeleteAsync(IEnumerable&lt;IRedbObject&gt;, IRedbUser, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_DeleteWithPurgeAsync_System_Collections_Generic_IEnumerable_System_Int64__System_Int32_System_IProgress_redb_Core_Services_PurgeProgress__System_Threading_CancellationToken_System_Nullable_System_Int64__">IObjectStorageProvider.DeleteWithPurgeAsync(IEnumerable&lt;long&gt;, int, IProgress&lt;PurgeProgress&gt;, CancellationToken, long?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_PurgeTrashAsync_System_Int64_System_Int32_System_Int32_System_IProgress_redb_Core_Services_PurgeProgress__System_Threading_CancellationToken_">IObjectStorageProvider.PurgeTrashAsync(long, int, int, IProgress&lt;PurgeProgress&gt;, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_GetDeletionProgressAsync_System_Int64_">IObjectStorageProvider.GetDeletionProgressAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_GetUserActiveDeletionsAsync_System_Int64_">IObjectStorageProvider.GetUserActiveDeletionsAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_GetOrphanedDeletionTasksAsync_System_Int32_">IObjectStorageProvider.GetOrphanedDeletionTasksAsync(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_TryClaimOrphanedTaskAsync_System_Int64_System_Int32_">IObjectStorageProvider.TryClaimOrphanedTaskAsync(long, int)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_AddNewObjectsAsync__1_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject___0___">IObjectStorageProvider.AddNewObjectsAsync&lt;TProps&gt;(IEnumerable&lt;IRedbObject&lt;TProps&gt;&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_AddNewObjectsAsync__1_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject___0___redb_Core_Models_Contracts_IRedbUser_">IObjectStorageProvider.AddNewObjectsAsync&lt;TProps&gt;(IEnumerable&lt;IRedbObject&lt;TProps&gt;&gt;, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadWithParentsAsync__1_System_Int64_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadWithParentsAsync&lt;TProps&gt;(long, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadWithParentsAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadWithParentsAsync&lt;TProps&gt;(IRedbObject, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadWithParentsAsync__1_System_Int64_redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadWithParentsAsync&lt;TProps&gt;(long, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadWithParentsAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadWithParentsAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadWithParentsAsync__1_System_Collections_Generic_IEnumerable_System_Int64__System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadWithParentsAsync&lt;TProps&gt;(IEnumerable&lt;long&gt;, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadWithParentsAsync__1_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadWithParentsAsync&lt;TProps&gt;(IEnumerable&lt;long&gt;, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadWithParentsAsync_System_Collections_Generic_IEnumerable_System_Int64__System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadWithParentsAsync(IEnumerable&lt;long&gt;, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html#redb_Core_Providers_IObjectStorageProvider_LoadWithParentsAsync_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_System_Int32_System_Nullable_System_Boolean__">IObjectStorageProvider.LoadWithParentsAsync(IEnumerable&lt;long&gt;, IRedbUser, int, bool?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_LoadTreeAsync__1_System_Int64_System_Nullable_System_Int32__">ITreeProvider.LoadTreeAsync&lt;TProps&gt;(long, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_LoadTreeAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">ITreeProvider.LoadTreeAsync&lt;TProps&gt;(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetChildrenAsync__1_redb_Core_Models_Contracts_IRedbObject_">ITreeProvider.GetChildrenAsync&lt;TProps&gt;(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetPathToRootAsync__1_redb_Core_Models_Contracts_IRedbObject_">ITreeProvider.GetPathToRootAsync&lt;TProps&gt;(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetDescendantsAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">ITreeProvider.GetDescendantsAsync&lt;TProps&gt;(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_MoveObjectAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_">ITreeProvider.MoveObjectAsync(IRedbObject, IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_CreateChildAsync__1_redb_Core_Models_Entities_TreeRedbObject___0__redb_Core_Models_Contracts_IRedbObject_">ITreeProvider.CreateChildAsync&lt;TProps&gt;(TreeRedbObject&lt;TProps&gt;, IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_DeleteSubtreeAsync_redb_Core_Models_Contracts_IRedbObject_">ITreeProvider.DeleteSubtreeAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_LoadTreeAsync__1_System_Int64_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">ITreeProvider.LoadTreeAsync&lt;TProps&gt;(long, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_LoadTreeAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">ITreeProvider.LoadTreeAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetChildrenAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">ITreeProvider.GetChildrenAsync&lt;TProps&gt;(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetPathToRootAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">ITreeProvider.GetPathToRootAsync&lt;TProps&gt;(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetDescendantsAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">ITreeProvider.GetDescendantsAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_MoveObjectAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">ITreeProvider.MoveObjectAsync(IRedbObject, IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_CreateChildAsync__1_redb_Core_Models_Entities_TreeRedbObject___0__redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">ITreeProvider.CreateChildAsync&lt;TProps&gt;(TreeRedbObject&lt;TProps&gt;, IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_DeleteSubtreeAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">ITreeProvider.DeleteSubtreeAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_LoadPolymorphicTreeAsync_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">ITreeProvider.LoadPolymorphicTreeAsync(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetPolymorphicChildrenAsync_redb_Core_Models_Contracts_IRedbObject_">ITreeProvider.GetPolymorphicChildrenAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetPolymorphicPathToRootAsync_redb_Core_Models_Contracts_IRedbObject_">ITreeProvider.GetPolymorphicPathToRootAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetPolymorphicDescendantsAsync_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">ITreeProvider.GetPolymorphicDescendantsAsync(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_LoadPolymorphicTreeAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">ITreeProvider.LoadPolymorphicTreeAsync(IRedbObject, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetPolymorphicChildrenAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">ITreeProvider.GetPolymorphicChildrenAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetPolymorphicPathToRootAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">ITreeProvider.GetPolymorphicPathToRootAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_GetPolymorphicDescendantsAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">ITreeProvider.GetPolymorphicDescendantsAsync(IRedbObject, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.ITreeProvider.html#redb_Core_Providers_ITreeProvider_InitializeTypeRegistryAsync">ITreeProvider.InitializeTypeRegistryAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetReadableObjectIds">IPermissionProvider.GetReadableObjectIds()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserEditObject_redb_Core_Models_Contracts_IRedbObject_">IPermissionProvider.CanUserEditObject(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserSelectObject_redb_Core_Models_Contracts_IRedbObject_">IPermissionProvider.CanUserSelectObject(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_redb_Core_Models_Contracts_IRedbScheme_">IPermissionProvider.CanUserInsertScheme(IRedbScheme)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_redb_Core_Models_Contracts_IRedbObject_">IPermissionProvider.CanUserDeleteObject(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetReadableObjectIds_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.GetReadableObjectIds(IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserEditObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.CanUserEditObject(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserSelectObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.CanUserSelectObject(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_redb_Core_Models_Contracts_IRedbScheme_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.CanUserInsertScheme(IRedbScheme, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.CanUserDeleteObject(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserEditObject_redb_Core_Models_Entities_RedbObject_">IPermissionProvider.CanUserEditObject(RedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserSelectObject_redb_Core_Models_Entities_RedbObject_">IPermissionProvider.CanUserSelectObject(RedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_redb_Core_Models_Entities_RedbObject_">IPermissionProvider.CanUserDeleteObject(RedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserEditObject_redb_Core_Models_Entities_RedbObject_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.CanUserEditObject(RedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserSelectObject_redb_Core_Models_Entities_RedbObject_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.CanUserSelectObject(RedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_redb_Core_Models_Entities_RedbObject_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.CanUserInsertScheme(RedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_redb_Core_Models_Entities_RedbObject_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.CanUserDeleteObject(RedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CreatePermissionAsync_redb_Core_Models_Permissions_PermissionRequest_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.CreatePermissionAsync(PermissionRequest, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_UpdatePermissionAsync_redb_Core_Models_Contracts_IRedbPermission_redb_Core_Models_Permissions_PermissionRequest_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.UpdatePermissionAsync(IRedbPermission, PermissionRequest, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_DeletePermissionAsync_redb_Core_Models_Contracts_IRedbPermission_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.DeletePermissionAsync(IRedbPermission, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetPermissionsByUserAsync_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.GetPermissionsByUserAsync(IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetPermissionsByRoleAsync_redb_Core_Models_Contracts_IRedbRole_">IPermissionProvider.GetPermissionsByRoleAsync(IRedbRole)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetPermissionsByObjectAsync_redb_Core_Models_Contracts_IRedbObject_">IPermissionProvider.GetPermissionsByObjectAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetPermissionByIdAsync_System_Int64_">IPermissionProvider.GetPermissionByIdAsync(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GrantPermissionAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Enums_PermissionAction_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.GrantPermissionAsync(IRedbUser, IRedbObject, PermissionAction, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GrantPermissionAsync_redb_Core_Models_Contracts_IRedbRole_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Enums_PermissionAction_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.GrantPermissionAsync(IRedbRole, IRedbObject, PermissionAction, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_RevokePermissionAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.RevokePermissionAsync(IRedbUser, IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_RevokePermissionAsync_redb_Core_Models_Contracts_IRedbRole_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.RevokePermissionAsync(IRedbRole, IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_RevokeAllUserPermissionsAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.RevokeAllUserPermissionsAsync(IRedbUser, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_RevokeAllRolePermissionsAsync_redb_Core_Models_Contracts_IRedbRole_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.RevokeAllRolePermissionsAsync(IRedbRole, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetEffectivePermissionsAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbObject_">IPermissionProvider.GetEffectivePermissionsAsync(IRedbUser, IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetEffectivePermissionsBatchAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbObject___">IPermissionProvider.GetEffectivePermissionsBatchAsync(IRedbUser, IRedbObject[])</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetAllEffectivePermissionsAsync_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.GetAllEffectivePermissionsAsync(IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetPermissionCountAsync">IPermissionProvider.GetPermissionCountAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetUserPermissionCountAsync_redb_Core_Models_Contracts_IRedbUser_">IPermissionProvider.GetUserPermissionCountAsync(IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_GetRolePermissionCountAsync_redb_Core_Models_Contracts_IRedbRole_">IPermissionProvider.GetRolePermissionCountAsync(IRedbRole)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserEditObject_System_Int64_System_Int64_">IPermissionProvider.CanUserEditObject(long, long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserSelectObject_System_Int64_System_Int64_">IPermissionProvider.CanUserSelectObject(long, long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserInsertScheme_System_Int64_System_Int64_">IPermissionProvider.CanUserInsertScheme(long, long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IPermissionProvider.html#redb_Core_Providers_IPermissionProvider_CanUserDeleteObject_System_Int64_System_Int64_">IPermissionProvider.CanUserDeleteObject(long, long)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_Query__1">IQueryableProvider.Query&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_Query__1_redb_Core_Models_Contracts_IRedbUser_">IQueryableProvider.Query&lt;TProps&gt;(IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1">IQueryableProvider.TreeQuery&lt;TProps&gt;()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1_redb_Core_Models_Contracts_IRedbUser_">IQueryableProvider.TreeQuery&lt;TProps&gt;(IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1_System_Int64_System_Nullable_System_Int32__">IQueryableProvider.TreeQuery&lt;TProps&gt;(long, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">IQueryableProvider.TreeQuery&lt;TProps&gt;(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__System_Nullable_System_Int32__">IQueryableProvider.TreeQuery&lt;TProps&gt;(IEnumerable&lt;IRedbObject&gt;, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1_System_Collections_Generic_IEnumerable_System_Int64__System_Nullable_System_Int32__">IQueryableProvider.TreeQuery&lt;TProps&gt;(IEnumerable&lt;long&gt;, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1_System_Int64_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">IQueryableProvider.TreeQuery&lt;TProps&gt;(long, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">IQueryableProvider.TreeQuery&lt;TProps&gt;(IRedbObject, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1_System_Collections_Generic_IEnumerable_redb_Core_Models_Contracts_IRedbObject__redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">IQueryableProvider.TreeQuery&lt;TProps&gt;(IEnumerable&lt;IRedbObject&gt;, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IQueryableProvider.html#redb_Core_Providers_IQueryableProvider_TreeQuery__1_System_Collections_Generic_IEnumerable_System_Int64__redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">IQueryableProvider.TreeQuery&lt;TProps&gt;(IEnumerable&lt;long&gt;, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IValidationProvider.html#redb_Core_Providers_IValidationProvider_GetSupportedTypesAsync">IValidationProvider.GetSupportedTypesAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IValidationProvider.html#redb_Core_Providers_IValidationProvider_ValidateTypeAsync_System_Type_System_String_">IValidationProvider.ValidateTypeAsync(Type, string)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IValidationProvider.html#redb_Core_Providers_IValidationProvider_ValidateSchemaAsync__1_System_String_System_Boolean_">IValidationProvider.ValidateSchemaAsync&lt;TProps&gt;(string, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IValidationProvider.html#redb_Core_Providers_IValidationProvider_ValidateSchemaAsync__1_redb_Core_Models_Contracts_IRedbScheme_System_Boolean_">IValidationProvider.ValidateSchemaAsync&lt;TProps&gt;(IRedbScheme, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IValidationProvider.html#redb_Core_Providers_IValidationProvider_AnalyzeSchemaChangesAsync__1_redb_Core_Models_Contracts_IRedbScheme_">IValidationProvider.AnalyzeSchemaChangesAsync&lt;TProps&gt;(IRedbScheme)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.IValidationProvider.html#redb_Core_Providers_IValidationProvider_ValidatePropertyConstraints_System_Type_System_String_System_Boolean_System_Boolean_">IValidationProvider.ValidatePropertyConstraints(Type, string, bool, bool)</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbServiceConfigurationExtensions.html#redb_Core_Extensions_RedbServiceConfigurationExtensions_ApplyTemporary_redb_Core_IRedbService_System_Func_redb_Core_Models_Configuration_RedbServiceConfigurationBuilder_redb_Core_Models_Configuration_RedbServiceConfigurationBuilder__">RedbServiceConfigurationExtensions.ApplyTemporary(IRedbService, Func&lt;RedbServiceConfigurationBuilder, RedbServiceConfigurationBuilder&gt;)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbServiceConfigurationExtensions.html#redb_Core_Extensions_RedbServiceConfigurationExtensions_ApplyTemporary_redb_Core_IRedbService_redb_Core_Models_Configuration_RedbServiceConfiguration_">RedbServiceConfigurationExtensions.ApplyTemporary(IRedbService, RedbServiceConfiguration)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbServiceInitializationExtensions.html#redb_Core_Extensions_RedbServiceInitializationExtensions_AutoSyncSchemesAsync_redb_Core_IRedbService_System_Reflection_Assembly___">RedbServiceInitializationExtensions.AutoSyncSchemesAsync(IRedbService, params Assembly[])</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Extensions.RedbServiceInitializationExtensions.html#redb_Core_Extensions_RedbServiceInitializationExtensions_InitializeAsync_redb_Core_IRedbService_System_Reflection_Assembly___">RedbServiceInitializationExtensions.InitializeAsync(IRedbService, params Assembly[])</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Pro.Migration.MigrationExtensions.html#redb_Core_Pro_Migration_MigrationExtensions_MigrateAllAsync_redb_Core_IRedbService_redb_Core_Pro_Query_ISqlDialectPro_System_Reflection_Assembly_System_Boolean_System_String_">MigrationExtensions.MigrateAllAsync(IRedbService, ISqlDialectPro, Assembly, bool, string?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Pro.Migration.MigrationExtensions.html#redb_Core_Pro_Migration_MigrationExtensions_MigrateAsync__1_redb_Core_IRedbService_redb_Core_Pro_Query_ISqlDialectPro_System_Reflection_Assembly_System_Boolean_System_String_">MigrationExtensions.MigrateAsync&lt;TProps&gt;(IRedbService, ISqlDialectPro, Assembly, bool, string?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Pro.Migration.MigrationExtensions.html#redb_Core_Pro_Migration_MigrationExtensions_MigrateAsync__2_redb_Core_IRedbService_redb_Core_Pro_Query_ISqlDialectPro_System_Boolean_System_String_">MigrationExtensions.MigrateAsync&lt;TProps, TMigration&gt;(IRedbService, ISqlDialectPro, bool, string?)</a>
+  </div>
+  <div>
+      <a class="xref" href="redb.Core.Pro.Migration.MigrationExtensions.html#redb_Core_Pro_Migration_MigrationExtensions_PreviewMigrationAsync__2_redb_Core_IRedbService_redb_Core_Pro_Query_ISqlDialectPro_">MigrationExtensions.PreviewMigrationAsync&lt;TProps, TMigration&gt;(IRedbService, ISqlDialectPro)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_IRedbService_CacheDomain_" data-uid="redb.Core.IRedbService.CacheDomain*"></a>
+
+  <h3 id="redb_Core_IRedbService_CacheDomain" data-uid="redb.Core.IRedbService.CacheDomain">
+  CacheDomain
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L59"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Cache domain identifier for this service instance.
+Used to isolate caches between different database connections.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string CacheDomain { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_Configuration_" data-uid="redb.Core.IRedbService.Configuration*"></a>
+
+  <h3 id="redb_Core_IRedbService_Configuration" data-uid="redb.Core.IRedbService.Configuration">
+  Configuration
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L53"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Current service configuration.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">RedbServiceConfiguration Configuration { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_Context_" data-uid="redb.Core.IRedbService.Context*"></a>
+
+  <h3 id="redb_Core_IRedbService_Context" data-uid="redb.Core.IRedbService.Context">
+  Context
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L29"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Database context for direct SQL queries.
+Replaces EF Core RedbContext.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbContext Context { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_ListProvider_" data-uid="redb.Core.IRedbService.ListProvider*"></a>
+
+  <h3 id="redb_Core_IRedbService_ListProvider" data-uid="redb.Core.IRedbService.ListProvider">
+  ListProvider
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L46"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Provider for list management.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IListProvider ListProvider { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.IListProvider.html">IListProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_RoleProvider_" data-uid="redb.Core.IRedbService.RoleProvider*"></a>
+
+  <h3 id="redb_Core_IRedbService_RoleProvider" data-uid="redb.Core.IRedbService.RoleProvider">
+  RoleProvider
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L41"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Provider for role management.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRoleProvider RoleProvider { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.IRoleProvider.html">IRoleProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_SecurityContext_" data-uid="redb.Core.IRedbService.SecurityContext*"></a>
+
+  <h3 id="redb_Core_IRedbService_SecurityContext" data-uid="redb.Core.IRedbService.SecurityContext">
+  SecurityContext
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L76"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Security context for user and permission management.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRedbSecurityContext SecurityContext { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Contracts.IRedbSecurityContext.html">IRedbSecurityContext</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_UserProvider_" data-uid="redb.Core.IRedbService.UserProvider*"></a>
+
+  <h3 id="redb_Core_IRedbService_UserProvider" data-uid="redb.Core.IRedbService.UserProvider">
+  UserProvider
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Provider for user management.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IUserProvider UserProvider { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.IUserProvider.html">IUserProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_dbMigration_" data-uid="redb.Core.IRedbService.dbMigration*"></a>
+
+  <h3 id="redb_Core_IRedbService_dbMigration" data-uid="redb.Core.IRedbService.dbMigration">
+  dbMigration
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L145"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Database migration version.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string dbMigration { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_dbSize_" data-uid="redb.Core.IRedbService.dbSize*"></a>
+
+  <h3 id="redb_Core_IRedbService_dbSize" data-uid="redb.Core.IRedbService.dbSize">
+  dbSize
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L150"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Database size in MB (optional).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long? dbSize { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_dbType_" data-uid="redb.Core.IRedbService.dbType*"></a>
+
+  <h3 id="redb_Core_IRedbService_dbType" data-uid="redb.Core.IRedbService.dbType">
+  dbType
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L140"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Database type (e.g., &quot;PostgreSQL&quot;).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string dbType { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_dbVersion_" data-uid="redb.Core.IRedbService.dbVersion*"></a>
+
+  <h3 id="redb_Core_IRedbService_dbVersion" data-uid="redb.Core.IRedbService.dbVersion">
+  dbVersion
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L135"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string dbVersion { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_IRedbService_CreateSystemContext_" data-uid="redb.Core.IRedbService.CreateSystemContext*"></a>
+
+  <h3 id="redb_Core_IRedbService_CreateSystemContext" data-uid="redb.Core.IRedbService.CreateSystemContext">
+  CreateSystemContext()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L86"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create temporary system context.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IDisposable CreateSystemContext()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_EnsureDatabaseAsync_" data-uid="redb.Core.IRedbService.EnsureDatabaseAsync*"></a>
+
+  <h3 id="redb_Core_IRedbService_EnsureDatabaseAsync" data-uid="redb.Core.IRedbService.EnsureDatabaseAsync">
+  EnsureDatabaseAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L120"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Ensures the REDB database schema exists.
+If the core tables are not found, executes the full initialization script.
+Safe to call on every startup — idempotent.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task EnsureDatabaseAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_GetEffectiveUserId_" data-uid="redb.Core.IRedbService.GetEffectiveUserId*"></a>
+
+  <h3 id="redb_Core_IRedbService_GetEffectiveUserId" data-uid="redb.Core.IRedbService.GetEffectiveUserId">
+  GetEffectiveUserId()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L91"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get effective user ID with fallback logic.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long GetEffectiveUserId()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_GetSchemaScript_" data-uid="redb.Core.IRedbService.GetSchemaScript*"></a>
+
+  <h3 id="redb_Core_IRedbService_GetSchemaScript" data-uid="redb.Core.IRedbService.GetSchemaScript">
+  GetSchemaScript()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L126"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Returns the full SQL script that creates the REDB schema.
+Useful for manual database setup or CI/CD pipelines.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">string GetSchemaScript()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_InitializeAsync_" data-uid="redb.Core.IRedbService.InitializeAsync*"></a>
+
+  <h3 id="redb_Core_IRedbService_InitializeAsync_System_Boolean_System_Reflection_Assembly___" data-uid="redb.Core.IRedbService.InitializeAsync(System.Boolean,System.Reflection.Assembly[])">
+  InitializeAsync(bool, params Assembly[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L133"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Initialize REDB system at application startup, optionally creating the database schema first.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task InitializeAsync(bool ensureCreated, params Assembly[] assemblies)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ensureCreated</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>If true, calls <a class="xref" href="redb.Core.IRedbService.html#redb_Core_IRedbService_EnsureDatabaseAsync">EnsureDatabaseAsync()</a> before initialization.</p>
+</dd>
+    <dt><code>assemblies</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.reflection.assembly">Assembly</a>[]</dt>
+    <dd><p>Assemblies to scan. If not specified — all loaded assemblies are scanned.</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_InitializeAsync_" data-uid="redb.Core.IRedbService.InitializeAsync*"></a>
+
+  <h3 id="redb_Core_IRedbService_InitializeAsync_System_Reflection_Assembly___" data-uid="redb.Core.IRedbService.InitializeAsync(System.Reflection.Assembly[])">
+  InitializeAsync(params Assembly[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L105"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Initialize REDB system at application startup.
+Automatically performs:</p>
+<ol>
+<li>Synchronization of all schemes with RedbSchemeAttribute</li>
+<li>RedbObjectFactory initialization</li>
+<li>AutomaticTypeRegistry initialization</li>
+<li>GlobalPropsCache initialization (if enabled in configuration)</li>
+<li>Setting global scheme provider for RedbObject</li>
+</ol>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task InitializeAsync(params Assembly[] assemblies)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>assemblies</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.reflection.assembly">Assembly</a>[]</dt>
+    <dd><p>Assemblies to scan. If not specified - all loaded assemblies are scanned</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_SetCurrentUser_" data-uid="redb.Core.IRedbService.SetCurrentUser*"></a>
+
+  <h3 id="redb_Core_IRedbService_SetCurrentUser_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.IRedbService.SetCurrentUser(redb.Core.Models.Contracts.IRedbUser)">
+  SetCurrentUser(IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L81"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Set current user.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SetCurrentUser(IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_UpdateConfiguration_" data-uid="redb.Core.IRedbService.UpdateConfiguration*"></a>
+
+  <h3 id="redb_Core_IRedbService_UpdateConfiguration_System_Action_redb_Core_Models_Configuration_RedbServiceConfigurationBuilder__" data-uid="redb.Core.IRedbService.UpdateConfiguration(System.Action{redb.Core.Models.Configuration.RedbServiceConfigurationBuilder})">
+  UpdateConfiguration(Action&lt;RedbServiceConfigurationBuilder&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L69"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Update configuration via builder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void UpdateConfiguration(Action&lt;RedbServiceConfigurationBuilder&gt; configureBuilder)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>configureBuilder</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfigurationBuilder.html">RedbServiceConfigurationBuilder</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_IRedbService_UpdateConfiguration_" data-uid="redb.Core.IRedbService.UpdateConfiguration*"></a>
+
+  <h3 id="redb_Core_IRedbService_UpdateConfiguration_System_Action_redb_Core_Models_Configuration_RedbServiceConfiguration__" data-uid="redb.Core.IRedbService.UpdateConfiguration(System.Action{redb.Core.Models.Configuration.RedbServiceConfiguration})">
+  UpdateConfiguration(Action&lt;RedbServiceConfiguration&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L64"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Update configuration.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void UpdateConfiguration(Action&lt;RedbServiceConfiguration&gt; configure)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>configure</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/IRedbService.cs/#L15" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

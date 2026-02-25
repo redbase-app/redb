@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class ProMssqlTreeProvider </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class ProMssqlTreeProvider ">
+      
+      <meta name="description" content="MSSqlQL Pro version of TreeProvider. Inherits PVT loading logic from ProTreeProviderBase. Provides MSSqlQL-specific SQL.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_MSSql_Pro_Providers_ProMssqlTreeProvider.md&amp;value=---%0Auid%3A%20redb.MSSql.Pro.Providers.ProMssqlTreeProvider%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider">
+
+
+
+  <h1 id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider" class="text-break">
+Class ProMssqlTreeProvider  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Providers/ProMsSqlTreeProvider.cs/#L23"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.MSSql.html">MSSql</a>.<a class="xref" href="redb.MSSql.Pro.html">Pro</a>.<a class="xref" href="redb.MSSql.Pro.Providers.html">Providers</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.MSSql.Pro.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>MSSqlQL Pro version of TreeProvider.
+Inherits PVT loading logic from ProTreeProviderBase.
+Provides MSSqlQL-specific SQL.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public class ProMssqlTreeProvider : ProTreeProviderBase, ITreeProvider</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html">TreeProviderBase</a></div>
+      <div><a class="xref" href="redb.Core.Pro.Providers.ProTreeProviderBase.html">ProTreeProviderBase</a></div>
+      <div><span class="xref">ProMssqlTreeProvider</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Providers.ITreeProvider.html">ITreeProvider</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="redb.Core.Pro.Providers.ProTreeProviderBase.html#redb_Core_Pro_Providers_ProTreeProviderBase_ListProvider">ProTreeProviderBase.ListProvider</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Pro.Providers.ProTreeProviderBase.html#redb_Core_Pro_Providers_ProTreeProviderBase_GetChildrenWithUserAsync__1_System_Int64_System_Nullable_System_Int64__System_Boolean_">ProTreeProviderBase.GetChildrenWithUserAsync&lt;TProps&gt;(long, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Pro.Providers.ProTreeProviderBase.html#redb_Core_Pro_Providers_ProTreeProviderBase_GetPolymorphicChildrenWithUserAsync_System_Int64_System_Nullable_System_Int64__System_Boolean_">ProTreeProviderBase.GetPolymorphicChildrenWithUserAsync(long, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Pro.Providers.ProTreeProviderBase.html#redb_Core_Pro_Providers_ProTreeProviderBase_LoadDynamicObjectAsync_System_Int64_redb_Core_Models_Contracts_IRedbUser_">ProTreeProviderBase.LoadDynamicObjectAsync(long, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Pro.Providers.ProTreeProviderBase.html#redb_Core_Pro_Providers_ProTreeProviderBase_MapRowToRedbObject__1_redb_Core_Models_Entities_RedbObjectRow_">ProTreeProviderBase.MapRowToRedbObject&lt;TProps&gt;(RedbObjectRow)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_Context">TreeProviderBase.Context</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_ObjectStorage">TreeProviderBase.ObjectStorage</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_PermissionProvider">TreeProviderBase.PermissionProvider</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_Serializer">TreeProviderBase.Serializer</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_SecurityContext">TreeProviderBase.SecurityContext</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_Configuration">TreeProviderBase.Configuration</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_SchemeSyncProvider">TreeProviderBase.SchemeSyncProvider</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_Sql">TreeProviderBase.Sql</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_Cache">TreeProviderBase.Cache</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_Logger">TreeProviderBase.Logger</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_InitializeTypeRegistryAsync">TreeProviderBase.InitializeTypeRegistryAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_LoadTreeAsync__1_System_Int64_System_Nullable_System_Int32__">TreeProviderBase.LoadTreeAsync&lt;TProps&gt;(long, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_LoadTreeAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">TreeProviderBase.LoadTreeAsync&lt;TProps&gt;(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetChildrenAsync__1_redb_Core_Models_Contracts_IRedbObject_">TreeProviderBase.GetChildrenAsync&lt;TProps&gt;(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPathToRootAsync__1_redb_Core_Models_Contracts_IRedbObject_">TreeProviderBase.GetPathToRootAsync&lt;TProps&gt;(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetDescendantsAsync__1_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">TreeProviderBase.GetDescendantsAsync&lt;TProps&gt;(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_MoveObjectAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_">TreeProviderBase.MoveObjectAsync(IRedbObject, IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_CreateChildAsync__1_redb_Core_Models_Entities_TreeRedbObject___0__redb_Core_Models_Contracts_IRedbObject_">TreeProviderBase.CreateChildAsync&lt;TProps&gt;(TreeRedbObject&lt;TProps&gt;, IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_DeleteSubtreeAsync_redb_Core_Models_Contracts_IRedbObject_">TreeProviderBase.DeleteSubtreeAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_LoadTreeAsync__1_System_Int64_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">TreeProviderBase.LoadTreeAsync&lt;TProps&gt;(long, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_LoadTreeAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">TreeProviderBase.LoadTreeAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetChildrenAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">TreeProviderBase.GetChildrenAsync&lt;TProps&gt;(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPathToRootAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">TreeProviderBase.GetPathToRootAsync&lt;TProps&gt;(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetDescendantsAsync__1_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">TreeProviderBase.GetDescendantsAsync&lt;TProps&gt;(IRedbObject, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_MoveObjectAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">TreeProviderBase.MoveObjectAsync(IRedbObject, IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_CreateChildAsync__1_redb_Core_Models_Entities_TreeRedbObject___0__redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">TreeProviderBase.CreateChildAsync&lt;TProps&gt;(TreeRedbObject&lt;TProps&gt;, IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_DeleteSubtreeAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">TreeProviderBase.DeleteSubtreeAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_LoadPolymorphicTreeAsync_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">TreeProviderBase.LoadPolymorphicTreeAsync(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPolymorphicChildrenAsync_redb_Core_Models_Contracts_IRedbObject_">TreeProviderBase.GetPolymorphicChildrenAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPolymorphicPathToRootAsync_redb_Core_Models_Contracts_IRedbObject_">TreeProviderBase.GetPolymorphicPathToRootAsync(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPolymorphicDescendantsAsync_redb_Core_Models_Contracts_IRedbObject_System_Nullable_System_Int32__">TreeProviderBase.GetPolymorphicDescendantsAsync(IRedbObject, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_LoadPolymorphicTreeAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">TreeProviderBase.LoadPolymorphicTreeAsync(IRedbObject, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPolymorphicChildrenAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">TreeProviderBase.GetPolymorphicChildrenAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPolymorphicPathToRootAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_">TreeProviderBase.GetPolymorphicPathToRootAsync(IRedbObject, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPolymorphicDescendantsAsync_redb_Core_Models_Contracts_IRedbObject_redb_Core_Models_Contracts_IRedbUser_System_Nullable_System_Int32__">TreeProviderBase.GetPolymorphicDescendantsAsync(IRedbObject, IRedbUser, int?)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_LoadTreeWithUserAsync__1_System_Int64_System_Int32_System_Nullable_System_Int64__System_Boolean_">TreeProviderBase.LoadTreeWithUserAsync&lt;TProps&gt;(long, int, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPathToRootWithUserAsync__1_System_Int64_System_Nullable_System_Int64__System_Boolean_">TreeProviderBase.GetPathToRootWithUserAsync&lt;TProps&gt;(long, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetDescendantsWithUserAsync__1_System_Int64_System_Int32_System_Nullable_System_Int64__System_Boolean_">TreeProviderBase.GetDescendantsWithUserAsync&lt;TProps&gt;(long, int, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_MoveObjectWithUserAsync_System_Int64_System_Nullable_System_Int64__System_Int64_System_Boolean_">TreeProviderBase.MoveObjectWithUserAsync(long, long?, long, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_CreateChildWithUserAsync__1_redb_Core_Models_Entities_TreeRedbObject___0__System_Int64_System_Nullable_System_Int64__System_Boolean_">TreeProviderBase.CreateChildWithUserAsync&lt;TProps&gt;(TreeRedbObject&lt;TProps&gt;, long, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_DeleteSubtreeWithUserAsync_System_Int64_redb_Core_Models_Contracts_IRedbUser_">TreeProviderBase.DeleteSubtreeWithUserAsync(long, IRedbUser)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_LoadPolymorphicTreeWithUserAsync_System_Int64_System_Int32_System_Nullable_System_Int64__System_Boolean_">TreeProviderBase.LoadPolymorphicTreeWithUserAsync(long, int, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPolymorphicPathToRootWithUserAsync_System_Int64_System_Nullable_System_Int64__System_Boolean_">TreeProviderBase.GetPolymorphicPathToRootWithUserAsync(long, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_GetPolymorphicDescendantsWithUserAsync_System_Int64_System_Int32_System_Nullable_System_Int64__System_Boolean_">TreeProviderBase.GetPolymorphicDescendantsWithUserAsync(long, int, long?, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_ConvertToTreeObject__1_redb_Core_Models_Entities_RedbObject___0__">TreeProviderBase.ConvertToTreeObject&lt;TProps&gt;(RedbObject&lt;TProps&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="redb.Core.Providers.Base.TreeProviderBase.html#redb_Core_Providers_Base_TreeProviderBase_ConvertToPolymorphicTreeObjectWithProps_redb_Core_Models_Contracts_IRedbObject_">TreeProviderBase.ConvertToPolymorphicTreeObjectWithProps(IRedbObject)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider__ctor_" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.#ctor*"></a>
+
+  <h3 id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider__ctor_redb_Core_Data_IRedbContext_redb_Core_Providers_IObjectStorageProvider_redb_Core_Providers_IPermissionProvider_redb_Core_Serialization_IRedbObjectSerializer_redb_Core_Models_Contracts_IRedbSecurityContext_redb_Core_Providers_ISchemeSyncProvider_redb_Core_Models_Configuration_RedbServiceConfiguration_redb_Core_Query_ISqlDialect_redb_Core_Pro_Query_ISqlDialectPro_redb_Core_Providers_IListProvider_Microsoft_Extensions_Logging_ILogger_" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.#ctor(redb.Core.Data.IRedbContext,redb.Core.Providers.IObjectStorageProvider,redb.Core.Providers.IPermissionProvider,redb.Core.Serialization.IRedbObjectSerializer,redb.Core.Models.Contracts.IRedbSecurityContext,redb.Core.Providers.ISchemeSyncProvider,redb.Core.Models.Configuration.RedbServiceConfiguration,redb.Core.Query.ISqlDialect,redb.Core.Pro.Query.ISqlDialectPro,redb.Core.Providers.IListProvider,Microsoft.Extensions.Logging.ILogger)">
+  ProMssqlTreeProvider(IRedbContext, IObjectStorageProvider, IPermissionProvider, IRedbObjectSerializer, IRedbSecurityContext, ISchemeSyncProvider, RedbServiceConfiguration?, ISqlDialect?, ISqlDialectPro?, IListProvider?, ILogger?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Providers/ProMsSqlTreeProvider.cs/#L29"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ProMssqlTreeProvider(IRedbContext context, IObjectStorageProvider objectStorage, IPermissionProvider permissionProvider, IRedbObjectSerializer serializer, IRedbSecurityContext securityContext, ISchemeSyncProvider schemeSyncProvider, RedbServiceConfiguration? configuration = null, ISqlDialect? dialect = null, ISqlDialectPro? dialectPro = null, IListProvider? listProvider = null, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+    <dt><code>objectStorage</code> <a class="xref" href="redb.Core.Providers.IObjectStorageProvider.html">IObjectStorageProvider</a></dt>
+    <dd></dd>
+    <dt><code>permissionProvider</code> <a class="xref" href="redb.Core.Providers.IPermissionProvider.html">IPermissionProvider</a></dt>
+    <dd></dd>
+    <dt><code>serializer</code> <a class="xref" href="redb.Core.Serialization.IRedbObjectSerializer.html">IRedbObjectSerializer</a></dt>
+    <dd></dd>
+    <dt><code>securityContext</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbSecurityContext.html">IRedbSecurityContext</a></dt>
+    <dd></dd>
+    <dt><code>schemeSyncProvider</code> <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html">ISchemeSyncProvider</a></dt>
+    <dd></dd>
+    <dt><code>configuration</code> <a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+    <dt><code>dialect</code> <a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+    <dd></dd>
+    <dt><code>dialectPro</code> <a class="xref" href="redb.Core.Pro.Query.ISqlDialectPro.html">ISqlDialectPro</a></dt>
+    <dd></dd>
+    <dt><code>listProvider</code> <a class="xref" href="redb.Core.Providers.IListProvider.html">IListProvider</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider_CreateProLazyPropsLoader_" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.CreateProLazyPropsLoader*"></a>
+
+  <h3 id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider_CreateProLazyPropsLoader" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.CreateProLazyPropsLoader">
+  CreateProLazyPropsLoader()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Providers/ProMsSqlTreeProvider.cs/#L52"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates ProLazyPropsLoader for PVT materialization.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override ILazyPropsLoader CreateProLazyPropsLoader()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.ILazyPropsLoader.html">ILazyPropsLoader</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider_LoadChildrenBaseAsync_" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.LoadChildrenBaseAsync*"></a>
+
+  <h3 id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider_LoadChildrenBaseAsync_System_Int64_" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.LoadChildrenBaseAsync(System.Int64)">
+  LoadChildrenBaseAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Providers/ProMsSqlTreeProvider.cs/#L69"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>MSSqlQL: Load all children (base fields only).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override Task&lt;List&lt;RedbObjectRow&gt;&gt; LoadChildrenBaseAsync(long parentId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObjectRow.html">RedbObjectRow</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider_LoadChildrenBySchemeBaseAsync_" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.LoadChildrenBySchemeBaseAsync*"></a>
+
+  <h3 id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider_LoadChildrenBySchemeBaseAsync_System_Int64_System_Int64_" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.LoadChildrenBySchemeBaseAsync(System.Int64,System.Int64)">
+  LoadChildrenBySchemeBaseAsync(long, long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Providers/ProMsSqlTreeProvider.cs/#L60"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>MSSqlQL: Load children by scheme (base fields only).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override Task&lt;List&lt;RedbObjectRow&gt;&gt; LoadChildrenBySchemeBaseAsync(long parentId, long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>parentId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObjectRow.html">RedbObjectRow</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider_LoadObjectByIdAsync_" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.LoadObjectByIdAsync*"></a>
+
+  <h3 id="redb_MSSql_Pro_Providers_ProMssqlTreeProvider_LoadObjectByIdAsync_System_Int64_" data-uid="redb.MSSql.Pro.Providers.ProMssqlTreeProvider.LoadObjectByIdAsync(System.Int64)">
+  LoadObjectByIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Providers/ProMsSqlTreeProvider.cs/#L78"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>MSSqlQL: Load object by ID (base fields only).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override Task&lt;RedbObjectRow?&gt; LoadObjectByIdAsync(long objectId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Entities.RedbObjectRow.html">RedbObjectRow</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.MSSql.Pro/Providers/ProMsSqlTreeProvider.cs/#L23" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

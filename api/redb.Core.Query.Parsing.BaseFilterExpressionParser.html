@@ -1,0 +1,1675 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class BaseFilterExpressionParser </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class BaseFilterExpressionParser ">
+      
+      <meta name="description" content="Base class for parsing LINQ expressions to FilterExpression. Contains all DB-agnostic logic. DB-specific implementations override CheckProOnlyFeatures.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Query_Parsing_BaseFilterExpressionParser.md&amp;value=---%0Auid%3A%20redb.Core.Query.Parsing.BaseFilterExpressionParser%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser">
+
+
+
+  <h1 id="redb_Core_Query_Parsing_BaseFilterExpressionParser" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser" class="text-break">
+Class BaseFilterExpressionParser  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L13"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Query.html">Query</a>.<a class="xref" href="redb.Core.Query.Parsing.html">Parsing</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Base class for parsing LINQ expressions to FilterExpression.
+Contains all DB-agnostic logic. DB-specific implementations override CheckProOnlyFeatures.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class BaseFilterExpressionParser : IFilterExpressionParser</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">BaseFilterExpressionParser</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Query.QueryExpressions.IFilterExpressionParser.html">IFilterExpressionParser</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Pro.Query.ProFilterExpressionParser.html">ProFilterExpressionParser</a></div>
+      <div><a class="xref" href="redb.Core.Query.Parsing.FilterExpressionParser.html">FilterExpressionParser</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser__isBaseFieldContext" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser._isBaseFieldContext">
+  _isBaseFieldContext
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L18"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Context flag: true when parsing WhereRedb (base fields), false for regular Where (Props).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool _isBaseFieldContext</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_BuildPropertyPath_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.BuildPropertyPath*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_BuildPropertyPath_System_Linq_Expressions_MemberExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.BuildPropertyPath(System.Linq.Expressions.MemberExpression)">
+  BuildPropertyPath(MemberExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L907"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Build property path from member expression chain.
+Handles nested properties, Length, Count, Dictionary indexers.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected (string Path, PropertyFunction? Function) BuildPropertyPath(MemberExpression memberExpression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>memberExpression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.memberexpression">MemberExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.string,system.nullable-redb.core.query.queryexpressions.propertyfunction--.path">Path</a>, <a class="xref" href="redb.Core.Query.QueryExpressions.PropertyFunction.html">PropertyFunction</a>? <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.string,system.nullable-redb.core.query.queryexpressions.propertyfunction--.function">Function</a>)</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CheckPathDepth_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CheckPathDepth*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CheckPathDepth_System_Int32_System_String_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CheckPathDepth(System.Int32,System.String)">
+  CheckPathDepth(int, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L39"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check property path nesting depth. FREE version limits to 2 levels.
+Override in Pro to allow deeper nesting.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual void CheckPathDepth(int depth, string fullPath)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>depth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+    <dt><code>fullPath</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CheckProOnlyFeatures_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CheckProOnlyFeatures*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CheckProOnlyFeatures_System_Linq_Expressions_Expression_System_String_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CheckProOnlyFeatures(System.Linq.Expressions.Expression,System.String)">
+  CheckProOnlyFeatures(Expression, string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L33"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>DB-specific check for Pro-only features. Override in implementations.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract void CheckProOnlyFeatures(Expression body, string context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>body</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+    <dt><code>context</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateArithmeticExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateArithmeticExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateArithmeticExpression_System_Linq_Expressions_BinaryExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateArithmeticExpression(System.Linq.Expressions.BinaryExpression)">
+  CreateArithmeticExpression(BinaryExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L572"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected ValueExpression CreateArithmeticExpression(BinaryExpression binary)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>binary</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.binaryexpression">BinaryExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ValueExpression.html">ValueExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateCustomFunctionExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateCustomFunctionExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateCustomFunctionExpression_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateCustomFunctionExpression(System.Linq.Expressions.MethodCallExpression)">
+  CreateCustomFunctionExpression(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L656"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected ValueExpression CreateCustomFunctionExpression(MethodCallExpression method)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ValueExpression.html">ValueExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateDateTimeFunctionExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateDateTimeFunctionExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateDateTimeFunctionExpression_System_Linq_Expressions_MemberExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateDateTimeFunctionExpression(System.Linq.Expressions.MemberExpression)">
+  CreateDateTimeFunctionExpression(MemberExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L736"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected ValueExpression CreateDateTimeFunctionExpression(MemberExpression member)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>member</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.memberexpression">MemberExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ValueExpression.html">ValueExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateExtendedComparison_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateExtendedComparison*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateExtendedComparison_System_Linq_Expressions_BinaryExpression_redb_Core_Query_QueryExpressions_ComparisonOperator_redb_Core_Query_QueryExpressions_ValueExpression_redb_Core_Query_QueryExpressions_ValueExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateExtendedComparison(System.Linq.Expressions.BinaryExpression,redb.Core.Query.QueryExpressions.ComparisonOperator,redb.Core.Query.QueryExpressions.ValueExpression,redb.Core.Query.QueryExpressions.ValueExpression)">
+  CreateExtendedComparison(BinaryExpression, ComparisonOperator, ValueExpression?, ValueExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L186"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Extended comparison with ValueExpression (arithmetic/functions).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression CreateExtendedComparison(BinaryExpression binary, ComparisonOperator op, ValueExpression? leftValueExpr, ValueExpression? rightValueExpr)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>binary</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.binaryexpression">BinaryExpression</a></dt>
+    <dd></dd>
+    <dt><code>op</code> <a class="xref" href="redb.Core.Query.QueryExpressions.ComparisonOperator.html">ComparisonOperator</a></dt>
+    <dd></dd>
+    <dt><code>leftValueExpr</code> <a class="xref" href="redb.Core.Query.QueryExpressions.ValueExpression.html">ValueExpression</a></dt>
+    <dd></dd>
+    <dt><code>rightValueExpr</code> <a class="xref" href="redb.Core.Query.QueryExpressions.ValueExpression.html">ValueExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateFunctionCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateFunctionCallExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_CreateFunctionCallExpression_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.CreateFunctionCallExpression(System.Linq.Expressions.MethodCallExpression)">
+  CreateFunctionCallExpression(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L680"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected ValueExpression CreateFunctionCallExpression(MethodCallExpression method)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ValueExpression.html">ValueExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_EvaluateExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.EvaluateExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_EvaluateExpression_System_Linq_Expressions_Expression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.EvaluateExpression(System.Linq.Expressions.Expression)">
+  EvaluateExpression(Expression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L973"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Evaluate expression to get constant value.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected object? EvaluateExpression(Expression expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_EvaluateStringComparison_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.EvaluateStringComparison*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_EvaluateStringComparison_System_Linq_Expressions_Expression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.EvaluateStringComparison(System.Linq.Expressions.Expression)">
+  EvaluateStringComparison(Expression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L368"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected StringComparison EvaluateStringComparison(Expression comparisonExpression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>comparisonExpression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.stringcomparison">StringComparison</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractDictionaryIndexerProperty_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractDictionaryIndexerProperty*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractDictionaryIndexerProperty_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractDictionaryIndexerProperty(System.Linq.Expressions.MethodCallExpression)">
+  ExtractDictionaryIndexerProperty(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L863"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Extract property from Dictionary indexer.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected PropertyInfo ExtractDictionaryIndexerProperty(MethodCallExpression methodCall)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>methodCall</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.PropertyInfo.html">PropertyInfo</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractProperty_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractProperty*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractProperty_System_Linq_Expressions_Expression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractProperty(System.Linq.Expressions.Expression)">
+  ExtractProperty(Expression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L819"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Extract property info from expression.
+Supports: property access, Dictionary indexer, string functions (ToLower, ToUpper, Trim).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected PropertyInfo ExtractProperty(Expression expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.PropertyInfo.html">PropertyInfo</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractPropertyAndValue_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractPropertyAndValue*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractPropertyAndValue_System_Linq_Expressions_BinaryExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractPropertyAndValue(System.Linq.Expressions.BinaryExpression)">
+  ExtractPropertyAndValue(BinaryExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L779"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Extract property and value from binary expression.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected (PropertyInfo Property, object? Value) ExtractPropertyAndValue(BinaryExpression binary)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>binary</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.binaryexpression">BinaryExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="redb.Core.Query.QueryExpressions.PropertyInfo.html">PropertyInfo</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-redb.core.query.queryexpressions.propertyinfo,system.object-.property">Property</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-redb.core.query.queryexpressions.propertyinfo,system.object-.value">Value</a>)</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractPropertyFromMember_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractPropertyFromMember*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractPropertyFromMember_System_Linq_Expressions_MemberExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractPropertyFromMember(System.Linq.Expressions.MemberExpression)">
+  ExtractPropertyFromMember(MemberExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L890"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Extract PropertyInfo from MemberExpression.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected PropertyInfo ExtractPropertyFromMember(MemberExpression member)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>member</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.memberexpression">MemberExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.PropertyInfo.html">PropertyInfo</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractValueExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractValueExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ExtractValueExpression_System_Linq_Expressions_Expression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ExtractValueExpression(System.Linq.Expressions.Expression)">
+  ExtractValueExpression(Expression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L592"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Recursively extract ValueExpression from any Expression.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected ValueExpression ExtractValueExpression(Expression expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ValueExpression.html">ValueExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsArithmeticExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsArithmeticExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsArithmeticExpression_System_Linq_Expressions_BinaryExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsArithmeticExpression(System.Linq.Expressions.BinaryExpression)">
+  IsArithmeticExpression(BinaryExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L562"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool IsArithmeticExpression(BinaryExpression binary)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>binary</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.binaryexpression">BinaryExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsCustomFunctionCall_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsCustomFunctionCall*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsCustomFunctionCall_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsCustomFunctionCall(System.Linq.Expressions.MethodCallExpression)">
+  IsCustomFunctionCall(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L650"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool IsCustomFunctionCall(MethodCallExpression method)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsDateTimePropertyAccess_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsDateTimePropertyAccess*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsDateTimePropertyAccess_System_Linq_Expressions_MemberExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsDateTimePropertyAccess(System.Linq.Expressions.MemberExpression)">
+  IsDateTimePropertyAccess(MemberExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L722"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool IsDateTimePropertyAccess(MemberExpression member)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>member</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.memberexpression">MemberExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsDictionaryType_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsDictionaryType*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsDictionaryType_System_Type_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsDictionaryType(System.Type)">
+  IsDictionaryType(Type?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L550"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool IsDictionaryType(Type? type)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>type</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsIgnoreCaseComparison_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsIgnoreCaseComparison*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsIgnoreCaseComparison_System_StringComparison_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsIgnoreCaseComparison(System.StringComparison)">
+  IsIgnoreCaseComparison(StringComparison)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L374"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool IsIgnoreCaseComparison(StringComparison comparison)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>comparison</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.stringcomparison">StringComparison</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsProFunctionCall_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsProFunctionCall*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsProFunctionCall_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsProFunctionCall(System.Linq.Expressions.MethodCallExpression)">
+  IsProFunctionCall(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L630"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool IsProFunctionCall(MethodCallExpression method)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsPropertyAccess_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsPropertyAccess*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_IsPropertyAccess_System_Linq_Expressions_Expression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.IsPropertyAccess(System.Linq.Expressions.Expression)">
+  IsPropertyAccess(Expression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L802"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if expression is property access.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool IsPropertyAccess(Expression expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ParseFilter_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ParseFilter*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ParseFilter__1_System_Linq_Expressions_Expression_System_Func___0_System_Boolean___" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ParseFilter``1(System.Linq.Expressions.Expression{System.Func{``0,System.Boolean}})">
+  ParseFilter&lt;TProps&gt;(Expression&lt;Func&lt;TProps, bool&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L23"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Parse LINQ predicate to FilterExpression for Props fields.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual FilterExpression ParseFilter&lt;TProps&gt;(Expression&lt;Func&lt;TProps, bool&gt;&gt; predicate) where TProps : class</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>predicate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;TProps, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ParseRedbFilter_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ParseRedbFilter*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ParseRedbFilter_System_Linq_Expressions_Expression_System_Func_redb_Core_Models_Contracts_IRedbObject_System_Boolean___" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ParseRedbFilter(System.Linq.Expressions.Expression{System.Func{redb.Core.Models.Contracts.IRedbObject,System.Boolean}})">
+  ParseRedbFilter(Expression&lt;Func&lt;IRedbObject, bool&gt;&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L52"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Parse LINQ predicate for base RedbObject fields (id, name, parent_id, etc.).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public FilterExpression ParseRedbFilter(Expression&lt;Func&lt;IRedbObject, bool&gt;&gt; predicate)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>predicate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1">Expression</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbObject.html">IRedbObject</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ReferencesLambdaParameter_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ReferencesLambdaParameter*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_ReferencesLambdaParameter_System_Linq_Expressions_Expression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.ReferencesLambdaParameter(System.Linq.Expressions.Expression)">
+  ReferencesLambdaParameter(Expression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L760"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if expression references lambda parameter.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool ReferencesLambdaParameter(Expression? expr)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expr</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_TryExtractValueExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.TryExtractValueExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_TryExtractValueExpression_System_Linq_Expressions_Expression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.TryExtractValueExpression(System.Linq.Expressions.Expression)">
+  TryExtractValueExpression(Expression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L217"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Try to extract ValueExpression from Expression (arithmetic, functions).
+Returns null for simple property/constant.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual ValueExpression? TryExtractValueExpression(Expression expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.ValueExpression.html">ValueExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitArithmeticComparisonExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitArithmeticComparisonExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitArithmeticComparisonExpression_System_Linq_Expressions_BinaryExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitArithmeticComparisonExpression(System.Linq.Expressions.BinaryExpression)">
+  VisitArithmeticComparisonExpression(BinaryExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L143"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Arithmetic expression as top-level is not allowed.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitArithmeticComparisonExpression(BinaryExpression binary)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>binary</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.binaryexpression">BinaryExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitBinaryExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitBinaryExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitBinaryExpression_System_Linq_Expressions_BinaryExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitBinaryExpression(System.Linq.Expressions.BinaryExpression)">
+  VisitBinaryExpression(BinaryExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L94"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Binary expression visitor (AND, OR, comparisons, arithmetic).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitBinaryExpression(BinaryExpression binary)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>binary</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.binaryexpression">BinaryExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitBooleanMemberExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitBooleanMemberExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitBooleanMemberExpression_System_Linq_Expressions_MemberExpression_System_Boolean_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitBooleanMemberExpression(System.Linq.Expressions.MemberExpression,System.Boolean)">
+  VisitBooleanMemberExpression(MemberExpression, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L85"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Handles boolean member expressions like p.IsActive or !p.IsActive.
+Converts to field = true/false comparison.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitBooleanMemberExpression(MemberExpression member, bool negated)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>member</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.memberexpression">MemberExpression</a></dt>
+    <dd></dd>
+    <dt><code>negated</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitCollectionContains_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitCollectionContains*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitCollectionContains_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitCollectionContains(System.Linq.Expressions.MethodCallExpression)">
+  VisitCollectionContains(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L486"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Collection.Contains visitor.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitCollectionContains(MethodCallExpression method)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitComparisonExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitComparisonExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitComparisonExpression_System_Linq_Expressions_BinaryExpression_redb_Core_Query_QueryExpressions_ComparisonOperator_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitComparisonExpression(System.Linq.Expressions.BinaryExpression,redb.Core.Query.QueryExpressions.ComparisonOperator)">
+  VisitComparisonExpression(BinaryExpression, ComparisonOperator)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L153"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Comparison expression visitor.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitComparisonExpression(BinaryExpression binary, ComparisonOperator op)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>binary</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.binaryexpression">BinaryExpression</a></dt>
+    <dd></dd>
+    <dt><code>op</code> <a class="xref" href="redb.Core.Query.QueryExpressions.ComparisonOperator.html">ComparisonOperator</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitConstantBooleanExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitConstantBooleanExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitConstantBooleanExpression_System_Linq_Expressions_ConstantExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitConstantBooleanExpression(System.Linq.Expressions.ConstantExpression)">
+  VisitConstantBooleanExpression(ConstantExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L326"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Constant boolean expression visitor.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitConstantBooleanExpression(ConstantExpression constant)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>constant</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.constantexpression">ConstantExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitDictionaryContainsKey_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitDictionaryContainsKey*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitDictionaryContainsKey_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitDictionaryContainsKey(System.Linq.Expressions.MethodCallExpression)">
+  VisitDictionaryContainsKey(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L528"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Dictionary.ContainsKey visitor.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitDictionaryContainsKey(MethodCallExpression method)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitEnumerableAny_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitEnumerableAny*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitEnumerableAny_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitEnumerableAny(System.Linq.Expressions.MethodCallExpression)">
+  VisitEnumerableAny(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L421"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Enumerable.Any visitor.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitEnumerableAny(MethodCallExpression method)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitEnumerableContains_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitEnumerableContains*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitEnumerableContains_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitEnumerableContains(System.Linq.Expressions.MethodCallExpression)">
+  VisitEnumerableContains(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L389"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Enumerable.Contains visitor.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitEnumerableContains(MethodCallExpression method)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitExpression_System_Linq_Expressions_Expression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitExpression(System.Linq.Expressions.Expression)">
+  VisitExpression(Expression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L65"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Main visitor dispatcher.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitExpression(Expression expression)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitMethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitMethodCallExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitMethodCallExpression_System_Linq_Expressions_MethodCallExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitMethodCallExpression(System.Linq.Expressions.MethodCallExpression)">
+  VisitMethodCallExpression(MethodCallExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L266"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Method call expression visitor.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitMethodCallExpression(MethodCallExpression method)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitStringMethodWithComparison_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitStringMethodWithComparison*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitStringMethodWithComparison_System_Linq_Expressions_MethodCallExpression_redb_Core_Query_QueryExpressions_ComparisonOperator_redb_Core_Query_QueryExpressions_ComparisonOperator_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitStringMethodWithComparison(System.Linq.Expressions.MethodCallExpression,redb.Core.Query.QueryExpressions.ComparisonOperator,redb.Core.Query.QueryExpressions.ComparisonOperator)">
+  VisitStringMethodWithComparison(MethodCallExpression, ComparisonOperator, ComparisonOperator)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L340"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>String methods with StringComparison support.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitStringMethodWithComparison(MethodCallExpression method, ComparisonOperator caseSensitiveOp, ComparisonOperator ignoreCaseOp)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>method</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.methodcallexpression">MethodCallExpression</a></dt>
+    <dd></dd>
+    <dt><code>caseSensitiveOp</code> <a class="xref" href="redb.Core.Query.QueryExpressions.ComparisonOperator.html">ComparisonOperator</a></dt>
+    <dd></dd>
+    <dt><code>ignoreCaseOp</code> <a class="xref" href="redb.Core.Query.QueryExpressions.ComparisonOperator.html">ComparisonOperator</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitUnaryExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitUnaryExpression*"></a>
+
+  <h3 id="redb_Core_Query_Parsing_BaseFilterExpressionParser_VisitUnaryExpression_System_Linq_Expressions_UnaryExpression_" data-uid="redb.Core.Query.Parsing.BaseFilterExpressionParser.VisitUnaryExpression(System.Linq.Expressions.UnaryExpression)">
+  VisitUnaryExpression(UnaryExpression)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L245"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Unary expression visitor (NOT).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual FilterExpression VisitUnaryExpression(UnaryExpression unary)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>unary</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.unaryexpression">UnaryExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Parsing/BaseFilterExpressionParser.cs/#L13" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

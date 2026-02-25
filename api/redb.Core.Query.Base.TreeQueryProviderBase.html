@@ -1,0 +1,2658 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TreeQueryProviderBase </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TreeQueryProviderBase ">
+      
+      <meta name="description" content="Base tree query provider for executing hierarchical LINQ queries via search_tree_objects_with_facets. Database-specific implementations should inherit and provide ISqlDialect.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Query_Base_TreeQueryProviderBase.md&amp;value=---%0Auid%3A%20redb.Core.Query.Base.TreeQueryProviderBase%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Query.Base.TreeQueryProviderBase">
+
+
+
+  <h1 id="redb_Core_Query_Base_TreeQueryProviderBase" data-uid="redb.Core.Query.Base.TreeQueryProviderBase" class="text-break">
+Class TreeQueryProviderBase  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L28"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Query.html">Query</a>.<a class="xref" href="redb.Core.Query.Base.html">Base</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Base tree query provider for executing hierarchical LINQ queries via search_tree_objects_with_facets.
+Database-specific implementations should inherit and provide ISqlDialect.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class TreeQueryProviderBase : ITreeQueryProvider, IRedbQueryProvider</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TreeQueryProviderBase</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="redb.Core.Query.ITreeQueryProvider.html">ITreeQueryProvider</a></div>
+      <div><a class="xref" href="redb.Core.Query.IRedbQueryProvider.html">IRedbQueryProvider</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="redb.MSSql.Query.MssqlTreeQueryProvider.html">MssqlTreeQueryProvider</a></div>
+      <div><a class="xref" href="redb.Postgres.Query.PostgresTreeQueryProvider.html">PostgresTreeQueryProvider</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase__ctor_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.#ctor*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__ctor_redb_Core_Data_IRedbContext_redb_Core_Serialization_IRedbObjectSerializer_redb_Core_Query_ISqlDialect_System_String_redb_Core_Providers_ILazyPropsLoader_redb_Core_Models_Configuration_RedbServiceConfiguration_Microsoft_Extensions_Logging_ILogger_redb_Core_Providers_ISchemeSyncProvider_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.#ctor(redb.Core.Data.IRedbContext,redb.Core.Serialization.IRedbObjectSerializer,redb.Core.Query.ISqlDialect,System.String,redb.Core.Providers.ILazyPropsLoader,redb.Core.Models.Configuration.RedbServiceConfiguration,Microsoft.Extensions.Logging.ILogger,redb.Core.Providers.ISchemeSyncProvider)">
+  TreeQueryProviderBase(IRedbContext, IRedbObjectSerializer, ISqlDialect, string?, ILazyPropsLoader?, RedbServiceConfiguration?, ILogger?, ISchemeSyncProvider?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L46"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected TreeQueryProviderBase(IRedbContext context, IRedbObjectSerializer serializer, ISqlDialect dialect, string? cacheDomain = null, ILazyPropsLoader? lazyPropsLoader = null, RedbServiceConfiguration? configuration = null, ILogger? logger = null, ISchemeSyncProvider? schemeSync = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+    <dt><code>serializer</code> <a class="xref" href="redb.Core.Serialization.IRedbObjectSerializer.html">IRedbObjectSerializer</a></dt>
+    <dd></dd>
+    <dt><code>dialect</code> <a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+    <dd></dd>
+    <dt><code>cacheDomain</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>lazyPropsLoader</code> <a class="xref" href="redb.Core.Providers.ILazyPropsLoader.html">ILazyPropsLoader</a></dt>
+    <dd></dd>
+    <dt><code>configuration</code> <a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+    <dt><code>schemeSync</code> <a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html">ISchemeSyncProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__configuration" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._configuration">
+  _configuration
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L37"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly RedbServiceConfiguration _configuration</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Models.Configuration.RedbServiceConfiguration.html">RedbServiceConfiguration</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__context" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._context">
+  _context
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L30"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IRedbContext _context</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Data.IRedbContext.html">IRedbContext</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__facetBuilder" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._facetBuilder">
+  _facetBuilder
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L34"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IFacetFilterBuilder _facetBuilder</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.FacetFilters.IFacetFilterBuilder.html">IFacetFilterBuilder</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__filterParser" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._filterParser">
+  _filterParser
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L32"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IFilterExpressionParser _filterParser</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IFilterExpressionParser.html">IFilterExpressionParser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__lazyPropsLoader" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._lazyPropsLoader">
+  _lazyPropsLoader
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L36"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ILazyPropsLoader? _lazyPropsLoader</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.ILazyPropsLoader.html">ILazyPropsLoader</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__logger" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._logger">
+  _logger
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L35"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ILogger? _logger</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/microsoft.extensions.logging.ilogger">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__orderingParser" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._orderingParser">
+  _orderingParser
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L33"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IOrderingExpressionParser _orderingParser</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IOrderingExpressionParser.html">IOrderingExpressionParser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__schemeSync" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._schemeSync">
+  _schemeSync
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L39"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ISchemeSyncProvider? _schemeSync</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Providers.ISchemeSyncProvider.html">ISchemeSyncProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__serializer" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._serializer">
+  _serializer
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L31"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly IRedbObjectSerializer _serializer</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Serialization.IRedbObjectSerializer.html">IRedbObjectSerializer</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase__sql" data-uid="redb.Core.Query.Base.TreeQueryProviderBase._sql">
+  _sql
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L38"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected readonly ISqlDialect _sql</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.ISqlDialect.html">ISqlDialect</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_Cache_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.Cache*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_Cache" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.Cache">
+  Cache
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L44"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Metadata cache for this provider (domain-isolated).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public GlobalMetadataCache Cache { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Caching.GlobalMetadataCache.html">GlobalMetadataCache</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_CheckProOnlyDistinctFeatures_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CheckProOnlyDistinctFeatures*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_CheckProOnlyDistinctFeatures__1_redb_Core_Query_QueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CheckProOnlyDistinctFeatures``1(redb.Core.Query.QueryContext{``0})">
+  CheckProOnlyDistinctFeatures&lt;TProps&gt;(QueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L133"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check for Pro-only Distinct features (DistinctBy, DistinctByRedb, DistinctRedb).
+Throws NotSupportedException in Free version.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual void CheckProOnlyDistinctFeatures&lt;TProps&gt;(QueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_CreateFacetBuilder_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateFacetBuilder*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_CreateFacetBuilder" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateFacetBuilder">
+  CreateFacetBuilder()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L82"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates facet filter builder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual IFacetFilterBuilder CreateFacetBuilder()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.FacetFilters.IFacetFilterBuilder.html">IFacetFilterBuilder</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_CreateFilterParser_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateFilterParser*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_CreateFilterParser" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateFilterParser">
+  CreateFilterParser()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L72"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates filter expression parser. Override for Pro features.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract IFilterExpressionParser CreateFilterParser()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IFilterExpressionParser.html">IFilterExpressionParser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_CreateOrderingParser_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateOrderingParser*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_CreateOrderingParser" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateOrderingParser">
+  CreateOrderingParser()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L77"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates ordering expression parser.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual IOrderingExpressionParser CreateOrderingParser()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.QueryExpressions.IOrderingExpressionParser.html">IOrderingExpressionParser</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_CreateQueryProvider_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateQueryProvider*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_CreateQueryProvider" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateQueryProvider">
+  CreateQueryProvider()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L87"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates query provider for delegation. Override in derived classes.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract IRedbQueryProvider CreateQueryProvider()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryProvider.html">IRedbQueryProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_CreateQuery_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateQuery*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_CreateQuery__1_System_Int64_System_Nullable_System_Int64__System_Boolean_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateQuery``1(System.Int64,System.Nullable{System.Int64},System.Boolean)">
+  CreateQuery&lt;TProps&gt;(long, long?, bool)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L147"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create new query for specified scheme.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbQueryable&lt;TProps&gt; CreateQuery&lt;TProps&gt;(long schemeId, long? userId = null, bool checkPermissions = false) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd></dd>
+    <dt><code>checkPermissions</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_CreateTreeQuery_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateTreeQuery*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_CreateTreeQuery__1_System_Int64_System_Nullable_System_Int64__System_Boolean_System_Nullable_System_Int64__System_Nullable_System_Int32__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateTreeQuery``1(System.Int64,System.Nullable{System.Int64},System.Boolean,System.Nullable{System.Int64},System.Nullable{System.Int32})">
+  CreateTreeQuery&lt;TProps&gt;(long, long?, bool, long?, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L339"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create tree query with hierarchical constraint support.
+Uses SQL function search_tree_objects_with_facets() instead of search_objects_with_facets().
+Returns IRedbQueryable with full tree method support.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IRedbQueryable&lt;TProps&gt; CreateTreeQuery&lt;TProps&gt;(long schemeId, long? userId = null, bool checkPermissions = false, long? rootObjectId = null, int? maxDepth = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Object scheme ID</p>
+</dd>
+    <dt><code>userId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd><p>User ID for permission check (null = current user)</p>
+</dd>
+    <dt><code>checkPermissions</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>Check object access permissions</p>
+</dd>
+    <dt><code>rootObjectId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd><p>Limit search to subtree of specified root (null = entire forest)</p>
+</dd>
+    <dt><code>maxDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd><p>Maximum tree search depth (null = unlimited)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd><p>Typed query with tree operation support</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_CreateTreeQueryable_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateTreeQueryable*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_CreateTreeQueryable__1_redb_Core_Query_Base_TreeQueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.CreateTreeQueryable``1(redb.Core.Query.Base.TreeQueryContext{``0})">
+  CreateTreeQueryable&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L92"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Creates tree queryable instance. Override in derived classes.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract IRedbQueryable&lt;TProps&gt; CreateTreeQueryable&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.IRedbQueryable-1.html">IRedbQueryable</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateAsync_System_Int64_System_String_redb_Core_Query_Aggregation_AggregateFunction_System_String_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAggregateAsync(System.Int64,System.String,redb.Core.Query.Aggregation.AggregateFunction,System.String)">
+  ExecuteAggregateAsync(long, string, AggregateFunction, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L160"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute aggregation on EAV field (SQL strategy for simple fields).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;decimal?&gt; ExecuteAggregateAsync(long schemeId, string fieldPath, AggregateFunction function, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Scheme ID</p>
+</dd>
+    <dt><code>fieldPath</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Field path (e.g. &quot;Price&quot;)</p>
+</dd>
+    <dt><code>function</code> <a class="xref" href="redb.Core.Query.Aggregation.AggregateFunction.html">AggregateFunction</a></dt>
+    <dd><p>Aggregation function</p>
+</dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>JSON filter (as for search_objects)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a>?&gt;</dt>
+    <dd><p>Aggregation result</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateAsync_System_Int64_System_String_redb_Core_Query_Aggregation_AggregateFunction_redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAggregateAsync(System.Int64,System.String,redb.Core.Query.Aggregation.AggregateFunction,redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteAggregateAsync(long, string, AggregateFunction, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L166"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute single-field aggregation with FilterExpression (Pro version).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;decimal?&gt; ExecuteAggregateAsync(long schemeId, string fieldPath, AggregateFunction function, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>fieldPath</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>function</code> <a class="xref" href="redb.Core.Query.Aggregation.AggregateFunction.html">AggregateFunction</a></dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.decimal">decimal</a>?&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateBatchAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAggregateBatchAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateBatchAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_String_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAggregateBatchAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.String)">
+  ExecuteAggregateBatchAsync(long, IEnumerable&lt;AggregateRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L172"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute batch aggregation (multiple fields in one query).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;AggregateResult&gt; ExecuteAggregateBatchAsync(long schemeId, IEnumerable&lt;AggregateRequest&gt; requests, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>requests</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateResult.html">AggregateResult</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateBatchAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAggregateBatchAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAggregateBatchAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAggregateBatchAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteAggregateBatchAsync(long, IEnumerable&lt;AggregateRequest&gt;, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L178"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute batch aggregation with FilterExpression (Pro version).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;AggregateResult&gt; ExecuteAggregateBatchAsync(long schemeId, IEnumerable&lt;AggregateRequest&gt; requests, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>requests</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateResult.html">AggregateResult</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteArrayGroupedAggregateAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteArrayGroupedAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteArrayGroupedAggregateAsync_System_Int64_System_String_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_String_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteArrayGroupedAggregateAsync(System.Int64,System.String,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.String)">
+  ExecuteArrayGroupedAggregateAsync(long, string, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L220"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute GroupBy aggregation on array (SQL function aggregate_array_grouped).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteArrayGroupedAggregateAsync(long schemeId, string arrayPath, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>arrayPath</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteAsync_System_Linq_Expressions_Expression_System_Type_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteAsync(System.Linq.Expressions.Expression,System.Type)">
+  ExecuteAsync(Expression, Type)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L353"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query asynchronously.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;object&gt; ExecuteAsync(Expression expression, Type elementType)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expression</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression">Expression</a></dt>
+    <dd></dd>
+    <dt><code>elementType</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteDeleteAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteDeleteAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteDeleteAsync_System_Int64_System_String_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteDeleteAsync(System.Int64,System.String)">
+  ExecuteDeleteAsync(long, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1461"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete objects by filter. Delegates to base QueryProvider.
+Cascade delete in DB handles children automatically.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; ExecuteDeleteAsync(long schemeId, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteDeleteAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteDeleteAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteDeleteAsync_System_Int64_redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteDeleteAsync(System.Int64,redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteDeleteAsync(long, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1471"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete objects by FilterExpression. Delegates to base QueryProvider.
+Cascade delete in DB handles children automatically.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; ExecuteDeleteAsync(long schemeId, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedAggregateAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteGroupedAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedAggregateAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_String_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteGroupedAggregateAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.String)">
+  ExecuteGroupedAggregateAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L196"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute GroupBy aggregation (SQL function aggregate_grouped).
+Uses filterJson for Free version compatibility.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteGroupedAggregateAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedAggregateAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteGroupedAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedAggregateAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteGroupedAggregateAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteGroupedAggregateAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L210"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute GroupBy aggregation with FilterExpression (Pro version).
+Delegates to QueryProvider.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteGroupedAggregateAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedWindowQueryAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteGroupedWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteGroupedWindowQueryAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String)">
+  ExecuteGroupedWindowQueryAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L281"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute GroupBy with Window Functions (ranking, running totals on aggregated data).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteGroupedWindowQueryAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedWindowQueryAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteGroupedWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteGroupedWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteGroupedWindowQueryAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},redb.Core.Query.QueryExpressions.FilterExpression)">
+  ExecuteGroupedWindowQueryAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L295"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute GroupBy with Window Functions with FilterExpression (Pro version).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteGroupedWindowQueryAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteOptimizedWhereHasAncestor_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteOptimizedWhereHasAncestor*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteOptimizedWhereHasAncestor__1_redb_Core_Query_Base_TreeQueryContext___0__redb_Core_Query_Base_TreeFilter_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteOptimizedWhereHasAncestor``1(redb.Core.Query.Base.TreeQueryContext{``0},redb.Core.Query.Base.TreeFilter)">
+  ExecuteOptimizedWhereHasAncestor&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, TreeFilter)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L807"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Optimized execution of WhereHasAncestor through logic inversion:</p>
+<ol>
+<li>Find ancestors with condition</li>
+<li>Find their descendants (using ParentIds)</li>
+<li>Apply remaining filters</li>
+</ol>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected Task&lt;List&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; ExecuteOptimizedWhereHasAncestor&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context, TreeFilter hasAncestorFilter) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>hasAncestorFilter</code> <a class="xref" href="redb.Core.Query.Base.TreeFilter.html">TreeFilter</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteOptimizedWhereHasDescendant_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteOptimizedWhereHasDescendant*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteOptimizedWhereHasDescendant__1_redb_Core_Query_Base_TreeQueryContext___0__redb_Core_Query_Base_TreeFilter_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteOptimizedWhereHasDescendant``1(redb.Core.Query.Base.TreeQueryContext{``0},redb.Core.Query.Base.TreeFilter)">
+  ExecuteOptimizedWhereHasDescendant&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, TreeFilter)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L902"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Optimized execution of WhereHasDescendant through logic inversion:</p>
+<ol>
+<li>Find descendants with condition</li>
+<li>Get their parents (via Parent/Ancestor chain)</li>
+<li>Apply remaining filters</li>
+</ol>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected Task&lt;List&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; ExecuteOptimizedWhereHasDescendant&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context, TreeFilter hasDescendantFilter) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>hasDescendantFilter</code> <a class="xref" href="redb.Core.Query.Base.TreeFilter.html">TreeFilter</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeCountAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeCountAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeCountAsync__1_redb_Core_Query_Base_TreeQueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeCountAsync``1(redb.Core.Query.Base.TreeQueryContext{``0})">
+  ExecuteTreeCountAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L467"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute COUNT for tree query through search_tree_objects_with_facets</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual Task&lt;int&gt; ExecuteTreeCountAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeDeleteAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeDeleteAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeDeleteAsync_System_Int64___" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeDeleteAsync(System.Int64[])">
+  ExecuteTreeDeleteAsync(long[])
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1480"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete objects by ID array (cascade with children).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;int&gt; ExecuteTreeDeleteAsync(long[] objectIds)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeGroupedAggregateAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeGroupedAggregateAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeGroupedAggregateAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeGroupedAggregateAsync``1(redb.Core.Query.Base.TreeQueryContext{``0},System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest})">
+  ExecuteTreeGroupedAggregateAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1500"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute GROUP BY with tree context (CTE for tree traversal).
+Base implementation: gets tree object IDs first, then delegates to base GroupBy with filter.
+Override in Pro version for optimized CTE-based implementation.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteTreeGroupedAggregateAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeGroupedWindowQueryAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeGroupedWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeGroupedWindowQueryAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeGroupedWindowQueryAsync``1(redb.Core.Query.Base.TreeQueryContext{``0},System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest})">
+  ExecuteTreeGroupedWindowQueryAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1616"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute GroupBy + Window with tree context.
+Base implementation: gets tree object IDs first, then delegates to base GroupBy + Window with filter.
+Override in Pro version for optimized CTE-based implementation.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteTreeGroupedWindowQueryAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeToListAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeToListAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeToListAsync__1_redb_Core_Query_Base_TreeQueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeToListAsync``1(redb.Core.Query.Base.TreeQueryContext{``0})">
+  ExecuteTreeToListAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L530"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute ToList for tree query through search_tree_objects_with_facets</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual Task&lt;object&gt; ExecuteTreeToListAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeWindowQueryAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteTreeWindowQueryAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteTreeWindowQueryAsync``1(redb.Core.Query.Base.TreeQueryContext{``0},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String)">
+  ExecuteTreeWindowQueryAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1550"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute Window Functions with tree context.
+Base implementation: get tree object IDs first, then execute window functions with ID filter.
+Override in Pro version for optimized CTE-based implementation.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteTreeWindowQueryAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context, IEnumerable&lt;WindowFieldRequest&gt; selectFields, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? frameJson = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>selectFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>frameJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteWindowQueryAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_System_String_System_Nullable_System_Int32__System_Nullable_System_Int32__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteWindowQueryAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String,System.String,System.Nullable{System.Int32},System.Nullable{System.Int32})">
+  ExecuteWindowQueryAsync(long, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?, string?, int?, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L234"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query with window functions (SQL function query_with_window).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteWindowQueryAsync(long schemeId, IEnumerable&lt;WindowFieldRequest&gt; selectFields, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? filterJson = null, string? frameJson = null, int? take = null, int? skip = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>selectFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>frameJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>take</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+    <dt><code>skip</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteWindowQueryAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteWindowQueryAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ExecuteWindowQueryAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__redb_Core_Query_QueryExpressions_FilterExpression_System_String_System_Nullable_System_Int32__System_Nullable_System_Int32__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ExecuteWindowQueryAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},redb.Core.Query.QueryExpressions.FilterExpression,System.String,System.Nullable{System.Int32},System.Nullable{System.Int32})">
+  ExecuteWindowQueryAsync(long, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, FilterExpression?, string?, int?, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L249"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Execute query with window functions with FilterExpression (Pro version).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;JsonDocument?&gt; ExecuteWindowQueryAsync(long schemeId, IEnumerable&lt;WindowFieldRequest&gt; selectFields, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, FilterExpression? filter, string? frameJson = null, int? take = null, int? skip = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>selectFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+    <dt><code>frameJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>take</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+    <dt><code>skip</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.json.jsondocument">JsonDocument</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetFilterJsonAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetFilterJsonAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetFilterJsonAsync__1_redb_Core_Query_QueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetFilterJsonAsync``1(redb.Core.Query.QueryContext{``0})">
+  GetFilterJsonAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1450"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Returns the JSON filter that will be sent to SQL function (for diagnostics)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;string&gt; GetFilterJsonAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetGroupedWindowSqlPreviewAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetGroupedWindowSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetGroupedWindowSqlPreviewAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetGroupedWindowSqlPreviewAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String)">
+  GetGroupedWindowSqlPreviewAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L309"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get SQL preview for GroupBy + Window query.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetGroupedWindowSqlPreviewAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? filterJson = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetGroupedWindowSqlPreviewAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetGroupedWindowSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetGroupedWindowSqlPreviewAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__redb_Core_Query_QueryExpressions_FilterExpression_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetGroupedWindowSqlPreviewAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},redb.Core.Query.QueryExpressions.FilterExpression)">
+  GetGroupedWindowSqlPreviewAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, FilterExpression?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L323"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get SQL preview for GroupBy + Window query with FilterExpression (Pro version).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetGroupedWindowSqlPreviewAsync(long schemeId, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, FilterExpression? filter)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filter</code> <a class="xref" href="redb.Core.Query.QueryExpressions.FilterExpression.html">FilterExpression</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetIdsWithAncestorsAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetIdsWithAncestorsAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetIdsWithAncestorsAsync__1_System_Collections_Generic_List_System_Int64__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetIdsWithAncestorsAsync``1(System.Collections.Generic.List{System.Int64})">
+  GetIdsWithAncestorsAsync&lt;TProps&gt;(List&lt;long&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1250"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get IDs of all objects and their parents up to root through recursive CTE</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;long&gt;&gt; GetIdsWithAncestorsAsync&lt;TProps&gt;(List&lt;long&gt; filteredIds) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filteredIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetOptimizableHasAncestorFilter_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetOptimizableHasAncestorFilter*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetOptimizableHasAncestorFilter__1_redb_Core_Query_Base_TreeQueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetOptimizableHasAncestorFilter``1(redb.Core.Query.Base.TreeQueryContext{``0})">
+  GetOptimizableHasAncestorFilter&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L772"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Determines if WhereHasAncestor can be optimized through logic inversion</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected TreeFilter? GetOptimizableHasAncestorFilter&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.Base.TreeFilter.html">TreeFilter</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetOptimizableHasDescendantFilter_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetOptimizableHasDescendantFilter*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetOptimizableHasDescendantFilter__1_redb_Core_Query_Base_TreeQueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetOptimizableHasDescendantFilter``1(redb.Core.Query.Base.TreeQueryContext{``0})">
+  GetOptimizableHasDescendantFilter&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L793"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Determines if WhereHasDescendant can be optimized through logic inversion</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected TreeFilter? GetOptimizableHasDescendantFilter&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="redb.Core.Query.Base.TreeFilter.html">TreeFilter</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetSchemeAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetSchemeAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetSchemeAsync_System_Int64_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetSchemeAsync(System.Int64)">
+  GetSchemeAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L187"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get scheme by ID (for projections) - delegate to base provider</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;IRedbScheme?&gt; GetSchemeAsync(long schemeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbScheme.html">IRedbScheme</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetSqlPreviewAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetSqlPreviewAsync__1_redb_Core_Query_Base_TreeQueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetSqlPreviewAsync``1(redb.Core.Query.Base.TreeQueryContext{``0})">
+  GetSqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1383"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Returns SQL query for tree search that will be executed (for debugging)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetSqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetSqlPreviewAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetSqlPreviewAsync__1_redb_Core_Query_QueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetSqlPreviewAsync``1(redb.Core.Query.QueryContext{``0})">
+  GetSqlPreviewAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1420"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get SQL preview for standard QueryContext (for IRedbQueryProvider compatibility)</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;string&gt; GetSqlPreviewAsync&lt;TProps&gt;(QueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetTreeGroupBySqlPreviewAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetTreeGroupBySqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetTreeGroupBySqlPreviewAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetTreeGroupBySqlPreviewAsync``1(redb.Core.Query.Base.TreeQueryContext{``0},System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest})">
+  GetTreeGroupBySqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1595"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get SQL preview for tree GROUP BY query.
+Base implementation: returns placeholder, override in Pro for actual SQL.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetTreeGroupBySqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetTreeGroupedWindowSqlPreviewAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetTreeGroupedWindowSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetTreeGroupedWindowSqlPreviewAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Grouping_GroupFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Aggregation_AggregateRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetTreeGroupedWindowSqlPreviewAsync``1(redb.Core.Query.Base.TreeQueryContext{``0},System.Collections.Generic.IEnumerable{redb.Core.Query.Grouping.GroupFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Aggregation.AggregateRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest})">
+  GetTreeGroupedWindowSqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1643"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get SQL preview for tree GroupBy + Window.
+Base implementation: returns placeholder.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetTreeGroupedWindowSqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context, IEnumerable&lt;GroupFieldRequest&gt; groupFields, IEnumerable&lt;AggregateRequest&gt; aggregations, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>groupFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Grouping.GroupFieldRequest.html">GroupFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>aggregations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Aggregation.AggregateRequest.html">AggregateRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetTreeWindowSqlPreviewAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetTreeWindowSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetTreeWindowSqlPreviewAsync__1_redb_Core_Query_Base_TreeQueryContext___0__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetTreeWindowSqlPreviewAsync``1(redb.Core.Query.Base.TreeQueryContext{``0},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String)">
+  GetTreeWindowSqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1580"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get SQL preview for tree window query.
+Base implementation: returns placeholder, override in Pro for actual SQL.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetTreeWindowSqlPreviewAsync&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context, IEnumerable&lt;WindowFieldRequest&gt; selectFields, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? frameJson = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+    <dt><code>selectFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>frameJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_GetWindowSqlPreviewAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetWindowSqlPreviewAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_GetWindowSqlPreviewAsync_System_Int64_System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFuncRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowFieldRequest__System_Collections_Generic_IEnumerable_redb_Core_Query_Window_WindowOrderRequest__System_String_System_String_System_Nullable_System_Int32__System_Nullable_System_Int32__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.GetWindowSqlPreviewAsync(System.Int64,System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFuncRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowFieldRequest},System.Collections.Generic.IEnumerable{redb.Core.Query.Window.WindowOrderRequest},System.String,System.String,System.Nullable{System.Int32},System.Nullable{System.Int32})">
+  GetWindowSqlPreviewAsync(long, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowFuncRequest&gt;, IEnumerable&lt;WindowFieldRequest&gt;, IEnumerable&lt;WindowOrderRequest&gt;, string?, string?, int?, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L264"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get SQL preview for window query (for debugging).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual Task&lt;string&gt; GetWindowSqlPreviewAsync(long schemeId, IEnumerable&lt;WindowFieldRequest&gt; selectFields, IEnumerable&lt;WindowFuncRequest&gt; windowFuncs, IEnumerable&lt;WindowFieldRequest&gt; partitionBy, IEnumerable&lt;WindowOrderRequest&gt; orderBy, string? filterJson = null, string? frameJson = null, int? take = null, int? skip = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schemeId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>selectFields</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>windowFuncs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFuncRequest.html">WindowFuncRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>partitionBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowFieldRequest.html">WindowFieldRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>orderBy</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="redb.Core.Query.Window.WindowOrderRequest.html">WindowOrderRequest</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>filterJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>frameJson</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>take</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+    <dt><code>skip</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_LoadObjectsByIdsAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.LoadObjectsByIdsAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_LoadObjectsByIdsAsync_System_Collections_Generic_List_System_Int64__System_Nullable_System_Int32__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.LoadObjectsByIdsAsync(System.Collections.Generic.List{System.Int64},System.Nullable{System.Int32})">
+  LoadObjectsByIdsAsync(List&lt;long&gt;, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1322"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load full polymorphic objects by ID list via get_object_json function.
+Used for polymorphic trees where objects can be of different types.
+Each object is deserialized to its real type based on scheme_id.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;ITreeRedbObject&gt;&gt; LoadObjectsByIdsAsync(List&lt;long&gt; objectIds, int? propsDepth = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>propsDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.ITreeRedbObject.html">ITreeRedbObject</a>&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_LoadObjectsByIdsAsync_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.LoadObjectsByIdsAsync*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_LoadObjectsByIdsAsync__1_System_Collections_Generic_List_System_Int64__System_Nullable_System_Int32__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.LoadObjectsByIdsAsync``1(System.Collections.Generic.List{System.Int64},System.Nullable{System.Int32})">
+  LoadObjectsByIdsAsync&lt;TProps&gt;(List&lt;long&gt;, int?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L1275"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load full objects by ID list via get_object_json function</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;List&lt;TreeRedbObject&lt;TProps&gt;&gt;&gt; LoadObjectsByIdsAsync&lt;TProps&gt;(List&lt;long&gt; objectIds, int? propsDepth = null) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectIds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>propsDepth</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject</a>&lt;TProps&gt;&gt;&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ShouldUseLazyLoading_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ShouldUseLazyLoading*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ShouldUseLazyLoading__1_redb_Core_Query_Base_TreeQueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ShouldUseLazyLoading``1(redb.Core.Query.Base.TreeQueryContext{``0})">
+  ShouldUseLazyLoading&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L115"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Determines if lazy loading should be used for tree query.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool ShouldUseLazyLoading&lt;TProps&gt;(TreeQueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.Base.TreeQueryContext-1.html">TreeQueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Query_Base_TreeQueryProviderBase_ShouldUseLazyLoading_" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ShouldUseLazyLoading*"></a>
+
+  <h3 id="redb_Core_Query_Base_TreeQueryProviderBase_ShouldUseLazyLoading__1_redb_Core_Query_QueryContext___0__" data-uid="redb.Core.Query.Base.TreeQueryProviderBase.ShouldUseLazyLoading``1(redb.Core.Query.QueryContext{``0})">
+  ShouldUseLazyLoading&lt;TProps&gt;(QueryContext&lt;TProps&gt;)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L98"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Determines if lazy loading should be used for this query.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool ShouldUseLazyLoading&lt;TProps&gt;(QueryContext&lt;TProps&gt; context) where TProps : class, new()</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="redb.Core.Query.QueryContext-1.html">QueryContext</a>&lt;TProps&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TProps</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Query/Base/TreeQueryProviderBase.cs/#L28" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

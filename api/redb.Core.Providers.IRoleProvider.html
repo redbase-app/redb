@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IRoleProvider </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IRoleProvider ">
+      
+      <meta name="description" content="Provider for user role management. Provides CRUD operations for roles and user-role relationship management.">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/reliktbk/redb/new/feature/redb-doc/apiSpec/new?filename=redb_Core_Providers_IRoleProvider.md&amp;value=---%0Auid%3A%20redb.Core.Providers.IRoleProvider%0Asummary%3A%20&#39;*You%20can%20override%20summary%20for%20the%20API%20here%20using%20*MARKDOWN*%20syntax&#39;%0A---%0A%0A*Please%20type%20below%20more%20information%20about%20this%20API%3A*%0A%0A">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Providers.IRoleProvider">
+
+
+
+  <h1 id="redb_Core_Providers_IRoleProvider" data-uid="redb.Core.Providers.IRoleProvider" class="text-break">
+Interface IRoleProvider  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L12"><i class="bi bi-code-slash"></i></a>
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="redb.html">redb</a>.<a class="xref" href="redb.Core.html">Core</a>.<a class="xref" href="redb.Core.Providers.html">Providers</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>redb.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Provider for user role management.
+Provides CRUD operations for roles and user-role relationship management.</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IRoleProvider</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="redb_Core_Providers_IRoleProvider_AssignUserToRoleAsync_" data-uid="redb.Core.Providers.IRoleProvider.AssignUserToRoleAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_AssignUserToRoleAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbRole_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IRoleProvider.AssignUserToRoleAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbRole,redb.Core.Models.Contracts.IRedbUser)">
+  AssignUserToRoleAsync(IRedbUser, IRedbRole, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L89"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Assign role to user.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; AssignUserToRoleAsync(IRedbUser user, IRedbRole role, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if role assigned</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_CreateRoleAsync_" data-uid="redb.Core.Providers.IRoleProvider.CreateRoleAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_CreateRoleAsync_redb_Core_Models_Roles_CreateRoleRequest_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IRoleProvider.CreateRoleAsync(redb.Core.Models.Roles.CreateRoleRequest,redb.Core.Models.Contracts.IRedbUser)">
+  CreateRoleAsync(CreateRoleRequest, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L22"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Create new role.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbRole&gt; CreateRoleAsync(CreateRoleRequest request, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>request</code> <a class="xref" href="redb.Core.Models.Roles.CreateRoleRequest.html">CreateRoleRequest</a></dt>
+    <dd><p>Role creation data</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>&gt;</dt>
+    <dd><p>Created role</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_DeleteRoleAsync_" data-uid="redb.Core.Providers.IRoleProvider.DeleteRoleAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_DeleteRoleAsync_redb_Core_Models_Contracts_IRedbRole_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IRoleProvider.DeleteRoleAsync(redb.Core.Models.Contracts.IRedbRole,redb.Core.Models.Contracts.IRedbUser)">
+  DeleteRoleAsync(IRedbRole, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L40"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete role.
+All related permissions are also deleted (cascade).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; DeleteRoleAsync(IRedbRole role, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role to delete</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if role deleted</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_GetRoleByIdAsync_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleByIdAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_GetRoleByIdAsync_System_Int64_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleByIdAsync(System.Int64)">
+  GetRoleByIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L49"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get role by ID.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbRole?&gt; GetRoleByIdAsync(long roleId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>roleId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Role ID</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>&gt;</dt>
+    <dd><p>Role or null if not found</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_GetRoleByNameAsync_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleByNameAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_GetRoleByNameAsync_System_String_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleByNameAsync(System.String)">
+  GetRoleByNameAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L56"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get role by name.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbRole?&gt; GetRoleByNameAsync(string roleName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>roleName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Role name</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>&gt;</dt>
+    <dd><p>Role or null if not found</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_GetRoleConfigurationIdAsync_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleConfigurationIdAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_GetRoleConfigurationIdAsync_System_Int64_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleConfigurationIdAsync(System.Int64)">
+  GetRoleConfigurationIdAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L169"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get role configuration ID.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;long?&gt; GetRoleConfigurationIdAsync(long roleId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>roleId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Role ID</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?&gt;</dt>
+    <dd><p>Configuration ID or null if not set</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_GetRoleCountAsync_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleCountAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_GetRoleCountAsync" data-uid="redb.Core.Providers.IRoleProvider.GetRoleCountAsync">
+  GetRoleCountAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L147"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get role count.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; GetRoleCountAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Number of roles</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_GetRoleStatisticsAsync_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleStatisticsAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_GetRoleStatisticsAsync" data-uid="redb.Core.Providers.IRoleProvider.GetRoleStatisticsAsync">
+  GetRoleStatisticsAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L160"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get role statistics (role -&gt; user count).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;Dictionary&lt;IRedbRole, int&gt;&gt; GetRoleStatisticsAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2">Dictionary</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;&gt;</dt>
+    <dd><p>Dictionary role -&gt; user count</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_GetRoleUserCountAsync_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleUserCountAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_GetRoleUserCountAsync_redb_Core_Models_Contracts_IRedbRole_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleUserCountAsync(redb.Core.Models.Contracts.IRedbRole)">
+  GetRoleUserCountAsync(IRedbRole)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L154"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get user count in role.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;int&gt; GetRoleUserCountAsync(IRedbRole role)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>Number of users in role</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_GetRoleUsersAsync_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleUsersAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_GetRoleUsersAsync_redb_Core_Models_Contracts_IRedbRole_" data-uid="redb.Core.Providers.IRoleProvider.GetRoleUsersAsync(redb.Core.Models.Contracts.IRedbRole)">
+  GetRoleUsersAsync(IRedbRole)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L121"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get role users.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;IRedbUser&gt;&gt; GetRoleUsersAsync(IRedbRole role)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a>&gt;&gt;</dt>
+    <dd><p>List of users with this role</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_GetRolesAsync_" data-uid="redb.Core.Providers.IRoleProvider.GetRolesAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_GetRolesAsync" data-uid="redb.Core.Providers.IRoleProvider.GetRolesAsync">
+  GetRolesAsync()
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L78"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get all roles.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;IRedbRole&gt;&gt; GetRolesAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>&gt;&gt;</dt>
+    <dd><p>List of all roles</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_GetUserRolesAsync_" data-uid="redb.Core.Providers.IRoleProvider.GetUserRolesAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_GetUserRolesAsync_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IRoleProvider.GetUserRolesAsync(redb.Core.Models.Contracts.IRedbUser)">
+  GetUserRolesAsync(IRedbUser)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L114"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Get user roles.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;List&lt;IRedbRole&gt;&gt; GetUserRolesAsync(IRedbUser user)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>&gt;&gt;</dt>
+    <dd><p>List of user roles</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_IsRoleNameAvailableAsync_" data-uid="redb.Core.Providers.IRoleProvider.IsRoleNameAvailableAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_IsRoleNameAvailableAsync_System_String_redb_Core_Models_Contracts_IRedbRole_" data-uid="redb.Core.Providers.IRoleProvider.IsRoleNameAvailableAsync(System.String,redb.Core.Models.Contracts.IRedbRole)">
+  IsRoleNameAvailableAsync(string, IRedbRole?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L139"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check role name availability.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; IsRoleNameAvailableAsync(string roleName, IRedbRole? excludeRole = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>roleName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Role name to check</p>
+</dd>
+    <dt><code>excludeRole</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role to exclude (for update)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if role name available</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_LoadRoleAsync_" data-uid="redb.Core.Providers.IRoleProvider.LoadRoleAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_LoadRoleAsync_System_Int64_" data-uid="redb.Core.Providers.IRoleProvider.LoadRoleAsync(System.Int64)">
+  LoadRoleAsync(long)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L64"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load role by ID (throws exception if not found).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbRole&gt; LoadRoleAsync(long roleId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>roleId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Role ID</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>&gt;</dt>
+    <dd><p>Role</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>If role not found</p>
+</dd>
+  </dl>
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_LoadRoleAsync_" data-uid="redb.Core.Providers.IRoleProvider.LoadRoleAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_LoadRoleAsync_System_String_" data-uid="redb.Core.Providers.IRoleProvider.LoadRoleAsync(System.String)">
+  LoadRoleAsync(string)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L72"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Load role by name (throws exception if not found).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbRole&gt; LoadRoleAsync(string roleName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>roleName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>Role name</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>&gt;</dt>
+    <dd><p>Role</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>If role not found</p>
+</dd>
+  </dl>
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_RemoveUserFromRoleAsync_" data-uid="redb.Core.Providers.IRoleProvider.RemoveUserFromRoleAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_RemoveUserFromRoleAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbRole_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IRoleProvider.RemoveUserFromRoleAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbRole,redb.Core.Models.Contracts.IRedbUser)">
+  RemoveUserFromRoleAsync(IRedbUser, IRedbRole, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L98"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Remove role from user.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; RemoveUserFromRoleAsync(IRedbUser user, IRedbRole role, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if role removed</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_SetRoleConfigurationAsync_" data-uid="redb.Core.Providers.IRoleProvider.SetRoleConfigurationAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_SetRoleConfigurationAsync_System_Int64_System_Nullable_System_Int64__" data-uid="redb.Core.Providers.IRoleProvider.SetRoleConfigurationAsync(System.Int64,System.Nullable{System.Int64})">
+  SetRoleConfigurationAsync(long, long?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L176"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Set role configuration.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task SetRoleConfigurationAsync(long roleId, long? configId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>roleId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Role ID</p>
+</dd>
+    <dt><code>configId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd><p>Configuration ID (RedbObject&lt;UserConfigurationProps&gt;) or null to reset</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_SetUserRolesAsync_" data-uid="redb.Core.Providers.IRoleProvider.SetUserRolesAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_SetUserRolesAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbRole___redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IRoleProvider.SetUserRolesAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbRole[],redb.Core.Models.Contracts.IRedbUser)">
+  SetUserRolesAsync(IRedbUser, IRedbRole[], IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L107"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Set user roles (replace all existing).</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; SetUserRolesAsync(IRedbUser user, IRedbRole[] roles, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>roles</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>[]</dt>
+    <dd><p>Array of roles</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if roles set</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_UpdateRoleAsync_" data-uid="redb.Core.Providers.IRoleProvider.UpdateRoleAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_UpdateRoleAsync_redb_Core_Models_Contracts_IRedbRole_System_String_redb_Core_Models_Contracts_IRedbUser_" data-uid="redb.Core.Providers.IRoleProvider.UpdateRoleAsync(redb.Core.Models.Contracts.IRedbRole,System.String,redb.Core.Models.Contracts.IRedbUser)">
+  UpdateRoleAsync(IRedbRole, string, IRedbUser?)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L31"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Update role.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;IRedbRole&gt; UpdateRoleAsync(IRedbRole role, string newName, IRedbUser? currentUser = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role to update</p>
+</dd>
+    <dt><code>newName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>New role name</p>
+</dd>
+    <dt><code>currentUser</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>Current user (for audit)</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a>&gt;</dt>
+    <dd><p>Updated role</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="redb_Core_Providers_IRoleProvider_UserHasRoleAsync_" data-uid="redb.Core.Providers.IRoleProvider.UserHasRoleAsync*"></a>
+
+  <h3 id="redb_Core_Providers_IRoleProvider_UserHasRoleAsync_redb_Core_Models_Contracts_IRedbUser_redb_Core_Models_Contracts_IRedbRole_" data-uid="redb.Core.Providers.IRoleProvider.UserHasRoleAsync(redb.Core.Models.Contracts.IRedbUser,redb.Core.Models.Contracts.IRedbRole)">
+  UserHasRoleAsync(IRedbUser, IRedbRole)
+  <a class="header-action link-secondary" title="View source" href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L129"><i class="bi bi-code-slash"></i></a>
+  </h3>
+
+  <div class="markdown level1 summary"><p>Check if user has role.</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">Task&lt;bool&gt; UserHasRoleAsync(IRedbUser user, IRedbRole role)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>user</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbUser.html">IRedbUser</a></dt>
+    <dd><p>User</p>
+</dd>
+    <dt><code>role</code> <a class="xref" href="redb.Core.Models.Contracts.IRedbRole.html">IRedbRole</a></dt>
+    <dd><p>Role</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true if user has role</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/reliktbk/redb/blob/feature/redb-doc/redb.Core/Providers/IRoleProvider.cs/#L12" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

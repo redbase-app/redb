@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace redb.Core.Models.Entities </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace redb.Core.Models.Entities ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Models.Entities">
+
+  <h1 id="redb_Core_Models_Entities" data-uid="redb.Core.Models.Entities" class="text-break">Namespace redb.Core.Models.Entities</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbList.html">RedbList</a></dt>
+      <dd><p>REDB list entity with direct data storage (Aggregate Root).
+Maps to _lists table in PostgreSQL.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbListItem.html">RedbListItem</a></dt>
+      <dd><p>REDB list item entity with direct data storage.
+Maps to _list_items table in PostgreSQL.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbObject.html">RedbObject</a></dt>
+      <dd><p>Base class for all Redb objects with access to metadata.
+Contains all fields from _objects table and methods for working with cached metadata.
+Can be used directly for Object schemes (without Props) or as base for RedbObject{TProps}.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbObjectRow.html">RedbObjectRow</a></dt>
+      <dd><p>POCO for _objects table.
+Used for direct SQL queries to objects table.
+Not to be confused with RedbObject&lt;TProps&gt; which is a domain wrapper.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbObject-1.html">RedbObject&lt;TProps&gt;</a></dt>
+      <dd><p>Generic wrapper for JSON from get_object_json with typed interface.
+Field names match JSON/DB (snake_case) to work without attributes and settings.
+Inherits from base RedbObject for API unification.
+Implements typed interface IRedbObject&lt;TProps&gt; for type safety.</p>
+<p>Object saving uses ChangeTracking strategy by default -
+compares with DB and updates only changed properties.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbPermission.html">RedbPermission</a></dt>
+      <dd><p>REDB permission entity with direct data storage.
+Maps to _permissions table in PostgreSQL.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbRole.html">RedbRole</a></dt>
+      <dd><p>REDB role entity with direct data storage.
+Maps to _roles table in PostgreSQL.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbScheme.html">RedbScheme</a></dt>
+      <dd><p>REDB scheme entity with direct data storage.
+Maps to _schemes table in PostgreSQL.
+Contains collection of structures (fields).</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbStructure.html">RedbStructure</a></dt>
+      <dd><p>REDB structure (field definition) entity with direct data storage.
+Maps to _structures table in PostgreSQL.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbType.html">RedbType</a></dt>
+      <dd><p>REDB type entity with direct data storage.
+Maps to _types table in PostgreSQL.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbUser.html">RedbUser</a></dt>
+      <dd><p>REDB user entity with direct data storage.
+Maps to _users table in PostgreSQL.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbUserRole.html">RedbUserRole</a></dt>
+      <dd><p>REDB user-role association entity with direct data storage.
+Maps to _users_roles table in PostgreSQL.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.RedbValue.html">RedbValue</a></dt>
+      <dd><p>REDB value entity with direct data storage.
+Maps to _values table in PostgreSQL.
+Stores field values for objects (EAV pattern).</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.StructureTreeBuilder.html">StructureTreeBuilder</a></dt>
+      <dd><p>Structure tree builder from flat lists</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.StructureTreeNode.html">StructureTreeNode</a></dt>
+      <dd><p>Structure tree node for hierarchical navigation
+Solves the problem of flat structure search in SaveAsync</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.TreeDiagnosticReport.html">TreeDiagnosticReport</a></dt>
+      <dd><p>Structure tree diagnostic report</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.TreeRedbObject.html">TreeRedbObject</a></dt>
+      <dd><p>Base class for REDB tree objects with hierarchy navigation
+Supports polymorphic trees - objects of different schemes in one tree
+Extends RedbObject by adding navigational properties and traversal methods</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Models.Entities.TreeRedbObject-1.html">TreeRedbObject&lt;TProps&gt;</a></dt>
+      <dd><p>ARCHITECTURAL FIX: Typed version of REDB tree object
+NEW INHERITANCE: RedbObject&lt;TProps&gt; instead of TreeRedbObject
+ADVANTAGES: Direct type casting, Props duplication elimination, no conversion
+POLYMORPHISM: Implements ITreeRedbObject for untyped operations support</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

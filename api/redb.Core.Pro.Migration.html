@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace redb.Core.Pro.Migration </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace redb.Core.Pro.Migration ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="redb.Core.Pro.Migration">
+
+  <h1 id="redb_Core_Pro_Migration" data-uid="redb.Core.Pro.Migration" class="text-break">Namespace redb.Core.Pro.Migration</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationBuilder-1.html">MigrationBuilder&lt;TProps&gt;</a></dt>
+      <dd><p>IMigrationBuilder implementation - collects migration configurations</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationDiscovery.html">MigrationDiscovery</a></dt>
+      <dd><p>Automatic migration discovery in assemblies.
+Analogue of ApplyConfigurationsFromAssembly in EF Core.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationExecutor.html">MigrationExecutor</a></dt>
+      <dd><p>Executes data migrations with support for dry-run, logging and history.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationExpressionCompiler.html">MigrationExpressionCompiler</a></dt>
+      <dd><p>Expression to SQL compiler for migrations.
+Generates UPDATE with JOIN on _values instead of PVT.</p>
+<p>Example:
+Expression: p =&gt; p.Quantity * p.Price
+SQL: UPDATE _values target SET _numeric = (
+SELECT v1._long * v2._numeric
+FROM _values v1 JOIN _values v2 ON v1._id_object = v2._id_object
+WHERE v1._id_structure = 123 AND v2._id_structure = 124
+AND v1._id_object = target._id_object
+)
+WHERE target._id_structure = 125</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationExtensions.html">MigrationExtensions</a></dt>
+      <dd><p>Extension methods for working with migrations.
+Database-agnostic: requires ISqlDialectPro to be passed.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationInfo.html">MigrationInfo</a></dt>
+      <dd><p>Found migration information</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationResult.html">MigrationResult</a></dt>
+      <dd><p>Migration execution result</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationServiceCollectionExtensions.html">MigrationServiceCollectionExtensions</a></dt>
+      <dd><p>DI registration for migration services.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationSql.html">MigrationSql</a></dt>
+      <dd><p>Migration compilation result to SQL</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.PropertyMigrationBuilder-2.html">PropertyMigrationBuilder&lt;TProps, TProp&gt;</a></dt>
+      <dd><p>IPropertyMigrationBuilder implementation</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.PropertyMigrationConfig.html">PropertyMigrationConfig</a></dt>
+      <dd><p>Migration configuration for single property</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.TypeChangeMigrationBuilder-3.html">TypeChangeMigrationBuilder&lt;TProps, TFrom, TTo&gt;</a></dt>
+      <dd><p>ITypeChangeMigrationBuilder implementation</p>
+</dd>
+    </dl>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.IMigrationBuilder-1.html">IMigrationBuilder&lt;TProps&gt;</a></dt>
+      <dd><p>Builder for configuring property migrations.
+Fluent API similar to EF Core ModelBuilder.</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.IPropertyMigrationBuilder-2.html">IPropertyMigrationBuilder&lt;TProps, TProp&gt;</a></dt>
+      <dd><p>Builder for configuring migration of specific property</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.IRedbMigration-1.html">IRedbMigration&lt;TProps&gt;</a></dt>
+      <dd><p>Migration configuration interface for Props type.
+Analogy with IEntityTypeConfiguration in EF Core.</p>
+<p>Usage example:</p>
+<pre><code class="lang-csharp">public class OrderPropsMigration : IRedbMigration&lt;OrderProps&gt;
+{
+    public void Configure(IMigrationBuilder&lt;OrderProps&gt; builder)
+    {
+        builder.Property(p =&gt; p.TotalPrice)
+            .ComputedFrom(p =&gt; p.Quantity * p.Price);
+    }
+}</code></pre>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.ITypeChangeMigrationBuilder-3.html">ITypeChangeMigrationBuilder&lt;TProps, TFrom, TTo&gt;</a></dt>
+      <dd><p>Builder for configuring type conversion</p>
+</dd>
+    </dl>
+    <h3 id="enums">
+Enums
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="redb.Core.Pro.Migration.MigrationType.html">MigrationType</a></dt>
+      <dd><p>Migration type</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
