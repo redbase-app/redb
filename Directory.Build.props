@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <Version>1.2.15</Version>
+    <Authors>RedBase</Authors>
+    <Company>RedBase</Company>
+    <Copyright>Copyright (c) 2024-2026 RedBase</Copyright>
+    <PackageProjectUrl>https://redbase.app</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

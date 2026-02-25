@@ -1,0 +1,16 @@
+labels:
+  - question
+  - discussion
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use [Discussions](https://github.com/redbase-app/redb/discussions) for questions and general topics.
+        Use this form only for issues that don't fit bug reports or feature requests.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe your question or topic
+    validations:
+      required: true
