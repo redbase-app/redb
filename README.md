@@ -632,6 +632,19 @@ REDB Pro unlocks compiled query execution, parallel materialization, deep nested
 
 ---
 
+## Contributing
+
+Contributions are welcome! We especially look for:
+- New **examples** and **tutorials**
+- **Bug reports** with minimal repro
+- **Documentation** improvements
+- **New export formats** and **templates**
+- Future **database providers** (MySQL, SQLite, Oracle) — reach out in [Discussions](https://github.com/redbase-app/redb/discussions) first
+
+Please read our [CONTRIBUTING.md](CONTRIBUTING.md) for details on the process, coding guidelines, and development setup.
+
+---
+
 ## License
 
 Core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.Export`) are MIT-licensed.
