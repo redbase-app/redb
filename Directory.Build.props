@@ -1,0 +1,29 @@
+<Project>
+  <PropertyGroup>
+    <Version>2.0.2</Version>
+    <Authors>RedBase</Authors>
+    <Company>RedBase</Company>
+    <Copyright>Copyright (c) 2024-2026 RedBase</Copyright>
+    <PackageProjectUrl>https://redbase.app</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+  <!--
+    Default to Apache-2.0 for OSS projects (any project NOT ending with .Pro
+    and not the licensing library itself). Pro projects override below.
+  -->
+  <PropertyGroup Condition="!$(MSBuildProjectName.EndsWith('.Pro')) AND '$(MSBuildProjectName)' != 'redb.Licensing'">
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+  </PropertyGroup>
+  <!-- Pro / Licensing: commercial license file is shipped with the package. -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Pro')) OR '$(MSBuildProjectName)' == 'redb.Licensing'">
+    <PackageLicenseFile>LICENSE-PRO.txt</PackageLicenseFile>
+  </PropertyGroup>
+  <!-- Pack LICENSE and NOTICE into every nupkg (Apache 2.0 § 4 attribution requirement for OSS;
+       harmless extras for Pro packages whose primary license file is LICENSE-PRO.txt). -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="\" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)LICENSE') AND '$(IsPackable)' != 'false'" />
+    <None Include="$(MSBuildThisFileDirectory)NOTICE" Pack="true" PackagePath="\" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)NOTICE') AND '$(IsPackable)' != 'false'" />
+  </ItemGroup>
+  <!-- Strong-name signing for Pro assemblies (opt-in via /p:RedbProSignAssembly=true). -->
+  <Import Project="$(MSBuildThisFileDirectory)Directory.Build.Pro.props" Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.Pro.props')" />
+</Project>

@@ -1,0 +1,1046 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Reflection;
+using redb.Core.Data;
+using redb.Core.Models.Contracts;
+using redb.Core.Models.Entities;
+using redb.Core.Providers;
+
+namespace redb.Postgres.Materialization
+{
+    /// <summary>
+    /// Материализатор Props из RedbValue записей
+    /// Прямой перевод SQL функций get_object_json и build_hierarchical_properties_optimized в C#
+    /// Работает с values из памяти БЕЗ обращений к БД
+    /// </summary>
+    public class PropsMaterializer
+    {
+        private readonly ISchemeSyncProvider _schemeSync;
+        private readonly Dictionary<long, IRedbScheme> _schemeCache;
+        private readonly Dictionary<long, (string? DbType, string? TypeSemantic)>? _typeInfoCache;
+        private readonly Dictionary<long, IRedbListItem>? _preloadedListItems;  // ⚡ НОВОЕ: предзагруженные ListItem для BULK материализации
+        
+        // === СТАТИЧЕСКИЙ ПРОВАЙДЕР СПИСКОВ (для загрузки IRedbListItem) ===
+        private static IListProvider? _globalListProvider;
+        
+        /// <summary>
+        /// Установить глобальный провайдер списков для всех PropsMaterializer
+        /// </summary>
+        public static void SetGlobalListProvider(IListProvider provider)
+        {
+            _globalListProvider = provider ?? throw new ArgumentNullException(nameof(provider));
+        }
+        
+        /// <summary>
+        /// Проверить, установлен ли глобальный провайдер списков
+        /// </summary>
+        public static bool IsListProviderAvailable => _globalListProvider != null;
+
+        public PropsMaterializer(ISchemeSyncProvider schemeSync)
+        {
+            _schemeSync = schemeSync ?? throw new ArgumentNullException(nameof(schemeSync));
+            _schemeCache = new Dictionary<long, IRedbScheme>();
+            _typeInfoCache = null;
+            _preloadedListItems = null;
+        }
+        
+        public PropsMaterializer(ISchemeSyncProvider schemeSync, Dictionary<long, IRedbScheme> preloadedSchemes)
+        {
+            _schemeSync = schemeSync ?? throw new ArgumentNullException(nameof(schemeSync));
+            _schemeCache = preloadedSchemes ?? new Dictionary<long, IRedbScheme>();
+            _typeInfoCache = null;
+            _preloadedListItems = null;
+        }
+        
+        public PropsMaterializer(ISchemeSyncProvider schemeSync, Dictionary<long, IRedbScheme> preloadedSchemes, Dictionary<long, (string? DbType, string? TypeSemantic)> typeInfoCache)
+        {
+            _schemeSync = schemeSync ?? throw new ArgumentNullException(nameof(schemeSync));
+            _schemeCache = preloadedSchemes ?? new Dictionary<long, IRedbScheme>();
+            _typeInfoCache = typeInfoCache;
+            _preloadedListItems = null;
+        }
+        
+        /// <summary>
+        /// ⚡ НОВЫЙ конструктор с предзагруженными ListItem для BULK материализации
+        /// </summary>
+        public PropsMaterializer(
+            ISchemeSyncProvider schemeSync, 
+            Dictionary<long, IRedbScheme> preloadedSchemes, 
+            Dictionary<long, (string? DbType, string? TypeSemantic)> typeInfoCache,
+            Dictionary<long, IRedbListItem> preloadedListItems)
+        {
+            _schemeSync = schemeSync ?? throw new ArgumentNullException(nameof(schemeSync));
+            _schemeCache = preloadedSchemes ?? new Dictionary<long, IRedbScheme>();
+            _typeInfoCache = typeInfoCache;
+            _preloadedListItems = preloadedListItems;  // ⚡ Используем предзагруженные ListItem
+        }
+
+        /// <summary>
+        /// Аналог get_object_json - работает с values из ПАМЯТИ!
+        /// SQL: строки 243-331 в redb_json_objects.sql
+        /// </summary>
+        public TProps GetObjectProps<TProps>(
+            long objectId,
+            List<RedbValue> allValuesForObject,
+            long schemeId,
+            int maxDepth,
+            ConcurrentBag<long> nestedObjectIdsCollector) where TProps : class, new()
+        {
+            if (maxDepth <= 0)
+            {
+                return new TProps();
+            }
+
+            // SQL строка 298-313: Группируем values по structure_id (как jsonb_object_agg)
+            var valuesByStructure = allValuesForObject
+                .GroupBy(v => v.IdStructure)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // SQL строка 316-324: Вызываем build_hierarchical_properties_optimized
+            return BuildHierarchicalPropertiesOptimized<TProps>(
+                objectId,
+                null, // parent_structure_id = NULL для корня
+                schemeId,
+                valuesByStructure,
+                allValuesForObject,
+                maxDepth,
+                null, // array_index = NULL
+                null, // parent_value_id = NULL
+                nestedObjectIdsCollector);
+        }
+
+        /// <summary>
+        /// Аналог build_hierarchical_properties_optimized
+        /// SQL: строки 8-240 в redb_json_objects.sql
+        /// </summary>
+        private TProps BuildHierarchicalPropertiesOptimized<TProps>(
+            long objectId,
+            long? parentStructureId,
+            long schemeId,
+            Dictionary<long, List<RedbValue>> valuesByStructure,
+            List<RedbValue> allValues,
+            int maxDepth,
+            string? arrayIndex,
+            long? parentValueId,
+            ConcurrentBag<long> nestedObjectIdsCollector) where TProps : class, new()
+        {
+            // SQL строка 28-31: Защита от рекурсии
+            if (maxDepth <= 0)
+            {
+                return new TProps();
+            }
+
+            var result = new TProps();
+
+            // SQL строка 34-47: Получаем структуры схемы
+            // ВАЖНО: используем preloaded cache, НЕ обращаемся к _schemeSync в параллельном коде!
+            if (!_schemeCache.TryGetValue(schemeId, out var scheme))
+            {
+                // Fallback: если схемы нет в кеше (не должно происходить в параллельном коде)
+                return result;
+            }
+            
+            if (scheme == null)
+            {
+                return result;
+            }
+
+            var structures = scheme.Structures
+                .Where(s => s.IdParent == parentStructureId)
+                .OrderBy(s => s.Order ?? 0)
+                .ThenBy(s => s.Id)
+                .ToList();
+
+            // SQL строка 48: FOR LOOP по структурам
+            foreach (var structure in structures)
+            {
+                
+                // SQL строка 50-73: Получаем значение из предзагруженных данных
+                // 🔥 FIX: Передаём parentValueId для корректного поиска полей внутри элементов массива
+                List<RedbValue> currentValues = GetValuesForStructure(
+                    structure.Id, arrayIndex, parentValueId, valuesByStructure, allValues);
+
+                // Получаем typeInfo заранее для всех случаев (для передачи в SetPropertyValue)
+                var typeInfo = GetTypeInfo(structure, currentValues);
+
+                // SQL строка 102-230: CASE для определения значения поля
+                object? fieldValue = null;
+
+                if (structure.CollectionType == Core.Utils.RedbTypeIds.Array)
+                {
+                    // SQL строка 104-179: Массивы
+                    fieldValue = BuildArrayField(
+                        objectId, structure, schemeId, valuesByStructure,
+                        allValues, maxDepth, parentValueId, nestedObjectIdsCollector, typeof(TProps));
+                }
+                else if (structure.CollectionType == Core.Utils.RedbTypeIds.Dictionary)
+                {
+                    // Dictionary<K,V> fields
+                    fieldValue = BuildDictionaryField(
+                        objectId, structure, schemeId, valuesByStructure,
+                        allValues, maxDepth, parentValueId, nestedObjectIdsCollector, typeof(TProps));
+                }
+                else
+                {
+                    if (typeInfo.TypeSemantic == "_RObject")
+                    {
+                        // SQL строка 183-188: Object ссылка на другой объект
+                        // 🔥 FIX: Читаем из Object (специальное поле для FK на _objects), не из Long!
+                        var nestedId = currentValues?.FirstOrDefault()?.Object;
+                        if (nestedId.HasValue)
+                        {
+                            nestedObjectIdsCollector.Add(nestedId.Value); // thread-safe!
+                            // Создаем placeholder с id для последующей подстановки
+                            var propertyType = typeof(TProps).GetProperty(structure.Name)?.PropertyType;
+                            if (propertyType != null && propertyType.IsGenericType && 
+                                propertyType.GetGenericTypeDefinition() == typeof(RedbObject<>))
+                            {
+                                // Создаем RedbObject<TNestedProps> с только id
+                                var placeholder = Activator.CreateInstance(propertyType);
+                                propertyType.GetProperty("id")?.SetValue(placeholder, nestedId.Value);
+                                fieldValue = placeholder;
+                            }
+                        }
+                    }
+                    else if (typeInfo.TypeSemantic == "Object")
+                    {
+                        // SQL строка 191-205: Class поле с иерархическими дочерними полями
+                        var currentValue = currentValues?.FirstOrDefault();
+                        if (currentValue?.Guid.HasValue == true)
+                        {
+                            // Class поле действительно НЕ NULL - строим объект
+                            var propertyType = typeof(TProps).GetProperty(structure.Name)?.PropertyType;
+                            if (propertyType != null)
+                            {
+                                var buildMethod = typeof(PropsMaterializer)
+                                    .GetMethod(nameof(BuildHierarchicalPropertiesOptimized), 
+                                        BindingFlags.NonPublic | BindingFlags.Instance)?
+                                    .MakeGenericMethod(propertyType);
+
+                                // ВАЖНО: передаём currentValue.Id как parentValueId для дочерних элементов!
+                                fieldValue = buildMethod?.Invoke(this, new object?[]
+                                {
+                                    objectId, structure.Id, schemeId, valuesByStructure,
+                                    allValues, maxDepth - 1, arrayIndex, currentValue.Id,
+                                    nestedObjectIdsCollector
+                                });
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // SQL строка 208-229: Примитивные типы
+                        fieldValue = ExtractSimpleValue(typeInfo.DbType, typeInfo.TypeSemantic, currentValues?.FirstOrDefault());
+                    }
+                }
+
+                // SQL строка 232-234: Добавляем поле в результат только если значение не NULL
+                if (fieldValue != null)
+                {
+                    SetPropertyValue(result, structure.Name, fieldValue, typeInfo.DbType, typeInfo.TypeSemantic);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Обработка массивов (простых типов, Class, RedbObjectRow)
+        /// SQL: строки 104-179 в redb_json_objects.sql
+        /// </summary>
+        private object? BuildArrayField(
+            long objectId,
+            IRedbStructure structure,
+            long schemeId,
+            Dictionary<long, List<RedbValue>> valuesByStructure,
+            List<RedbValue> allValues,
+            int maxDepth,
+            long? parentValueId,
+            ConcurrentBag<long> nestedObjectIdsCollector,
+            Type propsType)
+        {
+            // Получаем values для этой структуры чтобы извлечь type info
+            valuesByStructure.TryGetValue(structure.Id, out var structureValues);
+            var typeInfo = GetTypeInfo(structure, structureValues ?? new List<RedbValue>());
+
+            // SQL строка 78-99: Получаем ID базовой записи массива
+            long? baseArrayValueId = GetBaseArrayValueId(objectId, structure.Id, parentValueId, allValues);
+
+            if (typeInfo.TypeSemantic == "Object")
+            {
+                // SQL строка 107-136: Массив Class полей - рекурсивно
+                var arrayElements = allValues
+                    .Where(v => v.IdStructure == structure.Id &&
+                               !string.IsNullOrEmpty(v.ArrayIndex) &&
+                               (!baseArrayValueId.HasValue || v.ArrayParentId == baseArrayValueId))
+                    .OrderBy(v => int.TryParse(v.ArrayIndex, out var idx) ? idx : 0)
+                    .ToList();
+
+                if (!arrayElements.Any())
+                {
+                    // 🔥 FIX: Пустой массив = [] (не NULL!)
+                    var emptyElementType = GetArrayElementType(propsType, structure.Name);
+                    var emptyListType = typeof(List<>).MakeGenericType(emptyElementType);
+                    return Activator.CreateInstance(emptyListType);
+                }
+
+                var elementType = GetArrayElementType(propsType, structure.Name);
+                var listType = typeof(List<>).MakeGenericType(elementType);
+                var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
+
+                foreach (var element in arrayElements)
+                {
+                    var buildMethod = typeof(PropsMaterializer)
+                        .GetMethod(nameof(BuildHierarchicalPropertiesOptimized),
+                            BindingFlags.NonPublic | BindingFlags.Instance)?
+                        .MakeGenericMethod(elementType);
+
+                    var elementObj = buildMethod?.Invoke(this, new object?[]
+                    {
+                        objectId, structure.Id, schemeId, valuesByStructure,
+                        allValues, maxDepth - 1, element.ArrayIndex, element.Id,
+                        nestedObjectIdsCollector
+                    });
+
+                    if (elementObj != null)
+                    {
+                        list.Add(elementObj);
+                    }
+                }
+
+                return list;
+            }
+            else
+            {
+                // SQL строка 138-178: Массивы простых типов
+                var arrayValues = allValues
+                    .Where(v => v.IdStructure == structure.Id &&
+                               !string.IsNullOrEmpty(v.ArrayIndex) &&
+                               (!baseArrayValueId.HasValue || v.ArrayParentId == baseArrayValueId))
+                    .OrderBy(v => int.TryParse(v.ArrayIndex, out var idx) ? idx : 0)
+                    .ToList();
+
+                if (!arrayValues.Any())
+                {
+                    // 🔥 FIX: Пустой массив = [] (не NULL!)
+                    var emptyElementType = typeInfo.TypeSemantic == "_RObject" 
+                        ? GetArrayElementType(propsType, structure.Name)
+                        : GetSimpleTypeForDbType(typeInfo.DbType);
+                    var emptyListType = typeof(List<>).MakeGenericType(emptyElementType);
+                    return Activator.CreateInstance(emptyListType);
+                }
+
+                if (typeInfo.TypeSemantic == "_RObject")
+                {
+                    // SQL строка 145-146: Массив _RObject ссылок
+                    // 🔥 FIX: Читаем из Object (специальное поле для FK на _objects), не из Long!
+                    var ids = arrayValues.Select(v => v.Object).Where(id => id.HasValue).Select(id => id!.Value).ToList();
+                   //Console.WriteLine($"[BuildArrayField] 🔗 Массив RedbObjectRow: structure={structure.Name}, ids=[{string.Join(",", ids)}]");
+                    foreach (var id in ids)
+                    {
+                        nestedObjectIdsCollector.Add(id);
+                    }
+                    
+                    // Создаем placeholder list для последующей подстановки
+                    var elementType = GetArrayElementType(propsType, structure.Name);
+                   //Console.WriteLine($"[BuildArrayField]   elementType={elementType?.Name}, isRedbObject={elementType?.IsGenericType == true && elementType.GetGenericTypeDefinition() == typeof(RedbObject<>)}");
+                    if (elementType.IsGenericType && elementType.GetGenericTypeDefinition() == typeof(RedbObject<>))
+                    {
+                        var listType = typeof(List<>).MakeGenericType(elementType);
+                        var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
+                        
+                        foreach (var id in ids)
+                        {
+                            var placeholder = Activator.CreateInstance(elementType);
+                            elementType.GetProperty("id")?.SetValue(placeholder, id);
+                            list.Add(placeholder);
+                        }
+                        
+                       //Console.WriteLine($"[BuildArrayField]   ✅ Создан placeholder list: count={list.Count}");
+                        return list;
+                    }
+                    
+                   //Console.WriteLine($"[BuildArrayField]   ❌ elementType не RedbObject, возвращаем null");
+                    return null;
+                }
+                else
+                {
+                    // SQL строка 147-162: Простые типы
+                    var actualDbType = typeInfo.DbType;
+                    
+                    // ⚠️ ИСПРАВЛЕНИЕ: Если TypeSemantic="_RListItem", но DbType="Long" (старая схема), исправляем
+                    if (actualDbType == "Long" && typeInfo.TypeSemantic == "_RListItem")
+                    {
+                       //System.Console.WriteLine($"[BuildArrayField] ⚠️ ОБНАРУЖЕНА ПРОБЛЕМА: TypeSemantic=_RListItem, но DbType=Long (старая схема). Исправляем на ListItem.");
+                        actualDbType = "ListItem";
+                    }
+                    
+                    // ⚡ Определяем тип элемента массива
+                    Type elementType;
+                    
+                    // ОСОБЫЙ СЛУЧАЙ: Для ListItem ВСЕГДА используем IRedbListItem (интерфейс)
+                    // Это гарантирует совместимость с предзагруженными данными
+                    if (actualDbType == "ListItem")
+                    {
+                        elementType = typeof(IRedbListItem);
+                    }
+                    else
+                    {
+                        // Для остальных типов: используем тип из DbType (long, double, string и т.д.)
+                        elementType = GetSimpleTypeForDbType(actualDbType);
+                       //System.Console.WriteLine($"[BuildArrayField] Простой массив: DbType={actualDbType}, elementType={elementType.Name}");
+                    }
+                    
+                    var listType = typeof(List<>).MakeGenericType(elementType);
+                    var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
+                    
+                   //System.Console.WriteLine($"[BuildArrayField] Создан list type={listType.Name}");
+
+                    // ⭐ ОПТИМИЗАЦИЯ для ListItem: используем предзагруженные данные
+                    if (actualDbType == "ListItem")
+                    {
+                       //System.Console.WriteLine($"[BuildArrayField] Обработка ListItem массива");
+                        
+                        var listItemIds = arrayValues
+                            .Where(v => v.ListItem.HasValue)
+                            .Select(v => v.ListItem!.Value)
+                            .ToList();
+                        
+                       //System.Console.WriteLine($"[BuildArrayField] Найдено {listItemIds.Count} ListItem IDs: {string.Join(", ", listItemIds)}");
+                        
+                        if (listItemIds.Any())
+                        {
+                            // ⚡ Приоритет 1: Используем предзагруженные ListItem (BULK материализация)
+                            if (_preloadedListItems != null)
+                            {
+                               //System.Console.WriteLine($"[BuildArrayField] ✅ Используем предзагруженные ListItem (count={_preloadedListItems.Count})");
+                                
+                                // Заполняем список из предзагруженных данных (БЕЗ запросов к БД!)
+                                foreach (var val in arrayValues.OrderBy(v => v.ArrayIndex))
+                                {
+                                    if (val.ListItem.HasValue && _preloadedListItems.TryGetValue(val.ListItem.Value, out var listItem))
+                                    {
+                                       //System.Console.WriteLine($"[BuildArrayField] Добавляем предзагруженный ListItem: Index={val.ArrayIndex}, ID={val.ListItem.Value}, Value={listItem.Value}");
+                                        list.Add(listItem);
+                                    }
+                                    else
+                                    {
+                                       //System.Console.WriteLine($"[BuildArrayField] ⚠️ ListItem ID={val.ListItem.Value} НЕ найден в предзагруженных!");
+                                    }
+                                }
+                                
+                               //System.Console.WriteLine($"[BuildArrayField] ✅ Массив ListItem заполнен из предзагруженных, count={list.Count}");
+                            }
+                            // ⚠️ Fallback: загружаем из _globalListProvider (если нет предзагруженных)
+                            else if (_globalListProvider != null)
+                            {
+                               //System.Console.WriteLine($"[BuildArrayField] ⚠️ Fallback: загрузка ListItem через _globalListProvider (последовательно)");
+                                
+                                // Последовательная загрузка для избежания DbContext threading issues
+                                var listItemsDict = new Dictionary<long, IRedbListItem?>();
+                                foreach (var id in listItemIds.Distinct())
+                                {
+                                   //System.Console.WriteLine($"[BuildArrayField] Загрузка ListItem ID={id}");
+                                    var item = Task.Run(async () => await _globalListProvider.GetListItemAsync(id)).GetAwaiter().GetResult();
+                                    if (item != null)
+                                    {
+                                        listItemsDict[id] = item;
+                                       //System.Console.WriteLine($"[BuildArrayField] ✅ Загружен ListItem ID={id}, Value={item.Value}");
+                                    }
+                                }
+                                
+                                // Заполняем список в правильном порядке
+                                foreach (var val in arrayValues.OrderBy(v => v.ArrayIndex))
+                                {
+                                    if (val.ListItem.HasValue && listItemsDict.TryGetValue(val.ListItem.Value, out var listItem))
+                                    {
+                                        list.Add(listItem);
+                                    }
+                                }
+                                
+                               //System.Console.WriteLine($"[BuildArrayField] ✅ Массив ListItem заполнен, count={list.Count}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Обычная обработка для других типов
+                        foreach (var val in arrayValues)
+                        {
+                            var simpleValue = ExtractSimpleValue(typeInfo.DbType, typeInfo.TypeSemantic, val);
+                            if (simpleValue != null)
+                            {
+                                list.Add(simpleValue);
+                            }
+                        }
+                    }
+
+                    return list;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Build Dictionary field from RedbValue records.
+        /// Dictionary elements stored with serialized keys in _array_index.
+        /// </summary>
+        private object? BuildDictionaryField(
+            long objectId,
+            IRedbStructure structure,
+            long schemeId,
+            Dictionary<long, List<RedbValue>> valuesByStructure,
+            List<RedbValue> allValues,
+            int maxDepth,
+            long? parentValueId,
+            ConcurrentBag<long> nestedObjectIdsCollector,
+            Type propsType)
+        {
+            // Get values for this structure to extract type info
+            valuesByStructure.TryGetValue(structure.Id, out var structureValues);
+            var typeInfo = GetTypeInfo(structure, structureValues ?? new List<RedbValue>());
+            
+            // Get base record for Dictionary (same logic as Array)
+            long? baseDictValueId = GetBaseArrayValueId(objectId, structure.Id, parentValueId, allValues);
+            
+            // Get property type to determine Dictionary<TKey, TValue> types
+            var property = propsType.GetProperty(structure.Name);
+            if (property == null || property.GetIndexParameters().Length > 0)
+                return null;
+            
+            var propertyType = property.PropertyType;
+            if (!propertyType.IsGenericType) return null;
+            
+            var genericDef = propertyType.GetGenericTypeDefinition();
+            if (genericDef != typeof(Dictionary<,>) && genericDef != typeof(IDictionary<,>)) 
+                return null;
+            
+            var genericArgs = propertyType.GetGenericArguments();
+            if (genericArgs.Length != 2) return null;
+            
+            var keyType = genericArgs[0];
+            var valueType = genericArgs[1];
+            
+            // Create concrete Dictionary<TKey, TValue> instance
+            var dictType = typeof(Dictionary<,>).MakeGenericType(keyType, valueType);
+            var dict = Activator.CreateInstance(dictType);
+            if (dict == null) return null;
+            
+            // Get Add method for the concrete Dictionary type
+            var addMethod = dictType.GetMethod("Add", new[] { keyType, valueType });
+            if (addMethod == null) return null;
+            
+            // Get Dictionary elements (records with ArrayIndex = serialized key)
+            var dictElements = allValues
+                .Where(v => v.IdStructure == structure.Id &&
+                           !string.IsNullOrEmpty(v.ArrayIndex) &&
+                           (!baseDictValueId.HasValue || v.ArrayParentId == baseDictValueId))
+                .ToList();
+            
+            if (!dictElements.Any())
+            {
+                return dict; // Return empty Dictionary
+            }
+            
+            foreach (var element in dictElements)
+            {
+                // Deserialize key from ArrayIndex
+                var key = Core.Utils.RedbKeySerializer.DeserializeObject(element.ArrayIndex!, keyType);
+                if (key == null) continue;
+                
+                object? value = null;
+                
+                // Check if value is RedbObject<T> - either by TypeSemantic or by C# type
+                var isRedbObjectValue = typeInfo.TypeSemantic == "_RObject" || 
+                    (valueType.IsGenericType && valueType.GetGenericTypeDefinition() == typeof(RedbObject<>));
+                
+                if (isRedbObjectValue)
+                {
+                    // Dictionary<K, RedbObject<T>> - collect nested object IDs for later loading
+                    if (element.Object.HasValue)
+                    {
+                        nestedObjectIdsCollector.Add(element.Object.Value);
+                        
+                        // Create placeholder RedbObject with only id set
+                        var placeholder = Activator.CreateInstance(valueType);
+                        valueType.GetProperty("id")?.SetValue(placeholder, element.Object.Value);
+                        value = placeholder;
+                    }
+                }
+                else if (typeInfo.TypeSemantic == "Object")
+                {
+                    // Dictionary<K, ClassType> - build class from child values
+                    var buildMethod = typeof(PropsMaterializer)
+                        .GetMethod(nameof(BuildHierarchicalPropertiesOptimized),
+                            BindingFlags.NonPublic | BindingFlags.Instance)?
+                        .MakeGenericMethod(valueType);
+
+                    value = buildMethod?.Invoke(this, new object?[]
+                    {
+                        objectId, structure.Id, schemeId, valuesByStructure,
+                        allValues, maxDepth - 1, element.ArrayIndex, element.Id,
+                        nestedObjectIdsCollector
+                    });
+                }
+                else
+                {
+                    // Dictionary<K, PrimitiveType> - extract simple value
+                    value = ExtractSimpleValue(typeInfo.DbType, typeInfo.TypeSemantic, element);
+                    
+                    // Convert value to target type if needed (e.g., long to decimal)
+                    if (value != null && value.GetType() != valueType && !valueType.IsAssignableFrom(value.GetType()))
+                    {
+                        try
+                        {
+                            value = Convert.ChangeType(value, valueType, CultureInfo.InvariantCulture);
+                        }
+                        catch
+                        {
+                            // If conversion fails, skip this element
+                            continue;
+                        }
+                    }
+                }
+                
+                if (value != null)
+                {
+                    // Invoke Add method with proper types
+                    addMethod.Invoke(dict, new[] { key, value });
+                }
+            }
+            
+            return dict;
+        }
+
+        /// <summary>
+        /// Извлечение простых типов из RedbValue
+        /// SQL: строки 208-229 в redb_json_objects.sql
+        /// </summary>
+        private object? ExtractSimpleValue(string? dbType, string? typeSemantic, RedbValue? value)
+        {
+            if (value == null) return null;
+
+            //System.Console.WriteLine($"[PropsMaterializer.ExtractSimpleValue] 🔍 Извлечение значения: dbType={dbType}, IdStructure={value.IdStructure}, ListItem={value.ListItem}, Long={value.Long}");
+
+            // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Если dbType=Long, но value.ListItem.HasValue, то это ListItem, сохраненный в старую схему
+            if (dbType == "Long" && value.ListItem.HasValue)
+            {
+                //System.Console.WriteLine($"[PropsMaterializer.ExtractSimpleValue] ⚠️ ОБНАРУЖЕН ListItem в поле с dbType=Long (старая схема). Загружаем как ListItem.");
+                return ExtractListItemValue(value);
+            }
+
+            return dbType switch
+            {
+                "String" => value.String,
+                "Long" => value.Long,
+                "Boolean" => value.Boolean,
+                // DateTime: конвертируем DateTimeOffset → DateTime (UTC)
+                "DateTime" => value.DateTimeOffset.HasValue 
+                    ? Core.Utils.DateTimeConverter.DenormalizeFromStorage(value.DateTimeOffset.Value)
+                    : (DateTime?)null,
+                "DateTimeOffset" => value.DateTimeOffset,
+                "Double" => value.Double,
+                "Numeric" => value.Numeric,
+                "Guid" => value.Guid,
+                "ByteArray" => value.ByteArray,
+                "ListItem" => ExtractListItemValue(value),
+                "Object" => value.Object,
+                _ => null
+            };
+        }
+
+        /// <summary>
+        /// Извлечение значения ListItem с логированием
+        /// </summary>
+        private IRedbListItem? ExtractListItemValue(RedbValue? value)
+        {
+            if (value == null || !value.ListItem.HasValue)
+            {
+                //System.Console.WriteLine($"[PropsMaterializer.ExtractListItemValue] ℹ️ value.ListItem не имеет значения (NULL)");
+                return null;
+            }
+            
+            //System.Console.WriteLine($"[PropsMaterializer.ExtractListItemValue] 🔍 ListItem обнаружен: Id={value.ListItem.Value}, _globalListProvider={(_globalListProvider != null ? "available" : "NULL")}");
+            
+            if (_globalListProvider == null)
+            {
+                //System.Console.WriteLine($"[PropsMaterializer.ExtractListItemValue] ⚠️ _globalListProvider NULL, возвращаю null");
+                return null;
+            }
+            
+            //System.Console.WriteLine($"[PropsMaterializer.ExtractListItemValue] 🚀 Вызов GetListItemAsync через Task.Run...");
+            
+            // ⚠️ КРИТИЧНО: Task.Run для избежания deadlock при вызове EF Core async из sync контекста
+            var listItem = Task.Run(async () => 
+            {
+                //System.Console.WriteLine($"[PropsMaterializer.ExtractListItemValue/Task.Run] 📞 Внутри Task.Run, вызываем GetListItemAsync({value.ListItem.Value})");
+                var result = await _globalListProvider.GetListItemAsync(value.ListItem.Value);
+                //System.Console.WriteLine($"[PropsMaterializer.ExtractListItemValue/Task.Run] ✅ GetListItemAsync завершен, result={result?.Id}");
+                return result;
+            }).GetAwaiter().GetResult();
+            
+            //System.Console.WriteLine($"[PropsMaterializer.ExtractListItemValue] ✅ ListItem загружен: Id={listItem?.Id}, Value={listItem?.Value}, IdObject={listItem?.IdObject}");
+            return listItem;
+        }
+
+        /// <summary>
+        /// Получение values для структуры с учетом array_index и parent_value_id
+        /// SQL: строки 50-73 в redb_json_objects.sql
+        /// </summary>
+        private List<RedbValue> GetValuesForStructure(
+            long structureId,
+            string? arrayIndex,
+            long? parentValueId,
+            Dictionary<long, List<RedbValue>> valuesByStructure,
+            List<RedbValue> allValues)
+        {
+            if (parentValueId.HasValue)
+            {
+                // 🔥 FIX: Для полей ВНУТРИ элемента массива - ищем по ArrayParentId
+                // Это касается полей как Details[j].Key, Details[j].Value
+                return allValues
+                    .Where(v => v.IdStructure == structureId && v.ArrayParentId == parentValueId.Value)
+                    .ToList();
+            }
+            else if (string.IsNullOrEmpty(arrayIndex))
+            {
+                // Для обычных полей или корневых полей массива
+                if (valuesByStructure.TryGetValue(structureId, out var values))
+                {
+                    return values;
+                }
+                return new List<RedbValue>();
+            }
+            else
+            {
+                // Для элементов массива - ищем с конкретным array_index
+                return allValues
+                    .Where(v => v.IdStructure == structureId && v.ArrayIndex == arrayIndex)
+                    .ToList();
+            }
+        }
+
+        /// <summary>
+        /// Получение ID базовой записи массива
+        /// SQL: строки 78-99 в redb_json_objects.sql
+        /// </summary>
+        private long? GetBaseArrayValueId(long objectId, long structureId, long? parentValueId, List<RedbValue> allValues)
+        {
+            if (parentValueId == null)
+            {
+                // Корневой массив: _array_parent_id должен быть NULL
+                return allValues
+                    .FirstOrDefault(v => v.IdObject == objectId &&
+                                        v.IdStructure == structureId &&
+                                        v.ArrayIndex == null &&
+                                        v.ArrayParentId == null)?.Id;
+            }
+            else
+            {
+                // Вложенный массив: _array_parent_id должен совпадать с parentValueId
+                return allValues
+                    .FirstOrDefault(v => v.IdObject == objectId &&
+                                        v.IdStructure == structureId &&
+                                        v.ArrayIndex == null &&
+                                        v.ArrayParentId == parentValueId)?.Id;
+            }
+        }
+
+        /// <summary>
+        /// Установка значения свойства через Reflection
+        /// КРИТИЧНО: любая ошибка прерывает процесс!
+        /// </summary>
+        private void SetPropertyValue<TProps>(TProps target, string propertyName, object value, string? dbType = null, string? typeSemantic = null)
+        {
+            var property = typeof(TProps).GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+            if (property != null && property.CanWrite)
+            {
+                // Преобразование типов если необходимо
+                var convertedValue = ConvertValue(value, property.PropertyType, dbType, typeSemantic);
+                property.SetValue(target, convertedValue);
+                // ОШИБКИ НЕ ЛОВИМ - пусть летит наверх и прерывает всё!
+            }
+        }
+
+        /// <summary>
+        /// Преобразование значения к целевому типу
+        /// Использует TypeSemantic из БД для правильной конверсии (Enum, TimeSpan и т.д.)
+        /// </summary>
+        private object? ConvertValue(object value, Type targetType, string? dbType = null, string? typeSemantic = null)
+        {
+            if (value == null) return null;
+
+            var valueType = value.GetType();
+            if (targetType.IsAssignableFrom(valueType))
+            {
+                return value;
+            }
+
+            // ✅ Обработка RedbObject<T> references (когда value это long ID, а target это RedbObject<T>)
+            if (value is long nestedId && targetType.IsGenericType && 
+                targetType.GetGenericTypeDefinition() == typeof(RedbObject<>))
+            {
+                // Создаем placeholder с ID для последующей загрузки
+                var placeholder = Activator.CreateInstance(targetType);
+                targetType.GetProperty("id")?.SetValue(placeholder, nestedId);
+                return placeholder;
+            }
+
+            // ✅ ПРИОРИТЕТ: используем TypeSemantic из БД (_types.type) для специальных типов
+            if (!string.IsNullOrEmpty(typeSemantic))
+            {
+                switch (typeSemantic)
+                {
+                    case "Enum":
+                        // Enum может храниться как String ("High") или Long (2)
+                        if (targetType.IsEnum)
+                        {
+                            if (dbType == "String" && value is string enumString)
+                            {
+                                return Enum.Parse(targetType, enumString);
+                            }
+                            else if ((dbType == "Long" || dbType == "bigint") && value is long enumLong)
+                            {
+                                return Enum.ToObject(targetType, enumLong);
+                            }
+                            else if (value is int enumInt)
+                            {
+                                return Enum.ToObject(targetType, enumInt);
+                            }
+                        }
+                        break;
+                    
+                    case "TimeSpan":
+                        if (value is string timeSpanString)
+                        {
+                            return TimeSpan.Parse(timeSpanString);
+                        }
+                        break;
+                    
+                    case "TimeOnly":
+                        if (value is string timeOnlyString)
+                        {
+                            return TimeOnly.Parse(timeOnlyString);
+                        }
+                        else if (value is DateTime dateTime)
+                        {
+                            return TimeOnly.FromDateTime(dateTime);
+                        }
+                        else if (value is DateTimeOffset dateTimeOffset)
+                        {
+                            return TimeOnly.FromDateTime(dateTimeOffset.DateTime);
+                        }
+                        break;
+                    
+                    case "DateOnly":
+                        if (value is string dateOnlyString)
+                        {
+                            return DateOnly.Parse(dateOnlyString);
+                        }
+                        else if (value is DateTime dateTime2)
+                        {
+                            return DateOnly.FromDateTime(dateTime2);
+                        }
+                        else if (value is DateTimeOffset dateTime3)
+                        {
+                            return DateOnly.FromDateTime(dateTime3.UtcDateTime);
+                        }
+                        break;
+                }
+            }
+
+            // ✅ Обработка char (String → char[0])
+            if (targetType == typeof(char) && value is string charString && charString.Length > 0)
+            {
+                return charString[0];
+            }
+
+            // Обработка коллекций (List, Array)
+            if (typeof(System.Collections.IEnumerable).IsAssignableFrom(valueType) && 
+                valueType != typeof(string))
+            {
+                // Если value это коллекция, а target это массив
+                if (targetType.IsArray)
+                {
+                    var elementType = targetType.GetElementType();
+                    if (elementType != null && value is System.Collections.IList list)
+                    {
+                        var array = Array.CreateInstance(elementType, list.Count);
+                        for (int i = 0; i < list.Count; i++)
+                        {
+                            // ВАЖНО: конвертируем каждый элемент (например long → double)
+                            var element = list[i];
+                            if (element != null && !elementType.IsAssignableFrom(element.GetType()))
+                            {
+                                try
+                                {
+                                    element = ConvertValue(element, elementType, dbType, typeSemantic);
+                                }
+                                catch
+                                {
+                                    // Если не получилось сконвертировать, пропускаем элемент
+                                    element = elementType.IsValueType ? Activator.CreateInstance(elementType) : null;
+                                }
+                            }
+                            array.SetValue(element, i);
+                        }
+                        return array;
+                    }
+                }
+                
+                // Если value это List<T>, а target тоже List<T>, проверяем типы
+                if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(List<>))
+                {
+                    var targetElementType = targetType.GetGenericArguments()[0];
+                    if (value is System.Collections.IList list)
+                    {
+                        // 🔥 FIX: Проверяем совместимость типа СПИСКА, не только элементов
+                        // List<IRedbListItem> нельзя присвоить к List<RedbListItem> даже если элементы совместимы!
+                        bool listTypeCompatible = targetType.IsAssignableFrom(valueType);
+                        
+                        // Проверяем, нужна ли конвертация элементов
+                        bool needsElementConversion = false;
+                        if (list.Count > 0 && list[0] != null)
+                        {
+                            needsElementConversion = !targetElementType.IsAssignableFrom(list[0].GetType());
+                        }
+                        
+                        // Нужна конвертация если: типы списков несовместимы ИЛИ элементы нужно конвертировать
+                        if (!listTypeCompatible || needsElementConversion)
+                        {
+                            var listType = typeof(List<>).MakeGenericType(targetElementType);
+                            var newList = (System.Collections.IList)Activator.CreateInstance(listType)!;
+                            
+                            foreach (var item in list)
+                            {
+                                try
+                                {
+                                    var converted = item != null && !targetElementType.IsAssignableFrom(item.GetType())
+                                        ? ConvertValue(item, targetElementType, dbType, typeSemantic)
+                                        : item;
+                                    newList.Add(converted);
+                                }
+                                catch
+                                {
+                                    // Пропускаем элементы, которые не удалось сконвертировать
+                                }
+                            }
+                            return newList;
+                        }
+                    }
+                }
+                
+                // Если типы совместимы, просто возвращаем
+                return value;
+            }
+
+            // Обработка Nullable types
+            var underlyingType = Nullable.GetUnderlyingType(targetType);
+            if (underlyingType != null)
+            {
+                // Рекурсивно конвертируем в underlying тип с сохранением typeSemantic
+                return ConvertValue(value, underlyingType, dbType, typeSemantic);
+            }
+
+            // ✅ FALLBACK для Enum (если TypeSemantic не был передан из БД)
+            if (targetType.IsEnum)
+            {
+                if (value is string enumString)
+                {
+                    return Enum.Parse(targetType, enumString);
+                }
+                else if (value is long enumLong)
+                {
+                    return Enum.ToObject(targetType, enumLong);
+                }
+                else if (value is int enumInt)
+                {
+                    return Enum.ToObject(targetType, enumInt);
+                }
+            }
+
+            // ✅ Специальная обработка DateTimeOffset → DateTime
+            // DateTimeOffset не реализует IConvertible, поэтому Convert.ChangeType не работает
+            if (value is DateTimeOffset dateTimeOffsetValue && targetType == typeof(DateTime))
+            {
+                // ✅ Используем централизованный конвертер: DateTimeOffset → DateTime (UTC)
+                return Core.Utils.DateTimeConverter.DenormalizeFromStorage(dateTimeOffsetValue);
+            }
+
+            // Fallback: стандартная конвертация через Convert.ChangeType
+            return Convert.ChangeType(value, targetType);
+        }
+
+        /// <summary>
+        /// Получение информации о типе из структуры
+        /// Сначала ищем в preloaded кеше типов, потом fallback на RedbValue.StructureNavigation
+        /// </summary>
+        private (string? DbType, string? TypeSemantic) GetTypeInfo(IRedbStructure structure, List<RedbValue> currentValues)
+        {
+            // Use preloaded type dictionary from scheme (no Include needed!)
+            if (_typeInfoCache != null && _typeInfoCache.TryGetValue(structure.Id, out var typeInfo))
+            {
+                return typeInfo;
+            }
+            
+            // If unable to get - return null
+            // IMPORTANT: Do NOT access _schemeSync in parallel code!
+            return (null, null);
+        }
+
+        /// <summary>
+        /// Получение типа элемента массива через рефлексию
+        /// </summary>
+        private Type GetArrayElementType(Type propsType, string propertyName)
+        {
+            // Находим свойство по имени
+            var property = propsType.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+            if (property == null)
+            {
+                return typeof(object); // Fallback если свойство не найдено
+            }
+
+            var propertyType = property.PropertyType;
+
+            // Проверяем массив: Contact[] или RedbObject<T>[]
+            if (propertyType.IsArray)
+            {
+                return propertyType.GetElementType() ?? typeof(object);
+            }
+
+            // Проверяем List<T>: List<Contact> или List<RedbObject<T>>
+            if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(List<>))
+            {
+                return propertyType.GetGenericArguments()[0];
+            }
+
+            // Fallback
+            return typeof(object);
+        }
+
+        /// <summary>
+        /// Получение C# типа для DbType
+        /// </summary>
+        private Type GetSimpleTypeForDbType(string? dbType)
+        {
+            return dbType switch
+            {
+                "String" => typeof(string),
+                "Long" => typeof(long),
+                "Boolean" => typeof(bool),
+                "DateTime" => typeof(DateTimeOffset),        // ⭐ ИСПРАВЛЕНО (был DateTime)
+                "DateTimeOffset" => typeof(DateTimeOffset),  // ⭐ ДОБАВЛЕНО
+                "Double" => typeof(double),
+                "Numeric" => typeof(decimal),                // ⭐ ДОБАВЛЕНО
+                "Guid" => typeof(Guid),
+                "ByteArray" => typeof(byte[]),
+                "ListItem" => typeof(IRedbListItem),        // ⭐ ИЗМЕНЕНО: возвращаем IRedbListItem вместо long
+                "Object" => typeof(long),                    // ⭐ ДОБАВЛЕНО (ID)
+                _ => typeof(object)
+            };
+        }
+    }
+}
+
