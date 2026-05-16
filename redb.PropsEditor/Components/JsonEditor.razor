@@ -1,0 +1,46 @@
+@using Microsoft.FluentUI.AspNetCore.Components
+
+@* Fallback JSON editor for complex types *@
+
+<div class="json-editor">
+    <FluentTextArea Value="@Value"
+                    ValueChanged="HandleChange"
+                    Rows="8"
+                    ReadOnly="@IsReadOnly"
+                    Style="width: 100%; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem;" />
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="color: #dc3545; font-size: 0.85rem; margin-top: 0.25rem;">
+            @errorMessage
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Value { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> OnValueChanged { get; set; }
+
+    [Parameter]
+    public bool IsReadOnly { get; set; }
+
+    private string? errorMessage;
+
+    private async Task HandleChange(string value)
+    {
+        errorMessage = null;
+
+        // Validate JSON
+        try
+        {
+            System.Text.Json.JsonDocument.Parse(value);
+            await OnValueChanged.InvokeAsync(value);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            errorMessage = $"Invalid JSON: {ex.Message}";
+        }
+    }
+}
