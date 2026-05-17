@@ -26,6 +26,8 @@ No Entity Framework. No migrations. No 40-table Include chains. Just C# classes 
 | Learn curve | DbContext, Fluent API, migrations, conventions | One interface: `IRedbService`. One attribute: `[RedbScheme]` |
 | Forgot Include? | Runtime crash or silent null | Impossible — Props are always loaded |
 
+> **Strong typing — real columns, not JSON blobs.** Every property of your `*Props` class maps to a dedicated typed column with a FK constraint and an index. `string` → `nvarchar`, `decimal` → `numeric(18,4)`, `DateTime` → `timestamptz`, arrays and dictionaries → normalised rows. Your data is queryable, filterable, and aggregatable at the SQL level — no `JSON_VALUE` hacks, no full-table JSON scans, no cast errors at runtime.
+
 ---
 
 ## Quick Start
