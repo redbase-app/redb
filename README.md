@@ -1,6 +1,6 @@
-# RedBase — Data Platform for .NET
+# RedBase — typed object storage for .NET. Schema = C# class. Zero migrations. Full LINQ. Postgres & MSSQL.
 
-**SQL speed. NoSQL flexibility. Pure C# schemas. Zero migrations.**
+**Trees, lists, aggregations, windows — one LINQ API.**
 
 RedBase is a data platform for .NET that stores typed objects in a relational backend (PostgreSQL, Microsoft SQL Server). You define schemas as plain C# classes — RedBase handles storage, indexing, querying, trees, lists, aggregation, and window functions through a single LINQ-style API.
 
