@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Text.Json;
 using redb.Core.Query.Aggregation;
+using redb.Core.Query.QueryExpressions;
 using redb.Core.Query.Utils;
 
 namespace redb.Core.Query.Grouping;
@@ -15,8 +16,11 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
     private readonly IRedbQueryProvider _provider;
     private readonly long _schemeId;
     private readonly string? _filterJson;
+    private readonly FilterExpression? _filter;
     private readonly Expression _arraySelector;
     private readonly Expression _keySelector;
+    private string? _havingJson;
+    private readonly List<LambdaExpression> _havingPredicates = new();
     
     public RedbArrayGroupedQueryable(
         IRedbQueryProvider provider,
@@ -24,10 +28,22 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         string? filterJson,
         Expression<Func<TProps, IEnumerable<TItem>>> arraySelector,
         Expression<Func<TItem, TKey>> keySelector)
+        : this(provider, schemeId, filterJson, null, arraySelector, keySelector)
+    {
+    }
+
+    public RedbArrayGroupedQueryable(
+        IRedbQueryProvider provider,
+        long schemeId,
+        string? filterJson,
+        FilterExpression? filter,
+        Expression<Func<TProps, IEnumerable<TItem>>> arraySelector,
+        Expression<Func<TItem, TKey>> keySelector)
     {
         _provider = provider;
         _schemeId = schemeId;
         _filterJson = filterJson;
+        _filter = filter;
         _arraySelector = arraySelector;
         _keySelector = keySelector;
     }
@@ -46,8 +62,12 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
             groupFields[0].Alias = keyAlias;
         }
         
-        var jsonResult = await _provider.ExecuteArrayGroupedAggregateAsync(
-            _schemeId, arrayPath, groupFields, aggregations, _filterJson);
+        var havingJson = BuildHavingJson();
+        var jsonResult = _filter != null
+            ? await _provider.ExecuteArrayGroupedAggregateAsync(
+                _schemeId, arrayPath, groupFields, aggregations, _filter, havingJson)
+            : await _provider.ExecuteArrayGroupedAggregateAsync(
+                _schemeId, arrayPath, groupFields, aggregations, _filterJson, havingJson);
         
         if (jsonResult == null) return new List<TResult>();
         return MaterializeResults<TResult>(jsonResult, selector);
@@ -76,8 +96,12 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         var groupFields = ParseGroupFields();
         var aggregations = new[] { new AggregateRequest { FieldPath = "*", Function = AggregateFunction.Count, Alias = "cnt" } };
         
-        var jsonResult = await _provider.ExecuteArrayGroupedAggregateAsync(
-            _schemeId, arrayPath, groupFields, aggregations, _filterJson);
+        var havingJson = BuildHavingJson();
+        var jsonResult = _filter != null
+            ? await _provider.ExecuteArrayGroupedAggregateAsync(
+                _schemeId, arrayPath, groupFields, aggregations, _filter, havingJson)
+            : await _provider.ExecuteArrayGroupedAggregateAsync(
+                _schemeId, arrayPath, groupFields, aggregations, _filterJson, havingJson);
         
         if (jsonResult == null) return 0;
         return jsonResult.RootElement.GetArrayLength();
@@ -110,6 +134,55 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         Action<IGroupedWindowSpec<TKey, TItem>> windowConfig)
     {
         throw new NotSupportedException("WithWindow is not supported for array GroupBy. Use regular GroupBy instead.");
+    }
+
+    /// <inheritdoc />
+    public IRedbGroupedQueryable<TKey, TItem> Having(
+        Expression<Func<IRedbGrouping<TKey, TItem>, bool>> predicate)
+    {
+        if (predicate is null) throw new ArgumentNullException(nameof(predicate));
+        _havingPredicates.Add(predicate);
+        _havingJson = null;
+        return this;
+    }
+
+    private string? BuildHavingJson()
+    {
+        if (_havingJson != null) return _havingJson;
+        if (_havingPredicates.Count == 0) return null;
+
+        if (_havingPredicates.Count == 1)
+        {
+            var single = (Expression<Func<IRedbGrouping<TKey, TItem>, bool>>)_havingPredicates[0];
+            _havingJson = HavingPredicateParser.ToJson(single);
+            return _havingJson;
+        }
+
+        var param = Expression.Parameter(typeof(IRedbGrouping<TKey, TItem>), "g");
+        Expression body = ReplaceParam((Expression<Func<IRedbGrouping<TKey, TItem>, bool>>)_havingPredicates[0], param);
+        for (int i = 1; i < _havingPredicates.Count; i++)
+        {
+            var nextBody = ReplaceParam((Expression<Func<IRedbGrouping<TKey, TItem>, bool>>)_havingPredicates[i], param);
+            body = Expression.AndAlso(body, nextBody);
+        }
+        var combined = Expression.Lambda<Func<IRedbGrouping<TKey, TItem>, bool>>(body, param);
+        _havingJson = HavingPredicateParser.ToJson(combined);
+        return _havingJson;
+    }
+
+    private static Expression ReplaceParam(
+        Expression<Func<IRedbGrouping<TKey, TItem>, bool>> lambda,
+        ParameterExpression newParam)
+    {
+        return new ParameterReplacer(lambda.Parameters[0], newParam).Visit(lambda.Body)!;
+    }
+
+    private sealed class ParameterReplacer : ExpressionVisitor
+    {
+        private readonly ParameterExpression _from;
+        private readonly ParameterExpression _to;
+        public ParameterReplacer(ParameterExpression from, ParameterExpression to) { _from = from; _to = to; }
+        protected override Expression VisitParameter(ParameterExpression node) => node == _from ? _to : base.VisitParameter(node);
     }
     
     private string ExtractArrayPath()

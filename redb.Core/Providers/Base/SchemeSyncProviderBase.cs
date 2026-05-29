@@ -166,6 +166,24 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
             if (idsToDelete.Count > 0)
             {
+                if (Logger != null)
+                {
+                    var namesToDelete = existingStructures
+                        .Where(s => idsToDelete.Contains(s.Id))
+                        .Select(s => $"{s.Id}:{s.Name}")
+                        .ToList();
+
+                    Logger.LogWarning(
+                        "REDB schema sync: removing {Count} structure(s) from scheme '{SchemeName}' (id={SchemeId}): [{Items}]. " +
+                        "This is a destructive DDL operation. On PostgreSQL the FK `_values._id_structure -> _structures._id` " +
+                        "is ON DELETE CASCADE; on MSSQL the equivalent effect is produced by the INSTEAD OF DELETE trigger " +
+                        "TR__structures__cascade_values. In both backends every `_values` row referencing these structures " +
+                        "will be silently deleted. " +
+                        "Set RedbServiceConfiguration.DefaultStrictDeleteExtra=false (or pass strictDeleteExtra:false) " +
+                        "to skip destructive sync \u2014 recommended for rolling/blue-green deployments.",
+                        idsToDelete.Count, scheme.Name, scheme.Id, string.Join(", ", namesToDelete));
+                }
+
                 deletedCount = await Context.ExecuteAsync(Sql.Structures_DeleteByIds(idsToDelete));
             }
         }
@@ -202,7 +220,13 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         var alias = attr?.Alias;
         
         var scheme = await EnsureSchemeFromTypeInternalAsync(typeof(TProps), alias);
-        var structures = await SyncStructuresFromTypeAsync<TProps>(scheme, strictDeleteExtra: true);
+        // Honor the configured policy. Default value of DefaultStrictDeleteExtra is true,
+        // so behavior is unchanged for users on the default config. Users who explicitly
+        // set the flag to false (or pick the Development/HighPerformance/Migration presets)
+        // now actually get the non-destructive sync they asked for \u2014 required for safe
+        // rolling/blue-green deployments where old and new app versions share a database.
+        var structures = await SyncStructuresFromTypeAsync<TProps>(
+            scheme, strictDeleteExtra: Configuration.DefaultStrictDeleteExtra);
         
         // Reload scheme from DB to get current state (including updated hash),
         // attach structures, and cache for subsequent queries

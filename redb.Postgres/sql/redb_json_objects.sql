@@ -583,6 +583,95 @@ ListItem with _id_object (base fields of linked object)
 Relational arrays of all types
 Optimal for objects with 10+ fields and arrays.';
 
+-- ============================================================================
+-- BULK get_objects_json: single-pass batch loader for many object IDs.
+-- ----------------------------------------------------------------------------
+-- Replaces the legacy "unnest($1::bigint[]) + get_object_json(id, N)" pattern
+-- used by C# LazyPropsLoader.LoadPropsForManyAsync. The legacy pattern made
+-- one full plpgsql invocation per object (EXISTS + base SELECT + _values
+-- SELECT, then recursion), producing 3*N round-trips. This bulk variant does
+-- one scan of _objects, one scan of _values grouped by _id_object, then a
+-- single LEFT JOIN that materializes hierarchical properties per row inside
+-- one execution plan.
+-- ============================================================================
+DROP FUNCTION IF EXISTS get_objects_json(bigint[], integer) CASCADE;
+
+CREATE OR REPLACE FUNCTION get_objects_json(
+    p_ids bigint[],
+    p_max_depth integer DEFAULT 10
+) RETURNS TABLE("Id" bigint, "JsonData" text)
+LANGUAGE 'sql'
+COST 200
+VOLATILE
+AS $BODY$
+    WITH bases AS (
+        SELECT
+            o._id,
+            o._id_scheme,
+            jsonb_build_object(
+                'id', o._id,
+                'name', o._name,
+                'scheme_id', o._id_scheme,
+                'scheme_name', sc._name,
+                'parent_id', o._id_parent,
+                'owner_id', o._id_owner,
+                'who_change_id', o._id_who_change,
+                'date_create', o._date_create,
+                'date_modify', o._date_modify,
+                'date_begin', o._date_begin,
+                'date_complete', o._date_complete,
+                'key', o._key,
+                'value_long', o._value_long,
+                'value_string', o._value_string,
+                'value_guid', o._value_guid,
+                'note', o._note,
+                'value_bool', o._value_bool,
+                'value_double', o._value_double,
+                'value_numeric', o._value_numeric,
+                'value_datetime', o._value_datetime,
+                'value_bytes', o._value_bytes,
+                'hash', o._hash
+            ) AS base
+        FROM _objects o
+        JOIN _schemes sc ON sc._id = o._id_scheme
+        WHERE o._id = ANY(p_ids)
+    ),
+    grouped_values AS (
+        SELECT v._id_object AS oid, array_agg(v) AS vs
+        FROM _values v
+        WHERE v._id_object = ANY(p_ids)
+        GROUP BY v._id_object
+    )
+    SELECT
+        b._id AS "Id",
+        (
+            b.base || jsonb_build_object(
+                'properties',
+                CASE
+                    WHEN p_max_depth <= 0 THEN NULL
+                    WHEN g.vs IS NULL THEN NULL
+                    ELSE COALESCE(
+                        build_hierarchical_properties_optimized(
+                            b._id, NULL, b._id_scheme, g.vs, p_max_depth, NULL, NULL
+                        ),
+                        '{}'::jsonb
+                    )
+                END
+            )
+        )::text AS "JsonData"
+    FROM bases b
+    LEFT JOIN grouped_values g ON g.oid = b._id;
+$BODY$;
+
+COMMENT ON FUNCTION get_objects_json(bigint[], integer) IS
+'Bulk JSON materializer for a set of object IDs. Single-plan replacement for
+"SELECT get_object_json(id, N) FROM unnest($1::bigint[])". Aggregates _values
+once with GROUP BY _id_object, joins to _objects + _schemes, then calls
+build_hierarchical_properties_optimized per row from in-memory array. Returns
+rows compatible with the C# ObjectJsonResult DTO ("Id", "JsonData"). Honors
+max_depth = 0 (base fields only, properties=null) and absent _values rows
+(properties=null) the same way as get_object_json.';
+
 -- ===== SIMPLE VIEW FOR OBJECTS WITH JSON =====
 
 -- Drop existing view if exists

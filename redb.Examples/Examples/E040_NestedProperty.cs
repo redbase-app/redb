@@ -22,8 +22,8 @@ public class E040_NestedProperty : ExampleBase
             .Take(100);
 
         // Uncomment to see generated SQL:
-        // var sql = await query.ToSqlStringAsync();
-        // Console.WriteLine(sql);
+        var sql = await query.ToSqlStringAsync();
+        Console.WriteLine(sql);
 
         var result = await query.ToListAsync();
         sw.Stop();

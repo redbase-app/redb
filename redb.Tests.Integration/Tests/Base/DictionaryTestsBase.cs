@@ -25,6 +25,7 @@ public abstract class DictionaryTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.PhoneDirectory!.ContainsKey("desk"))
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();
@@ -39,6 +40,7 @@ public abstract class DictionaryTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.BonusByYear![2023] > 5000m)
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();
@@ -53,6 +55,7 @@ public abstract class DictionaryTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.OfficeLocations!["HQ"].City == "New York")
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();
@@ -68,6 +71,7 @@ public abstract class DictionaryTestsBase
         var reviewKey = (Year: 2024, Quarter: "Q1");
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.PerformanceReviews![reviewKey] == "Excellent")
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();

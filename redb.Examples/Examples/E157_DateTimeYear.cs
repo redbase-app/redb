@@ -19,16 +19,18 @@ public class E157_DateTimeYear : ExampleBase
         var sw = Stopwatch.StartNew();
 
         var currentYear = DateTime.UtcNow.Year;
+        Console.WriteLine($"Current Year: {currentYear}$");
 
         // Find employees created in the current year
         // Uses base field DateCreate (not Props) via WhereRedb
         var query = redb.Query<EmployeeProps>()
             .WhereRedb(o => o.DateCreate.Year == currentYear)
+            .Where(e => e.Age > 30)
             .Take(100);
 
         // Uncomment to see generated SQL (contains EXTRACT):
-        // var sql = await query.ToSqlStringAsync();
-        // Console.WriteLine(sql);
+        var sql = await query.ToSqlStringAsync();
+        Console.WriteLine("Generated SQL:\n" + sql);
 
         var results = await query.ToListAsync();
         var totalCount = await redb.Query<EmployeeProps>()

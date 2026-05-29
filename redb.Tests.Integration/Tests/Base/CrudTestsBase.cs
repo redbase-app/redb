@@ -147,12 +147,8 @@ public abstract class CrudTestsBase
             .Cast<RedbObject<SimpleProps>>()
             .ToList();
 
-        var ids = new List<long>();
-        foreach (var obj in objects)
-        {
-            obj.id = await Redb.SaveAsync(obj);
-            ids.Add(obj.id);
-        }
+        var ids = await Redb.SaveAsync(objects);
+        for (int i = 0; i < objects.Count; i++) objects[i].id = ids[i];
 
         var count = await Redb.Query<SimpleProps>()
             .Where(s => s.Title.Contains("Bulk-"))
@@ -164,13 +160,11 @@ public abstract class CrudTestsBase
     [Fact]
     public async Task Delete_Batch_RemovesAll()
     {
-        var ids = new List<long>();
-        for (int i = 0; i < 5; i++)
-        {
-            var obj = TestDataFactory.CreateSimple($"BatchDel-{i}");
-            obj.id = await Redb.SaveAsync(obj);
-            ids.Add(obj.id);
-        }
+        var objects = Enumerable.Range(0, 5)
+            .Select(i => TestDataFactory.CreateSimple($"BatchDel-{i}"))
+            .Cast<RedbObject<SimpleProps>>()
+            .ToList();
+        var ids = await Redb.SaveAsync(objects);
 
         var deleted = await Redb.DeleteAsync(ids);
 

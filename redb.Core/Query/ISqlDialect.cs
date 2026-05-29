@@ -1135,6 +1135,140 @@ public interface ISqlDialect
     /// </summary>
     string Query_TreeSqlPreviewBaseFunction();
     
+    // ============================================================
+    // === v2-pvt MODULE (free Postgres only, phase 1) ===
+    // ------------------------------------------------------------
+    // Two-step search pipeline:
+    //   1. BUILD: ask the database to generate an _id-list SQL via
+    //      pvt_build_query_sql(...) — returned as plain text.
+    //   2. EXECUTE: the client (C#/Python/Go) wraps that text with
+    //      a materializer (get_object_json), COUNT(*), EXISTS(...) or
+    //      a projection JOIN and executes the wrapped SQL.
+    //
+    // Dialects that don't support v2-pvt MUST return null from all
+    // methods in this block. A null return is the explicit "no PVT"
+    // signal — there is no fallback flag, no try/catch on the hot
+    // path. The dispatch happens once per query call.
+    // ============================================================
+    
+    /// <summary>
+    /// Bare SQL function name returning the inner _id-list SQL string.
+    /// PostgreSQL: "pvt_build_query_sql". Return null when the dialect
+    /// has no v2-pvt module deployed (e.g. MSSql phase 1).
+    /// </summary>
+    string? Query_BuildPvtSqlFunction();
+    
+    /// <summary>
+    /// Builds the full SELECT statement that invokes pvt_build_query_sql.
+    /// Scalar arguments are inlined safely (no user-controlled strings);
+    /// only the three jsonb arguments are exposed as binding placeholders:
+    ///   $1 = filter      (jsonb)
+    ///   $2 = order       (jsonb)
+    ///   $3 = distinct_on (jsonb) — array of {field|$expr} entries; NULL when absent.
+    /// All may be NULL — the caller should pass DBNull when absent.
+    /// Returns null when v2-pvt is not supported.
+    /// </summary>
+    string? Query_BuildPvtSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false);
+    
+    /// <summary>
+    /// Wraps the inner _id-list SQL with the system materializer to
+    /// produce a result-set of object JSON. Returns null when v2-pvt
+    /// is not supported. PostgreSQL:
+    ///   SELECT get_object_json(t._id, {maxDepth})::text AS "Value"
+    ///   FROM ({innerSql}) t
+    /// </summary>
+    string? Query_WrapPvtWithObjectJson(string innerSql, int maxDepth);
+    
+    /// <summary>
+    /// Wraps the inner _id-list SQL with COUNT(*).
+    /// Returns null when v2-pvt is not supported.
+    /// </summary>
+    string? Query_WrapPvtWithCount(string innerSql);
+    
+    /// <summary>
+    /// Wraps the inner _id-list SQL with EXISTS(...).
+    /// Returns null when v2-pvt is not supported.
+    /// </summary>
+    string? Query_WrapPvtWithExists(string innerSql);
+    
+    /// <summary>
+    /// Bare SQL function name returning the deployed v2-pvt module
+    /// semver string (e.g. "0.1.0"). Used by RedbServiceBase.InitializeAsync
+    /// to enforce major-match + minor-compatibility. Returns null when
+    /// the dialect does not require a v2-pvt deployment check.
+    /// </summary>
+    string? Query_PvtModuleVersionFunction();
+
+    /// <summary>
+    /// Semver string the shipped v2-pvt bundle for this dialect declares.
+    /// Compared exactly against the value returned by
+    /// <see cref="Query_PvtModuleVersionFunction"/> at startup; any
+    /// mismatch triggers redeploy of <see cref="RedbServiceBase"/>'s
+    /// embedded bundle. Bump this string whenever any *.sql file under
+    /// the dialect's v2-pvt folder changes (together with the
+    /// `pvt_module_version()` literal inside `00_module_init.sql`).
+    /// Returns null for dialects that do not ship a v2-pvt module.
+    /// </summary>
+    string? Query_PvtRequiredVersion();
+
+    // ------------------------------------------------------------
+    // Native PVT projection orchestrator (pvt_build_projection_sql).
+    // Drives the .Select(...)/Distinct() shape directly in SQL: the
+    // outer SELECT yields the requested scalar columns (one per
+    // projection entry) instead of materializing full objects.
+    //
+    // Dialects that have no v2-pvt projection support MUST throw
+    // NotSupportedException from these methods. The caller dispatches
+    // via Query_BuildPvtProjectionSqlFunction() returning non-null.
+    // ------------------------------------------------------------
+
+    /// <summary>
+    /// Bare SQL function name returning the projection SELECT string.
+    /// PostgreSQL: "pvt_build_projection_sql". Return null when the
+    /// dialect has no native PVT projection (projection then falls
+    /// back to the standard PVT full-object path or to legacy SQL).
+    /// </summary>
+    string? Query_BuildPvtProjectionSqlFunction();
+
+    /// <summary>
+    /// Builds the full SELECT statement that invokes
+    /// pvt_build_projection_sql. Scalar arguments are inlined safely;
+    /// jsonb arguments are exposed as bound placeholders:
+    ///   $1 = projection  (jsonb)   — non-empty array, required
+    ///   $2 = filter      (jsonb)   — nullable
+    ///   $3 = order       (jsonb)   — nullable
+    ///   $4 = distinct_on (jsonb)   — nullable; required when hasDistinctOn
+    /// Returns null when native PVT projection is not supported.
+    /// </summary>
+    string? Query_BuildPvtProjectionSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false);
+
+    /// <summary>
+    /// Wraps the projection inner SQL into a result-set of JSON rows
+    /// shaped as <c>{"id": &lt;_id&gt;, "properties": { ...projected columns... }}</c>.
+    /// The inner SQL MUST contain an <c>_id</c> column (the caller adds
+    /// it explicitly to the projection JSON unless DISTINCT collapses it).
+    /// When <paramref name="includeId"/> is false the wrapper synthesizes
+    /// id=0 and treats every inner column as a projected property.
+    /// Returns null when native PVT projection is not supported.
+    /// </summary>
+    string? Query_WrapPvtProjectionRowsAsJson(string innerSql, bool includeId);
+    
     // =====================================================
     // SOFT DELETE METHODS
     // =====================================================

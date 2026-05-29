@@ -812,22 +812,32 @@ public class MsSqlDialect : ISqlDialect
     // ============================================================
     // === QUERY PROVIDER SQL ===
     // ============================================================
-    
-    // MSSQL: Full version (8 params) delegates to _base internally
-    public string Query_SearchObjectsFunction() => "dbo.search_objects_with_facets";
-    
-    // MSSQL: Base version (7 params) for lazy loading
-    public string Query_SearchObjectsBaseFunction() => "dbo.search_objects_with_facets_base";
-    
-    public string Query_SearchObjectsProjectionByPathsFunction() => "dbo.search_objects_with_projection_by_paths";
-    
-    public string Query_SearchObjectsProjectionByIdsFunction() => "dbo.search_objects_with_projection_by_ids";
-    
-    // MSSQL: Full version with Props (uses get_object_json internally)
-    public string Query_SearchTreeObjectsFunction() => "dbo.search_tree_objects_with_facets";
-    
-    // MSSQL: Base version without Props (for lazy loading)
-    public string Query_SearchTreeObjectsBaseFunction() => "dbo.search_tree_objects_with_facets_base";
+    // Legacy SP-based search path is removed. MSSql free path must use the
+    // v2-pvt pipeline (see redb.MSSql/sql/v2-pvt/). Throwing here makes any
+    // regression on MSSql free immediately visible in tests, mirroring the
+    // PostgreSQL pattern in PostgreSqlDialect.cs.
+    // MSSql Pro overrides the provider methods and never touches these.
+    // ------------------------------------------------------------
+    private const string LegacyMsSqlRemovedMsg =
+        "Legacy MSSql SQL path is removed. MSSql free provider must use the v2-pvt pipeline.";
+
+    public string Query_SearchObjectsFunction() =>
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (search_objects_with_facets)");
+
+    public string Query_SearchObjectsBaseFunction() =>
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (search_objects_with_facets_base)");
+
+    public string Query_SearchObjectsProjectionByPathsFunction() =>
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (search_objects_with_projection_by_paths)");
+
+    public string Query_SearchObjectsProjectionByIdsFunction() =>
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (search_objects_with_projection_by_ids)");
+
+    public string Query_SearchTreeObjectsFunction() =>
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (search_tree_objects_with_facets)");
+
+    public string Query_SearchTreeObjectsBaseFunction() =>
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (search_tree_objects_with_facets_base)");
     
     /// <summary>
     /// MSSQL uses EXEC and OPENJSON for JSON parameters.
@@ -864,41 +874,40 @@ public class MsSqlDialect : ISqlDialect
     public string Query_BigintArrayCast() => "";
     
     public string Query_ProjectionByPathsTemplate() =>
-        "EXEC dbo.search_objects_with_projection_by_paths @p0, @p1, @p2, @p3, @p4, @p5, @p6";
-    
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (projection_by_paths template)");
+
     public string Query_ProjectionByIdsTemplate(string structureIdsArray) =>
-        $"EXEC dbo.search_objects_with_projection_by_ids @p0, @p1, '{structureIdsArray}', @p2, @p3, @p4, @p5";
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (projection_by_ids template)");
     
     public string Query_CheckPermissionSql() =>
         "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.get_user_permissions_for_object(@p0, @p1) WHERE can_select = 1) THEN 1 ELSE 0 END as has_permission";
     
     public string Query_AggregateBatchPreviewSql() =>
-        "EXEC dbo.aggregate_batch_preview @p0, @p1, @p2";
-    
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (aggregate_batch_preview)");
+
     public string Query_AggregateFieldSql() =>
-        "EXEC dbo.aggregate_field @p0, @p1, @p2, @p3";
-    
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (aggregate_field)");
+
     public string Query_SqlPreviewTemplate() =>
         "EXEC {0} @p0, @p1, @p2, @p3, @p4, @p5, @p6";
-    
+
     public string Query_AggregateBatchSql() =>
-        "EXEC dbo.aggregate_batch @p0, @p1, @p2";
-    
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (aggregate_batch)");
+
     /// <summary>
-    /// Simple search for Delete operations - uses search_objects_with_facets with minimal params.
-    /// Returns JSON with {objects: [{id:...},...], total_count:...}
+    /// Simple search for Delete operations - LEGACY. MSSql free must migrate to PVT pipeline.
     /// </summary>
     public string Query_SearchObjectsSimpleSql() =>
-        "EXEC dbo.search_objects_with_facets @p0, @p1, NULL, 0, NULL, 10, 0, 0";
-    
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (search_objects_simple)");
+
     public string Query_AggregateGroupedSql() =>
-        "EXEC dbo.aggregate_grouped @p0, @p1, @p2, @p3";
-    
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (aggregate_grouped)");
+
     public string Query_AggregateArrayGroupedSql() =>
-        "EXEC dbo.aggregate_array_grouped @p0, @p1, @p2, @p3, @p4";
-    
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (aggregate_array_grouped)");
+
     public string Query_WindowSql() =>
-        "EXEC dbo.query_with_window @p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7";
+        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (query_with_window)");
     
     /// <summary>
     /// For Tree procedures, we use temp table to capture EXEC result and extract total_count.
@@ -1010,6 +1019,85 @@ public class MsSqlDialect : ISqlDialect
     public string Query_TreeSqlPreviewFunction() => "dbo.get_search_tree_sql_preview_base";
     
     public string Query_TreeSqlPreviewBaseFunction() => "dbo.get_search_tree_sql_preview_base";
+    
+    // ============================================================
+    // === v2-pvt MODULE ENTRY-POINTS (NOT SUPPORTED, phase 1) ===
+    // MSSql free still runs the legacy search SQL functions. When the
+    // v2-pvt SQL module gets a T-SQL port these methods will start
+    // returning real SQL; until then they return null so the dispatcher
+    // in QueryProviderBase routes to the legacy search path.
+    // ============================================================
+    
+    public string? Query_BuildPvtSqlFunction() => "dbo.pvt_build_query_sql";
+
+    public string? Query_BuildPvtSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var limitArg    = limit.HasValue ? limit.Value.ToString(inv) : "NULL";
+        var offsetArg   = offset.ToString(inv);
+        var maxDepthArg = maxDepth.ToString(inv);
+        var distinctArg = distinct ? "1" : "0";
+        var modeArg     = sourceMode == "tree" ? "N'tree'" : "N'flat'";
+        // Slice does not support tree mode; treeIds always NULL.
+        const string treeArg = "NULL";
+        var distinctOnArg = hasDistinctOn ? "$3" : "NULL";
+        // pvt_build_query_sql(scheme_id, filter, limit, offset, order, max_depth,
+        //                     distinct, source_mode, tree_ids, include_seed, polymorphic, distinct_on)
+        return "SELECT dbo.pvt_build_query_sql("
+             + schemeId.ToString(inv)
+             + ", $1, " + limitArg
+             + ", " + offsetArg
+             + ", $2, " + maxDepthArg
+             + ", " + distinctArg
+             + ", " + modeArg
+             + ", " + treeArg
+             + ", 0"   // include_seed
+             + ", 1"   // polymorphic
+             + ", " + distinctOnArg
+             + ") AS [Value]";
+    }
+
+    public string? Query_WrapPvtWithObjectJson(string innerSql, int maxDepth) =>
+        $"SELECT dbo.get_object_json(t.[_id], {maxDepth.ToString(System.Globalization.CultureInfo.InvariantCulture)}) AS [Value] FROM ({innerSql}) t";
+
+    public string? Query_WrapPvtWithCount(string innerSql) =>
+        $"SELECT CAST(COUNT(*) AS BIGINT) AS [Value] FROM ({innerSql}) t";
+
+    public string? Query_WrapPvtWithExists(string innerSql) =>
+        $"SELECT CASE WHEN EXISTS ({innerSql}) THEN 1 ELSE 0 END AS [Value]";
+
+    public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
+
+    // Bump together with the literal in redb.MSSql/sql/v2-pvt/00_module_init.sql.
+    public string? Query_PvtRequiredVersion() => "0.1.2";
+
+    // Native PVT projection orchestrator — not supported on MSSql (yet).
+    // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these
+    // throws should never fire in practice; they exist to surface a
+    // misconfigured caller path immediately.
+    public string? Query_BuildPvtProjectionSqlFunction() => null;
+
+    public string? Query_BuildPvtProjectionSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false)
+        => throw new NotSupportedException("Native PVT projection (pvt_build_projection_sql) is not supported on MSSql yet.");
+
+    public string? Query_WrapPvtProjectionRowsAsJson(string innerSql, bool includeId)
+        => throw new NotSupportedException("Native PVT projection (pvt_build_projection_sql) is not supported on MSSql yet.");
     
     // ============================================================
     // === SOFT DELETE ===

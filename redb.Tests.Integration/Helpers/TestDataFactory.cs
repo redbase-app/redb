@@ -134,13 +134,7 @@ public static class TestDataFactory
     public static async Task<List<long>> SeedEmployees(IRedbService redb, int count = 20)
     {
         var employees = Enumerable.Range(0, count).Select(i => CreateEmployee(i)).ToList();
-        var ids = new List<long>();
-        foreach (var emp in employees)
-        {
-            emp.id = await redb.SaveAsync(emp);
-            ids.Add(emp.id);
-        }
-        return ids;
+        return await redb.SaveAsync(employees);
     }
 
     public static TreeRedbObject<TreeNodeProps> CreateTreeNode(

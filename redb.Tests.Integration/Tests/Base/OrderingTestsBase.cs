@@ -22,6 +22,7 @@ public abstract class OrderingTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .OrderBy(e => e.Age)
+            .Take(50)
             .ToListAsync();
 
         results.Should().HaveCountGreaterThanOrEqualTo(10);
@@ -36,6 +37,7 @@ public abstract class OrderingTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .OrderByDescending(e => e.Salary)
+            .Take(50)
             .ToListAsync();
 
         var salaries = results.Select(r => r.Props.Salary).ToList();
@@ -50,6 +52,7 @@ public abstract class OrderingTestsBase
         var results = await Redb.Query<EmployeeProps>()
             .OrderBy(e => e.Department)
             .ThenBy(e => e.Age)
+            .Take(50)
             .ToListAsync();
 
         results.Should().NotBeEmpty();

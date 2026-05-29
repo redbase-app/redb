@@ -1,6 +1,5 @@
 using redb.Core.Providers;
 using redb.Core.Data;
-using redb.Core.Exceptions;
 using redb.Core.Utils;
 using redb.Core.Extensions;
 using redb.Core.Models.Contracts;
@@ -1614,7 +1613,9 @@ namespace redb.Core.Providers.Base
 
             if (strategy == PropsSaveStrategy.ChangeTracking)
             {
-                throw new RedbProRequiredException("ChangeTracking", ProFeatureCategory.ChangeTracking);
+                throw new NotSupportedException(
+                    "PropsSaveStrategy.ChangeTracking is not implemented in this provider. " +
+                    "Use PropsSaveStrategy.DeleteInsert.");
             }
 
             await PrepareValuesWithTreeDeleteInsert(objects, valuesList);

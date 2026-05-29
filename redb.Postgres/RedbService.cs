@@ -120,6 +120,20 @@ public class RedbService : RedbServiceBase
     }
 
     /// <inheritdoc />
+    protected override string? ReadEmbeddedPvtBundleSql()
+    {
+        var assembly = typeof(RedbService).Assembly;
+        var resourceName = "redb.Postgres.sql.v2-pvt.pvt_bundle.sql";
+
+        using var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream is null)
+            return null;
+
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    /// <inheritdoc />
     protected override async Task ExecuteSchemaScriptAsync(string sql)
     {
         await Context.ExecuteAsync(sql);

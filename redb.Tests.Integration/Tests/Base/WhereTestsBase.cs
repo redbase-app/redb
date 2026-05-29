@@ -27,6 +27,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Position == "Senior Developer")
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();
@@ -40,6 +41,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Age > 30)
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();
@@ -53,6 +55,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Salary > 50000m && e.IsRemote)
+            .Take(20)
             .ToListAsync();
 
         results.Should().AllSatisfy(r =>
@@ -69,6 +72,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Department == "Engineering" || e.Department == "Marketing")
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();
@@ -99,6 +103,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Salary >= 80000m)
+            .Take(20)
             .ToListAsync();
 
         results.Should().AllSatisfy(r => r.Props.Salary.Should().BeGreaterThanOrEqualTo(80000m));
@@ -111,6 +116,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Age < 30)
+            .Take(20)
             .ToListAsync();
 
         results.Should().AllSatisfy(r => r.Props.Age.Should().BeLessThan(30));
@@ -123,6 +129,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Salary >= 50000m && e.Salary <= 90000m)
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();
@@ -141,6 +148,7 @@ public abstract class WhereTestsBase
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Age > 25)
             .Where(e => e.IsRemote)
+            .Take(20)
             .ToListAsync();
 
         results.Should().AllSatisfy(r =>
@@ -158,6 +166,7 @@ public abstract class WhereTestsBase
         var cutoff = new DateTime(2020, 6, 1, 0, 0, 0, DateTimeKind.Utc);
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.HireDate > cutoff)
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();
@@ -171,6 +180,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Position.Contains("Developer"))
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();
@@ -184,6 +194,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Position.StartsWith("Senior"))
+            .Take(20)
             .ToListAsync();
 
         results.Should().AllSatisfy(r => r.Props.Position.Should().StartWith("Senior"));
@@ -196,6 +207,7 @@ public abstract class WhereTestsBase
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.IsRemote)
+            .Take(20)
             .ToListAsync();
 
         results.Should().NotBeEmpty();

@@ -786,6 +786,9 @@ public abstract class RedbServiceBase : IRedbService
     /// </summary>
     public async Task InitializeAsync(params Assembly[] assemblies)
     {
+        // 0. Verify v2-pvt SQL module is deployed (only for dialects that ship one).
+        await EnsurePvtModuleDeployedAsync();
+
         // 1. Set type resolver for serializer (for polymorphic deserialization)
         SystemTextJsonRedbSerializer.SetTypeResolver(schemeId => _schemeSync.Cache.GetClrType(schemeId));
         
@@ -816,6 +819,89 @@ public abstract class RedbServiceBase : IRedbService
         await _treeProvider.InitializeTypeRegistryAsync();
     }
 
+    // === v2-pvt MODULE GUARD ===
+
+    /// <summary>
+    /// Verifies that the v2-pvt SQL module is deployed at the exact
+    /// version this dialect's bundle ships. If the deployed version is
+    /// missing or differs (in either direction) and the provider ships
+    /// an embedded bundle, the bundle is applied automatically — so a
+    /// simple `git pull` + restart upgrades the in-database UDFs without
+    /// any manual `psql` / `sqlcmd` step. Dialects that do not ship
+    /// v2-pvt opt out by returning null from
+    /// <see cref="ISqlDialect.Query_PvtModuleVersionFunction"/> and this
+    /// check becomes a no-op.
+    /// </summary>
+    protected virtual async Task EnsurePvtModuleDeployedAsync()
+    {
+        var versionFn = SqlDialect.Query_PvtModuleVersionFunction();
+        if (string.IsNullOrEmpty(versionFn))
+            return;
+
+        var required = SqlDialect.Query_PvtRequiredVersion();
+        if (string.IsNullOrWhiteSpace(required))
+            return;
+
+        string? deployed = null;
+        try
+        {
+            deployed = await _context.ExecuteScalarAsync<string>($"SELECT {versionFn}()");
+        }
+        catch (Exception ex) when (IsUndefinedFunctionError(ex))
+        {
+            // Module missing entirely — fall through to deploy.
+        }
+
+        if (!string.IsNullOrWhiteSpace(deployed)
+            && string.Equals(deployed, required, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var bundleSql = ReadEmbeddedPvtBundleSql();
+        if (string.IsNullOrEmpty(bundleSql))
+        {
+            throw new InvalidOperationException(
+                $"v2-pvt module version mismatch: deployed='{deployed ?? "<none>"}', required='{required}'. " +
+                "The provider does not ship an embedded bundle; redeploy the SQL files manually " +
+                "(redb.Postgres/sql/v2-pvt/*.sql for PostgreSQL or redb.MSSql/sql/v2-pvt/pvt_bundle.sql for SQL Server).");
+        }
+
+        _logger?.LogInformation(
+            "v2-pvt module {State} (deployed='{Deployed}', required='{Required}'); applying embedded bundle...",
+            string.IsNullOrEmpty(deployed) ? "missing" : "out of date",
+            deployed ?? "<none>", required);
+
+        await ExecuteSchemaScriptAsync(bundleSql);
+
+        _logger?.LogInformation("v2-pvt module bundle applied.");
+    }
+
+    /// <summary>
+    /// True when the SQL exception indicates an undefined function/procedure:
+    /// Postgres SQLSTATE 42883 or SQL Server error 195 ("not a recognized
+    /// built-in function name") / 4121 ("Cannot find either column ... or
+    /// the user-defined function or aggregate ... or the name is ambiguous").
+    /// </summary>
+    private static bool IsUndefinedFunctionError(Exception ex)
+    {
+        for (var cur = ex; cur != null; cur = cur.InnerException)
+        {
+            var typeName = cur.GetType().Name;
+            if (typeName == "PostgresException")
+            {
+                var sqlState = cur.GetType().GetProperty("SqlState")?.GetValue(cur) as string;
+                if (sqlState == "42883") return true;
+            }
+            else if (typeName == "SqlException")
+            {
+                var number = cur.GetType().GetProperty("Number")?.GetValue(cur) as int?;
+                if (number == 195 || number == 4121) return true;
+            }
+        }
+        return false;
+    }
+
     // === DATABASE SCHEMA MANAGEMENT ===
 
     /// <summary>
@@ -834,6 +920,16 @@ public abstract class RedbServiceBase : IRedbService
     /// </summary>
     protected abstract Task ExecuteSchemaScriptAsync(string sql);
 
+    /// <summary>
+    /// Returns the embedded v2-pvt module bundle (pvt_bundle.sql) or
+    /// <c>null</c> when the provider doesn't ship a standalone bundle.
+    /// Used by <see cref="EnsureDatabaseAsync"/> to auto-upgrade databases
+    /// that were created before the v2-pvt module was added to
+    /// redb_init.sql (so the full init script is skipped, but the
+    /// module is still missing or outdated).
+    /// </summary>
+    protected virtual string? ReadEmbeddedPvtBundleSql() => null;
+
     /// <inheritdoc />
     public virtual async Task EnsureDatabaseAsync()
     {
@@ -841,6 +937,7 @@ public abstract class RedbServiceBase : IRedbService
         if (await TableExistsAsync("_schemes"))
         {
             _logger?.LogInformation("REDB schema already exists, skipping creation.");
+            await EnsurePvtModuleDeployedAsync();
             return;
         }
 

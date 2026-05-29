@@ -4,7 +4,6 @@ using redb.Core.Models.Configuration;
 using redb.Core.Providers;
 using redb.Core.Query;
 using redb.Core.Query.Base;
-using redb.Core.Query.Parsing;
 using redb.Core.Query.QueryExpressions;
 using redb.Core.Serialization;
 using redb.MSSql.Sql;
@@ -15,7 +14,7 @@ namespace redb.MSSql.Query;
 /// MS SQL Server tree query provider implementation.
 /// Inherits from TreeQueryProviderBase and provides MSSQL-specific components.
 /// </summary>
-public class MssqlTreeQueryProvider : TreeQueryProviderBase
+public partial class MssqlTreeQueryProvider : TreeQueryProviderBase
 {
     public MssqlTreeQueryProvider(
         IRedbContext context,
@@ -28,14 +27,6 @@ public class MssqlTreeQueryProvider : TreeQueryProviderBase
         ISchemeSyncProvider? schemeSync = null)
         : base(context, serializer, dialect ?? new MsSqlDialect(), cacheDomain, lazyPropsLoader, configuration, logger, schemeSync)
     {
-    }
-    
-    /// <summary>
-    /// Creates MSSQL-specific filter expression parser.
-    /// </summary>
-    protected override IFilterExpressionParser CreateFilterParser()
-    {
-        return new FilterExpressionParser();
     }
     
     /// <summary>

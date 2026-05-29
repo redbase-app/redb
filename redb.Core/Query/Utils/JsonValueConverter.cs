@@ -1,4 +1,5 @@
 using System.Text.Json;
+using redb.Core.Models.Entities;
 
 namespace redb.Core.Query.Utils;
 
@@ -20,8 +21,16 @@ public static class JsonValueConverter
         
         return underlyingType switch
         {
-            // Strings
-            Type t when t == typeof(string) => elem.GetString(),
+            // Strings — accept any scalar JSON kind, stringify Number/Bool fallbacks
+            Type t when t == typeof(string) => elem.ValueKind == JsonValueKind.String
+                ? elem.GetString()
+                : (elem.ValueKind == JsonValueKind.Number || elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False
+                    ? elem.GetRawText()
+                    : null),
+
+            // RedbListItem — projected from grouping/aggregations as scalar (Id or Value).
+            // Build a minimal stub so callers can surface the key without an extra ListProvider lookup.
+            Type t when t == typeof(RedbListItem) => BuildListItemStub(elem),
             
             // Integers (all mapped to _Long)
             Type t when t == typeof(long) => elem.TryGetInt64(out var l) ? l : 0L,
@@ -49,6 +58,30 @@ public static class JsonValueConverter
             _ => elem.GetRawText()
         };
     }
+
+    /// <summary>
+    /// Builds a minimal <see cref="RedbListItem"/> from a scalar JSON value.
+    /// Number → Id; String → Value; Object → full deserialization of known fields.
+    /// </summary>
+    private static RedbListItem? BuildListItemStub(JsonElement elem)
+    {
+        switch (elem.ValueKind)
+        {
+            case JsonValueKind.Number:
+                return elem.TryGetInt64(out var id) ? new RedbListItem { Id = id } : null;
+            case JsonValueKind.String:
+                return new RedbListItem { Value = elem.GetString() ?? string.Empty };
+            case JsonValueKind.Object:
+                var item = new RedbListItem();
+                if (elem.TryGetProperty("Id", out var idProp) && idProp.TryGetInt64(out var idVal)) item.Id = idVal;
+                if (elem.TryGetProperty("Value", out var valProp) && valProp.ValueKind == JsonValueKind.String) item.Value = valProp.GetString() ?? string.Empty;
+                if (elem.TryGetProperty("Alias", out var aliasProp) && aliasProp.ValueKind == JsonValueKind.String) item.Alias = aliasProp.GetString();
+                if (elem.TryGetProperty("IdList", out var listProp) && listProp.TryGetInt64(out var listVal)) item.IdList = listVal;
+                return item;
+            default:
+                return null;
+        }
+    }
     
     /// <summary>
     /// Typed version
@@ -66,30 +99,30 @@ public static class JsonValueConverter
     /// </summary>
     private static DateTime ParseDateTime(JsonElement elem)
     {
-        if (elem.TryGetDateTime(out var dt))
-            return dt;
+        if (elem.ValueKind == JsonValueKind.Number)
+        {
+            // Unix timestamp
+            return DateTimeOffset.FromUnixTimeSeconds(elem.GetInt64()).DateTime;
+        }
         
-        // Fallback: PostgreSQL row_to_json() may return non-ISO format
-        var raw = elem.GetString();
-        if (raw != null && DateTime.TryParse(raw, out var parsed))
-            return parsed;
+        var str = elem.GetString();
+        if (string.IsNullOrEmpty(str)) return DateTime.MinValue;
         
+        if (DateTime.TryParse(str, out var dt)) return dt;
         return DateTime.MinValue;
     }
-    
-    /// <summary>
-    /// Parses DateTimeOffset with fallback for PostgreSQL row_to_json() format.
-    /// </summary>
+
     private static DateTimeOffset ParseDateTimeOffset(JsonElement elem)
     {
-        if (elem.TryGetDateTimeOffset(out var dto))
-            return dto;
+        if (elem.ValueKind == JsonValueKind.Number)
+        {
+             return DateTimeOffset.FromUnixTimeSeconds(elem.GetInt64());
+        }
         
-        // Fallback: PostgreSQL row_to_json() may return non-ISO format (e.g., "2024-01-15 10:30:00+03")
-        var raw = elem.GetString();
-        if (raw != null && DateTimeOffset.TryParse(raw, out var parsed))
-            return parsed;
+        var str = elem.GetString();
+        if (string.IsNullOrEmpty(str)) return DateTimeOffset.MinValue;
         
+        if (DateTimeOffset.TryParse(str, out var dto)) return dto;
         return DateTimeOffset.MinValue;
     }
 }

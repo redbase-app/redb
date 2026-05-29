@@ -173,31 +173,26 @@ public abstract class GroupByTestsBase
         var active = statuses.First(s => s.Value == "Active");
         var blocked = statuses.First(s => s.Value == "Blocked");
 
-        var ids = new List<long>();
-        for (int i = 0; i < 10; i++)
+        var persons = Enumerable.Range(0, 10).Select(i => new RedbObject<PersonProps>
         {
-            var person = new RedbObject<PersonProps>
+            name = $"GroupByPerson_{i}",
+            Props = new PersonProps
             {
-                name = $"GroupByPerson_{i}",
-                Props = new PersonProps
-                {
-                    Name = $"Person{i}",
-                    Age = 20 + i,
-                    Email = $"p{i}@test.com",
-                    Status = i % 3 == 0 ? blocked : active
-                }
-            };
-            person.id = await Redb.SaveAsync(person);
-            ids.Add(person.id);
-        }
+                Name = $"Person{i}",
+                Age = 20 + i,
+                Email = $"p{i}@test.com",
+                Status = i % 3 == 0 ? blocked : active
+            }
+        }).ToList();
+        var ids = await Redb.SaveAsync(persons);
+        for (int i = 0; i < persons.Count; i++) persons[i].id = ids[i];
 
         return (ids, active, blocked);
     }
 
     private async Task CleanupPersonsWithStatusAsync(List<long> ids)
     {
-        foreach (var id in ids)
-            await Redb.DeleteAsync(id);
+        if (ids.Count > 0) await Redb.DeleteAsync(ids);
 
         var existing = await Redb.ListProvider.GetListByNameAsync("GroupByTestStatuses");
         if (existing != null)
@@ -215,7 +210,9 @@ public abstract class GroupByTestsBase
         var (ids, active, blocked) = await SeedPersonsWithStatusAsync();
         try
         {
+            var idSet = ids.ToHashSet();
             var results = await Redb.Query<PersonProps>()
+                .WhereRedb(p => idSet.Contains(p.Id))
                 .GroupBy(p => p.Status)
                 .SelectAsync(g => new
                 {
@@ -250,8 +247,10 @@ public abstract class GroupByTestsBase
         var (ids, active, blocked) = await SeedPersonsWithStatusAsync();
         try
         {
+            var idSet = ids.ToHashSet();
             // Anonymous property "Id" differs from what we name it ("StatusCode")
             var results = await Redb.Query<PersonProps>()
+                .WhereRedb(p => idSet.Contains(p.Id))
                 .GroupBy(p => p.Status)
                 .SelectAsync(g => new
                 {

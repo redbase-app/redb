@@ -267,6 +267,15 @@ CREATE TABLE [dbo].[_values](
     [_array_index] NVARCHAR(430) NULL,  -- Text key for Dictionary (limited: 3*BIGINT + 860 bytes = 884 < 900)
     CONSTRAINT [PK__values] PRIMARY KEY CLUSTERED ([_id]),
     CONSTRAINT [FK__values__objects] FOREIGN KEY ([_id_object]) REFERENCES [_objects]([_id]) ON DELETE NO ACTION,
+    -- DESIGN: NO ACTION here is required because MSSQL forbids multiple
+    -- cascade paths into [_values] (conflict with FK__values__objects /
+    -- FK__values__array_parent). The cascade behavior is provided instead
+    -- by the INSTEAD OF DELETE trigger TR__structures__cascade_values
+    -- (defined below at ~L717), which makes the runtime effect equivalent
+    -- to PostgreSQL's ON DELETE CASCADE on _values._id_structure
+    -- (redb.Postgres/sql/redbPostgre.sql ~L215). Destructive structure
+    -- deletion is gated by RedbServiceConfiguration.DefaultStrictDeleteExtra
+    -- (default true, see README "Schema lifecycle and multi-version deployments").
     CONSTRAINT [FK__values__structures] FOREIGN KEY ([_id_structure]) REFERENCES [_structures]([_id]) ON DELETE NO ACTION,
     CONSTRAINT [FK__values__array_parent] FOREIGN KEY ([_array_parent_id]) REFERENCES [_values]([_id]) ON DELETE NO ACTION,
     CONSTRAINT [FK__values__list_items] FOREIGN KEY ([_ListItem]) REFERENCES [_list_items]([_id]),

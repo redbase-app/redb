@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using redb.Core.Exceptions;
 using redb.Core.Models.Contracts;
 using redb.Core.Query.FacetFilters;
 using redb.Core.Query.QueryExpressions;
@@ -85,17 +84,26 @@ public class FacetFilterBuilder : IFacetFilterBuilder
 
     private object BuildComparisonFilter(ComparisonExpression comparison)
     {
-        // 🛡️ PROTECTION: Computed expressions not supported in open-source version
-        if (comparison.Property.Name == "__computed")
+        // Computed-expression comparison: arithmetic/function on either side.
+        // Emits PVT `$expr` boolean predicate node.
+        if (comparison.LeftExpression != null || comparison.RightExpression != null
+            || comparison.Property.Name == "__computed")
         {
-            throw new RedbProRequiredException(
-                "arithmetic: p.Stock * 2, functions: p.Date.Year, Math.Abs(p.Value)", 
-                ProFeatureCategory.ComputedExpression);
+            // Special case: `arr.Length OP const` (compiled as ArrayLength UnaryExpression
+            // and surfaced as FunctionCallExpression(Length, PropertyValue(arr)) by the
+            // parser) cannot use the generic $expr/$length form because that expands to
+            // text LENGTH(...) only. Route through the `.$length` modifier so the PVT
+            // engine picks the array-aware array_length() form.
+            if (TryBuildArrayLengthCountFilter(comparison, out var arrFilter))
+            {
+                return arrFilter!;
+            }
+            return BuildComputedExprFilter(comparison);
         }
-        
+
         var fieldName = BuildFieldPath(comparison.Property);
-        
-        // 🆕 Handling property functions: Length, Count
+
+        // Handling property functions: Length, Count, ToLower, ToUpper, Trim, Year, ...
         if (comparison.Property.Function.HasValue)
         {
             return BuildFunctionComparisonFilter(comparison, fieldName);
@@ -109,6 +117,16 @@ public class FacetFilterBuilder : IFacetFilterBuilder
         if (originalValue is IRedbListItem listItem)
         {
             originalValue = listItem.Id;
+
+            // Bare ListItem field path (e.g. "Status") defaults to .Value
+            // (string) on the SQL side. Direct comparison against a
+            // RedbListItem instance always means "match by id", so route
+            // through the .Id (bigint) accessor.
+            if (!fieldName.Contains('.', StringComparison.Ordinal)
+                && IsRedbListItemType(comparison.Property.Type))
+            {
+                fieldName += ".Id";
+            }
         }
         
         // 🔍 CRITICAL LOGGING: check what type comes in
@@ -292,41 +310,463 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     }
 
     /// <summary>
-    /// Builds filter for property functions like Length, Count.
-    /// Generates format: {"Name.$length": {"$gt": 3}} or {"Tags[].$count": {"$gte": 5}}
+    /// Builds filter for property functions like Length, ToLower, Year via PVT $expr form:
+    /// <c>{"$expr": {"$gt": [{"$length": {"$field": "Name"}}, {"$const": 3}]}}</c>.
     /// </summary>
     private object BuildFunctionComparisonFilter(ComparisonExpression comparison, string fieldName)
     {
         var function = comparison.Property.Function!.Value;
-        var value = comparison.Value;
-        
-        // Build function field name: "Name.$length", "Tags[].$count"
-        var functionName = function switch
+        var opKey = MapComparisonOperatorToExprKey(comparison.Operator);
+
+        // Length/Count on arrays/collections is polymorphic in SQL and cannot use the
+        // generic $expr/$length form (which expands to text LENGTH(...) only).
+        // Route through the legacy `.$length` / `.$count` modifier so the PVT SQL
+        // layer picks the array-aware array_length() form based on registered field metadata.
+        if ((function == QueryExpressions.PropertyFunction.Length || function == QueryExpressions.PropertyFunction.Count)
+            && IsArrayOrCollectionType(comparison.Property.FunctionSourceType))
         {
-            QueryExpressions.PropertyFunction.Length => "$length",
-            QueryExpressions.PropertyFunction.Count => "$count",
-            _ => throw new RedbProRequiredException($"PropertyFunction.{function}", ProFeatureCategory.ComputedExpression)
+            var modifier = function == QueryExpressions.PropertyFunction.Length ? ".$length" : ".$count";
+            return new Dictionary<string, object?>
+            {
+                [fieldName + modifier] = new Dictionary<string, object?>
+                {
+                    [opKey] = comparison.Value
+                }
+            };
+        }
+
+        var funcKey = MapPropertyFunctionToExprKey(function);
+
+        // Inner scalar node: {"$<func>": {"$field": "<fieldName>"}}
+        var inner = new Dictionary<string, object?>
+        {
+            [funcKey] = new Dictionary<string, object?> { ["$field"] = fieldName }
         };
-        
-        var functionFieldName = $"{fieldName}.{functionName}";
-        
-        // Build operator
-        var operatorName = comparison.Operator switch
+
+        var rhs = new Dictionary<string, object?> { ["$const"] = comparison.Value };
+
+        return new Dictionary<string, object?>
         {
-            ComparisonOperator.Equal => "$eq",
-            ComparisonOperator.NotEqual => "$ne",
-            ComparisonOperator.GreaterThan => "$gt",
-            ComparisonOperator.GreaterThanOrEqual => "$gte",
-            ComparisonOperator.LessThan => "$lt",
-            ComparisonOperator.LessThanOrEqual => "$lte",
-            _ => throw new NotSupportedException($"Operator {comparison.Operator} is not supported for property functions.")
-        };
-        
-        return new Dictionary<string, object>
-        {
-            [functionFieldName] = new Dictionary<string, object?> { [operatorName] = value }
+            ["$expr"] = new Dictionary<string, object?>
+            {
+                [opKey] = new object?[] { inner, rhs }
+            }
         };
     }
+
+    private static bool IsArrayOrCollectionType(Type? t)
+    {
+        if (t == null) return false;
+        if (t == typeof(string)) return false;
+        if (t.IsArray) return true;
+        if (typeof(System.Collections.IEnumerable).IsAssignableFrom(t)) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Detects `arr.Length/.Count OP const` (array side) and rewrites the comparison
+    /// as the legacy `.$length` / `.$count` modifier filter, which the PVT SQL builder
+    /// translates to <c>array_length()</c> for array-typed fields.
+    /// Returns false for non-matching shapes (string.Length, both sides expressions, etc.)
+    /// so caller falls back to <see cref="BuildComputedExprFilter"/>.
+    /// </summary>
+    private bool TryBuildArrayLengthCountFilter(ComparisonExpression comparison, out object? filter)
+    {
+        filter = null;
+
+        FunctionCallExpression? fc = null;
+        object? constValue = null;
+        ComparisonOperator op = comparison.Operator;
+        bool funcOnLeft = false;
+
+        if (comparison.LeftExpression is FunctionCallExpression lfc
+            && comparison.RightExpression is ConstantValueExpression rcv)
+        {
+            fc = lfc;
+            constValue = rcv.Value;
+            funcOnLeft = true;
+        }
+        else if (comparison.RightExpression is FunctionCallExpression rfc
+                 && comparison.LeftExpression is ConstantValueExpression lcv)
+        {
+            fc = rfc;
+            constValue = lcv.Value;
+        }
+        else
+        {
+            return false;
+        }
+
+        if (fc.Function != QueryExpressions.PropertyFunction.Length
+            && fc.Function != QueryExpressions.PropertyFunction.Count)
+        {
+            return false;
+        }
+
+        if (fc.Argument is not PropertyValueExpression pv) return false;
+        if (!IsArrayOrCollectionType(pv.Property.Type)) return false;
+
+        // Mirror operator if function was on the right side: `5 < arr.Length` becomes `arr.Length > 5`
+        if (!funcOnLeft)
+        {
+            op = op switch
+            {
+                ComparisonOperator.GreaterThan        => ComparisonOperator.LessThan,
+                ComparisonOperator.GreaterThanOrEqual => ComparisonOperator.LessThanOrEqual,
+                ComparisonOperator.LessThan           => ComparisonOperator.GreaterThan,
+                ComparisonOperator.LessThanOrEqual    => ComparisonOperator.GreaterThanOrEqual,
+                _ => op
+            };
+        }
+
+        var fieldName = BuildFieldPath(pv.Property);
+        // Both arr.Length and coll.Count on an array/collection field map to the PVT
+        // `.$count` modifier, which expands to COUNT(*) over the rows representing the
+        // array. The `.$length` modifier is reserved for STRING length and expands to
+        // LENGTH(_String), which is the wrong operation for arrays.
+        var modifier = ".$count";
+        var opKey = MapComparisonOperatorToExprKey(op);
+
+        filter = new Dictionary<string, object?>
+        {
+            [fieldName + modifier] = new Dictionary<string, object?>
+            {
+                [opKey] = constValue
+            }
+        };
+        return true;
+    }
+
+    /// <summary>
+    /// Builds PVT <c>$expr</c> predicate for computed comparisons whose operands are
+    /// arithmetic / function expressions (LeftExpression/RightExpression).
+    /// </summary>
+    private object BuildComputedExprFilter(ComparisonExpression comparison)
+    {
+        var opKey = MapComparisonOperatorToExprKey(comparison.Operator);
+
+        object? lhs = comparison.LeftExpression != null
+            ? BuildScalarExprNode(comparison.LeftExpression)
+            : new Dictionary<string, object?> { ["$field"] = BuildFieldPath(comparison.Property) };
+
+        object? rhs = comparison.RightExpression != null
+            ? BuildScalarExprNode(comparison.RightExpression)
+            : new Dictionary<string, object?> { ["$const"] = comparison.Value };
+
+        return new Dictionary<string, object?>
+        {
+            ["$expr"] = new Dictionary<string, object?>
+            {
+                [opKey] = new object?[] { lhs, rhs }
+            }
+        };
+    }
+
+    private object BuildScalarExprNode(ValueExpression expr)
+    {
+        switch (expr)
+        {
+            case PropertyValueExpression pv:
+                return new Dictionary<string, object?>
+                {
+                    ["$field"] = BuildFieldPath(pv.Property)
+                };
+
+            case ConstantValueExpression cv:
+            {
+                var value = cv.Value;
+                if (value is IRedbListItem li) value = li.Id;
+                return new Dictionary<string, object?> { ["$const"] = value };
+            }
+
+            case ArithmeticExpression ax:
+            {
+                // String '+' in C# is concatenation. PVT $add maps to SQL '+'
+                // (numeric); for text operands we must emit $concat (SQL '||').
+                var key = ax.Operator switch
+                {
+                    ArithmeticOperator.Add when IsStringValueExpression(ax.Left) || IsStringValueExpression(ax.Right)
+                                                 => "$concat",
+                    ArithmeticOperator.Add      => "$add",
+                    ArithmeticOperator.Subtract => "$sub",
+                    ArithmeticOperator.Multiply => "$mul",
+                    ArithmeticOperator.Divide   => "$div",
+                    ArithmeticOperator.Modulo   => "$mod",
+                    _ => throw new NotSupportedException($"ArithmeticOperator.{ax.Operator} is not supported.")
+                };
+                return new Dictionary<string, object?>
+                {
+                    [key] = new object?[]
+                    {
+                        BuildScalarExprNode(ax.Left),
+                        BuildScalarExprNode(ax.Right)
+                    }
+                };
+            }
+
+            case FunctionCallExpression fc:
+            {
+                var key = MapPropertyFunctionToExprKey(fc.Function);
+                return new Dictionary<string, object?>
+                {
+                    [key] = BuildScalarExprNode(fc.Argument)
+                };
+            }
+
+            case MultiArgFunctionCallExpression mfc:
+            {
+                // DateTime.AddX(n) -> {"$dateadd": ["<unit>", <date>, <n>]} (unit is a plain JSON
+                // string literal, NOT wrapped in $const — see pvt_build_scalar_expr in 17_pvt_expr.sql).
+                var unit = MapAddFunctionToUnit(mfc.Function);
+                if (unit != null)
+                {
+                    if (mfc.Arguments.Count != 2)
+                        throw new InvalidOperationException($"DateTime.{mfc.Function} expects [date, n] (2 args).");
+                    return new Dictionary<string, object?>
+                    {
+                        ["$dateadd"] = new object?[]
+                        {
+                            unit,
+                            BuildScalarExprNode(mfc.Arguments[0]),
+                            BuildScalarExprNode(mfc.Arguments[1])
+                        }
+                    };
+                }
+
+                // Regex.Replace(input, pattern, replacement) -> {"$regexreplace": [input, pat, repl, "g"]}
+                // Inject 'g' flag as 4th arg ($const text literal) so PVT REGEXP_REPLACE replaces
+                // all matches like .NET Regex.Replace (PG default is first-match only).
+                if (mfc.Function == QueryExpressions.PropertyFunction.RegexReplace)
+                {
+                    if (mfc.Arguments.Count != 3)
+                        throw new InvalidOperationException("Regex.Replace expects [input, pattern, replacement] (3 args).");
+                    return new Dictionary<string, object?>
+                    {
+                        ["$regexreplace"] = new object?[]
+                        {
+                            BuildScalarExprNode(mfc.Arguments[0]),
+                            BuildScalarExprNode(mfc.Arguments[1]),
+                            BuildScalarExprNode(mfc.Arguments[2]),
+                            new Dictionary<string, object?> { ["$const"] = "g" }
+                        }
+                    };
+                }
+
+                // Multi-arg string functions (Substring/Replace/IndexOf/PadLeft/PadRight)
+                // map to {"$substring": [a, b[, c]]}, {"$replace": [a, b, c]}, etc.
+                // The parser already applied C#->SQL index translation (Substring start+1, IndexOf - 1).
+                var key = MapPropertyFunctionToExprKey(mfc.Function);
+                var args = new object?[mfc.Arguments.Count];
+                for (int i = 0; i < mfc.Arguments.Count; i++)
+                    args[i] = BuildScalarExprNode(mfc.Arguments[i]);
+                return new Dictionary<string, object?>
+                {
+                    [key] = args
+                };
+            }
+
+            case CustomFunctionExpression cfe:
+            {
+                var args = new object?[cfe.Arguments.Count];
+                for (int i = 0; i < cfe.Arguments.Count; i++)
+                    args[i] = BuildScalarExprNode(cfe.Arguments[i]);
+                return new Dictionary<string, object?>
+                {
+                    ["$" + cfe.FunctionName.ToLowerInvariant()] = args
+                };
+            }
+
+            case CoalesceExpression ce:
+            {
+                // ?? operator (n-ary) → {"$coalesce": [a, b, ...]}, handled by
+                // pvt_build_scalar_expr (17_pvt_expr.sql) which emits COALESCE(a, b, ...).
+                var args = new object?[ce.Arguments.Count];
+                for (int i = 0; i < ce.Arguments.Count; i++)
+                    args[i] = BuildScalarExprNode(ce.Arguments[i]);
+                return new Dictionary<string, object?>
+                {
+                    ["$coalesce"] = args
+                };
+            }
+
+            case ConditionalValueExpression cv:
+            {
+                // C# ternary cond ? a : b → {"$if": [<bool-node>, <then>, <else>]},
+                // handled by pvt_build_scalar_expr ($if branch) in 17_pvt_expr.sql.
+                return new Dictionary<string, object?>
+                {
+                    ["$if"] = new object?[]
+                    {
+                        BuildBoolExprNode(cv.Test),
+                        BuildScalarExprNode(cv.IfTrue),
+                        BuildScalarExprNode(cv.IfFalse)
+                    }
+                };
+            }
+
+            default:
+                throw new NotSupportedException($"ValueExpression {expr.GetType().Name} is not supported in $expr.");
+        }
+    }
+
+    /// <summary>
+    /// Builds the inner-predicate JSON shape expected by <c>pvt_build_bool_expr</c>
+    /// (see <c>17_pvt_expr.sql</c>): comparisons render as
+    /// <c>{"$eq":[lhs,rhs]}</c>, logical operators as <c>{"$and"/"$or":[..]}</c> /
+    /// <c>{"$not":node}</c>, null-checks as <c>{"$null":[field]}</c> /
+    /// <c>{"$notnull":[field]}</c>. Used as the <c>cond</c> slot of <c>$if</c>.
+    /// </summary>
+    private object BuildBoolExprNode(FilterExpression filter)
+    {
+        switch (filter)
+        {
+            case ComparisonExpression cmp:
+            {
+                var opKey = MapComparisonOperatorToExprKey(cmp.Operator);
+                var lhs = cmp.LeftExpression != null
+                    ? BuildScalarExprNode(cmp.LeftExpression)
+                    : new Dictionary<string, object?> { ["$field"] = BuildFieldPath(cmp.Property) };
+                var rhs = cmp.RightExpression != null
+                    ? BuildScalarExprNode(cmp.RightExpression)
+                    : new Dictionary<string, object?> { ["$const"] = cmp.Value };
+                return new Dictionary<string, object?>
+                {
+                    [opKey] = new object?[] { lhs, rhs }
+                };
+            }
+
+            case LogicalExpression logical:
+            {
+                if (logical.Operator == LogicalOperator.Not)
+                {
+                    return new Dictionary<string, object?>
+                    {
+                        ["$not"] = BuildBoolExprNode(logical.Operands[0])
+                    };
+                }
+                var key = logical.Operator == LogicalOperator.And ? "$and" : "$or";
+                var parts = new object?[logical.Operands.Count];
+                for (int i = 0; i < logical.Operands.Count; i++)
+                    parts[i] = BuildBoolExprNode(logical.Operands[i]);
+                return new Dictionary<string, object?> { [key] = parts };
+            }
+
+            case NullCheckExpression nc:
+            {
+                var fieldNode = new Dictionary<string, object?>
+                {
+                    ["$field"] = BuildFieldPath(nc.Property)
+                };
+                return new Dictionary<string, object?>
+                {
+                    [nc.IsNull ? "$null" : "$notnull"] = new object?[] { fieldNode }
+                };
+            }
+
+            default:
+                throw new NotSupportedException(
+                    $"FilterExpression {filter.GetType().Name} is not supported inside a ternary $if condition.");
+        }
+    }
+
+    /// <summary>
+    /// Best-effort check whether a <see cref="ValueExpression"/> resolves to a string at runtime.
+    /// Used to decide between SQL '+' (numeric $add) and '||' ($concat) for arithmetic Add.
+    /// </summary>
+    private static bool IsStringValueExpression(ValueExpression expr)
+    {
+        return expr switch
+        {
+            PropertyValueExpression pve => pve.Property.Type == typeof(string),
+            ConstantValueExpression cve => cve.Type == typeof(string) || cve.Value is string,
+            ArithmeticExpression ae when ae.Operator == ArithmeticOperator.Add
+                => IsStringValueExpression(ae.Left) || IsStringValueExpression(ae.Right),
+            FunctionCallExpression fce => fce.Function is QueryExpressions.PropertyFunction.ToLower
+                                                or QueryExpressions.PropertyFunction.ToUpper
+                                                or QueryExpressions.PropertyFunction.Trim
+                                                or QueryExpressions.PropertyFunction.TrimStart
+                                                or QueryExpressions.PropertyFunction.TrimEnd
+                                                || IsStringValueExpression(fce.Argument),
+            MultiArgFunctionCallExpression mfce => mfce.Function is QueryExpressions.PropertyFunction.Substring
+                                                       or QueryExpressions.PropertyFunction.Replace
+                                                       or QueryExpressions.PropertyFunction.PadLeft
+                                                       or QueryExpressions.PropertyFunction.PadRight
+                                                       or QueryExpressions.PropertyFunction.RegexReplace,
+            _ => false
+        };
+    }
+
+    private static string MapPropertyFunctionToExprKey(QueryExpressions.PropertyFunction function) => function switch
+    {
+        QueryExpressions.PropertyFunction.Length    => "$length",
+        QueryExpressions.PropertyFunction.Count     => "$count",
+        QueryExpressions.PropertyFunction.ToLower   => "$lower",
+        QueryExpressions.PropertyFunction.ToUpper   => "$upper",
+        QueryExpressions.PropertyFunction.Trim      => "$trim",
+        QueryExpressions.PropertyFunction.TrimStart => "$trimstart",
+        QueryExpressions.PropertyFunction.TrimEnd   => "$trimend",
+        QueryExpressions.PropertyFunction.Substring => "$substring",
+        QueryExpressions.PropertyFunction.Replace   => "$replace",
+        QueryExpressions.PropertyFunction.IndexOf   => "$indexof",
+        QueryExpressions.PropertyFunction.PadLeft   => "$padleft",
+        QueryExpressions.PropertyFunction.PadRight  => "$padright",
+        QueryExpressions.PropertyFunction.Abs       => "$abs",
+        QueryExpressions.PropertyFunction.Round     => "$round",
+        QueryExpressions.PropertyFunction.Floor     => "$floor",
+        QueryExpressions.PropertyFunction.Ceiling   => "$ceil",
+        QueryExpressions.PropertyFunction.Sqrt      => "$sqrt",
+        QueryExpressions.PropertyFunction.Sign      => "$sign",
+        QueryExpressions.PropertyFunction.Exp       => "$exp",
+        QueryExpressions.PropertyFunction.Log       => "$ln",      // 1-arg Math.Log = natural log
+        QueryExpressions.PropertyFunction.LogBase   => "$log",     // 2-arg: [base, value]
+        QueryExpressions.PropertyFunction.Pow       => "$power",
+        QueryExpressions.PropertyFunction.Year      => "$year",
+        QueryExpressions.PropertyFunction.Month     => "$month",
+        QueryExpressions.PropertyFunction.Day       => "$day",
+        QueryExpressions.PropertyFunction.Hour      => "$hour",
+        QueryExpressions.PropertyFunction.Minute    => "$minute",
+        QueryExpressions.PropertyFunction.Second    => "$second",
+        QueryExpressions.PropertyFunction.DayOfWeek => "$dayofweek",
+        QueryExpressions.PropertyFunction.DayOfYear => "$dayofyear",
+        QueryExpressions.PropertyFunction.RegexReplace => "$regexreplace",
+        _ => throw new NotSupportedException($"PropertyFunction.{function} has no $expr mapping.")
+    };
+
+    /// <summary>
+    /// Maps a <see cref="QueryExpressions.PropertyFunction"/> AddX function to the
+    /// PVT <c>$dateadd</c> unit literal (lowercase). Returns <c>null</c> if the
+    /// function is not a DateTime add. Used in the MultiArgFunctionCallExpression
+    /// branch to emit <c>{"$dateadd": ["unit", date, n]}</c> facet shape.
+    /// </summary>
+    private static string? MapAddFunctionToUnit(QueryExpressions.PropertyFunction function) => function switch
+    {
+        QueryExpressions.PropertyFunction.AddYears   => "year",
+        QueryExpressions.PropertyFunction.AddMonths  => "month",
+        QueryExpressions.PropertyFunction.AddDays    => "day",
+        QueryExpressions.PropertyFunction.AddHours   => "hour",
+        QueryExpressions.PropertyFunction.AddMinutes => "minute",
+        QueryExpressions.PropertyFunction.AddSeconds => "second",
+        _ => null
+    };
+
+    private static string MapComparisonOperatorToExprKey(ComparisonOperator op) => op switch
+    {
+        ComparisonOperator.Equal                => "$eq",
+        ComparisonOperator.NotEqual             => "$ne",
+        ComparisonOperator.GreaterThan          => "$gt",
+        ComparisonOperator.GreaterThanOrEqual   => "$gte",
+        ComparisonOperator.LessThan             => "$lt",
+        ComparisonOperator.LessThanOrEqual      => "$lte",
+        ComparisonOperator.Contains             => "$contains",
+        ComparisonOperator.ContainsIgnoreCase   => "$containsignorecase",
+        ComparisonOperator.StartsWith           => "$startswith",
+        ComparisonOperator.StartsWithIgnoreCase => "$startswithignorecase",
+        ComparisonOperator.EndsWith             => "$endswith",
+        ComparisonOperator.EndsWithIgnoreCase   => "$endswithignorecase",
+        ComparisonOperator.RegexMatch           => "$regex",
+        ComparisonOperator.RegexMatchIgnoreCase => "$iregex",
+        _ => throw new NotSupportedException($"Operator {op} is not supported in $expr predicate.")
+    };
 
     private object BuildNullCheckFilter(NullCheckExpression nullCheck)
     {
@@ -581,6 +1021,27 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     private bool IsNullableType(Type type)
     {
         return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+    }
+
+    /// <summary>
+    /// Returns true when the type is <see cref="IRedbListItem"/> (or a
+    /// nullable / collection wrapper around it).
+    /// </summary>
+    private static bool IsRedbListItemType(Type type)
+    {
+        var t = Nullable.GetUnderlyingType(type) ?? type;
+        if (typeof(IRedbListItem).IsAssignableFrom(t)) return true;
+        if (t.IsGenericType)
+        {
+            var arg = t.GetGenericArguments().FirstOrDefault();
+            if (arg != null) return IsRedbListItemType(arg);
+        }
+        if (t.IsArray)
+        {
+            var elem = t.GetElementType();
+            if (elem != null) return IsRedbListItemType(elem);
+        }
+        return false;
     }
 
     /// <summary>

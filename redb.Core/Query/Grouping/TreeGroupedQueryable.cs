@@ -18,6 +18,8 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
     private readonly Expression _keySelector;
     private readonly string? _baseFilterJson;
     private readonly bool _isBaseFieldGrouping;
+    private readonly List<LambdaExpression> _havingPredicates = new();
+    private string? _havingJson;
 
     public TreeGroupedQueryable(
         ITreeQueryProvider treeProvider,
@@ -41,7 +43,7 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
 
         // Use tree-aware execution with full context
         var jsonResult = await _treeProvider.ExecuteTreeGroupedAggregateAsync(
-            _treeContext, groupFields, aggregations);
+            _treeContext, groupFields, aggregations, BuildHavingJson());
 
         return MaterializeResults<TResult>(jsonResult, selector, groupFields);
     }
@@ -52,7 +54,7 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
         var aggregations = new[] { new AggregateRequest { FieldPath = "*", Function = AggregateFunction.Count, Alias = "cnt" } };
 
         var jsonResult = await _treeProvider.ExecuteTreeGroupedAggregateAsync(
-            _treeContext, groupFields, aggregations);
+            _treeContext, groupFields, aggregations, BuildHavingJson());
 
         if (jsonResult == null) return 0;
         return jsonResult.RootElement.GetArrayLength();
@@ -66,7 +68,7 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
 
         // Delegate to tree provider for real SQL preview
         return await _treeProvider.GetTreeGroupBySqlPreviewAsync(
-            _treeContext, groupFields, aggregations);
+            _treeContext, groupFields, aggregations, BuildHavingJson());
     }
     
     /// <summary>
@@ -79,6 +81,55 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
         windowConfig(windowSpec);
         return new TreeGroupedWindowedQueryable<TKey, TProps>(
             _treeProvider, _treeContext, _keySelector, windowSpec);
+    }
+
+    /// <inheritdoc />
+    public IRedbGroupedQueryable<TKey, TProps> Having(
+        Expression<Func<IRedbGrouping<TKey, TProps>, bool>> predicate)
+    {
+        if (predicate is null) throw new ArgumentNullException(nameof(predicate));
+        _havingPredicates.Add(predicate);
+        _havingJson = null;
+        return this;
+    }
+
+    private string? BuildHavingJson()
+    {
+        if (_havingJson != null) return _havingJson;
+        if (_havingPredicates.Count == 0) return null;
+
+        if (_havingPredicates.Count == 1)
+        {
+            var single = (Expression<Func<IRedbGrouping<TKey, TProps>, bool>>)_havingPredicates[0];
+            _havingJson = HavingPredicateParser.ToJson(single);
+            return _havingJson;
+        }
+
+        var param = Expression.Parameter(typeof(IRedbGrouping<TKey, TProps>), "g");
+        Expression body = ReplaceParam((Expression<Func<IRedbGrouping<TKey, TProps>, bool>>)_havingPredicates[0], param);
+        for (int i = 1; i < _havingPredicates.Count; i++)
+        {
+            var nextBody = ReplaceParam((Expression<Func<IRedbGrouping<TKey, TProps>, bool>>)_havingPredicates[i], param);
+            body = Expression.AndAlso(body, nextBody);
+        }
+        var combined = Expression.Lambda<Func<IRedbGrouping<TKey, TProps>, bool>>(body, param);
+        _havingJson = HavingPredicateParser.ToJson(combined);
+        return _havingJson;
+    }
+
+    private static Expression ReplaceParam(
+        Expression<Func<IRedbGrouping<TKey, TProps>, bool>> lambda,
+        ParameterExpression newParam)
+    {
+        return new ParameterReplacer(lambda.Parameters[0], newParam).Visit(lambda.Body)!;
+    }
+
+    private sealed class ParameterReplacer : ExpressionVisitor
+    {
+        private readonly ParameterExpression _from;
+        private readonly ParameterExpression _to;
+        public ParameterReplacer(ParameterExpression from, ParameterExpression to) { _from = from; _to = to; }
+        protected override Expression VisitParameter(ParameterExpression node) => node == _from ? _to : base.VisitParameter(node);
     }
 
     #region Expression Parsing (same as RedbGroupedQueryable)

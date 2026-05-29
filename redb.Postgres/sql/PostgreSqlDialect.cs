@@ -772,8 +772,8 @@ public class PostgreSqlDialect : ISqlDialect
         "SELECT get_object_json($1, $2)::text";
     
     public string LazyLoader_GetObjectJsonBatch() =>
-        @"SELECT id as ""Id"", get_object_json(id, 10)::text as ""JsonData""
-          FROM unnest($1::bigint[]) as id";
+        @"SELECT id::bigint AS ""Id"", get_object_json(id, 10)::text AS ""JsonData""
+          FROM unnest($1::bigint[]) AS id";
     
     public string LazyLoader_SelectObjectHash() =>
         "SELECT _hash FROM _objects WHERE _id = $1";
@@ -782,17 +782,23 @@ public class PostgreSqlDialect : ISqlDialect
     // === QUERY PROVIDER SQL ===
     // ============================================================
     
-    public string Query_SearchObjectsFunction() => "search_objects_with_facets";
-    
-    public string Query_SearchObjectsBaseFunction() => "search_objects_with_facets_base";
-    
-    public string Query_SearchObjectsProjectionByPathsFunction() => "search_objects_with_projection_by_paths";
-    
-    public string Query_SearchObjectsProjectionByIdsFunction() => "search_objects_with_projection_by_ids";
-    
-    public string Query_SearchTreeObjectsFunction() => "search_tree_objects_with_facets";
-    
-    public string Query_SearchTreeObjectsBaseFunction() => "search_tree_objects_with_facets_base";
+    public string Query_SearchObjectsFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_with_facets)");
+
+    public string Query_SearchObjectsBaseFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_with_facets_base)");
+
+    public string Query_SearchObjectsProjectionByPathsFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_with_projection_by_paths)");
+
+    public string Query_SearchObjectsProjectionByIdsFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_with_projection_by_ids)");
+
+    public string Query_SearchTreeObjectsFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_tree_objects_with_facets)");
+
+    public string Query_SearchTreeObjectsBaseFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_tree_objects_with_facets_base)");
     
     public string Query_CountTemplate() =>
         "SELECT ({0}($1, $2::jsonb, NULL, NULL, NULL, $3))->>'total_count'";
@@ -813,41 +819,52 @@ public class PostgreSqlDialect : ISqlDialect
     public string Query_BigintArrayCast() => "::bigint[]";
     
     public string Query_ProjectionByPathsTemplate() =>
-        "SELECT search_objects_with_projection_by_paths($1, $2::jsonb, $3::text[], $4, $5, $6::jsonb, $7) as result";
-    
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (projection_by_paths template)");
+
     public string Query_ProjectionByIdsTemplate(string structureIdsArray) =>
-        $"SELECT search_objects_with_projection_by_ids($1, $2::jsonb, ARRAY[{structureIdsArray}]::bigint[], $3, $4, $5::jsonb, $6) as result";
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (projection_by_ids template)");
     
     public string Query_CheckPermissionSql() =>
         "SELECT EXISTS(SELECT 1 FROM get_user_permissions_for_object($1, $2) WHERE can_select = true) as has_permission";
     
+    // --------------------------------------------------------
+    // Legacy aggregate/window/grouped SQL — DEPRECATED for Postgres.
+    // PG free path is fully PVT (see PostgresQueryProvider.Aggregation.cs /
+    // .Grouping.cs / .Window.cs / .GroupedWindow.cs which override base methods
+    // and call pvt_build_aggregate_sql / pvt_build_groupby_sql /
+    // pvt_build_array_groupby_sql / pvt_build_window_sql).
+    // Throwing here makes any regression on PG immediately visible in tests.
+    // MSSql still uses its own MsSqlDialect implementations.
+    // --------------------------------------------------------
+    private const string LegacyPgRemovedMsg =
+        "Legacy PostgreSQL SQL path is removed. PG provider must use the v2-pvt pipeline.";
+
     public string Query_AggregateBatchPreviewSql() =>
-        "SELECT aggregate_batch_preview($1, $2::jsonb, $3::jsonb) as sql_preview";
-    
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_batch_preview)");
+
     public string Query_AggregateFieldSql() =>
-        "SELECT aggregate_field($1, $2, $3, $4::jsonb) as result";
-    
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_field)");
+
     public string Query_SqlPreviewTemplate() =>
         "SELECT {0}($1, $2::jsonb, $3, $4, $5::jsonb, $6, $7) as sql_preview";
-    
+
     public string Query_AggregateBatchSql() =>
-        "SELECT aggregate_batch($1, $2::jsonb, $3::jsonb)";
-    
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_batch)");
+
     /// <summary>
-    /// Simple search for Delete operations - uses search_objects_with_facets with minimal params.
-    /// Returns JSON with {objects: [{id:...},...], total_count:...}
+    /// Simple search for Delete operations - LEGACY. PG must migrate to PVT pipeline.
     /// </summary>
     public string Query_SearchObjectsSimpleSql() =>
-        "SELECT search_objects_with_facets($1, $2::jsonb, NULL, 0, NULL, 10, false, false)";
-    
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_simple)");
+
     public string Query_AggregateGroupedSql() =>
-        "SELECT aggregate_grouped($1, $2::jsonb, $3::jsonb, $4::jsonb) as result";
-    
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_grouped)");
+
     public string Query_AggregateArrayGroupedSql() =>
-        "SELECT aggregate_array_grouped($1, $2, $3::jsonb, $4::jsonb, $5::jsonb) as result";
-    
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_array_grouped)");
+
     public string Query_WindowSql() =>
-        "SELECT query_with_window($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8::jsonb) as result";
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (query_with_window)");
     
     public string Query_TreeCountNormalSql(string functionName) =>
         $"SELECT (result->>'total_count')::int FROM {functionName}($1, $2::jsonb, 1, 0, NULL::jsonb, $3) as result";
@@ -956,6 +973,153 @@ public class PostgreSqlDialect : ISqlDialect
     public string Query_TreeSqlPreviewFunction() => "get_search_tree_sql_preview";
     
     public string Query_TreeSqlPreviewBaseFunction() => "get_search_tree_sql_preview_base";
+    
+    // ============================================================
+    // === v2-pvt MODULE ENTRY-POINTS (free Postgres) ===
+    // Two-step pipeline: ask DB to BUILD the inner _id-list SQL,
+    // then wrap on the C# side with a materializer/COUNT/EXISTS.
+    // The v2-pvt SQL module must be deployed (see redb.Postgres/sql/v2-pvt/).
+    // Init-time check lives in RedbServiceBase.InitializeAsync using
+    // Query_PvtModuleVersionFunction().
+    // ============================================================
+    
+    public string? Query_BuildPvtSqlFunction() => "pvt_build_query_sql";
+    
+    public string? Query_BuildPvtSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false)
+    {
+        var limitArg    = limit.HasValue ? limit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "NULL";
+        var offsetArg   = offset.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var maxDepthArg = maxDepth.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var distinctArg = distinct ? "true" : "false";
+        var modeArg     = sourceMode switch
+        {
+            "tree" => "'tree'",
+            _      => "'flat'",
+        };
+        string treeArg;
+        if (treeIds is null || treeIds.Length == 0)
+        {
+            treeArg = "NULL::bigint[]";
+        }
+        else
+        {
+            treeArg = "ARRAY[" + string.Join(",", treeIds.Select(
+                i => i.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]::bigint[]";
+        }
+        var distinctOnArg = hasDistinctOn ? "$3::jsonb" : "NULL::jsonb";
+        // pvt_build_query_sql signature:
+        //   p_scheme_id, p_filter, p_limit, p_offset, p_order, p_max_depth,
+        //   p_distinct, p_source_mode, p_tree_ids, p_include_seed,
+        //   p_polymorphic, p_distinct_on
+        return "SELECT pvt_build_query_sql("
+             + schemeId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+             + ", $1::jsonb, " + limitArg
+             + ", " + offsetArg
+             + ", $2::jsonb, " + maxDepthArg
+             + ", " + distinctArg
+             + ", " + modeArg
+             + ", " + treeArg
+             + ", false"   // p_include_seed
+             + ", true"    // p_polymorphic
+             + ", " + distinctOnArg
+             + ") AS \"Value\"";
+    }
+    
+    public string? Query_WrapPvtWithObjectJson(string innerSql, int maxDepth) =>
+        $"SELECT get_object_json(t._id, {maxDepth})::text AS \"Value\" FROM ({innerSql}) t";
+    
+    public string? Query_WrapPvtWithCount(string innerSql) =>
+        $"SELECT count(*)::bigint AS \"Value\" FROM ({innerSql}) t";
+    
+    public string? Query_WrapPvtWithExists(string innerSql) =>
+        $"SELECT EXISTS ({innerSql}) AS \"Value\"";
+    
+    public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
+
+    // Bump together with the literal in redb.Postgres/sql/v2-pvt/00_module_init.sql.
+    public string? Query_PvtRequiredVersion() => "0.6.2";
+
+    // ============================================================
+    // Native PVT projection orchestrator (pvt_build_projection_sql).
+    // Mirrors the pvt_build_query_sql plumbing but the outer SELECT
+    // yields the requested scalar columns. The C# layer wraps the
+    // resulting SQL into a JSON-row shape via Query_WrapPvtProjectionRowsAsJson
+    // so the existing materializer can consume it.
+    // ============================================================
+
+    public string? Query_BuildPvtProjectionSqlFunction() => "pvt_build_projection_sql";
+
+    public string? Query_BuildPvtProjectionSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false)
+    {
+        var limitArg    = limit.HasValue ? limit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "NULL";
+        var offsetArg   = offset.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var maxDepthArg = maxDepth.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var distinctArg = distinct ? "true" : "false";
+        var modeArg     = sourceMode switch
+        {
+            "tree" => "'tree'",
+            _      => "'flat'",
+        };
+        string treeArg;
+        if (treeIds is null || treeIds.Length == 0)
+        {
+            treeArg = "NULL::bigint[]";
+        }
+        else
+        {
+            treeArg = "ARRAY[" + string.Join(",", treeIds.Select(
+                i => i.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]::bigint[]";
+        }
+        var distinctOnArg = hasDistinctOn ? "$4::jsonb" : "NULL::jsonb";
+        // pvt_build_projection_sql signature:
+        //   p_scheme_id, p_projection, p_filter, p_limit, p_offset, p_order,
+        //   p_max_depth, p_distinct, p_source_mode, p_tree_ids,
+        //   p_include_seed, p_polymorphic, p_distinct_on
+        return "SELECT pvt_build_projection_sql("
+             + schemeId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+             + ", $1::jsonb"
+             + ", $2::jsonb, " + limitArg
+             + ", " + offsetArg
+             + ", $3::jsonb, " + maxDepthArg
+             + ", " + distinctArg
+             + ", " + modeArg
+             + ", " + treeArg
+             + ", false"   // p_include_seed
+             + ", true"    // p_polymorphic
+             + ", " + distinctOnArg
+             + ") AS \"Value\"";
+    }
+
+    public string? Query_WrapPvtProjectionRowsAsJson(string innerSql, bool includeId)
+    {
+        // The inner projection SQL yields one column per projection entry.
+        // We wrap it so each row becomes a JSON object shaped like a partial
+        // RedbObject<T>: {"id": <_id|0>, "properties": { ...projected scalar columns... }}.
+        // ConvertFlatPropertiesToHierarchy on the C# side then turns dotted
+        // aliases (e.g. "Address.City") into nested objects.
+        if (includeId)
+        {
+            return $"SELECT (jsonb_build_object('id', t._id, 'properties', (to_jsonb(t) - '_id')))::text AS \"Value\" FROM ({innerSql}) t";
+        }
+        // No _id column — every projected column is a property; id defaults to 0.
+        return $"SELECT (jsonb_build_object('id', 0, 'properties', to_jsonb(t)))::text AS \"Value\" FROM ({innerSql}) t";
+    }
     
     // ============================================================
     // === SOFT DELETE ===

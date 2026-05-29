@@ -73,24 +73,27 @@ public interface IRedbQueryProvider
     // ===== GROUPBY AGGREGATIONS =====
     
     /// <summary>
-    /// Execute GroupBy aggregation (SQL function aggregate_grouped).
-    /// Uses filterJson for Free version compatibility.
+    /// Execute GroupBy aggregation. Uses filterJson for Free version compatibility.
+    /// <paramref name="havingJson"/> is a PVT-shape HAVING predicate; pass null when none.
     /// </summary>
     Task<System.Text.Json.JsonDocument?> ExecuteGroupedAggregateAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
-        string? filterJson = null);
+        string? filterJson = null,
+        string? havingJson = null);
     
     /// <summary>
     /// Execute GroupBy aggregation with FilterExpression (Pro version).
     /// Provides direct access to filter for proper SQL compilation.
+    /// <paramref name="havingJson"/> carries the PVT-shape HAVING predicate when present.
     /// </summary>
     Task<System.Text.Json.JsonDocument?> ExecuteGroupedAggregateAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
-        FilterExpression? filter);
+        FilterExpression? filter,
+        string? havingJson = null);
     
     /// <summary>
     /// Execute GroupBy aggregation on array (SQL function aggregate_array_grouped).
@@ -100,7 +103,21 @@ public interface IRedbQueryProvider
         string arrayPath,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
-        string? filterJson = null);
+        string? filterJson = null,
+        string? havingJson = null);
+
+    /// <summary>
+    /// Execute GroupBy aggregation on array with FilterExpression (Pro version).
+    /// Provides direct access to outer filter for proper inline SQL compilation
+    /// without delegating to PVT SQL functions.
+    /// </summary>
+    Task<System.Text.Json.JsonDocument?> ExecuteArrayGroupedAggregateAsync(
+        long schemeId,
+        string arrayPath,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<AggregateRequest> aggregations,
+        FilterExpression? filter,
+        string? havingJson = null);
     
     // ===== WINDOW FUNCTIONS =====
     

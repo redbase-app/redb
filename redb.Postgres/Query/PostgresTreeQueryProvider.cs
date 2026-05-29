@@ -4,7 +4,6 @@ using redb.Core.Models.Configuration;
 using redb.Core.Providers;
 using redb.Core.Query;
 using redb.Core.Query.Base;
-using redb.Core.Query.Parsing;
 using redb.Core.Query.QueryExpressions;
 using redb.Core.Serialization;
 using redb.Postgres.Sql;
@@ -15,7 +14,7 @@ namespace redb.Postgres.Query;
 /// PostgreSQL tree query provider implementation.
 /// Inherits from TreeQueryProviderBase and provides PostgreSQL-specific components.
 /// </summary>
-public class PostgresTreeQueryProvider : TreeQueryProviderBase
+public partial class PostgresTreeQueryProvider : TreeQueryProviderBase
 {
     public PostgresTreeQueryProvider(
         IRedbContext context,
@@ -28,14 +27,6 @@ public class PostgresTreeQueryProvider : TreeQueryProviderBase
         ISchemeSyncProvider? schemeSync = null)
         : base(context, serializer, dialect ?? new PostgreSqlDialect(), cacheDomain, lazyPropsLoader, configuration, logger, schemeSync)
     {
-    }
-    
-    /// <summary>
-    /// Creates PostgreSQL-specific filter expression parser.
-    /// </summary>
-    protected override IFilterExpressionParser CreateFilterParser()
-    {
-        return new FilterExpressionParser();
     }
     
     /// <summary>

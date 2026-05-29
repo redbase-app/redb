@@ -12,6 +12,14 @@ public abstract class ListTestsBase
     protected readonly IRedbService Redb;
     protected virtual bool IsPro => false;
 
+    /// <summary>
+    /// True if the underlying provider supports OrderBy/Where on `ListItem.Value` / `ListItem.Alias`
+    /// (requires a JOIN to `_list_items` or equivalent). All Postgres tiers (Free PVT + Pro) and
+    /// MsSql Pro support it; MsSql Free currently does not (ORDER BY is ignored, rows come back
+    /// in insertion order). Override to opt-in.
+    /// </summary>
+    protected virtual bool SupportsListItemValueAliasOrdering => IsPro;
+
     protected ListTestsBase(IRedbService redb) => Redb = redb;
 
     private async Task<RedbList> CreateTestListAsync(string name = "TestStatuses")
@@ -244,9 +252,10 @@ public abstract class ListTestsBase
             Props = new PersonProps { Name = "Carol", Age = 35, Email = "carol@test.com", Status = pendingItem }
         };
 
-        person1.id = await Redb.SaveAsync(person1);
-        person2.id = await Redb.SaveAsync(person2);
-        person3.id = await Redb.SaveAsync(person3);
+        var batchIds = await Redb.SaveAsync(new[] { person1, person2, person3 });
+        person1.id = batchIds[0];
+        person2.id = batchIds[1];
+        person3.id = batchIds[2];
 
         // Query: find persons where Status IN (Active, Pending) — closure Contains pattern
         var selected = new List<RedbListItem> { activeItem, pendingItem };
@@ -283,8 +292,9 @@ public abstract class ListTestsBase
             Props = new PersonProps { Name = "Eve", Age = 28, Email = "eve@test.com", Roles = [viewerItem] }
         };
 
-        person1.id = await Redb.SaveAsync(person1);
-        person2.id = await Redb.SaveAsync(person2);
+        var batchIds = await Redb.SaveAsync(new[] { person1, person2 });
+        person1.id = batchIds[0];
+        person2.id = batchIds[1];
 
         // Query: x.Roles.Contains(adminItem) — array Contains pattern
         var results = await Redb.Query<PersonProps>()
@@ -309,37 +319,41 @@ public abstract class ListTestsBase
         var alphaItem = statuses.First(s => s.Value == "Alpha");
         var betaItem = statuses.First(s => s.Value == "Beta");
 
+        // Use unique per-run prefix to avoid cross-test pollution in PersonProps scheme
+        var tag = $"OrderByValue_{Guid.NewGuid():N}";
         var person1 = new RedbObject<PersonProps>
         {
             name = "Person Gamma",
-            Props = new PersonProps { Name = "P1", Age = 20, Email = "p1@test.com", Status = gammaItem }
+            Props = new PersonProps { Name = $"{tag}_P1", Age = 20, Email = "p1@test.com", Status = gammaItem }
         };
         var person2 = new RedbObject<PersonProps>
         {
             name = "Person Alpha",
-            Props = new PersonProps { Name = "P2", Age = 30, Email = "p2@test.com", Status = alphaItem }
+            Props = new PersonProps { Name = $"{tag}_P2", Age = 30, Email = "p2@test.com", Status = alphaItem }
         };
         var person3 = new RedbObject<PersonProps>
         {
             name = "Person Beta",
-            Props = new PersonProps { Name = "P3", Age = 40, Email = "p3@test.com", Status = betaItem }
+            Props = new PersonProps { Name = $"{tag}_P3", Age = 40, Email = "p3@test.com", Status = betaItem }
         };
 
-        person1.id = await Redb.SaveAsync(person1);
-        person2.id = await Redb.SaveAsync(person2);
-        person3.id = await Redb.SaveAsync(person3);
+        var batchIds = await Redb.SaveAsync(new[] { person1, person2, person3 });
+        person1.id = batchIds[0];
+        person2.id = batchIds[1];
+        person3.id = batchIds[2];
 
         // Query: OrderBy Status.Value — should sort alphabetically by list item text
         var results = await Redb.Query<PersonProps>()
-            .Where(p => p.Name == "P1" || p.Name == "P2" || p.Name == "P3")
+            .Where(p => p.Name == $"{tag}_P1" || p.Name == $"{tag}_P2" || p.Name == $"{tag}_P3")
             .OrderBy(p => p.Status!.Value)
             .ToListAsync();
 
         results.Should().HaveCount(3);
 
-        if (IsPro)
+        if (SupportsListItemValueAliasOrdering)
         {
-            // Pro: JOIN _list_items generates correct alphabetical sorting
+            // Provider supports JOIN to _list_items (Postgres Free + Pro, MsSql Pro):
+            // OrderBy Status.Value must sort alphabetically by the list item text.
             var values = results.Select(r => r.Props.Status!.Value).ToList();
             values.Should().BeEquivalentTo(["Alpha", "Beta", "Gamma"],
                 opts => opts.WithStrictOrdering(),
@@ -361,37 +375,41 @@ public abstract class ListTestsBase
         var s2 = statuses.First(s => s.Alias == "Apple");
         var s3 = statuses.First(s => s.Alias == "Banana");
 
+        // Use unique per-run prefix to avoid cross-test pollution in PersonProps scheme
+        var aliasTag = $"OrderByAlias_{Guid.NewGuid():N}";
         var person1 = new RedbObject<PersonProps>
         {
             name = "Person Cherry",
-            Props = new PersonProps { Name = "A1", Age = 20, Email = "a1@test.com", Status = s1 }
+            Props = new PersonProps { Name = $"{aliasTag}_A1", Age = 20, Email = "a1@test.com", Status = s1 }
         };
         var person2 = new RedbObject<PersonProps>
         {
             name = "Person Apple",
-            Props = new PersonProps { Name = "A2", Age = 30, Email = "a2@test.com", Status = s2 }
+            Props = new PersonProps { Name = $"{aliasTag}_A2", Age = 30, Email = "a2@test.com", Status = s2 }
         };
         var person3 = new RedbObject<PersonProps>
         {
             name = "Person Banana",
-            Props = new PersonProps { Name = "A3", Age = 40, Email = "a3@test.com", Status = s3 }
+            Props = new PersonProps { Name = $"{aliasTag}_A3", Age = 40, Email = "a3@test.com", Status = s3 }
         };
 
-        person1.id = await Redb.SaveAsync(person1);
-        person2.id = await Redb.SaveAsync(person2);
-        person3.id = await Redb.SaveAsync(person3);
+        var batchIds = await Redb.SaveAsync(new[] { person1, person2, person3 });
+        person1.id = batchIds[0];
+        person2.id = batchIds[1];
+        person3.id = batchIds[2];
 
         // Query: OrderBy Status.Alias — should sort alphabetically by alias
         var results = await Redb.Query<PersonProps>()
-            .Where(p => p.Name == "A1" || p.Name == "A2" || p.Name == "A3")
+            .Where(p => p.Name == $"{aliasTag}_A1" || p.Name == $"{aliasTag}_A2" || p.Name == $"{aliasTag}_A3")
             .OrderBy(p => p.Status!.Alias)
             .ToListAsync();
 
         results.Should().HaveCount(3);
 
-        if (IsPro)
+        if (SupportsListItemValueAliasOrdering)
         {
-            // Pro: JOIN _list_items generates correct alphabetical sorting by alias
+            // Provider supports JOIN to _list_items (Postgres Free + Pro, MsSql Pro):
+            // OrderBy Status.Alias must sort alphabetically by alias.
             var resultAliases = results.Select(r => r.Props.Status!.Alias).ToList();
             resultAliases.Should().BeEquivalentTo(["Apple", "Banana", "Cherry"],
                 opts => opts.WithStrictOrdering(),

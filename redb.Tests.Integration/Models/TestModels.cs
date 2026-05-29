@@ -109,9 +109,24 @@ public class ProjectMetricsProps
     public long ProjectId { get; set; }
     public long? TasksCompleted { get; set; }
     public long? TasksTotal { get; set; }
+    public long? BugsFixed { get; set; }
     public double? Budget { get; set; }
     public long? TeamSize { get; set; }
     public string[]? Technologies { get; set; }
+}
+
+// ───────────────────────────────────────────────
+// Department model (tree hierarchy — mirrors redb.Examples.Models.DepartmentProps)
+// ───────────────────────────────────────────────
+
+[RedbScheme("TestDepartment")]
+public class DepartmentProps
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public decimal Budget { get; set; }
+    public string Code { get; set; } = string.Empty;
 }
 
 // ───────────────────────────────────────────────
@@ -177,4 +192,5 @@ public class CityProps
     public int Population { get; set; }
     public string Region { get; set; } = string.Empty;
     public bool IsCapital { get; set; }
+    public double[]? Coordinates { get; set; }
 }

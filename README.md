@@ -577,6 +577,43 @@ Storage is provider-based. Each `[RedbScheme]` class maps to an internal structu
 
 **Supported backends:** PostgreSQL 14+, Microsoft SQL Server 2019+.
 
+### Schema lifecycle and multi-version deployments
+
+**Read path is graceful.** When deployed code has a `Props` class without a field
+that exists in the database, the materializer silently skips it. Old binaries
+safely read newer data — no exception is thrown.
+
+**Write path is destructive by default.** `InitializeAsync()` runs
+`AutoSyncSchemesAsync()` which calls `SyncSchemeAsync<T>()` per scheme. By
+default this **deletes** any `_structures` row not present in the C# Props
+class, and every `_values` row referencing those structures is silently
+removed as well:
+
+- **PostgreSQL** — the FK `_values._id_structure -> _structures._id` is
+  declared `ON DELETE CASCADE`.
+- **MSSQL** — the FK is `NO ACTION` (MSSQL forbids multiple cascade paths
+  into `_values`), but the trigger `TR__structures__cascade_values`
+  (`INSTEAD OF DELETE` on `_structures`) deletes the dependent `_values`
+  rows first, producing the same runtime effect as PostgreSQL.
+
+For rolling / blue-green deployments where old and new app versions may share
+the database, disable destructive sync:
+
+```csharp
+services.AddRedb(options => options
+    .UsePostgres(connectionString)
+    .Configure(c => c.DefaultStrictDeleteExtra = false));
+```
+
+When destructive sync is enabled and structures are actually removed, an
+`ILogger.LogWarning` is emitted listing the scheme name and the structure
+ids / names being deleted.
+
+The per-save value-set ownership contract (one object's `SaveAsync` rewrites
+its full value set) is still destructive in this release — old and new versions
+should not write to the same object during the multi-version window. An opt-in
+`PropsSaveMode.PreserveUnknownStructures` flag is planned; see ROADMAP.
+
 ---
 
 ## How It Compares

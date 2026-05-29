@@ -21,11 +21,11 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -38,6 +38,19 @@
 
   <ItemGroup>
     <EmbeddedResource Include="sql\redb_init.sql" />
+    <EmbeddedResource Include="sql\v2-pvt\pvt_bundle.sql">
+      <!-- Pin the manifest name so the C# loader (RedbService.ReadEmbeddedPvtBundleSql)
+           can find it. By default MSBuild mangles `-` in the path into `_`, producing
+           `redb.Postgres.sql.v2_pvt.pvt_bundle.sql` instead of the expected
+           `redb.Postgres.sql.v2-pvt.pvt_bundle.sql`. -->
+      <LogicalName>redb.Postgres.sql.v2-pvt.pvt_bundle.sql</LogicalName>
+    </EmbeddedResource>
+    <!-- Register every .sql file under sql/ as a FastUpToDateCheck input so
+         `dotnet run` / `dotnet build` does NOT skip the build when only .sql
+         files changed. Without this MSBuild treats the project as up-to-date,
+         the ConcatenateSql target is never invoked, and the stale
+         pvt_bundle.sql stays embedded in the assembly. -->
+    <UpToDateCheckInput Include="sql\**\*.sql" Exclude="sql\redb_init.sql;sql\v2-pvt\pvt_bundle.sql" />
   </ItemGroup>
 
   <!-- Inline task: concatenate SQL source files into a single init script -->
@@ -67,18 +80,42 @@
     </Task>
   </UsingTask>
 
-  <!-- Run only for the first TFM to avoid parallel write conflicts on redb_init.sql -->
-  <Target Name="ConcatenateSql" BeforeTargets="BeforeBuild"
-          Condition="'$(TargetFramework)' == 'net8.0' OR '$(TargetFrameworks)' == ''">
-    <ItemGroup>
-      <SqlMainFile Include="sql\redbPostgre.sql" />
-      <!-- Order matters: metadata_cache creates _scheme_metadata_cache table needed by facets_search;
-           window creates resolve_field_path proc needed by aggregation -->
-      <SqlEarlyFiles Include="sql\redb_metadata_cache.sql;sql\redb_window.sql" />
-      <SqlOtherFiles Include="sql\*.sql" Exclude="sql\redbPostgre.sql;sql\redb_init.sql;@(SqlEarlyFiles)" />
-      <SqlAllFiles Include="@(SqlMainFile);@(SqlEarlyFiles);@(SqlOtherFiles)" />
-    </ItemGroup>
+  <!-- SQL source items used by ConcatenateSql. Declared at project scope so
+       Target Inputs="..." can evaluate them for incremental builds. -->
+  <ItemGroup>
+    <SqlMainFile Include="sql\redbPostgre.sql" />
+    <!-- Order matters: metadata_cache creates _scheme_metadata_cache table needed by facets_search.
+         NOTE: redb_window.sql moved to sql/deprecated/ (2026-05-23) — PG window path is fully
+         PVT-driven (pvt_build_window_sql), redb_grouping.sql also moved (PVT covers it). -->
+    <SqlEarlyFiles Include="sql\redb_metadata_cache.sql" />
+    <SqlOtherFiles Include="sql\*.sql" Exclude="sql\redbPostgre.sql;sql\redb_init.sql;@(SqlEarlyFiles)" />
+    <!-- v2-pvt module — MUST come last. PVT requires core tables and
+         get_scheme_definition / get_object_json already deployed (see the
+         DO-block precondition checks at the top of v2-pvt/00_module_init.sql).
+         Files are picked up by numeric prefix (00..26). Excludes the
+         pre-built pvt_bundle.sql (would duplicate content), smoke tests
+         (CI-only) and anything under v2-pvt/deprecated/. -->
+    <SqlPvtBundle Include="sql\v2-pvt\*.sql"
+                  Exclude="sql\v2-pvt\pvt_bundle.sql;sql\v2-pvt\99_smoke_auto.sql;sql\v2-pvt\99_smoke_tests.sql" />
+    <SqlAllFiles Include="@(SqlMainFile);@(SqlEarlyFiles);@(SqlOtherFiles);@(SqlPvtBundle)" />
+  </ItemGroup>
+
+  <!-- Always regenerate the bundles before any inner build starts. We hook
+       both DispatchToInnerBuilds (outer multi-TFM evaluation) and BeforeBuild
+       (single-TFM build, e.g. when consumed via ProjectReference for one TFM).
+       Inputs/Outputs make the target incremental: it skips when no .sql file
+       under sql/ changed. This guarantees that `dotnet build` for any TFM
+       picks up a fresh pvt_bundle.sql when the source files change. -->
+  <Target Name="ConcatenateSql"
+          BeforeTargets="DispatchToInnerBuilds;BeforeBuild"
+          Inputs="@(SqlAllFiles)"
+          Outputs="sql\redb_init.sql;sql\v2-pvt\pvt_bundle.sql">
     <ConcatenateSqlFiles InputFiles="@(SqlAllFiles)" OutputFile="sql\redb_init.sql" />
+    <!-- Also produce a v2-pvt-only bundle so the C# layer can deploy the module
+         to existing databases that pre-date its introduction (EnsureDatabaseAsync
+         skips redb_init.sql when _schemes already exists). Mirrors the standalone
+         _bundle.ps1 used during PVT development. -->
+    <ConcatenateSqlFiles InputFiles="@(SqlPvtBundle)" OutputFile="sql\v2-pvt\pvt_bundle.sql" />
   </Target>
 
 </Project>

@@ -212,6 +212,13 @@ CREATE TABLE _values(
     _array_index text NULL, -- Key/index of element: '0','1','2' for arrays, string key for dictionaries
     CONSTRAINT PK__values PRIMARY KEY (_id),
     CONSTRAINT FK__values__objects FOREIGN KEY (_id_object) REFERENCES _objects (_id) ON DELETE CASCADE,
+    -- DESIGN: ON DELETE CASCADE here intentionally mirrors the MSSQL
+    -- TR__structures__cascade_values INSTEAD OF DELETE trigger
+    -- (redb.MSSql/sql/redbMSSQL.sql ~L717). Both backends silently remove
+    -- every _values row when a _structures row is deleted. Destructive
+    -- structure deletion at runtime is gated by
+    -- RedbServiceConfiguration.DefaultStrictDeleteExtra (default true,
+    -- see README "Schema lifecycle and multi-version deployments").
     CONSTRAINT FK__values__structures FOREIGN KEY (_id_structure) REFERENCES _structures (_id) ON DELETE CASCADE,
     CONSTRAINT FK__values__array_parent FOREIGN KEY (_array_parent_id) REFERENCES _values (_id) ON DELETE CASCADE,
     CONSTRAINT FK__values__list_items FOREIGN KEY (_ListItem) REFERENCES _list_items (_id),

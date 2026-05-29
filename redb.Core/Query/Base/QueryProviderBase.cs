@@ -6,13 +6,13 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Data;
-using redb.Core.Exceptions;
 using redb.Core.Models.Configuration;
 using redb.Core.Models.Contracts;
 using redb.Core.Models.Entities;
 using redb.Core.Providers;
 using redb.Core.Query.Aggregation;
 using redb.Core.Query.FacetFilters;
+using redb.Core.Query.Parsing;
 using redb.Core.Query.QueryExpressions;
 using redb.Core.Serialization;
 
@@ -59,7 +59,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
     /// <summary>
     /// Creates filter expression parser. Override for Pro features.
     /// </summary>
-    protected abstract IFilterExpressionParser CreateFilterParser();
+    protected virtual IFilterExpressionParser CreateFilterParser() => new FilterExpressionParser();
     
     /// <summary>
     /// Creates ordering expression parser.
@@ -96,18 +96,12 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
     }
     
     /// <summary>
-    /// Check for Pro-only Distinct features
+    /// Hook for Distinct-related feature checks. No-op in OSS — DistinctRedb /
+    /// DistinctBy are evaluated by SQL builders directly and either work or
+    /// surface a concrete error from the dialect.
     /// </summary>
     protected virtual void CheckProOnlyDistinctFeatures<TProps>(QueryContext<TProps> context) where TProps : class, new()
     {
-        if (context.IsDistinctRedb)
-        {
-            throw new RedbProRequiredException("DistinctRedb()", ProFeatureCategory.DistinctQuery);
-        }
-        if (context.DistinctByField != null)
-        {
-            throw new RedbProRequiredException(context.DistinctByIsBaseField ? "DistinctByRedb()" : "DistinctBy()", ProFeatureCategory.DistinctQuery);
-        }
     }
     
     /// <summary>
@@ -180,6 +174,15 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
     /// </summary>
     protected virtual async Task<int> ExecuteCountAsync<TProps>(QueryContext<TProps> context) where TProps : class, new()
     {
+        // v2-pvt path (free Postgres): build inner SQL via pvt_build_query_sql,
+        // then COUNT(*) it on the client side. Dialect that returns null falls
+        // through to the legacy search_objects_with_facets_base pipeline below.
+        if (CanUsePvtPipeline(context))
+        {
+            _logger?.LogDebug("PVT Count Query: SchemeId={SchemeId}", context.SchemeId);
+            return await ExecuteCountAsyncPvt(context);
+        }
+
         var facetFilters = _facetBuilder.BuildFacetFilters(context.Filter);
         var orderByJson = BuildOrderByJson(context);
         
@@ -213,7 +216,29 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
     {
         // ⚠️ Pro-only features check
         CheckProOnlyDistinctFeatures(context);
-        
+
+        var hasFieldPathsEarly = context.ProjectedFieldPaths != null && context.ProjectedFieldPaths.Count > 0;
+
+        // v2-pvt native projection path: when there are projected field paths
+        // AND the dialect ships pvt_build_projection_sql. The outer SELECT
+        // yields the requested scalar columns, wrapped into a JSON-row shape
+        // that flows through the standard materializer.
+        if (hasFieldPathsEarly && CanUsePvtProjection(context))
+        {
+            _logger?.LogDebug("PVT Projection ToList Query: SchemeId={SchemeId}, Paths={Paths}",
+                context.SchemeId, string.Join(",", context.ProjectedFieldPaths!));
+            return await ExecuteToListAsyncPvtProjection<TProps>(context);
+        }
+
+        // v2-pvt full-object path (free Postgres). Projection without native
+        // pvt_build_projection_sql falls through to this branch — the compiled
+        // selector then trims columns client-side from full RedbObject<T>s.
+        if (CanUsePvtPipeline(context))
+        {
+            _logger?.LogDebug("PVT ToList Query: SchemeId={SchemeId}", context.SchemeId);
+            return await ExecuteToListAsyncPvt<TProps>(context, propsType);
+        }
+
         var facetFilters = _facetBuilder.BuildFacetFilters(context.Filter);
         var parameters = _facetBuilder.BuildQueryParameters(context.Limit, context.Offset);
         var orderByJson = BuildOrderByJson(context);
@@ -488,6 +513,265 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
 
         // 🆕 Using _facetBuilder.BuildOrderBy which correctly handles IsBaseField
         return _facetBuilder.BuildOrderBy(context.Orderings);
+    }
+    
+    // ============================================================
+    // === v2-pvt PIPELINE (free Postgres path) ===
+    // Two-step search: ask the DB to BUILD the inner _id-list SQL via
+    // pvt_build_query_sql(), then wrap on the client side. Dialect that
+    // does not support v2-pvt (Query_BuildPvtSqlFunction() == null)
+    // routes back to the legacy search_objects_with_facets pipeline.
+    // ============================================================
+
+    /// <summary>
+    /// Returns true when the active dialect exposes the v2-pvt module.
+    /// Projection is applied client-side (see RedbProjectedQueryable.ToListAsync),
+    /// so the PVT pipeline serves projection queries by returning full objects via
+    /// get_object_json — the compiled selector then extracts the requested fields.
+    /// </summary>
+    protected virtual bool CanUsePvtPipeline<TProps>(QueryContext<TProps> context) where TProps : class, new()
+    {
+        return _sql.Query_BuildPvtSqlFunction() is not null;
+    }
+
+    /// <summary>
+    /// Phase 1: ask the database to build the inner _id-list SQL string.
+    /// When <paramref name="ignoreLimitOffset"/> is true the call passes
+    /// p_limit=NULL,p_offset=0 (used for COUNT/EXISTS wrappers).
+    /// </summary>
+    protected async Task<string> BuildPvtInnerSqlAsync<TProps>(
+        QueryContext<TProps> context,
+        bool ignoreLimitOffset) where TProps : class, new()
+    {
+        var facetFilters = _facetBuilder.BuildFacetFilters(context.Filter);
+        var orderByJson  = BuildOrderByJson(context);
+        var parameters   = _facetBuilder.BuildQueryParameters(context.Limit, context.Offset);
+
+        var limit  = ignoreLimitOffset ? (int?)null : parameters.Limit;
+        var offset = ignoreLimitOffset ? 0          : (parameters.Offset ?? 0);
+
+        // DistinctBy → p_distinct_on jsonb array (PVT engine handles SELECT DISTINCT ON parity)
+        string? distinctOnJson = null;
+        if (context.DistinctByField != null)
+        {
+            var name = context.DistinctByField.Property.Name;
+            distinctOnJson = context.DistinctByIsBaseField
+                ? "[{\"field\":\"0$:" + name + "\"}]"
+                : "[{\"field\":\"" + name + "\"}]";
+        }
+
+        var invocation = _sql.Query_BuildPvtSqlInvocation(
+            schemeId     : context.SchemeId,
+            limit        : limit,
+            offset       : offset,
+            maxDepth     : context.MaxRecursionDepth ?? 10,
+            distinct     : context.IsDistinct,
+            sourceMode   : "flat",
+            treeIds      : null,
+            hasDistinctOn: distinctOnJson != null);
+
+        if (invocation is null)
+            throw new InvalidOperationException(
+                "v2-pvt is enabled by dialect but Query_BuildPvtSqlInvocation returned null.");
+
+        object filterParam = string.IsNullOrEmpty(facetFilters) || facetFilters == "{}"
+            ? (object)DBNull.Value
+            : facetFilters;
+        object orderParam = string.IsNullOrEmpty(orderByJson) || orderByJson == "null" || orderByJson == "[]"
+            ? (object)DBNull.Value
+            : orderByJson;
+
+        string? inner;
+        if (distinctOnJson != null)
+            inner = await _context.ExecuteScalarAsync<string>(invocation, filterParam, orderParam, distinctOnJson);
+        else
+            inner = await _context.ExecuteScalarAsync<string>(invocation, filterParam, orderParam);
+
+        if (string.IsNullOrWhiteSpace(inner))
+            throw new InvalidOperationException(
+                "pvt_build_query_sql returned an empty SQL string for scheme " + context.SchemeId + ".");
+        return inner;
+    }
+
+    /// <summary>v2-pvt Count path: COUNT(*) wrapper over the inner _id-list SQL.</summary>
+    protected virtual async Task<int> ExecuteCountAsyncPvt<TProps>(QueryContext<TProps> context) where TProps : class, new()
+    {
+        var inner   = await BuildPvtInnerSqlAsync(context, ignoreLimitOffset: true);
+        var wrapped = _sql.Query_WrapPvtWithCount(inner)
+            ?? throw new InvalidOperationException("Query_WrapPvtWithCount returned null for a PVT-enabled dialect.");
+        var count = await _context.ExecuteScalarAsync<long>(wrapped);
+        return checked((int)count);
+    }
+
+    /// <summary>v2-pvt SQL preview path: returns the inner _id-list SQL as-is.</summary>
+    protected virtual Task<string> GetSqlPreviewAsyncPvt<TProps>(QueryContext<TProps> context) where TProps : class, new()
+        => BuildPvtInnerSqlAsync(context, ignoreLimitOffset: false);
+
+    /// <summary>
+    /// v2-pvt ToList path: wraps the inner SQL with get_object_json, executes,
+    /// and reuses the existing JSON materializer.
+    /// </summary>
+    protected virtual async Task<object> ExecuteToListAsyncPvt<TProps>(QueryContext<TProps> context, Type propsType) where TProps : class, new()
+    {
+        var inner = await BuildPvtInnerSqlAsync(context, ignoreLimitOffset: false);
+        var maxDepth = context.MaxRecursionDepth ?? 10;
+        var wrapped = _sql.Query_WrapPvtWithObjectJson(inner, maxDepth)
+            ?? throw new InvalidOperationException("Query_WrapPvtWithObjectJson returned null for a PVT-enabled dialect.");
+
+        var sqlTimer = System.Diagnostics.Stopwatch.StartNew();
+        var rows = await _context.QueryAsync<StringValue>(wrapped);
+        sqlTimer.Stop();
+        _logger?.LogInformation("⏱️  PVT SQL (get_object_json wrapper) executed in {ElapsedMs} ms", sqlTimer.ElapsedMilliseconds);
+
+        if (rows is null || rows.Count == 0)
+        {
+            _logger?.LogDebug("PVT ToList Result: empty");
+            return new List<RedbObject<TProps>>();
+        }
+
+        var objects = new System.Text.Json.JsonElement[rows.Count];
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var json = rows[i].Value;
+            if (string.IsNullOrWhiteSpace(json)) continue;
+            objects[i] = System.Text.Json.JsonDocument.Parse(json).RootElement.Clone();
+        }
+
+        return await MaterializeResultsFromJson<TProps>(objects, context);
+    }
+
+    /// <summary>
+    /// Returns true when the active dialect exposes native PVT projection
+    /// (pvt_build_projection_sql) AND the context has only safe constructs.
+    /// Currently we exclude DistinctByField (uses p_distinct_on path that
+    /// needs separate wiring) and ProjectedStructureIds (legacy by-ids path).
+    /// </summary>
+    protected virtual bool CanUsePvtProjection<TProps>(QueryContext<TProps> context) where TProps : class, new()
+    {
+        if (_sql.Query_BuildPvtProjectionSqlFunction() is null) return false;
+        if (context.ProjectedFieldPaths is null || context.ProjectedFieldPaths.Count == 0) return false;
+        if (context.DistinctByField != null) return false;
+        if (context.ProjectedStructureIds != null && context.ProjectedStructureIds.Count > 0) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// v2-pvt native projection path. Builds a projection JSON from
+    /// context.ProjectedFieldPaths, asks pvt_build_projection_sql for the
+    /// inner SELECT yielding the requested scalar columns, wraps it into a
+    /// JSON-row shape compatible with the standard materializer, and runs
+    /// it through ConvertFlatPropertiesToHierarchy + MaterializeResultsFromJson.
+    /// The compiled selector (RedbProjectedQueryable) then trims the resulting
+    /// RedbObject&lt;TProps&gt; instances client-side.
+    /// </summary>
+    protected virtual async Task<object> ExecuteToListAsyncPvtProjection<TProps>(QueryContext<TProps> context) where TProps : class, new()
+    {
+        var facetFilters = _facetBuilder.BuildFacetFilters(context.Filter);
+        var orderByJson  = BuildOrderByJson(context);
+        var parameters   = _facetBuilder.BuildQueryParameters(context.Limit, context.Offset);
+
+        // Build projection JSON: one {"field":"<path>"} entry per ProjectedFieldPath.
+        // The default alias inside pvt_build_projection equals the field text, so the
+        // resulting inner-SQL columns are named exactly "FirstName", "Address.City", etc.
+        // When IsDistinct is false we add an extra "_id" entry so we can attach the
+        // object id to each materialized RedbObject<TProps>. Under DISTINCT we drop
+        // "_id" to avoid making every row trivially unique.
+        var includeId = !context.IsDistinct;
+        var projectionJson = BuildPvtProjectionJson(context.ProjectedFieldPaths!, includeId);
+
+        var invocation = _sql.Query_BuildPvtProjectionSqlInvocation(
+            schemeId     : context.SchemeId,
+            limit        : parameters.Limit,
+            offset       : parameters.Offset ?? 0,
+            maxDepth     : context.MaxRecursionDepth ?? 10,
+            distinct     : context.IsDistinct,
+            sourceMode   : "flat",
+            treeIds      : null,
+            hasDistinctOn: false);
+
+        if (invocation is null)
+            throw new InvalidOperationException(
+                "Query_BuildPvtProjectionSqlInvocation returned null for a projection-PVT-enabled dialect.");
+
+        object filterParam = string.IsNullOrEmpty(facetFilters) || facetFilters == "{}"
+            ? (object)DBNull.Value
+            : facetFilters;
+        object orderParam = string.IsNullOrEmpty(orderByJson) || orderByJson == "null" || orderByJson == "[]"
+            ? (object)DBNull.Value
+            : orderByJson;
+
+        var inner = await _context.ExecuteScalarAsync<string>(invocation, projectionJson, filterParam, orderParam);
+        if (string.IsNullOrWhiteSpace(inner))
+            throw new InvalidOperationException(
+                "pvt_build_projection_sql returned an empty SQL string for scheme " + context.SchemeId + ".");
+
+        var wrapped = _sql.Query_WrapPvtProjectionRowsAsJson(inner, includeId)
+            ?? throw new InvalidOperationException("Query_WrapPvtProjectionRowsAsJson returned null for a projection-PVT-enabled dialect.");
+
+        var sqlTimer = System.Diagnostics.Stopwatch.StartNew();
+        var rows = await _context.QueryAsync<StringValue>(wrapped);
+        sqlTimer.Stop();
+        _logger?.LogInformation("⏱️  PVT projection SQL executed in {ElapsedMs} ms ({RowCount} rows)",
+            sqlTimer.ElapsedMilliseconds, rows?.Count ?? 0);
+
+        if (rows is null || rows.Count == 0)
+            return new List<RedbObject<TProps>>();
+
+        var objects = new System.Text.Json.JsonElement[rows.Count];
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var json = rows[i].Value;
+            if (string.IsNullOrWhiteSpace(json)) continue;
+            objects[i] = System.Text.Json.JsonDocument.Parse(json).RootElement.Clone();
+        }
+
+        // Convert dotted-key properties ("Address.City") into nested objects so
+        // the typed Props deserializer can map them. Then go through the standard
+        // materializer with SkipPropsLoading=true (we already have the Props subset).
+        var hierarchical = ConvertFlatPropertiesToHierarchy(objects);
+        var prevSkip = context.SkipPropsLoading;
+        context.SkipPropsLoading = true;
+        try
+        {
+            return await MaterializeResultsFromJson<TProps>(hierarchical, context);
+        }
+        finally
+        {
+            context.SkipPropsLoading = prevSkip;
+        }
+    }
+
+    /// <summary>
+    /// Serializes the projected field paths into the JSON shape expected by
+    /// pvt_build_projection_sql: <c>[{"field":"FirstName"},{"field":"Address.City"}, ...]</c>.
+    /// Adds a trailing <c>{"field":"_id"}</c> entry when <paramref name="includeId"/> is true.
+    /// </summary>
+    private static string BuildPvtProjectionJson(List<string> fieldPaths, bool includeId)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append('[');
+        for (var i = 0; i < fieldPaths.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            sb.Append("{\"field\":");
+            sb.Append(System.Text.Json.JsonSerializer.Serialize(fieldPaths[i]));
+            sb.Append('}');
+        }
+        if (includeId)
+        {
+            if (fieldPaths.Count > 0) sb.Append(',');
+            sb.Append("{\"field\":\"_id\"}");
+        }
+        sb.Append(']');
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Trivial DTO for one-column string result-sets (e.g. get_object_json output).
+    /// </summary>
+    private sealed class StringValue
+    {
+        public string Value { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -800,6 +1084,14 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
     public virtual async Task<string> GetSqlPreviewAsync<TProps>(QueryContext<TProps> context) 
         where TProps : class, new()
     {
+        // v2-pvt path: return the inner _id-list SQL produced by pvt_build_query_sql.
+        // The caller can run it directly or wrap with COUNT/EXISTS/get_object_json on the client side.
+        if (CanUsePvtPipeline(context))
+        {
+            _logger?.LogDebug("PVT SQL Preview: SchemeId={SchemeId}", context.SchemeId);
+            return await GetSqlPreviewAsyncPvt(context);
+        }
+
         var facetFilters = _facetBuilder.BuildFacetFilters(context.Filter);
         var parameters = _facetBuilder.BuildQueryParameters(context.Limit, context.Offset);
         var orderByJson = BuildOrderByJson(context);

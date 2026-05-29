@@ -85,7 +85,8 @@ public interface ITreeQueryProvider : IRedbQueryProvider
     Task<System.Text.Json.JsonDocument?> ExecuteTreeGroupedAggregateAsync<TProps>(
         Base.TreeQueryContext<TProps> context,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
-        IEnumerable<Aggregation.AggregateRequest> aggregations) where TProps : class, new();
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        string? havingJson = null) where TProps : class, new();
     
     /// <summary>
     /// Execute Window Functions query with tree context (CTE for tree traversal).
@@ -124,7 +125,8 @@ public interface ITreeQueryProvider : IRedbQueryProvider
     Task<string> GetTreeGroupBySqlPreviewAsync<TProps>(
         Base.TreeQueryContext<TProps> context,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
-        IEnumerable<Aggregation.AggregateRequest> aggregations) where TProps : class, new();
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        string? havingJson = null) where TProps : class, new();
     
     // ===== TREE GROUPED WINDOW (GroupBy + Window for Trees) =====
     

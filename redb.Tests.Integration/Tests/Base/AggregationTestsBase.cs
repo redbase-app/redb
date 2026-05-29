@@ -168,16 +168,6 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        if (!IsPro)
-        {
-            // DistinctBy is Pro-only (E140_DistinctByRedb)
-            var act = () => Redb.Query<EmployeeProps>()
-                .DistinctBy(e => e.Department)
-                .ToListAsync();
-            await act.Should().ThrowAsync<RedbProRequiredException>();
-            return;
-        }
-
         var results = await Redb.Query<EmployeeProps>()
             .DistinctBy(e => e.Department)
             .ToListAsync();

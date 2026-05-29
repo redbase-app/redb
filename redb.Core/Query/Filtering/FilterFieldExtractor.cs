@@ -109,9 +109,22 @@ public class FilterFieldExtractor
             case FunctionCallExpression func:
                 ExtractFromValueExpression(func.Argument, infos);
                 break;
+            case MultiArgFunctionCallExpression mfunc:
+                foreach (var arg in mfunc.Arguments)
+                    ExtractFromValueExpression(arg, infos);
+                break;
             case CustomFunctionExpression custom:
                 foreach (var arg in custom.Arguments)
                     ExtractFromValueExpression(arg, infos);
+                break;
+            case CoalesceExpression coalesce:
+                foreach (var arg in coalesce.Arguments)
+                    ExtractFromValueExpression(arg, infos);
+                break;
+            case ConditionalValueExpression cond:
+                ExtractRecursive(cond.Test, infos, new HashSet<string>());
+                ExtractFromValueExpression(cond.IfTrue, infos);
+                ExtractFromValueExpression(cond.IfFalse, infos);
                 break;
             // ConstantValueExpression doesn't contribute fields
         }

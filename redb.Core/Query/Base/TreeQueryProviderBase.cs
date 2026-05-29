@@ -7,13 +7,15 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Data;
-using redb.Core.Exceptions;
 using redb.Core.Models.Configuration;
 using redb.Core.Models.Contracts;
 using redb.Core.Models.Entities;
 using redb.Core.Providers;
 using redb.Core.Query.Aggregation;
 using redb.Core.Query.FacetFilters;
+using redb.Core.Query.Parsing;
+
+#pragma warning disable CS0618 // Type or member is obsolete (internal calls into legacy ExecuteTreeToListAsync remain until full migration)
 using redb.Core.Query.QueryExpressions;
 using redb.Core.Serialization;
 using redb.Core.Utils;
@@ -69,7 +71,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// <summary>
     /// Creates filter expression parser. Override for Pro features.
     /// </summary>
-    protected abstract IFilterExpressionParser CreateFilterParser();
+    protected virtual IFilterExpressionParser CreateFilterParser() => new FilterExpressionParser();
     
     /// <summary>
     /// Creates ordering expression parser.
@@ -132,14 +134,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// </summary>
     protected virtual void CheckProOnlyDistinctFeatures<TProps>(QueryContext<TProps> context) where TProps : class, new()
     {
-        if (context.IsDistinctRedb)
-        {
-            throw new RedbProRequiredException("DistinctRedb()", ProFeatureCategory.DistinctQuery);
-        }
-        if (context.DistinctByField != null)
-        {
-            throw new RedbProRequiredException(context.DistinctByIsBaseField ? "DistinctByRedb()" : "DistinctBy()", ProFeatureCategory.DistinctQuery);
-        }
+        // No-op: DistinctRedb / DistinctBy are evaluated downstream by the SQL builder.
     }
 
     // ===== IRedbQueryProvider IMPLEMENTATION (BASE FUNCTIONALITY) =====
@@ -197,10 +192,11 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         long schemeId,
         IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
-        string? filterJson = null)
+        string? filterJson = null,
+        string? havingJson = null)
     {
         var baseProvider = CreateQueryProvider();
-        return await baseProvider.ExecuteGroupedAggregateAsync(schemeId, groupFields, aggregations, filterJson);
+        return await baseProvider.ExecuteGroupedAggregateAsync(schemeId, groupFields, aggregations, filterJson, havingJson);
     }
     
     /// <summary>
@@ -211,10 +207,11 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         long schemeId,
         IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
-        QueryExpressions.FilterExpression? filter)
+        QueryExpressions.FilterExpression? filter,
+        string? havingJson = null)
     {
         var baseProvider = CreateQueryProvider();
-        return await baseProvider.ExecuteGroupedAggregateAsync(schemeId, groupFields, aggregations, filter);
+        return await baseProvider.ExecuteGroupedAggregateAsync(schemeId, groupFields, aggregations, filter, havingJson);
     }
     
     public virtual async Task<System.Text.Json.JsonDocument?> ExecuteArrayGroupedAggregateAsync(
@@ -222,10 +219,28 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         string arrayPath,
         IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
-        string? filterJson = null)
+        string? filterJson = null,
+        string? havingJson = null)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteArrayGroupedAggregateAsync(schemeId, arrayPath, groupFields, aggregations, filterJson);
+    }
+
+    /// <summary>
+    /// Execute array-element GroupBy with FilterExpression (Pro version).
+    /// Default impl forwards to the underlying QueryProvider so Pro overrides
+    /// can short-circuit the facet-JSON conversion.
+    /// </summary>
+    public virtual async Task<System.Text.Json.JsonDocument?> ExecuteArrayGroupedAggregateAsync(
+        long schemeId,
+        string arrayPath,
+        IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<AggregateRequest> aggregations,
+        QueryExpressions.FilterExpression? filter,
+        string? havingJson = null)
+    {
+        var baseProvider = CreateQueryProvider();
+        return await baseProvider.ExecuteArrayGroupedAggregateAsync(schemeId, arrayPath, groupFields, aggregations, filter, havingJson);
     }
     
     // ===== WINDOW FUNCTIONS (delegate to QueryProviderBase) =====
@@ -464,6 +479,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// <summary>
     /// Execute COUNT for tree query through search_tree_objects_with_facets
     /// </summary>
+    [Obsolete("Legacy tree COUNT path. Postgres provider now overrides this and routes through pvt_build_query_sql ('tree_descendants'). This base implementation will be removed once all providers are migrated.")]
     protected virtual async Task<int> ExecuteTreeCountAsync<TProps>(TreeQueryContext<TProps> context) where TProps : class, new()
     {
         // Check for Pro-only Distinct features (DistinctBy, DistinctByRedb, DistinctRedb)
@@ -527,6 +543,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// <summary>
     /// Execute ToList for tree query through search_tree_objects_with_facets
     /// </summary>
+    [Obsolete("Legacy tree ToList path. Postgres provider now overrides this and routes through pvt_build_query_sql ('tree_descendants'). This base implementation will be removed once all providers are migrated.")]
     protected virtual async Task<object> ExecuteTreeToListAsync<TProps>(TreeQueryContext<TProps> context) where TProps : class, new()
     {
         // Check for Pro-only Distinct features (DistinctBy, DistinctByRedb, DistinctRedb)
@@ -1130,7 +1147,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// <summary>
     /// Deserialize JSON result to list of TreeRedbObject
     /// </summary>
-    private List<TreeRedbObject<TProps>> DeserializeTreeObjects<TProps>(string? objectsJson) where TProps : class, new()
+    protected List<TreeRedbObject<TProps>> DeserializeTreeObjects<TProps>(string? objectsJson) where TProps : class, new()
     {
         if (string.IsNullOrEmpty(objectsJson) || objectsJson == "null")
             return new List<TreeRedbObject<TProps>>();
@@ -1198,7 +1215,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// Convert RedbObject to TreeRedbObject
     /// ✅ FIXED: Props copied from source (fixed bug with empty Props)
     /// </summary>
-    private TreeRedbObject<TProps> ConvertToTreeObject<TProps>(RedbObject<TProps> source) where TProps : class, new()
+    protected TreeRedbObject<TProps> ConvertToTreeObject<TProps>(RedbObject<TProps> source) where TProps : class, new()
     {
         var treeObj = new TreeRedbObject<TProps>
         {
@@ -1500,7 +1517,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     public virtual async Task<System.Text.Json.JsonDocument?> ExecuteTreeGroupedAggregateAsync<TProps>(
         TreeQueryContext<TProps> context,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
-        IEnumerable<Aggregation.AggregateRequest> aggregations) where TProps : class, new()
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        string? havingJson = null) where TProps : class, new()
     {
         // Base implementation: get tree object IDs first, then filter grouping
         var treeObjectIds = await GetTreeObjectIdsAsync(context);
@@ -1511,10 +1529,10 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         // Build filter JSON with object IDs
         var filterJson = BuildObjectIdsFilterJson(treeObjectIds);
         
-        // Delegate to base grouped aggregate with ID filter
+        // Delegate to base grouped aggregate with ID filter (PVT path honors having)
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteGroupedAggregateAsync(
-            context.SchemeId, groupFields, aggregations, filterJson);
+            context.SchemeId, groupFields, aggregations, filterJson, havingJson);
     }
     
     /// <summary>
@@ -1577,7 +1595,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// Get SQL preview for tree window query.
     /// Base implementation: returns placeholder, override in Pro for actual SQL.
     /// </summary>
-    public virtual Task<string> GetTreeWindowSqlPreviewAsync<TProps>(
+    public virtual async Task<string> GetTreeWindowSqlPreviewAsync<TProps>(
         TreeQueryContext<TProps> context,
         IEnumerable<Window.WindowFieldRequest> selectFields,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
@@ -1585,25 +1603,78 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Window.WindowOrderRequest> orderBy,
         string? frameJson = null) where TProps : class, new()
     {
-        return Task.FromResult($"-- Tree Window SQL Preview not available in Open Source version\n-- SchemeId: {context.SchemeId}\n-- RootObjectId: {context.RootObjectId}\n-- Use Pro version for SQL preview");
+        // Mirror the runtime path: fetch tree object IDs, then delegate to
+        // the non-tree window preview with a `0$:id $in [...]` filter.
+        var treeObjectIds = await GetTreeObjectIdsAsync(context);
+        if (treeObjectIds.Count == 0)
+        {
+            return $"-- Tree Window: subtree is empty (no objects matched RootObjectId={context.RootObjectId})\n-- SchemeId: {context.SchemeId}";
+        }
+        var filterJson = BuildObjectIdsFilterJson(treeObjectIds);
+        var baseProvider = CreateQueryProvider();
+        var preview = await baseProvider.GetWindowSqlPreviewAsync(
+            context.SchemeId, selectFields, windowFuncs, partitionBy, orderBy,
+            filterJson, frameJson, context.Limit, context.Offset);
+        return $"-- Tree Window: subtree resolved to {treeObjectIds.Count} object(s) (RootObjectId={context.RootObjectId})\n" + preview;
     }
-    
+
     /// <summary>
     /// Get SQL preview for tree GROUP BY query.
-    /// Base implementation: returns placeholder, override in Pro for actual SQL.
+    /// Base implementation: fetches tree object IDs and delegates to the
+    /// non-tree GroupBy preview with an `0$:id $in [...]` filter.
     /// </summary>
-    public virtual Task<string> GetTreeGroupBySqlPreviewAsync<TProps>(
+    public virtual async Task<string> GetTreeGroupBySqlPreviewAsync<TProps>(
         TreeQueryContext<TProps> context,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
-        IEnumerable<Aggregation.AggregateRequest> aggregations) where TProps : class, new()
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        string? havingJson = null) where TProps : class, new()
     {
-        return Task.FromResult(
-            $"-- Tree GroupBy SQL Preview not available in Open Source version\n" +
-            $"-- SchemeId: {context.SchemeId}\n" +
-            $"-- RootObjectId: {context.RootObjectId}\n" +
-            $"-- GroupFields: {string.Join(", ", groupFields.Select(g => g.FieldPath))}\n" +
-            $"-- Aggregations: {string.Join(", ", aggregations.Select(a => $"{a.Function}({a.FieldPath})"))}\n" +
-            $"-- Use Pro version for SQL preview");
+        var treeObjectIds = await GetTreeObjectIdsAsync(context);
+        if (treeObjectIds.Count == 0)
+        {
+            return $"-- Tree GroupBy: subtree is empty (no objects matched RootObjectId={context.RootObjectId})\n-- SchemeId: {context.SchemeId}";
+        }
+        var filterJson = BuildObjectIdsFilterJson(treeObjectIds);
+        var baseProvider = CreateQueryProvider();
+
+        // GetGroupBySqlPreviewAsync is provider-specific (not on IRedbQueryProvider)
+        // — reach for it via reflection, mirroring RedbGroupedQueryable.ToSqlStringAsync.
+        var providerType = baseProvider.GetType();
+        var method = providerType.GetMethod("GetGroupBySqlPreviewAsync", new[]
+        {
+            typeof(long),
+            typeof(IEnumerable<Grouping.GroupFieldRequest>),
+            typeof(IEnumerable<Aggregation.AggregateRequest>),
+            typeof(string),
+            typeof(string)
+        });
+        object?[] methodArgs;
+        if (method == null)
+        {
+            method = providerType.GetMethod("GetGroupBySqlPreviewAsync", new[]
+            {
+                typeof(long),
+                typeof(IEnumerable<Grouping.GroupFieldRequest>),
+                typeof(IEnumerable<Aggregation.AggregateRequest>),
+                typeof(string)
+            });
+            methodArgs = new object?[] { context.SchemeId, groupFields, aggregations, filterJson };
+        }
+        else
+        {
+            methodArgs = new object?[] { context.SchemeId, groupFields, aggregations, filterJson, havingJson };
+        }
+        if (method == null)
+        {
+            return $"-- Tree GroupBy SQL Preview not supported by {providerType.Name}\n" +
+                   $"-- SchemeId: {context.SchemeId}\n" +
+                   $"-- RootObjectId: {context.RootObjectId}\n" +
+                   $"-- GroupFields: {string.Join(", ", groupFields.Select(g => g.FieldPath))}\n" +
+                   $"-- Aggregations: {string.Join(", ", aggregations.Select(a => $"{a.Function}({a.FieldPath})"))}";
+        }
+        var task = method.Invoke(baseProvider, methodArgs) as Task<string>;
+        var preview = task != null ? await task : "-- SQL preview failed";
+        return $"-- Tree GroupBy: subtree resolved to {treeObjectIds.Count} object(s) (RootObjectId={context.RootObjectId})\n" + preview;
     }
     
     // ===== TREE GROUPED WINDOW =====
@@ -1640,7 +1711,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// Get SQL preview for tree GroupBy + Window.
     /// Base implementation: returns placeholder.
     /// </summary>
-    public virtual Task<string> GetTreeGroupedWindowSqlPreviewAsync<TProps>(
+    public virtual async Task<string> GetTreeGroupedWindowSqlPreviewAsync<TProps>(
         TreeQueryContext<TProps> context,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<Aggregation.AggregateRequest> aggregations,
@@ -1648,14 +1719,16 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy) where TProps : class, new()
     {
-        return Task.FromResult(
-            $"-- Tree GroupBy + Window SQL Preview not available in Open Source version\n" +
-            $"-- SchemeId: {context.SchemeId}\n" +
-            $"-- RootObjectId: {context.RootObjectId}\n" +
-            $"-- GroupFields: {string.Join(", ", groupFields.Select(g => g.FieldPath))}\n" +
-            $"-- Aggregations: {string.Join(", ", aggregations.Select(a => $"{a.Function}({a.FieldPath})"))}\n" +
-            $"-- WindowFuncs: {string.Join(", ", windowFuncs.Select(w => w.Func))}\n" +
-            $"-- Use Pro version for SQL preview");
+        var treeObjectIds = await GetTreeObjectIdsAsync(context);
+        if (treeObjectIds.Count == 0)
+        {
+            return $"-- Tree GroupBy + Window: subtree is empty (no objects matched RootObjectId={context.RootObjectId})\n-- SchemeId: {context.SchemeId}";
+        }
+        var filterJson = BuildObjectIdsFilterJson(treeObjectIds);
+        var baseProvider = CreateQueryProvider();
+        var preview = await baseProvider.GetGroupedWindowSqlPreviewAsync(
+            context.SchemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
+        return $"-- Tree GroupBy + Window: subtree resolved to {treeObjectIds.Count} object(s) (RootObjectId={context.RootObjectId})\n" + preview;
     }
 }
 

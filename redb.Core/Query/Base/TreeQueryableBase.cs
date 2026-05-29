@@ -424,8 +424,8 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
 
     public override IRedbQueryable<TProps> Take(int count)
     {
-        if (count <= 0)
-            throw new ArgumentException("Take count must be positive", nameof(count));
+        if (count < 0)
+            throw new ArgumentException("Take count must be non-negative", nameof(count));
 
         var newContext = _treeContext.Clone();
         newContext.Limit = count;

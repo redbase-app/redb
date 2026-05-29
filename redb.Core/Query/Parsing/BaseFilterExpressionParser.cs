@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using redb.Core.Exceptions;
 using redb.Core.Models.Contracts;
 using redb.Core.Query.QueryExpressions;
 using redb.Core.Utils;
@@ -28,22 +27,24 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     }
     
     /// <summary>
-    /// DB-specific check for Pro-only features. Override in implementations.
+    /// Hook for backend-specific feature checks. No-op in OSS.
+    /// Implementations may override to raise on unsupported expressions.
     /// </summary>
-    protected abstract void CheckProOnlyFeatures(Expression body, string context);
+    protected virtual void CheckProOnlyFeatures(Expression body, string context)
+    {
+        // No-op: OSS allows all expression shapes; unsupported ones surface
+        // later as concrete errors during SQL generation or execution.
+    }
 
     /// <summary>
-    /// Check property path nesting depth. FREE version limits to 2 levels.
-    /// Override in Pro to allow deeper nesting.
+    /// Check property path nesting depth.
+    /// No artificial limit — PVT engine supports up to 50 levels natively.
+    /// Override in implementations if a backend-specific cap is needed.
     /// </summary>
     protected virtual void CheckPathDepth(int depth, string fullPath)
     {
-        if (depth > 2)
-        {
-            throw new RedbProRequiredException(
-                $"'{fullPath}' (depth {depth}), max allowed: 2 levels", 
-                ProFeatureCategory.FilterNesting);
-        }
+        // Intentionally no-op: deep nested paths (e.g. Address.Building.Floor)
+        // are fully supported by the SQL builder.
     }
 
     /// <summary>
@@ -173,6 +174,14 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
 
         if (value is IRedbListItem listItem)
         {
+            // Bare ListItem field path (e.g. "Status") defaults to .Value
+            // (string) on the SQL side. Direct comparison against a
+            // RedbListItem instance always means "match by id", so route
+            // through the .Id (bigint) accessor.
+            if (!property.Name.Contains('.'))
+            {
+                property = property with { Name = property.Name + ".Id", Type = typeof(long) };
+            }
             return new ComparisonExpression(property, op, listItem.Id);
         }
 
@@ -229,6 +238,14 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         {
             BinaryExpression binary when IsArithmeticExpression(binary) =>
                 CreateArithmeticExpression(binary),
+
+            // x ?? y — Coalesce (binary, right-associative; flattened to n-ary).
+            BinaryExpression binary when binary.NodeType == ExpressionType.Coalesce =>
+                CreateCoalesceExpression(binary),
+
+            // C# ternary: cond ? a : b
+            System.Linq.Expressions.ConditionalExpression cond =>
+                CreateConditionalValueExpression(cond),
             
             MethodCallExpression method when IsCustomFunctionCall(method) =>
                 CreateCustomFunctionExpression(method),
@@ -243,6 +260,26 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
                                          member.Expression is MethodCallExpression innerMethod &&
                                          IsProFunctionCall(innerMethod) =>
                 new FunctionCallExpression(PropertyFunction.Length, CreateFunctionCallExpression(innerMethod)),
+
+            // (any-ValueExpression).Length — e.g. `(s ?? "n/a").Length`. Falls through
+            // for simple property paths (which the legacy emitter handles via
+            // PropertyFunction.Length on the property column directly).
+            MemberExpression member when member.Member.Name == "Length" &&
+                                         member.Expression != null &&
+                                         member.Expression.Type == typeof(string) &&
+                                         member.Expression is not MemberExpression &&
+                                         member.Expression is not MethodCallExpression &&
+                                         TryExtractValueExpression(member.Expression) is { } innerValue =>
+                new FunctionCallExpression(PropertyFunction.Length, innerValue),
+
+            // arr.Length (C# compiles array .Length as ExpressionType.ArrayLength UnaryExpression,
+            // not a regular MemberExpression). ArrayLength is array-only (IL ldlen), so translate
+            // to PropertyFunction.Count: Pro path emits array_length(col,1), PVT path uses .$count.
+            UnaryExpression unaryArr when unaryArr.NodeType == ExpressionType.ArrayLength &&
+                                          unaryArr.Operand is MemberExpression arrMember =>
+                new FunctionCallExpression(
+                    PropertyFunction.Count,
+                    new PropertyValueExpression(ExtractPropertyFromMember(arrMember))),
             
             _ => null
         };
@@ -286,6 +323,14 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
                 "EndsWith" => VisitStringMethodWithComparison(method, ComparisonOperator.EndsWith, ComparisonOperator.EndsWithIgnoreCase),
                 _ => throw new NotSupportedException($"String method {methodName} is not supported")
             };
+        }
+
+        // Regex.IsMatch(input, pattern[, options]) -> ComparisonExpression with
+        // LeftExpression=input, RightExpression=pattern, RegexMatch / RegexMatchIgnoreCase.
+        if (declaringType == typeof(System.Text.RegularExpressions.Regex)
+            && methodName == "IsMatch")
+        {
+            return VisitRegexIsMatch(method);
         }
 
         if (declaringType == typeof(Enumerable))
@@ -354,24 +399,78 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         if (method.Object == null)
             throw new ArgumentException("String method must have an object instance");
 
-        var property = ExtractProperty(method.Object);
-        var value = EvaluateExpression(method.Arguments[0]);
-
-        if (method.Arguments.Count == 1)
+        var op = caseSensitiveOp;
+        if (method.Arguments.Count == 2)
         {
-            return new ComparisonExpression(property, caseSensitiveOp, value);
+            var stringComparison = EvaluateStringComparison(method.Arguments[1]);
+            op = IsIgnoreCaseComparison(stringComparison) ? ignoreCaseOp : caseSensitiveOp;
         }
-        else if (method.Arguments.Count == 2)
-        {
-            var comparisonArg = method.Arguments[1];
-            var stringComparison = EvaluateStringComparison(comparisonArg);
-            var finalOperator = IsIgnoreCaseComparison(stringComparison) ? ignoreCaseOp : caseSensitiveOp;
-            return new ComparisonExpression(property, finalOperator, value);
-        }
-        else
+        else if (method.Arguments.Count != 1)
         {
             throw new NotSupportedException($"String method with {method.Arguments.Count} arguments is not supported");
         }
+
+        var value = EvaluateExpression(method.Arguments[0]);
+
+        // LHS may be a computed value (string concat, ToLower over concat, Substring, etc.).
+        // ExtractProperty only handles property paths and bare string-function chains;
+        // anything richer (e.g. `(a + " " + b).ToLower()`) must go through the computed
+        // $expr / arithmetic ComparisonExpression route. Try the property form first to
+        // preserve the simple-field SQL fast path; fall back to a ValueExpression if it
+        // cannot be expressed as a property reference.
+        try
+        {
+            var property = ExtractProperty(method.Object);
+            return new ComparisonExpression(property, op, value);
+        }
+        catch (ArgumentException)
+        {
+            var leftValueExpr = TryExtractValueExpression(method.Object)
+                ?? throw new NotSupportedException(
+                    $"Cannot translate LHS of string method '{method.Method.Name}': {method.Object}");
+
+            var dummyProperty = new QueryExpressions.PropertyInfo(
+                "__computed", typeof(bool), _isBaseFieldContext);
+
+            return new ComparisonExpression(dummyProperty, op, null)
+            {
+                LeftExpression = leftValueExpr,
+                RightExpression = new ConstantValueExpression(value, method.Arguments[0].Type)
+            };
+        }
+    }
+
+    /// <summary>
+    /// Regex.IsMatch(input, pattern[, options]) — builds computed ComparisonExpression
+    /// routed through PVT $expr / PG '~' '~*'.
+    /// </summary>
+    protected virtual FilterExpression VisitRegexIsMatch(MethodCallExpression method)
+    {
+        if (method.Arguments.Count < 2)
+            throw new NotSupportedException("Regex.IsMatch requires (input, pattern[, options]).");
+
+        var inputExpr   = ExtractValueExpression(method.Arguments[0]);
+        var patternExpr = ExtractValueExpression(method.Arguments[1]);
+
+        var op = ComparisonOperator.RegexMatch;
+        if (method.Arguments.Count >= 3)
+        {
+            var optsValue = EvaluateExpression(method.Arguments[2]);
+            if (optsValue is System.Text.RegularExpressions.RegexOptions opts
+                && (opts & System.Text.RegularExpressions.RegexOptions.IgnoreCase) != 0)
+            {
+                op = ComparisonOperator.RegexMatchIgnoreCase;
+            }
+        }
+
+        var dummyProperty = new QueryExpressions.PropertyInfo(
+            "__computed", typeof(bool), _isBaseFieldContext);
+
+        return new ComparisonExpression(dummyProperty, op, null)
+        {
+            LeftExpression = inputExpr,
+            RightExpression = patternExpr
+        };
     }
 
     protected StringComparison EvaluateStringComparison(Expression comparisonExpression)
@@ -413,6 +512,12 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
                 var valuesList = enumerable.Cast<object>()
                     .Select(v => v is IRedbListItem li ? (object)li.Id : v)
                     .ToList();
+                if (valuesList.Count > 0
+                    && enumerable.Cast<object>().Any(v => v is IRedbListItem)
+                    && !property.Name.Contains('.'))
+                {
+                    property = property with { Name = property.Name + ".Id", Type = typeof(long) };
+                }
                 return new InExpression(property, valuesList);
             }
         }
@@ -432,6 +537,20 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     /// </summary>
     protected virtual FilterExpression VisitEnumerableAny(MethodCallExpression method)
     {
+        // Enumerable.Any(source) — 1-arg form. Translate to: cardinality(source) > 0
+        // i.e. ComparisonExpression with PropertyFunction.Length > 0, which the
+        // facet builder serializes as {"$expr":{"$gt":[{"$length":{"$field":"X"}},{"$const":0}]}}.
+        if (method.Arguments.Count == 1)
+        {
+            var only = method.Arguments[0];
+            if (!IsPropertyAccess(only))
+                throw new NotSupportedException("Any() must be called on a property collection");
+
+            var prop = ExtractProperty(only);
+            var lengthProp = prop with { Function = PropertyFunction.Length };
+            return new ComparisonExpression(lengthProp, ComparisonOperator.GreaterThan, 0);
+        }
+
         if (method.Arguments.Count != 2)
             throw new ArgumentException("Any method with predicate must have exactly 2 arguments");
 
@@ -513,6 +632,12 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
                 var valuesList = enumerable.Cast<object>()
                     .Select(v => v is IRedbListItem li ? (object)li.Id : v)
                     .ToList();
+                if (valuesList.Count > 0
+                    && enumerable.Cast<object>().Any(v => v is IRedbListItem)
+                    && !property.Name.Contains('.'))
+                {
+                    property = property with { Name = property.Name + ".Id", Type = typeof(long) };
+                }
                 return new InExpression(property, valuesList);
             }
             else
@@ -600,6 +725,44 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         var right = ExtractValueExpression(binary.Right);
         return new ArithmeticExpression(left, op, right);
     }
+
+    /// <summary>
+    /// Builds a <see cref="CoalesceExpression"/> from a chain of <c>??</c> operators.
+    /// C# parses <c>a ?? b ?? c</c> right-associatively as <c>a ?? (b ?? c)</c>; this helper
+    /// flattens that into a single n-ary node <c>[a, b, c]</c> so the downstream SQL emitter
+    /// produces <c>COALESCE(a, b, c)</c> instead of <c>COALESCE(a, COALESCE(b, c))</c>.
+    /// </summary>
+    protected ValueExpression CreateCoalesceExpression(BinaryExpression binary)
+    {
+        var args = new List<ValueExpression>();
+        void Flatten(Expression node)
+        {
+            if (node is BinaryExpression be && be.NodeType == ExpressionType.Coalesce)
+            {
+                Flatten(be.Left);
+                Flatten(be.Right);
+            }
+            else
+            {
+                args.Add(ExtractValueExpression(node));
+            }
+        }
+        Flatten(binary);
+        return new CoalesceExpression(args);
+    }
+
+    /// <summary>
+    /// Builds a <see cref="ConditionalValueExpression"/> from a C# ternary <c>?:</c>.
+    /// Test is parsed as a full boolean <see cref="FilterExpression"/> via <see cref="VisitExpression"/>;
+    /// IfTrue / IfFalse are parsed as value expressions via <see cref="ExtractValueExpression"/>.
+    /// </summary>
+    protected ValueExpression CreateConditionalValueExpression(System.Linq.Expressions.ConditionalExpression cond)
+    {
+        var test = VisitExpression(cond.Test);
+        var ifTrue = ExtractValueExpression(cond.IfTrue);
+        var ifFalse = ExtractValueExpression(cond.IfFalse);
+        return new ConditionalValueExpression(test, ifTrue, ifFalse);
+    }
     
     /// <summary>
     /// Recursively extract ValueExpression from any Expression.
@@ -610,6 +773,14 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         {
             BinaryExpression binary when IsArithmeticExpression(binary) =>
                 CreateArithmeticExpression(binary),
+
+            // x ?? y — Coalesce operator (binary, right-associative chained into n-ary)
+            BinaryExpression binary when binary.NodeType == ExpressionType.Coalesce =>
+                CreateCoalesceExpression(binary),
+
+            // C# ternary: cond ? a : b
+            System.Linq.Expressions.ConditionalExpression cond =>
+                CreateConditionalValueExpression(cond),
             
             UnaryExpression unary when unary.NodeType == ExpressionType.Convert =>
                 ExtractValueExpression(unary.Operand),
@@ -627,9 +798,17 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
                                          member.Expression is MethodCallExpression innerMethod &&
                                          IsProFunctionCall(innerMethod) =>
                 new FunctionCallExpression(PropertyFunction.Length, CreateFunctionCallExpression(innerMethod)),
+
+            // arr.Length inside an arithmetic/function chain (ArrayLength is array-only).
+            UnaryExpression unaryArr when unaryArr.NodeType == ExpressionType.ArrayLength &&
+                                          unaryArr.Operand is MemberExpression arrMember =>
+                new FunctionCallExpression(
+                    PropertyFunction.Count,
+                    new PropertyValueExpression(ExtractPropertyFromMember(arrMember))),
             
-            MemberExpression member when member.Member is System.Reflection.PropertyInfo || 
-                                         member.Member is System.Reflection.FieldInfo =>
+            MemberExpression member when (member.Member is System.Reflection.PropertyInfo || 
+                                          member.Member is System.Reflection.FieldInfo) &&
+                                         ReferencesLambdaParameter(member) =>
                 new PropertyValueExpression(ExtractPropertyFromMember(member)),
             
             ConstantExpression constant =>
@@ -651,12 +830,28 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         {
             return name is "ToLower" or "ToLowerInvariant" or 
                           "ToUpper" or "ToUpperInvariant" or 
-                          "Trim" or "TrimStart" or "TrimEnd";
+                          "Trim" or "TrimStart" or "TrimEnd" or
+                          "Substring" or "Replace" or "IndexOf" or
+                          "PadLeft" or "PadRight";
         }
         
         if (declaringType == typeof(Math))
         {
-            return name is "Abs" or "Round" or "Floor" or "Ceiling" or "Truncate";
+            return name is "Abs" or "Round" or "Floor" or "Ceiling" or "Truncate"
+                        or "Sqrt" or "Sign" or "Exp" or "Log" or "Log10" or "Pow";
+        }
+
+        if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
+        {
+            // Instance arithmetic methods AddDays/AddYears/AddMonths/AddHours/AddMinutes/AddSeconds.
+            return name is "AddDays" or "AddYears" or "AddMonths"
+                        or "AddHours" or "AddMinutes" or "AddSeconds";
+        }
+
+        if (declaringType == typeof(System.Text.RegularExpressions.Regex))
+        {
+            // Regex.Replace(input, pattern, replacement) — static; returns string.
+            return name == "Replace";
         }
         
         return false;
@@ -702,6 +897,13 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         
         if (declaringType == typeof(string))
         {
+            // Multi-arg string functions (Substring/Replace/IndexOf/PadLeft/PadRight)
+            // use MultiArgFunctionCallExpression and handle index translation here.
+            if (name is "Substring" or "Replace" or "IndexOf" or "PadLeft" or "PadRight")
+            {
+                return CreateMultiArgFunctionCallExpression(method);
+            }
+
             func = name switch
             {
                 "ToLower" or "ToLowerInvariant" => PropertyFunction.ToLower,
@@ -715,16 +917,40 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         }
         else if (declaringType == typeof(Math))
         {
+            // Multi-arg Math overloads dispatch to MultiArgFunctionCallExpression
+            // (Math is static, so method.Object is null — these are handled
+            // separately below in CreateMultiArgFunctionCallExpression).
+            if (name == "Pow" || name == "Log10"
+             || (name == "Log"   && method.Arguments.Count == 2)
+             || (name == "Round" && method.Arguments.Count == 2))
+            {
+                return CreateMultiArgFunctionCallExpression(method);
+            }
+
             func = name switch
             {
-                "Abs" => PropertyFunction.Abs,
-                "Round" => PropertyFunction.Round,
-                "Floor" => PropertyFunction.Floor,
-                "Ceiling" => PropertyFunction.Ceiling,
+                "Abs"      => PropertyFunction.Abs,
+                "Round"    => PropertyFunction.Round,
+                "Floor"    => PropertyFunction.Floor,
+                "Ceiling"  => PropertyFunction.Ceiling,
                 "Truncate" => PropertyFunction.Floor,
+                "Sqrt"     => PropertyFunction.Sqrt,
+                "Sign"     => PropertyFunction.Sign,
+                "Exp"      => PropertyFunction.Exp,
+                "Log"      => PropertyFunction.Log,    // 1-arg: natural log
                 _ => throw new NotSupportedException($"Math method {name} is not supported")
             };
             argument = ExtractValueExpression(method.Arguments[0]);
+        }
+        else if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
+        {
+            // All DateTime AddX methods are 2-arg in our AST [date, n] -> dispatch to MultiArg.
+            return CreateMultiArgFunctionCallExpression(method);
+        }
+        else if (declaringType == typeof(System.Text.RegularExpressions.Regex))
+        {
+            // Regex.Replace -> MultiArg with 3 args (static method, no receiver).
+            return CreateMultiArgFunctionCallExpression(method);
         }
         else
         {
@@ -733,7 +959,149 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         
         return new FunctionCallExpression(func, argument);
     }
-    
+
+    /// <summary>
+    /// Builds a <see cref="MultiArgFunctionCallExpression"/> for the multi-arg string
+    /// functions <c>Substring/Replace/IndexOf/PadLeft/PadRight</c>. Performs index
+    /// translation so the same AST works on both tiers (Free PVT and Pro):
+    /// <list type="bullet">
+    /// <item>C# <c>string.Substring(start[, length])</c> is 0-based; SQL <c>SUBSTRING</c>
+    /// is 1-based -> the <c>start</c> argument is wrapped in <c>start + 1</c>.</item>
+    /// <item>C# <c>string.IndexOf(needle)</c> returns -1 for not-found; SQL <c>POSITION</c>
+    /// returns 0 -> the whole call is wrapped in <c>(POSITION(...) - 1)</c>.</item>
+    /// </list>
+    /// </summary>
+    protected ValueExpression CreateMultiArgFunctionCallExpression(MethodCallExpression method)
+    {
+        var name = method.Method.Name;
+        var declaringType = method.Method.DeclaringType;
+
+        // DateTime.AddX(n) — instance call: receiver is the date, single arg is the delta.
+        if (declaringType == typeof(DateTime) || declaringType == typeof(DateTimeOffset))
+        {
+            var fn = name switch
+            {
+                "AddDays"    => PropertyFunction.AddDays,
+                "AddYears"   => PropertyFunction.AddYears,
+                "AddMonths"  => PropertyFunction.AddMonths,
+                "AddHours"   => PropertyFunction.AddHours,
+                "AddMinutes" => PropertyFunction.AddMinutes,
+                "AddSeconds" => PropertyFunction.AddSeconds,
+                _ => throw new NotSupportedException($"DateTime method {name} is not supported.")
+            };
+            return new MultiArgFunctionCallExpression(fn, new List<ValueExpression>
+            {
+                ExtractValueExpression(method.Object!),
+                ExtractValueExpression(method.Arguments[0]),
+            });
+        }
+
+        // Regex.Replace(input, pattern, replacement) — static; ignore optional flags overloads.
+        if (declaringType == typeof(System.Text.RegularExpressions.Regex) && name == "Replace")
+        {
+            if (method.Arguments.Count < 3)
+                throw new NotSupportedException("Regex.Replace requires (input, pattern, replacement).");
+            return new MultiArgFunctionCallExpression(PropertyFunction.RegexReplace, new List<ValueExpression>
+            {
+                ExtractValueExpression(method.Arguments[0]), // input
+                ExtractValueExpression(method.Arguments[1]), // pattern
+                ExtractValueExpression(method.Arguments[2]), // replacement
+            });
+        }
+
+        // Math.* are static — method.Object is null. Build args directly from method.Arguments.
+        if (declaringType == typeof(Math))
+        {
+            switch (name)
+            {
+                case "Pow":
+                    // Math.Pow(x, y) -> POWER(x, y)
+                    return new MultiArgFunctionCallExpression(PropertyFunction.Pow, new List<ValueExpression>
+                    {
+                        ExtractValueExpression(method.Arguments[0]),
+                        ExtractValueExpression(method.Arguments[1]),
+                    });
+                case "Log":
+                    // C# Math.Log(value, base); PG LOG(base, value) — argument SWAP at parse time.
+                    return new MultiArgFunctionCallExpression(PropertyFunction.LogBase, new List<ValueExpression>
+                    {
+                        ExtractValueExpression(method.Arguments[1]), // base
+                        ExtractValueExpression(method.Arguments[0]), // value
+                    });
+                case "Log10":
+                    // Math.Log10(x) -> LOG(10, x). Synthesize base=10 constant.
+                    return new MultiArgFunctionCallExpression(PropertyFunction.LogBase, new List<ValueExpression>
+                    {
+                        new ConstantValueExpression(10.0, typeof(double)),
+                        ExtractValueExpression(method.Arguments[0]),
+                    });
+                case "Round":
+                    // Math.Round(value, digits) -> ROUND(value, digits). 1-arg form goes through the
+                    // single-arg FunctionCallExpression path (PropertyFunction.Round).
+                    return new MultiArgFunctionCallExpression(PropertyFunction.Round, new List<ValueExpression>
+                    {
+                        ExtractValueExpression(method.Arguments[0]),
+                        ExtractValueExpression(method.Arguments[1]),
+                    });
+                default:
+                    throw new NotSupportedException($"Multi-arg Math method {name} is not supported.");
+            }
+        }
+
+        var receiver = ExtractValueExpression(method.Object!);
+        var args = new List<ValueExpression> { receiver };
+
+        switch (name)
+        {
+            case "Substring":
+            {
+                // s.Substring(start) | s.Substring(start, length)
+                var start = ExtractValueExpression(method.Arguments[0]);
+                args.Add(new ArithmeticExpression(start, ArithmeticOperator.Add, new ConstantValueExpression(1, typeof(int))));
+                if (method.Arguments.Count == 2)
+                    args.Add(ExtractValueExpression(method.Arguments[1]));
+                return new MultiArgFunctionCallExpression(PropertyFunction.Substring, args);
+            }
+            case "Replace":
+            {
+                // s.Replace(oldValue, newValue) — string-only overload supported
+                if (method.Arguments.Count != 2)
+                    throw new NotSupportedException("Only string.Replace(oldValue, newValue) is supported.");
+                args.Add(ExtractValueExpression(method.Arguments[0]));
+                args.Add(ExtractValueExpression(method.Arguments[1]));
+                return new MultiArgFunctionCallExpression(PropertyFunction.Replace, args);
+            }
+            case "IndexOf":
+            {
+                // s.IndexOf(needle) — wrap with `- 1` to map POSITION(1-based, 0=miss) to C# semantics.
+                if (method.Arguments.Count != 1)
+                    throw new NotSupportedException("Only string.IndexOf(value) (single argument) is supported.");
+                args.Add(ExtractValueExpression(method.Arguments[0]));
+                var inner = new MultiArgFunctionCallExpression(PropertyFunction.IndexOf, args);
+                return new ArithmeticExpression(inner, ArithmeticOperator.Subtract, new ConstantValueExpression(1, typeof(int)));
+            }
+            case "PadLeft":
+            case "PadRight":
+            {
+                // s.PadLeft(width) | s.PadLeft(width, padChar)
+                args.Add(ExtractValueExpression(method.Arguments[0]));
+                if (method.Arguments.Count == 2)
+                {
+                    // PadChar (char) — coerce to single-char string so PG LPAD/RPAD accept it.
+                    var padArg = method.Arguments[1];
+                    if (padArg is ConstantExpression ce && ce.Value is char ch)
+                        args.Add(new ConstantValueExpression(ch.ToString(), typeof(string)));
+                    else
+                        args.Add(ExtractValueExpression(padArg));
+                }
+                var fn = name == "PadLeft" ? PropertyFunction.PadLeft : PropertyFunction.PadRight;
+                return new MultiArgFunctionCallExpression(fn, args);
+            }
+            default:
+                throw new NotSupportedException($"Multi-arg string method {name} is not supported.");
+        }
+    }
+
     protected bool IsDateTimePropertyAccess(MemberExpression member)
     {
         var exprType = member.Expression?.Type;
@@ -745,7 +1113,8 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
             return false;
         
         return member.Member.Name is "Year" or "Month" or "Day" or 
-                                     "Hour" or "Minute" or "Second";
+                                     "Hour" or "Minute" or "Second" or
+                                     "DayOfWeek" or "DayOfYear";
     }
     
     protected ValueExpression CreateDateTimeFunctionExpression(MemberExpression member)
@@ -758,6 +1127,8 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
             "Hour" => PropertyFunction.Hour,
             "Minute" => PropertyFunction.Minute,
             "Second" => PropertyFunction.Second,
+            "DayOfWeek" => PropertyFunction.DayOfWeek,
+            "DayOfYear" => PropertyFunction.DayOfYear,
             _ => throw new NotSupportedException($"DateTime property {member.Member.Name} is not supported")
         };
         
@@ -866,7 +1237,10 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         if (expression is MemberExpression member && member.Member is System.Reflection.PropertyInfo propInfo)
         {
             var (fullPath, function) = BuildPropertyPath(member);
-            return new QueryExpressions.PropertyInfo(fullPath, propInfo.PropertyType, _isBaseFieldContext, function);
+            Type? sourceType = (function == PropertyFunction.Length || function == PropertyFunction.Count)
+                ? member.Expression?.Type
+                : null;
+            return new QueryExpressions.PropertyInfo(fullPath, propInfo.PropertyType, _isBaseFieldContext, function, sourceType);
         }
 
         throw new ArgumentException($"Expression must be a property access, got {expression.GetType().Name}");
@@ -912,7 +1286,10 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         };
         
         var (fullPath, function) = BuildPropertyPath(member);
-        return new QueryExpressions.PropertyInfo(fullPath, memberType, _isBaseFieldContext, function);
+        Type? sourceType = (function == PropertyFunction.Length || function == PropertyFunction.Count)
+            ? member.Expression?.Type
+            : null;
+        return new QueryExpressions.PropertyInfo(fullPath, memberType, _isBaseFieldContext, function, sourceType);
     }
 
     /// <summary>

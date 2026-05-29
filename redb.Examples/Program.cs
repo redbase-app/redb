@@ -127,7 +127,7 @@ class Program
     // {
     //     var services = new ServiceCollection();
     //     services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
-    //     services.AddRedbPro(options => options.UseMsSql(RedbDocConnection));
+    //     services.AddRedb(options => options.UseMsSql(RedbDocConnection));
     //     
     //     var provider = services.BuildServiceProvider();
     //     var redbDoc = provider.GetRequiredService<IRedbService>();
@@ -143,19 +143,19 @@ class Program
             .SetMinimumLevel(LogLevel.Warning));
 
         var TestLicense=@"<your-redb-pro-license>";
-        services.AddRedbPro(options => options
+        services.AddRedb(options => options
             .WithLicense(TestLicense)
             .Configure(c =>
             {
-                c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking; // Default is ChangeTracking - only saves changed props, requires tracking. Can switch to FullSave for simpler logic (always saves all props) or ManualSave for full control (must call SavePropsAsync manually).
+                c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert; // Default is ChangeTracking - only saves changed props, requires tracking. Can switch to FullSave for simpler logic (always saves all props) or ManualSave for full control (must call SavePropsAsync manually).
                 //c.SkipHashValidationOnCacheCheck = false;
                 //c.EnableLazyLoadingForProps = false;
                 //c.EnablePropsCache = false;
                 //c.PropsCacheMaxSize = 10000;
                 //c.PropsCacheTtl = TimeSpan.FromMinutes(60);
             })
-            .UsePostgres("Host=localhost;Port=5432;Username=postgres;Password=1;Database=redb;Pooling=true;Include Error Detail=true;Options=-c jit=off")
-            //.UseMsSql("Server=localhost;Database=redb;User Id=sa;Password=1;TrustServerCertificate=true;Command Timeout=600;")
+            //.UsePostgres("Host=localhost;Port=5432;Username=postgres;Password=1;Database=redb;Pooling=true;Include Error Detail=true;Options=-c jit=off")
+            .UseMsSql("Server=localhost;Database=redb;User Id=sa;Password=1;TrustServerCertificate=true;Command Timeout=600;")
             );
     }
 

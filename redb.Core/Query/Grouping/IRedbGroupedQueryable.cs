@@ -27,6 +27,16 @@ public interface IRedbGroupedQueryable<TKey, TProps> where TProps : class, new()
         Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector);
     
     /// <summary>
+    /// Filter groups by a predicate over aggregates (SQL HAVING).
+    /// The predicate must reference the grouped projection only through
+    /// <see cref="redb.Core.Query.Aggregation.Agg"/> helpers, e.g.:
+    ///   <c>.Having(g =&gt; Agg.Count(g) &gt; 5 &amp;&amp; Agg.Sum(g, x =&gt; x.Salary) &gt; 1000)</c>.
+    /// Multiple <c>Having</c> calls compose with logical AND.
+    /// </summary>
+    IRedbGroupedQueryable<TKey, TProps> Having(
+        System.Linq.Expressions.Expression<Func<IRedbGrouping<TKey, TProps>, bool>> predicate);
+
+    /// <summary>
     /// Apply window functions to grouped results.
     /// Allows ranking, running totals, and other analytics on aggregated data.
     /// </summary>

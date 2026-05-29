@@ -198,8 +198,8 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
 
     public virtual IRedbQueryable<TProps> Take(int count)
     {
-        if (count <= 0)
-            throw new ArgumentException("Take count must be positive", nameof(count));
+        if (count < 0)
+            throw new ArgumentException("Take count must be non-negative", nameof(count));
             
         var newContext = _context.Clone();
         newContext.Limit = count;
@@ -872,7 +872,6 @@ where TField : struct
     /// </summary>
     public virtual async Task<TResult> AggregateAsync<TResult>(Expression<Func<RedbObject<TProps>, TResult>> selector)
     {
-        var filterJson = BuildFilterJson();
         var schemeId = _context.SchemeId;
         
         // Parse expression and find all Agg.* calls
@@ -886,7 +885,9 @@ where TField : struct
             Alias = agg.PropertyName
         });
         
-        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, filterJson);
+        // BUG FIX: pass the FilterExpression directly so providers that only
+        // honour the typed overload (e.g. Pro) don't silently drop the outer Where.
+        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, _context.Filter);
         
         // Build result
         return BuildAggregateResult<TResult>(selector, batchResult.Values);
@@ -1360,7 +1361,7 @@ where TField : struct
     {
         var filterJson = BuildFilterJson();
         return new Grouping.RedbArrayGroupedQueryable<TKey, TItem, TProps>(
-            _provider, _context.SchemeId, filterJson, arraySelector, keySelector);
+            _provider, _context.SchemeId, filterJson, _context.Filter, arraySelector, keySelector);
     }
     
     // ===== WINDOW FUNCTIONS =====

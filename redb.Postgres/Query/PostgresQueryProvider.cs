@@ -4,7 +4,6 @@ using redb.Core.Models.Configuration;
 using redb.Core.Providers;
 using redb.Core.Query;
 using redb.Core.Query.Base;
-using redb.Core.Query.Parsing;
 using redb.Core.Query.QueryExpressions;
 using redb.Core.Serialization;
 using redb.Postgres.Sql;
@@ -27,13 +26,5 @@ public partial class PostgresQueryProvider : QueryProviderBase
         ISqlDialect? dialect = null)
         : base(context, serializer, dialect ?? new PostgreSqlDialect(), lazyPropsLoader, configuration, logger, schemeSync)
     {
-    }
-    
-    /// <summary>
-    /// Creates PostgreSQL-specific filter expression parser.
-    /// </summary>
-    protected override IFilterExpressionParser CreateFilterParser()
-    {
-        return new FilterExpressionParser();
     }
 }

@@ -4,7 +4,7 @@ namespace redb.Core.Query;
 
 /// <summary>
 /// SQL functions for use in LINQ expressions.
-/// Pro Only: Throws RedbProRequiredException in Open Source version.
+/// Translated to native SQL by the active provider during query generation.
 /// </summary>
 public static class Sql
 {

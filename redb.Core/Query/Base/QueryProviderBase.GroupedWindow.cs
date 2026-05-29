@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using redb.Core.Exceptions;
 using redb.Core.Query.Aggregation;
 using redb.Core.Query.Grouping;
 using redb.Core.Query.QueryExpressions;
@@ -26,7 +25,9 @@ public abstract partial class QueryProviderBase
         IEnumerable<WindowOrderRequest> orderBy,
         string? filterJson = null)
     {
-        throw new RedbProRequiredException("GroupBy + Window Functions", ProFeatureCategory.WindowFunction);
+        throw new NotSupportedException(
+            "GroupBy + Window Functions are not implemented in this provider. " +
+            "Use the PostgreSQL or MSSQL provider that supports grouped window queries.");
     }
     
     /// <summary>

@@ -51,6 +51,7 @@ public sealed class MsSqlFixture : IAsyncLifetime
         await Redb.SyncSchemeAsync<EmployeeProps>();
         await Redb.SyncSchemeAsync<ProjectMetricsProps>();
         await Redb.SyncSchemeAsync<TreeNodeProps>();
+        await Redb.SyncSchemeAsync<DepartmentProps>();
         await Redb.SyncSchemeAsync<OrgRootProps>();
         await Redb.SyncSchemeAsync<DivisionProps>();
         await Redb.SyncSchemeAsync<TeamProps>();
