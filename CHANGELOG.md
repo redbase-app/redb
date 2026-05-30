@@ -20,6 +20,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.0.0] — 2026-05-28
 
 ### Added
+- **PG Free: full v2-pvt query engine reaches Pro-parity (0.5.x → 0.6.1)**.
+  The PostgreSQL Free path got the feature-complete v2-pvt module ahead of
+  MSSql Free (commits 2026-05-21 … 2026-05-28). Before this series the Free
+  path was emitting `-- not available in Open Source` stubs for several
+  preview surfaces and was missing several Pro-only operators. Now in Free
+  on PG:
+  - **Universal "no black box" SQL preview** for `GroupBy` / `Window` /
+    `GroupedWindow` / `Tree-*` via two-pass compile (`pvt_build_*_sql`);
+    tree previews resolve the subtree and delegate to the matching non-tree
+    preview with a `-- Tree …: subtree resolved to N object(s)` header.
+  - **`Sql.Function<T>` whitelist** at the SQL boundary
+    ([17_pvt_expr.sql](redb.Postgres/sql/v2-pvt/17_pvt_expr.sql)) with a
+    hardcoded ELSIF chain and `RAISE EXCEPTION` for non-whitelisted names;
+    parser routes `Sql.Function<T>(name, args)` to
+    `CustomFunctionExpression` (FREE-OVER-PRO §2.4).
+  - **`ValueTuple` composite dict keys** (`Dictionary<(int,int), V>`)
+    consistently encoded as Base64-JSON on both write and read sides
+    (FREE-OVER-PRO §2.2).
+  - **`arr.Length` / `coll.Count`** in filters via the array-aware
+    `FacetFilterBuilder` (`.$count` modifier in Free); `e.Tags.Any()`
+    1-arg form mapped to `<field>.$length > 0`.
+  - **`Take(0)` returns empty** instead of `ArgumentException`.
+  - **`HAVING` parser + `ArrayGroupBy`** with PVT agg array `unnest`
+    ([19_pvt_agg_expr.sql](redb.Postgres/sql/v2-pvt/19_pvt_agg_expr.sql)) —
+    fixes `42883 function sum(bigint[]) does not exist`;
+    [26_pvt_array_groupby.sql](redb.Postgres/sql/v2-pvt/26_pvt_array_groupby.sql)
+    added.
+  - **`ListItem.Value` / `.Alias` via a single `LEFT JOIN _list_items`**
+    (v2-pvt 0.6.1) — plan-shape parity with Pro; replaces correlated
+    subquery per field.
+  - **Nested-dict CTE pushdown** for `Field[key].Child` (FREE-OVER-PRO §2.x):
+    outer `WHERE` references the already-built pivot column instead of a
+    redundant `EXISTS` over `_values`.
+  - **Auto-deploy of the v2-pvt bundle on version mismatch** (see the
+    matching item below — same infrastructure serves both PG and MSSql).
+
+  The MSSql Free engine described next ports this PG Free baseline; the
+  parity line in the next item ("145/145 parity with PG Free") refers to
+  this newly-completed PG Free feature set, not a pre-existing one.
+
 - **MSSql Free: full v2-pvt query engine (0.1.0 → 0.1.3) — 145/145 parity
   with PG Free**. The old MSSql Free path generated a wide inline CASE WHEN
   aggregate; it is now replaced with the Pro-shape CTE: a single pass over
