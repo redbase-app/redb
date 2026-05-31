@@ -2,6 +2,8 @@
 
 **Trees, lists, aggregations, windows — one LINQ API.**
 
+> **LLMs / coding agents:** canonical training contract → <https://redbase.app/llms.txt>
+
 RedBase is a data platform for .NET that stores typed objects in a relational backend (PostgreSQL, Microsoft SQL Server). You define schemas as plain C# classes — RedBase handles storage, indexing, querying, trees, lists, aggregation, and window functions through a single LINQ-style API.
 
 No Entity Framework. No migrations. No 40-table Include chains. Just C# classes and one line to save, one line to load.
