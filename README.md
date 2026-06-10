@@ -654,7 +654,7 @@ var order = await redb.LoadAsync<OrderProps>(orderId);
 
 REDB Pro unlocks compiled query execution, parallel materialization, deep nested property queries, arithmetic and math expressions in WHERE, `Sql.Function<T>()` for calling arbitrary SQL functions, change tracking, schema migrations, and advanced analytics (window functions over grouped data). If performance matters — use Pro.
 
-**[redbase.app/pricing](https://redbase.app/pricing)**
+**License is free** — register at [redbase.app](https://redbase.app) and send an email to request your license key.
 
 ---
 
@@ -667,7 +667,6 @@ REDB Pro unlocks compiled query execution, parallel materialization, deep nested
 | API Reference | [redbase-app.github.io/redb](https://redbase-app.github.io/redb/) |
 | Architecture | [redbase.app/architecture](https://redbase.app/architecture) |
 | Quick Start | [redbase.app/quickstart](https://redbase.app/quickstart) |
-| Pricing | [redbase.app/pricing](https://redbase.app/pricing) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | NuGet | [nuget.org/packages/redb.Core](https://www.nuget.org/packages/redb.Core) |
 
@@ -680,4 +679,4 @@ Core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.Export`,
 [Apache License 2.0](LICENSE) starting from version 2.0.0.
 Versions ≤ 1.3.0 published on nuget.org remain under MIT.
 
-Pro packages require a commercial license — see [LICENSE-PRO.txt](LICENSE-PRO.txt).
+Pro packages are free — register at [redbase.app](https://redbase.app) and request a license key by email.
