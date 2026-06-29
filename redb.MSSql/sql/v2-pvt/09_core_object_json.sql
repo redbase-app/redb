@@ -1,4 +1,15 @@
-﻿-- ====================================================================================================
+-- =====================================================================
+-- 09_core_object_json.sql (MSSql) — object<->JSON materializer (module-owned)
+-- ---------------------------------------------------------------------
+-- The whole object->JSON materializer (dbo.get_object_json plus its helpers
+-- escape_json_string / build_listitem_json / build_field_json / build_properties)
+-- lives in the v2-pvt module, not the core init, so that its bug fixes ride
+-- the versioned auto-redeploy: bumping dbo.pvt_module_version() re-applies
+-- this file to existing databases via EnsurePvtModuleDeployedAsync, without
+-- re-running the full redb_init.sql (skipped once _schemes exists).
+-- =====================================================================
+
+-- ====================================================================================================
 -- JSON OBJECT FUNCTION (not procedure!)
 -- MS SQL Server version - OPTIMIZED for use with SELECT + STRING_AGG
 -- ====================================================================================================
@@ -408,8 +419,12 @@ BEGIN
     DECLARE @base_json NVARCHAR(MAX);
     DECLARE @properties_json NVARCHAR(MAX);
     
-    -- Check if object exists
-    IF NOT EXISTS(SELECT 1 FROM _objects WHERE _id = @object_id)
+    -- Check if object exists.
+    -- Soft-deleted objects (_id_scheme = -10, @@__deleted) are treated as
+    -- non-existent: a nested _Object reference to a trashed object resolves
+    -- to NULL instead of materializing the tombstone. The _values pointer
+    -- stays intact, so the soft-delete remains reversible.
+    IF NOT EXISTS(SELECT 1 FROM _objects WHERE _id = @object_id AND _id_scheme <> -10)
         RETURN NULL;
     
     -- Get scheme_id and base fields

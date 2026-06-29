@@ -11,7 +11,8 @@ public static class ProviderFactory
     /// <param name="providerName">
     /// Case-insensitive provider name. Accepted values:
     /// <c>postgres</c>, <c>postgresql</c>, <c>pgsql</c>,
-    /// <c>mssql</c>, <c>sqlserver</c>.
+    /// <c>mssql</c>, <c>sqlserver</c>, <c>sqlite</c>
+    /// (<c>oracle</c> is recognized but not implemented).
     /// </param>
     /// <returns>A new, unopened <see cref="IDataProvider"/> instance.</returns>
     /// <exception cref="NotSupportedException">The provider is recognized but not yet implemented.</exception>
@@ -23,7 +24,7 @@ public static class ProviderFactory
             "postgres" or "postgresql" or "pgsql" => new PostgresProvider(),
             "mssql" or "sqlserver" => new MssqlProvider(),
             "oracle" => throw new NotSupportedException("Oracle provider is not implemented yet."),
-            "sqlite" => throw new NotSupportedException("SQLite provider is not implemented yet."),
+            "sqlite" => new SqliteProvider(),
             _ => throw new ArgumentException($"Unknown provider: {providerName}", nameof(providerName))
         };
     }

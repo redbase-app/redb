@@ -325,22 +325,22 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         }
         
         sqlTimer.Stop();
-        _logger?.LogInformation("⏱️  SQL query ({FunctionName}) executed in {ElapsedMs} ms", functionName, sqlTimer.ElapsedMilliseconds);
+        _logger?.LogDebug("SQL query ({FunctionName}) executed in {ElapsedMs} ms", functionName, sqlTimer.ElapsedMilliseconds);
 
         if (result?.result != null)
         {
-            _logger?.LogDebug("🔍 SQL RESPONSE: Received JSON with length {Length} characters", result.result.Length);
-            _logger?.LogDebug("🔍 SQL JSON: {JsonContent}", result.result);
+            _logger?.LogDebug("SQL RESPONSE: Received JSON with length {Length} characters", result.result.Length);
+            _logger?.LogDebug("SQL JSON: {JsonContent}", result.result);
             
             var jsonDoc = System.Text.Json.JsonDocument.Parse(result.result);
             if (jsonDoc.RootElement.TryGetProperty("objects", out var objectsElement))
             {
                 var objectsJson = objectsElement.GetRawText();
-                _logger?.LogDebug("🔍 OBJECTS JSON: {ObjectsJson}", objectsJson);
+                _logger?.LogDebug("OBJECTS JSON: {ObjectsJson}", objectsJson);
                 
                 var objects = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement[]>(objectsJson);
                 
-                _logger?.LogDebug("📊 SQL RESULT: {Count} objects received from the database", objects?.Length ?? 0);
+                _logger?.LogDebug("SQL RESULT: {Count} objects received from the database", objects?.Length ?? 0);
                 
                 // ⭐ PROJECTION: Convert flat paths to hierarchy ONLY for by_ids
                 // by_paths already returns hierarchical JSON from SQL (uses build_hierarchical_properties_optimized)
@@ -352,7 +352,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
                 // Results materialization from JSON objects
                 var materializationResult = await MaterializeResultsFromJson<TProps>(objects, context);
                 
-                _logger?.LogInformation("📊 TOTAL ToListAsync: SQL ({SqlMs} ms) + materialization + Props = full cycle", sqlTimer.ElapsedMilliseconds);
+                _logger?.LogDebug("TOTAL ToListAsync: SQL ({SqlMs} ms) + materialization + Props = full cycle", sqlTimer.ElapsedMilliseconds);
                 
                 return materializationResult;
             }
@@ -369,7 +369,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
     private async Task<List<RedbObject<TProps>>> MaterializeResultsFromJson<TProps>(System.Text.Json.JsonElement[] objects, QueryContext<TProps> context) 
         where TProps : class, new()
     {
-        _logger?.LogDebug("🔍 MATERIALIZATION: Received {Count} JSON objects for deserialization", objects?.Length ?? 0);
+        _logger?.LogDebug("MATERIALIZATION: Received {Count} JSON objects for deserialization", objects?.Length ?? 0);
         
         // ⏱️ MEASURING MATERIALIZATION TIME
         var materializationTimer = System.Diagnostics.Stopwatch.StartNew();
@@ -380,7 +380,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
 
         if (objects == null || objects.Length == 0)
         {
-            _logger?.LogDebug("⚠️ MATERIALIZATION: JSON array is empty or null");
+            _logger?.LogDebug("MATERIALIZATION: JSON array is empty or null");
             return materializedResults;
         }
 
@@ -422,7 +422,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
                     redbObject._lazyLoader = _lazyPropsLoader;
                     redbObject._propsLoaded = false;
                     
-                    _logger?.LogDebug("🔄 Lazy loader set for object {ObjectId} (individual on-demand mode)", redbObject.id);
+                    _logger?.LogDebug("Lazy loader set for object {ObjectId} (individual on-demand mode)", redbObject.id);
                 }
                 
                 materializedResults.Add(redbObject);
@@ -442,9 +442,9 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
 
         materializationTimer.Stop();
         
-        _logger?.LogDebug("📊 MATERIALIZATION COMPLETED: Success={Success}, Errors={Errors}, Total objects={Total}", 
+        _logger?.LogDebug("MATERIALIZATION COMPLETED: Success={Success}, Errors={Errors}, Total objects={Total}", 
             successCount, errorCount, materializedResults.Count);
-        _logger?.LogInformation("⏱️  Materialization JSON → C# objects completed in {ElapsedMs} ms", materializationTimer.ElapsedMilliseconds);
+        _logger?.LogDebug("Materialization JSON → C# objects completed in {ElapsedMs} ms", materializationTimer.ElapsedMilliseconds);
 
         // ⭐ PROJECTION: If SkipPropsLoading = true — skip Props loading completely
         if (context.SkipPropsLoading)
@@ -460,13 +460,13 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         // - useLazyOnDemand = false → LoadPropsForManyAsync (two-phase eager or batch)
         // - useLazyOnDemand = true → lazy on demand (Props loaded when accessing obj.Props)
         
-        _logger?.LogInformation("🔍 Props loading: EnableLazyForProps={EnableLazy}, UseLazyLoading={UseLazy}, UseLazyOnDemand={OnDemand}, ResultsCount={Count}", 
+        _logger?.LogDebug("Props loading: EnableLazyForProps={EnableLazy}, UseLazyLoading={UseLazy}, UseLazyOnDemand={OnDemand}, ResultsCount={Count}", 
             _configuration.EnableLazyLoadingForProps, context.UseLazyLoading, useLazyOnDemand, materializedResults.Count);
         
         if (useLazyOnDemand)
         {
             // INDIVIDUAL lazy loading - Props will be loaded when accessing obj.Props
-            _logger?.LogInformation("✅ Individual lazy loading enabled. Props will be loaded when accessing a specific object.");
+            _logger?.LogDebug("Individual lazy loading enabled. Props will be loaded when accessing a specific object.");
         }
         else if (materializedResults.Count > 0 && _lazyPropsLoader != null)
         {
@@ -485,7 +485,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
             }
             
             propsLoadTimer.Stop();
-            _logger?.LogInformation("⏱️  Props loaded via batch (with cache check) in {ElapsedMs} ms", propsLoadTimer.ElapsedMilliseconds);
+            _logger?.LogDebug("Props loaded via batch (with cache check) in {ElapsedMs} ms", propsLoadTimer.ElapsedMilliseconds);
         }
 
         // ✅ DISTINCT is now performed at the SQL level via search_objects_with_facets_base(..., distinct_hash=true)
@@ -621,7 +621,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         var sqlTimer = System.Diagnostics.Stopwatch.StartNew();
         var rows = await _context.QueryAsync<StringValue>(wrapped);
         sqlTimer.Stop();
-        _logger?.LogInformation("⏱️  PVT SQL (get_object_json wrapper) executed in {ElapsedMs} ms", sqlTimer.ElapsedMilliseconds);
+        _logger?.LogDebug("PVT SQL (get_object_json wrapper) executed in {ElapsedMs} ms", sqlTimer.ElapsedMilliseconds);
 
         if (rows is null || rows.Count == 0)
         {
@@ -711,7 +711,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         var sqlTimer = System.Diagnostics.Stopwatch.StartNew();
         var rows = await _context.QueryAsync<StringValue>(wrapped);
         sqlTimer.Stop();
-        _logger?.LogInformation("⏱️  PVT projection SQL executed in {ElapsedMs} ms ({RowCount} rows)",
+        _logger?.LogDebug("PVT projection SQL executed in {ElapsedMs} ms ({RowCount} rows)",
             sqlTimer.ElapsedMilliseconds, rows?.Count ?? 0);
 
         if (rows is null || rows.Count == 0)
@@ -1283,7 +1283,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         AggregateFunction function,
         string? filterJson = null)
     {
-        _logger?.LogDebug("🔢 AGGREGATION: SchemeId={SchemeId}, Field={Field}, Function={Function}, Filter={Filter}", 
+        _logger?.LogDebug("AGGREGATION: SchemeId={SchemeId}, Field={Field}, Function={Function}, Filter={Filter}", 
             schemeId, fieldPath, function, filterJson ?? "null");
         
         var timer = System.Diagnostics.Stopwatch.StartNew();
@@ -1309,7 +1309,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
                 filterJson ?? "null");
             
             timer.Stop();
-            _logger?.LogInformation("⏱️ AGGREGATION {Function}({Field}) = {Result} in {ElapsedMs} ms", 
+            _logger?.LogDebug("AGGREGATION {Function}({Field}) = {Result} in {ElapsedMs} ms", 
                 function, fieldPath, result?.result, timer.ElapsedMilliseconds);
             
             return result?.result;
@@ -1334,7 +1334,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         var result = new AggregateResult();
         var requestList = requests.ToList();
         
-        _logger?.LogDebug("🔢 BATCH AGGREGATION (1 SQL): SchemeId={SchemeId}, Requests={Count}", schemeId, requestList.Count);
+        _logger?.LogDebug("BATCH AGGREGATION (1 SQL): SchemeId={SchemeId}, Requests={Count}", schemeId, requestList.Count);
         
         // Form JSON array of aggregations
         var aggregationsJson = System.Text.Json.JsonSerializer.Serialize(
@@ -1375,7 +1375,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
             }
         }
         
-        _logger?.LogDebug("🔢 BATCH RESULT: {Result}", System.Text.Json.JsonSerializer.Serialize(result.Values));
+        _logger?.LogDebug("BATCH RESULT: {Result}", System.Text.Json.JsonSerializer.Serialize(result.Values));
         
         return result;
     }

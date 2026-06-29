@@ -19,7 +19,8 @@
       "description": "Database provider to use",
       "choices": [
         { "choice": "postgres", "description": "PostgreSQL (via Npgsql)" },
-        { "choice": "mssql", "description": "Microsoft SQL Server" }
+        { "choice": "mssql", "description": "Microsoft SQL Server" },
+        { "choice": "sqlite", "description": "SQLite (embedded; Pro runs in Blazor WASM / mobile)" }
       ]
     },
     "pro": {
@@ -35,6 +36,10 @@
     "UseMsSql": {
       "type": "computed",
       "value": "(db == \"mssql\")"
+    },
+    "UseSqlite": {
+      "type": "computed",
+      "value": "(db == \"sqlite\")"
     }
   },
   "sources": [

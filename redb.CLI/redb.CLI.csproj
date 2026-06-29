@@ -28,9 +28,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="redb.Export" Version="1.2.*" />
-    <PackageReference Include="redb.Postgres" Version="1.2.*" />
-    <PackageReference Include="redb.MSSql" Version="1.2.*" />
+    <!-- Build against the current monorepo, not stale 1.2.* NuGet packages: the SQLite provider
+         never existed at 1.2.*, so the package pins silently left `schema/init/export/import -p sqlite`
+         resolving against an assembly without redbSqlite.sql or redb.SQLite.RedbService. Mirrors the
+         ProjectReference switch already done in redb.Examples. (For a release pack, flip back to the
+         3.2.* published packages.) -->
+    <!-- <PackageReference Include="redb.Export" Version="1.2.*" /> -->
+    <!-- <PackageReference Include="redb.Postgres" Version="1.2.*" /> -->
+    <!-- <PackageReference Include="redb.MSSql" Version="1.2.*" /> -->
+    <!-- <PackageReference Include="redb.SQLite" Version="1.2.*" /> -->
+    <ProjectReference Include="..\redb.Export\redb.Export.csproj" />
+    <ProjectReference Include="..\redb.Postgres\redb.Postgres.csproj" />
+    <ProjectReference Include="..\redb.MSSql\redb.MSSql.csproj" />
+    <ProjectReference Include="..\redb.SQLite\redb.SQLite.csproj" />
   </ItemGroup>
 
 </Project>

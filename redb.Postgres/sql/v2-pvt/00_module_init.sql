@@ -31,17 +31,10 @@ BEGIN
             'v2-pvt: required system function public.get_scheme_definition(bigint) is missing. Deploy the REDB core schema first (redbPostgre.sql / generated redb_init.sql).';
     END IF;
 
-    -- Required system function: object JSON materializer.
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_proc p
-        JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE p.proname = 'get_object_json'
-          AND n.nspname = 'public'
-    ) THEN
-        RAISE EXCEPTION
-            'v2-pvt: required system function public.get_object_json(bigint, integer) is missing. Deploy the REDB core schema first (redbPostgre.sql / generated redb_init.sql).';
-    END IF;
+    -- NOTE: get_object_json() is now OWNED by this module (defined in
+    -- 08_core_object_json.sql), so it is no longer guarded as an external
+    -- prerequisite — it is (re)created later in the same bundle. This lets
+    -- its bug fixes ride the versioned auto-redeploy.
 
     -- Required core tables.
     IF NOT EXISTS (SELECT 1 FROM information_schema.tables
@@ -95,6 +88,18 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $BODY$
 BEGIN
+    -- 0.6.3 — Soft-delete read-path fix + object-json materializer ownership:
+    --   * The whole object->JSON materializer (get_object_json, get_objects_json,
+    --     build_hierarchical_properties_optimized, build_listitem_jsonb) moved
+    --     from core (redb_json_objects.sql, now deleted) into the module
+    --     (08_core_object_json.sql) so its fixes auto-redeploy to existing
+    --     databases via the version check (full redb_init.sql is not re-run
+    --     once _schemes exists).
+    --   * get_object_json() now treats soft-deleted objects
+    --     (_id_scheme = -10, @@__deleted) as non-existent: a nested
+    --     _Object reference to a trashed object resolves to NULL instead
+    --     of materializing the tombstone. The _values pointer stays
+    --     intact, so soft-delete remains reversible.
     -- 0.6.2 — Nested-dict object-set pushdown (mixed scalar+nested):
     --   * 12_pvt_cte_builder.sql now folds the object-set restriction
     --     (scheme + base pushdown + tree filter) into every
@@ -158,7 +163,7 @@ BEGIN
     --   * `_array_index IS NULL` filter for scalars (NOT `_array_parent_id IS NULL`).
     --   * `0$:` base-field prefix stripping in pvt_normalize_base_field_name.
     --   * full collection / nested / dictionary / ListItem.Value/Alias / array-op support.
-    RETURN '0.6.2';
+    RETURN '0.6.3';
 END;
 $BODY$;
 

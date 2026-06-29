@@ -1,0 +1,79 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>redb.SQLite</PackageId>
+    <Product>REDB - Entity Database for .NET</Product>
+    <Description>SQLite provider for REDB. Includes optimized SQL generation, tree queries with CTEs, and full LINQ support.</Description>
+    <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>
+    <PackageTags>database;orm;redb;redbase;sqlite;linq;dotnet;typed-storage;cte;tree-query</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+    <!-- Direct override of the transitive native lib to dodge NU1903
+         GHSA-2m69-gcr7-jv3q (vulnerable e_sqlite3 2.1.11, which Microsoft.Data.Sqlite
+         10.0.0 still pulls transitively via bundle/provider). Pin the native lib to a
+         real, patched version. NOTE: do NOT remove this pin — without it lib.e_sqlite3
+         falls back to the vulnerable 2.1.11. The previous 2.1.12 pin no longer exists
+         in the feed (→ NU1603); 3.50.3 is the current patched release. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\redb.Core\redb.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Schema init: a single hand-written SQLite DDL script (no concatenation /
+       no PL/pgSQL functions / no v2-pvt). Unlike the PostgreSQL provider, SQLite
+       does not host server-side functions, so redb_init for SQLite is just the
+       schema. RedbService.ReadEmbeddedSql loads this resource. -->
+  <ItemGroup>
+    <EmbeddedResource Include="sql\redbSqlite.sql" />
+  </ItemGroup>
+
+  <!-- ===== Free native SQLite extension packaging =====
+       The server-side SQL functions (get_object_json, pvt_build_*_sql, soft-delete,
+       permissions) ship as a native SQLite loadable extension (redb.dll/.so/.dylib)
+       built by the CMake project under native/. Pack the prebuilt binary into the
+       idiomatic runtimes/<rid>/native layout, plus a buildTransitive .targets that
+       copies it into framework-dependent consumer output — SQLite loads the
+       extension by explicit path (conn.LoadExtension), so the file must physically
+       sit in the app output, it is NOT host-resolved like a P/Invoke native lib.
+       The native binary is gitignored build output: build it before packing
+       (see native/README.md). Ships today: win-x64, linux-x64, linux-arm64;
+       osx-x64 / osx-arm64 need a macOS runner (CI matrix). -->
+  <ItemGroup>
+    <!-- One CMake build dir per RID; only the binaries actually built get packed
+         (Exists-gated). Local Windows dev uses native/build (the default CMake
+         output); CI / cross builds produce native/build-<rid>/ (see
+         native/README.md). A fully cross-platform package is produced by a CI
+         matrix: each OS job builds its binary, the pack job collects them here.
+         The runtime loader (SqliteDataSource.LocatePackagedExtension) and the
+         buildTransitive .targets pick the right file per OS/arch automatically. -->
+    <None Include="native\build\redb.dll"             Pack="true" PackagePath="runtimes/win-x64/native/redb.dll"     Visible="false" Condition="Exists('native\build\redb.dll')" />
+    <None Include="native\build-linux-x64\redb.so"    Pack="true" PackagePath="runtimes/linux-x64/native/redb.so"    Visible="false" Condition="Exists('native\build-linux-x64\redb.so')" />
+    <None Include="native\build-linux-arm64\redb.so"  Pack="true" PackagePath="runtimes/linux-arm64/native/redb.so"  Visible="false" Condition="Exists('native\build-linux-arm64\redb.so')" />
+    <None Include="native\build-osx-x64\redb.dylib"   Pack="true" PackagePath="runtimes/osx-x64/native/redb.dylib"   Visible="false" Condition="Exists('native\build-osx-x64\redb.dylib')" />
+    <None Include="native\build-osx-arm64\redb.dylib" Pack="true" PackagePath="runtimes/osx-arm64/native/redb.dylib" Visible="false" Condition="Exists('native\build-osx-arm64\redb.dylib')" />
+    <None Include="build\redb.SQLite.targets"         Pack="true" PackagePath="buildTransitive/redb.SQLite.targets"  Visible="false" />
+  </ItemGroup>
+
+  <Target Name="WarnMissingNativeExtension" BeforeTargets="GenerateNuspec"
+          Condition="!Exists('native\build\redb.dll')">
+    <Warning Text="redb.SQLite: native extension 'native/build/redb.dll' not found — the NuGet package will NOT contain the Free SQLite loadable extension. Build it first: cmake --build redb.SQLite/native/build (see native/README.md)." />
+  </Target>
+
+</Project>

@@ -685,7 +685,7 @@ where TField : struct
             _context.Filter);
         
         if (result == null) return null;
-        return (TField)Convert.ChangeType(result.Value, typeof(TField));
+        return (TField)Utils.TemporalDecoder.ChangeType(result.Value, typeof(TField));
     }
     
     public virtual async Task<TField?> MaxAsync<TField>(Expression<Func<TProps, TField>> selector) 
@@ -701,7 +701,7 @@ where TField : struct
             _context.Filter);
         
         if (result == null) return null;
-        return (TField)Convert.ChangeType(result.Value, typeof(TField));
+        return (TField)Utils.TemporalDecoder.ChangeType(result.Value, typeof(TField));
     }
     
     // ===== AGGREGATIONS FOR BASE FIELDS =====
@@ -1258,7 +1258,7 @@ where TField : struct
             Type t when t == typeof(decimal) => Convert.ToDecimal(value),
             Type t when t == typeof(double) => Convert.ToDouble(value),
             Type t when t == typeof(float) => Convert.ToSingle(value),
-            _ => Convert.ChangeType(value, underlying)
+            _ => Utils.TemporalDecoder.ChangeType(value, underlying)
         };
     }
     

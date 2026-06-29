@@ -7,7 +7,7 @@
 --
 -- This file must be applied FIRST. It performs three things:
 --   1. Verifies that system infrastructure of REDB is in place
---      (core tables and dbo.get_object_json).
+--      (core tables; dbo.get_object_json is now module-owned, see step 4).
 --   2. Drops every function this module owns so the module can be
 --      redeployed cleanly.
 --   3. Creates dbo.pvt_module_version() -- used by the C# client to
@@ -18,15 +18,10 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 -- ---------- 1. System infrastructure check ------------------------------
-IF OBJECT_ID(N'dbo.get_object_json', N'FN') IS NULL
-   AND OBJECT_ID(N'dbo.get_object_json', N'IF') IS NULL
-   AND OBJECT_ID(N'dbo.get_object_json', N'TF') IS NULL
-BEGIN
-    THROW 50000,
-        N'v2-pvt: required system function dbo.get_object_json is missing. Deploy the REDB core schema first (redbMSSQL.sql / generated redb_init.sql).',
-        1;
-END;
-
+-- NOTE: dbo.get_object_json (and its helpers) is now OWNED by this module
+-- (defined in 09_core_object_json.sql), so it is no longer guarded as an
+-- external prerequisite — it is (re)created later in the same bundle. This
+-- lets its bug fixes ride the versioned auto-redeploy.
 IF OBJECT_ID(N'dbo._objects', N'U') IS NULL
     THROW 50000, N'v2-pvt: required table dbo._objects is missing.', 1;
 IF OBJECT_ID(N'dbo._values', N'U') IS NULL
@@ -102,9 +97,25 @@ BEGIN
     --         * 20_pvt_build_query_sql.sql: narrow eligibility now
     --           allows nested groups; default ORDER BY @base_prefix
     --           + [_id] when paging is present without ORDER BY.
+    -- 0.1.3 - fix: DISTINCT (@distinct=1) outer ORDER BY referenced the inner
+    --         alias prefix (o./_pvt_cte.) outside the `_dist` wrapper -> "multi-part
+    --         identifier 'o._id' could not be bound" with .Distinct().Take(). Outer
+    --         order now uses the projected [_id] (@order_sql_dist) in all 3 branches.
+    -- 0.1.4 - Soft-delete read-path fix + object-json materializer ownership:
+    --         * The whole object->JSON materializer (dbo.get_object_json plus
+    --           helpers build_properties / build_field_json / build_listitem_json
+    --           / escape_json_string) moved from core (redb_json_objects.sql,
+    --           now deleted) into the module (09_core_object_json.sql) so its
+    --           fixes auto-redeploy to existing databases via the version check
+    --           (full redb_init.sql is not re-run once _schemes exists).
+    --         * dbo.get_object_json now treats soft-deleted objects
+    --           (_id_scheme = -10, @@__deleted) as non-existent: a nested
+    --           _Object reference to a trashed object resolves to NULL instead
+    --           of materializing the tombstone. The _values pointer stays
+    --           intact, so soft-delete remains reversible.
     -- 0.1.0 - skeleton: module bootstrap, drop-all, version function.
     --         Builder functions (pvt_build_query_sql etc.) not implemented yet.
-    RETURN N'0.1.2';
+    RETURN N'0.1.4';
 END;
 GO
 

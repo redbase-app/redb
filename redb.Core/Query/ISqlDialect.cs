@@ -316,6 +316,12 @@ public interface ISqlDialect
     /// SELECT all user fields by login. Params: $1=login
     /// </summary>
     string Users_SelectByLogin();
+
+    /// <summary>
+    /// SELECT all user fields by email (case-insensitive, first match, active only).
+    /// Params: $1=email. Used by <see cref="Providers.IUserProvider.GetUserByEmailAsync"/>.
+    /// </summary>
+    string Users_SelectByEmail();
     
     /// <summary>
     /// INSERT new user with all fields.
@@ -569,7 +575,15 @@ public interface ISqlDialect
     /// Returns: ObjectId, SchemeId, JsonData columns
     /// </summary>
     string Tree_SelectPolymorphicChildren();
-    
+
+    /// <summary>
+    /// SELECT direct child object ids only (no JSON materialization). Params: $1=parentId.
+    /// Returns a single _id column. Used for lightweight subtree id collection where the heavier
+    /// <see cref="Tree_SelectPolymorphicChildren"/> (which calls get_object_json) is unnecessary —
+    /// and unavailable on tiers without that function (e.g. SQLite Pro).
+    /// </summary>
+    string Tree_SelectChildrenIds();
+
     /// <summary>
     /// SELECT scheme and JSON for object. Params: $1=objectId
     /// Returns: SchemeId, JsonData columns

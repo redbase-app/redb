@@ -4,7 +4,7 @@ Core library for **RedBase (REDB)** — Entity Database for .NET.
 
 [![NuGet](https://img.shields.io/nuget/v/redb.Core?label=NuGet&color=blue)](https://www.nuget.org/packages/redb.Core)
 [![Downloads](https://img.shields.io/nuget/dt/redb.Core?label=Downloads&color=green)](https://www.nuget.org/packages/redb.Core)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](../LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](../LICENSE)
 
 ## What's inside
 

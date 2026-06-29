@@ -289,12 +289,27 @@ public class PostgreSqlDialect : ISqlDialect
     
     public string Users_SelectByLogin() =>
         """
-        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password, 
+        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password,
                _phone AS Phone, _email AS Email, _enabled AS Enabled,
                _date_register AS DateRegister, _date_dismiss AS DateDismiss,
                _key AS Key, _code_int AS CodeInt, _code_string AS CodeString,
                _code_guid AS CodeGuid, _note AS Note, _hash AS Hash
         FROM _users WHERE _login = $1
+        """;
+
+    // Case-insensitive email lookup. Returns the FIRST match — email isn't enforced
+    // unique at the schema level; callers that need uniqueness probe with their own
+    // policy. Filters out soft-deleted rows (_enabled = false) so a stale row whose
+    // address was anonymised by an admin update doesn't shadow a real new account.
+    public string Users_SelectByEmail() =>
+        """
+        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password,
+               _phone AS Phone, _email AS Email, _enabled AS Enabled,
+               _date_register AS DateRegister, _date_dismiss AS DateDismiss,
+               _key AS Key, _code_int AS CodeInt, _code_string AS CodeString,
+               _code_guid AS CodeGuid, _note AS Note, _hash AS Hash
+        FROM _users WHERE LOWER(_email) = LOWER($1) AND _enabled = TRUE
+        LIMIT 1
         """;
     
     public string Users_Insert() =>
@@ -313,8 +328,12 @@ public class PostgreSqlDialect : ISqlDialect
         WHERE _id = $13
         """;
     
+    // _login is immutable per the protect_system_users trigger — soft-delete must NOT
+    // touch it. Tombstoning happens on _name (mutable). Login slot stays occupied so
+    // re-registration with the same login is blocked while the soft-deleted row exists;
+    // freeing the login requires an explicit hard DELETE (separate admin operation).
     public string Users_SoftDelete() =>
-        "UPDATE _users SET _login = $1, _name = $2, _enabled = $3, _date_dismiss = $4 WHERE _id = $5";
+        "UPDATE _users SET _name = $1, _enabled = $2, _date_dismiss = $3 WHERE _id = $4";
     
     public string Users_UpdatePassword() =>
         "UPDATE _users SET _password = $1 WHERE _id = $2";
@@ -480,7 +499,10 @@ public class PostgreSqlDialect : ISqlDialect
         WHERE o._id_parent = $1
         ORDER BY o._name, o._id
         """;
-    
+
+    public string Tree_SelectChildrenIds() =>
+        "SELECT o._id FROM _objects o WHERE o._id_parent = $1 ORDER BY o._name, o._id";
+
     public string Tree_SelectSchemeAndJson() =>
         "SELECT _id_scheme as SchemeId, get_object_json(_id, 1)::text as JsonData FROM _objects WHERE _id = $1";
     
@@ -1045,7 +1067,7 @@ public class PostgreSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
     // Bump together with the literal in redb.Postgres/sql/v2-pvt/00_module_init.sql.
-    public string? Query_PvtRequiredVersion() => "0.6.2";
+    public string? Query_PvtRequiredVersion() => "0.6.3";
 
     // ============================================================
     // Native PVT projection orchestrator (pvt_build_projection_sql).

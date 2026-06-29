@@ -4,6 +4,10 @@ using Microsoft.Extensions.Logging;
 using redb.Core;
 using redb.Core.Pro.Extensions;
 using redb.Postgres.Pro.Extensions;
+using redb.SQLite.Pro.Extensions;        // UseSqlite is tier-agnostic: AddRedb -> Free, AddRedbPro -> Pro
+                                         // (do NOT also import redb.SQLite.Extensions — its UseSqlite
+                                         //  would make the call ambiguous; switch tiers via AddRedb/AddRedbPro)
+using redb.SQLite.Data;                  // SqliteDataSource.NativeExtensionPath (Free native ext)
 using redb.Examples.Examples;
 using redb.Examples.Output;
 using redb.Core.Models.Configuration;
@@ -42,7 +46,10 @@ class Program
         var redb = provider.GetRequiredService<IRedbService>();
 
         // Get DB type and platform key
-        var dbType = redb.Context.GetType().Name.Contains("Npgsql") ? "PostgreSQL" : "SQL Server";
+        var ctxName = redb.Context.GetType().Name;
+        var dbType = ctxName.Contains("Npgsql") ? "PostgreSQL"
+            : ctxName.Contains("Sqlite") ? "SQLite"   // check before "Sql": "Sqlite".Contains("Sql") == true
+            : "SQL Server";
         var platformKey = GetPlatformKey(redb);
         Console.WriteLine($"DB: {dbType} | Platform: {platformKey} | redb.Examples");
         Console.WriteLine();
@@ -142,12 +149,21 @@ class Program
             .AddConsole()
             .SetMinimumLevel(LogLevel.Warning));
 
-        var TestLicense=@"<your-redb-pro-license>";
-        services.AddRedb(options => options
+        // FREE SQLite needs the native extension loaded on every connection (it hosts
+        // get_object_json / pvt_build_*_sql in-DB). Make the example run out-of-the-box:
+        // honor REDB_SQLITE_EXTENSION if it's set (that's the env default), otherwise
+        // locate redb.SQLite/native/build/redb.{dll,so,dylib} by walking up from the app
+        // base dir. (Harmless for the Pro run — Pro never calls those functions.)
+        SqliteDataSource.NativeExtensionPath ??= ResolveSqliteNativeExtension();
+
+        // SQLite dev TRIAL license — type=trial, version=3.3.0, 30 days (hard expiry).
+        // Features: core.pro, postgres.pro, mssql.pro, sqlite.pro. Signed with the trusted RSA key (kid app-2025-01).
+        var TestLicense=@"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFwcC0yMDI1LTAxIn0.eyJqdGkiOiIwMWEyYzI3Zi0xMjRmLTQ2NzQtOWZlOS1kMDUxOWRhZWE4YTEiLCJsaWNlbnNlZSI6InJlbGlrdEBiay5ydSIsImVtYWlsIjoicmVsaWt0QGJrLnJ1IiwidmVyc2lvbiI6IjMuMy4wIiwidHlwZSI6InRyaWFsIiwiZmVhdHVyZXMiOlsiY29yZS5wcm8iLCJwb3N0Z3Jlcy5wcm8iLCJtc3NxbC5wcm8iLCJzcWxpdGUucHJvIiwidHNhay5jbHVzdGVyIiwidHNhay53ZWIucHJvIl0sIm1heF9ub2RlcyI6IjMiLCJ0c2FrX3ZlcnNpb24iOiIzLjMuMCIsIm5iZiI6MTc4MjE1MDk1NywiZXhwIjoxODEzMjU0OTU3LCJpc3MiOiJyZWRiLnJ1In0.I-62ha8_CrWoQGO39_532Gc3kw3Q6JDB7iijz6QPBgLzNB_M0VrRXTFd6jAkiFcWTq1jchC5vulRkr-0QOVgqr5nQT71nMpQo27AKt1f3RYyvNLO97YIg7C3aH8zccivTK5OXqRqmxJlMxtO9qj3_elyC23Zg8m-6YZdFD2h9CTmB4PV7IJq5pC8SMVCtCxh-owfsmtxmxlXRZeTV8Nck3J_9ozlcwdOkIBczzqFC-BFxw5iORqeeDLzs3lt3lmJfMwwRYtNZoBp_aZBmyFmYuYMliN8Cyy9zawv-GsbbIcKweq3I0q6H2Mv9Bd0S28Pii_kqzwcx4iFKlNfUlIWkA";
+        services.AddRedbPro(options => options
             .WithLicense(TestLicense)
             .Configure(c =>
             {
-                c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert; // Default is ChangeTracking - only saves changed props, requires tracking. Can switch to FullSave for simpler logic (always saves all props) or ManualSave for full control (must call SavePropsAsync manually).
+                c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert; // FREE tier: DeleteInsert (ChangeTracking is a Pro feature). Flip to ChangeTracking for the Pro run.
                 //c.SkipHashValidationOnCacheCheck = false;
                 //c.EnableLazyLoadingForProps = false;
                 //c.EnablePropsCache = false;
@@ -155,8 +171,32 @@ class Program
                 //c.PropsCacheTtl = TimeSpan.FromMinutes(60);
             })
             //.UsePostgres("Host=localhost;Port=5432;Username=postgres;Password=1;Database=redb;Pooling=true;Include Error Detail=true;Options=-c jit=off")
-            .UseMsSql("Server=localhost;Database=redb;User Id=sa;Password=1;TrustServerCertificate=true;Command Timeout=600;")
+            //.UseMsSql("Server=127.0.0.1,1433;Database=redb;User Id=sa;Password=1;TrustServerCertificate=true;Command Timeout=600;")  // 127.0.0.1 (not localhost): localhost->::1 hits docker [::]:1433 and hangs ~63s
+            .UseSqlite("Data Source=redb_examples.db")
             );
+    }
+
+    /// <summary>
+    /// Locate the FREE SQLite native extension (redb.dll/.so/.dylib) by walking up the
+    /// directory tree from the running app to the repo's redb.SQLite/native/build folder.
+    /// Returns the full path (suffix included) or null if not found / not yet built.
+    /// </summary>
+    private static string? ResolveSqliteNativeExtension()
+    {
+        var suffix = OperatingSystem.IsWindows() ? ".dll"
+                   : OperatingSystem.IsMacOS()   ? ".dylib"
+                   : ".so";
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName, "redb.SQLite", "native", "build", "redb" + suffix);
+            if (File.Exists(candidate))
+                return candidate;
+        }
+        Console.WriteLine(
+            "[WARN] FREE SQLite native extension not found (redb.SQLite/native/build/redb" + suffix +
+            "). Build it (cmake --build redb.SQLite/native/build) or set REDB_SQLITE_EXTENSION. " +
+            "Without it, get_object_json / pvt_build_*_sql are missing and most examples FAIL.");
+        return null;
     }
 
     private static List<(ExampleBase example, ExampleMetaAttribute? meta)> DiscoverExamples()
@@ -178,10 +218,12 @@ class Program
     /// </summary>
     private static string GetPlatformKey(IRedbService redb)
     {
-        var isPostgres = redb.Context.GetType().Name.Contains("Npgsql");
+        var ctxName = redb.Context.GetType().Name;
         var isPro = redb.GetType().Assembly.FullName?.Contains(".Pro") == true;
-        
-        var db = isPostgres ? "postgres" : "mssql";
+
+        var db = ctxName.Contains("Npgsql") ? "postgres"
+            : ctxName.Contains("Sqlite") ? "sqlite"   // check before "Sql": "Sqlite".Contains("Sql") == true
+            : "mssql";
         return isPro ? $"{db}.pro" : db;
     }
 

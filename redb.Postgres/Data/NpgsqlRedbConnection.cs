@@ -374,15 +374,15 @@ namespace redb.Postgres.Data
         {
             if (_disposed)
                 return;
-            
+
             _disposed = true;
-            
+
             if (_currentTransaction != null)
             {
                 await _currentTransaction.DisposeAsync();
                 _currentTransaction = null;
             }
-            
+
             if (_connection != null)
             {
                 await _connection.DisposeAsync();

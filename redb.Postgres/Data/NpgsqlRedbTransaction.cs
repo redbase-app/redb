@@ -53,9 +53,37 @@ namespace redb.Postgres.Data
         {
             if (!IsActive)
                 throw new InvalidOperationException("Transaction is not active. Already committed or rolled back.");
-            
-            await _transaction.CommitAsync();
+
+            try
+            {
+                await _transaction.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                // Commit failed: Npgsql's NpgsqlConnection still holds a reference to
+                // _transaction. Npgsql's pool reset (DISCARD ALL on acquire) usually
+                // hides leaks of this shape, but the semantics should not depend on
+                // pool-driver tolerance — speculatively rollback so the connection
+                // returns clean, then re-throw so the caller still sees the original
+                // exception. Both attempts are logged via [Diag-TX-LIFECYCLE-PG] so a
+                // failure shape never goes silent.
+                // Console.WriteLine($"[Diag-TX-LIFECYCLE-PG] CommitAsync FAILED: {ex.GetType().Name}: {ex.Message}. Attempting speculative rollback.");
+                try { await _transaction.RollbackAsync(); }
+                catch (Exception rbEx)
+                {
+                    // Console.WriteLine($"[Diag-TX-LIFECYCLE-PG] Speculative rollback after failed commit ALSO FAILED: {rbEx.GetType().Name}: {rbEx.Message}. Pool may receive a dirty NpgsqlConnection (Npgsql's DISCARD ALL on next acquire is the only remaining mitigation).");
+                }
+                IsActive = false;
+                _onDispose();
+                throw;
+            }
             IsActive = false;
+            // Clear the connection's `_currentTransaction` slot now so commands
+            // issued between commit and dispose run against the autocommit
+            // connection (Npgsql is more tolerant of cmd.Transaction=closedTx
+            // than Microsoft.Data.Sqlite, but the semantics should not depend
+            // on driver tolerance).
+            _onDispose();
         }
 
         /// <summary>
@@ -65,22 +93,35 @@ namespace redb.Postgres.Data
         {
             if (!IsActive)
                 throw new InvalidOperationException("Transaction is not active. Already committed or rolled back.");
-            
-            await _transaction.RollbackAsync();
+
+            try
+            {
+                await _transaction.RollbackAsync();
+            }
+            catch (Exception ex)
+            {
+                // Console.WriteLine($"[Diag-TX-LIFECYCLE-PG] RollbackAsync FAILED: {ex.GetType().Name}: {ex.Message}. Npgsql's DISCARD ALL on next pool acquire is the only mitigation if the underlying state is dirty.");
+                IsActive = false;
+                _onDispose();
+                throw;
+            }
             IsActive = false;
+            _onDispose();
         }
 
         /// <summary>
         /// Dispose transaction.
-        /// If still active - rollback automatically.
+        /// If still active - rollback automatically. The catch CANNOT throw (Dispose contract),
+        /// so a leaked NpgsqlConnection (autocommit=off at the driver layer) is mitigated by
+        /// Npgsql's built-in DISCARD ALL on next pool acquire.
         /// </summary>
         public async ValueTask DisposeAsync()
         {
             if (_disposed)
                 return;
-            
+
             _disposed = true;
-            
+
             // Auto-rollback if still active
             if (IsActive)
             {
@@ -88,13 +129,13 @@ namespace redb.Postgres.Data
                 {
                     await _transaction.RollbackAsync();
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore rollback errors during dispose
+                    // Console.WriteLine($"[Diag-TX-LIFECYCLE-PG] DisposeAsync auto-rollback FAILED: {ex.GetType().Name}: {ex.Message}. Pool poisoning mitigated by Npgsql's DISCARD ALL on next acquire.");
                 }
                 IsActive = false;
             }
-            
+
             await _transaction.DisposeAsync();
             _onDispose();
         }

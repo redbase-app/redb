@@ -1,3 +1,18 @@
+-- =====================================================================
+-- 08_core_object_json.sql — object<->JSON materializer (core, module-owned)
+-- ---------------------------------------------------------------------
+-- The whole object->JSON materializer (get_object_json + get_objects_json +
+-- build_hierarchical_properties_optimized + build_listitem_jsonb) lives in the
+-- v2-pvt module, not the core init, so that its bug fixes ride the versioned
+-- auto-redeploy: bumping pvt_module_version() re-applies this file to existing
+-- databases via EnsurePvtModuleDeployedAsync, without re-running the full
+-- redb_init.sql (skipped once _schemes exists).
+--
+-- Definition order matters: get_object_json (plpgsql) is defined BEFORE
+-- get_objects_json (LANGUAGE sql), whose body references it and is validated
+-- at CREATE time.
+-- =====================================================================
+
 DROP VIEW IF EXISTS v_objects_json;
 DROP FUNCTION IF EXISTS get_object_json;
 DROP FUNCTION IF EXISTS build_listitem_jsonb;
@@ -388,7 +403,7 @@ DECLARE
     all_values _values[];  -- 🚀 Typed array instead of jsonb
 BEGIN
     -- Check if object exists - return NULL if not found
-    SELECT EXISTS(SELECT 1 FROM _objects WHERE _id = object_id) INTO object_exists;
+    SELECT EXISTS(SELECT 1 FROM _objects WHERE _id = object_id AND _id_scheme <> -10) INTO object_exists;
     
     IF NOT object_exists THEN
         RETURN NULL;

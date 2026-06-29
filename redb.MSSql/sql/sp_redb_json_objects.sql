@@ -570,8 +570,12 @@ BEGIN
     DECLARE @properties_json NVARCHAR(MAX);
     DECLARE @is_root_call BIT = 0;
     
-    -- Check if object exists - return NULL if not found (consistent with PostgreSQL)
-    IF NOT EXISTS(SELECT 1 FROM [dbo].[_objects] WHERE [_id] = @object_id)
+    -- Check if object exists - return NULL if not found (consistent with PostgreSQL).
+    -- Soft-deleted objects (_id_scheme = -10, @@__deleted) are treated as
+    -- non-existent: a nested _Object reference to a trashed object resolves
+    -- to NULL instead of materializing the tombstone. The pointer in _values
+    -- stays intact, so the soft-delete remains reversible.
+    IF NOT EXISTS(SELECT 1 FROM [dbo].[_objects] WHERE [_id] = @object_id AND [_id_scheme] <> -10)
     BEGIN
         SET @result = NULL;
         RETURN;

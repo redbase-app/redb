@@ -21,11 +21,12 @@ Creates all REDB tables, sequences, functions and views in an existing empty dat
 ```bash
 redb init -p postgres -c "Host=localhost;Database=mydb;Username=postgres;Password=pass"
 redb init -p mssql -c "Server=localhost;Database=mydb;User Id=sa;Password=pass;TrustServerCertificate=True"
+redb init -p sqlite -c "Data Source=app.db"
 ```
 
 | Option | Alias | Required | Description |
 |--------|-------|----------|-------------|
-| `--provider` | `-p` | Yes | Database provider: `postgres`, `mssql` |
+| `--provider` | `-p` | Yes | Database provider: `postgres`, `mssql`, `sqlite` |
 | `--connection` | `-c` | Yes | ADO.NET connection string |
 | `--verbose` | `-v` | No | Show detailed output |
 
@@ -46,7 +47,7 @@ redb schema -p postgres | psql -d mydb
 
 | Option | Alias | Required | Description |
 |--------|-------|----------|-------------|
-| `--provider` | `-p` | Yes | Database provider: `postgres`, `mssql` |
+| `--provider` | `-p` | Yes | Database provider: `postgres`, `mssql`, `sqlite` |
 | `--output` | `-o` | No | Output file path. If omitted, writes to stdout |
 
 ### `export` — Export Data
@@ -67,7 +68,7 @@ redb export -p postgres -c "..." -o test.redb --dry-run
 
 | Option | Alias | Required | Description |
 |--------|-------|----------|-------------|
-| `--provider` | `-p` | Yes | Database provider: `postgres`, `mssql` |
+| `--provider` | `-p` | Yes | Database provider: `postgres`, `mssql`, `sqlite` |
 | `--connection` | `-c` | Yes | Connection string |
 | `--output` | `-o` | Yes | Output file path (`.redb`) |
 | `--compress` | | No | Compress with ZIP |
@@ -91,7 +92,7 @@ redb import -p mssql -c "..." -i backup.redb --dry-run
 
 | Option | Alias | Required | Description |
 |--------|-------|----------|-------------|
-| `--provider` | `-p` | Yes | Database provider: `postgres`, `mssql` |
+| `--provider` | `-p` | Yes | Database provider: `postgres`, `mssql`, `sqlite` |
 | `--connection` | `-c` | Yes | Connection string |
 | `--input` | `-i` | Yes | Input file path (`.redb`) |
 | `--clean` | | No | Truncate all REDB tables before import |

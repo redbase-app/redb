@@ -175,13 +175,16 @@ public abstract class UserProviderBase : IUserProvider
         await Context.ExecuteAsync(Sql.UsersRoles_DeleteByUser(), user.Id);
         await Context.ExecuteAsync(Sql.Permissions_DeleteByUser(), user.Id);
 
-        // Soft delete
+        // Soft delete — login STAYS as-is (immutable per protect_system_users trigger).
+        // Name is suffixed for tombstoning visibility. Soft-deleted rows are filtered out
+        // of normal queries by the _enabled=false predicate; their login slot remains
+        // occupied so re-registration with the same login is blocked until an explicit
+        // hard DELETE removes the row.
         var timestamp = DateTimeOffset.Now.ToString("yyyyMMddHHmmssfff");
-        var newLogin = $"{dbUser.Login}_DEL_{timestamp}";
         var newName = $"{dbUser.Name}_DEL_{timestamp}";
 
         var result = await Context.ExecuteAsync(Sql.Users_SoftDelete(),
-            newLogin, newName, false, DateTimeOffset.Now, user.Id);
+            newName, false, DateTimeOffset.Now, user.Id);
 
         if (result > 0)
             await OnUserDeletedAsync(user, currentUser);
@@ -213,6 +216,13 @@ public abstract class UserProviderBase : IUserProvider
     public virtual async Task<IRedbUser?> GetUserByLoginAsync(string login)
     {
         return await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectByLogin(), login);
+    }
+
+    /// <inheritdoc />
+    public virtual async Task<IRedbUser?> GetUserByEmailAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return null;
+        return await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectByEmail(), email);
     }
 
     /// <inheritdoc />
@@ -308,7 +318,7 @@ public abstract class UserProviderBase : IUserProvider
         if (criteria != null)
         {
             if (criteria.ExcludeSystemUsers)
-                conditions.Add("_id > 1");
+                conditions.Add("_id > 0");
 
             if (!string.IsNullOrEmpty(criteria.LoginPattern))
             {

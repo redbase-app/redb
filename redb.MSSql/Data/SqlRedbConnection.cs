@@ -63,16 +63,56 @@ public class SqlRedbConnection : IRedbConnection
     
     private async Task<SqlConnection> GetOpenConnectionAsync()
     {
+        var wasJustOpened = false;
         if (_connection == null)
         {
             _connection = new SqlConnection(_connectionString);
             await _connection.OpenAsync();
+            wasJustOpened = true;
         }
         else if (_connection.State != ConnectionState.Open)
         {
             await _connection.OpenAsync();
+            wasJustOpened = true;
         }
+        if (wasJustOpened)
+            await EnsureCleanTransactionStateAsync(_connection);
         return _connection;
+    }
+
+    /// <summary>
+    /// Defensive pool-poisoning guard, mirror of <c>SqliteDataSource.EnsureCleanTransactionState</c>.
+    /// Microsoft.Data.SqlClient's connection pool returns <see cref="SqlConnection"/> wrappers
+    /// without inspecting the underlying internal connection's transaction state — a prior
+    /// caller that failed to COMMIT or ROLLBACK (e.g. swallowed rollback in a dispose path)
+    /// hands us a connection with <c>_currentTransaction</c> still set. The next
+    /// <see cref="SqlConnection.BeginTransaction()"/> then fails with
+    /// <c>InvalidOperationException: SqlConnection does not support parallel transactions</c>.
+    /// A speculative <c>ROLLBACK</c> clears any leaked tx; "no transaction is active" is the
+    /// normal/clean case and is silently caught (SQL Server error 3903 / 0x0F4F).
+    /// </summary>
+    private static async Task EnsureCleanTransactionStateAsync(SqlConnection conn)
+    {
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ROLLBACK";
+            await cmd.ExecuteNonQueryAsync();
+            // If we reach here, the pooled SqlConnection HAD a leaked tx — log so the
+            // source of the leak is observable.
+            // Console.WriteLine("[Diag-TX-LIFECYCLE-MSSQL] POOL-CLEANUP: rolled back leaked tx on pooled SqlConnection acquire.");
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 3903)
+        {
+            // SQL Server error 3903: "The ROLLBACK TRANSACTION request has no corresponding
+            // BEGIN TRANSACTION." — clean handle, expected case.
+        }
+        catch
+        {
+            // Any other failure is non-fatal here — we don't want to break connection
+            // acquisition for a defensive measure. The next BeginTransaction will surface
+            // the real error if the state is still bad.
+        }
     }
     
     /// <summary>

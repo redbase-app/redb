@@ -60,6 +60,19 @@ namespace redb.Core.Providers
         /// <param name="login">User login</param>
         /// <returns>User or null if not found</returns>
         Task<IRedbUser?> GetUserByLoginAsync(string login);
+
+        /// <summary>
+        /// Get the first user whose <c>_email</c> matches the supplied address
+        /// (case-insensitive). Email is NOT enforced unique at the schema level —
+        /// one address may legitimately be reused after a prior account is soft-deleted
+        /// or whoever owned it changed their address. Callers that need a uniqueness
+        /// invariant (e.g. federation-conflict probes) should still verify the result
+        /// against their own policy.
+        /// </summary>
+        /// <param name="email">Email address to search by. Whitespace and surrounding
+        /// punctuation are NOT trimmed — pass a canonicalised value.</param>
+        /// <returns>First matching active user, or <c>null</c> when no row matches.</returns>
+        Task<IRedbUser?> GetUserByEmailAsync(string email);
         
         /// <summary>
         /// Load user by login (throws exception if not found).

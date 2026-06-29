@@ -296,7 +296,13 @@ namespace redb.Core.Providers.Base
             var strategy = _configuration.PropsSaveStrategy;
             
             // EF pattern: if already in transaction (explicit or ambient TransactionScope) — execute inline
-            if (_context.IsInTransaction)
+            var diagIsIn = _context.IsInTransaction;
+            // var diagAmbient = System.Transactions.Transaction.Current?.TransactionInformation.LocalIdentifier ?? "<null>";
+            // System.Console.WriteLine(
+            //     $"[Diag-TX-SAVE] DECISION IsInTransaction={diagIsIn} ambient={diagAmbient} " +
+            //     $"branch={(diagIsIn ? "INLINE" : "BEGIN-NEW")} thread={System.Environment.CurrentManagedThreadId} " +
+            //     $"objsToSave={allObjectsToSave.Count}");
+            if (diagIsIn)
             {
                 // Lock existing objects within the caller's transaction
                 var existingObjectIds = allObjectsToSave.Where(o => o.Id > 0).Select(o => o.Id).ToArray();

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using redb.Core;
+using redb.Core.Services;
 using redb.Examples.Models;
 using redb.Examples.Output;
 
@@ -27,7 +28,18 @@ public class E087_TreeCleanup : ExampleBase
 
         if (count > 0)
         {
-            await redb.DeleteWithPurgeAsync(existing.Select(e => e.Id).ToList(), batchSize: 50);
+            Console.WriteLine($"[E087] Purging {count} tree nodes (batchSize: 10)...");
+
+            var progress = new Progress<PurgeProgress>(p =>
+                Console.WriteLine(
+                    $"[E087] {p.Status}: deleted {p.Deleted}/{p.Total}, remaining {p.Remaining}"));
+
+            await redb.DeleteWithPurgeAsync(
+                existing.Select(e => e.Id).ToList(),
+                batchSize: 10,
+                progress: progress);
+
+            Console.WriteLine($"[E087] Purge complete: {count} nodes removed.");
         }
 
         sw.Stop();

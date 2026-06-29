@@ -1,10 +1,10 @@
-# RedBase — typed object storage for .NET. Schema = C# class. Zero migrations. Full LINQ. Postgres & MSSQL.
+# RedBase — typed object storage for .NET. Schema = C# class. Zero migrations. Full LINQ. Postgres, MSSQL & SQLite.
 
 **Trees, lists, aggregations, windows — one LINQ API.**
 
 > **LLMs / coding agents:** canonical training contract → <https://redbase.app/llms.txt>
 
-RedBase is a data platform for .NET that stores typed objects in a relational backend (PostgreSQL, Microsoft SQL Server). You define schemas as plain C# classes — RedBase handles storage, indexing, querying, trees, lists, aggregation, and window functions through a single LINQ-style API.
+RedBase is a data platform for .NET that stores typed objects in a relational backend (PostgreSQL, Microsoft SQL Server, or SQLite — including embedded/offline, Blazor WebAssembly and mobile via the SQLite provider). You define schemas as plain C# classes — RedBase handles storage, indexing, querying, trees, lists, aggregation, and window functions through a single LINQ-style API.
 
 No Entity Framework. No migrations. No 40-table Include chains. Just C# classes and one line to save, one line to load.
 
@@ -107,9 +107,11 @@ dotnet run
 | `redb.Core` | [![NuGet](https://img.shields.io/nuget/v/redb.Core?label=)](https://www.nuget.org/packages/redb.Core) | Core abstractions, query builder, LINQ provider |
 | `redb.Postgres` | [![NuGet](https://img.shields.io/nuget/v/redb.Postgres?label=)](https://www.nuget.org/packages/redb.Postgres) | PostgreSQL provider (free, Apache 2.0) |
 | `redb.MSSql` | [![NuGet](https://img.shields.io/nuget/v/redb.MSSql?label=)](https://www.nuget.org/packages/redb.MSSql) | Microsoft SQL Server provider (free, Apache 2.0) |
+| `redb.SQLite` | [![NuGet](https://img.shields.io/nuget/v/redb.SQLite?label=)](https://www.nuget.org/packages/redb.SQLite) | SQLite provider (free, Apache 2.0) — embedded/offline, native loadable extension |
 | `redb.Core.Pro` | [![NuGet](https://img.shields.io/nuget/v/redb.Core.Pro?label=)](https://www.nuget.org/packages/redb.Core.Pro) | Pro extensions: parallel materialization, change tracking, migrations |
 | `redb.Postgres.Pro` | [![NuGet](https://img.shields.io/nuget/v/redb.Postgres.Pro?label=)](https://www.nuget.org/packages/redb.Postgres.Pro) | PostgreSQL Pro provider with optimized query generation |
 | `redb.MSSql.Pro` | [![NuGet](https://img.shields.io/nuget/v/redb.MSSql.Pro?label=)](https://www.nuget.org/packages/redb.MSSql.Pro) | MSSQL Pro provider with optimized query generation |
+| `redb.SQLite.Pro` | [![NuGet](https://img.shields.io/nuget/v/redb.SQLite.Pro?label=)](https://www.nuget.org/packages/redb.SQLite.Pro) | SQLite Pro provider — pure C# (no native extension): Blazor WebAssembly & mobile |
 | `redb.Export` | [![NuGet](https://img.shields.io/nuget/v/redb.Export?label=)](https://www.nuget.org/packages/redb.Export) | Database export/import: `.redb` files (JSONL/ZIP) for backup, migration between PostgreSQL ↔ MSSQL |
 
 ---

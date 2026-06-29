@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Attributes;
 using redb.Core.Caching;
@@ -53,8 +54,12 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     protected static readonly ConcurrentDictionary<long, List<StructureTreeNode>> StructureTreeCache = new();
     protected static readonly ConcurrentDictionary<(long, long?), List<StructureTreeNode>> SubtreeCache = new();
     
-    // C# type to REDB type mapping cache
+    // C# type to REDB type mapping cache. Non-concurrent Dictionary, so it is built in a
+    // local and published atomically; the lock serializes builders. Parallel scheme syncs
+    // (e.g. Postgres + MSSql fixtures initializing at once) would otherwise read the cache
+    // while another thread is still populating it and corrupt its internal state.
     private static Dictionary<Type, string>? _csharpToRedbTypeCache;
+    private static readonly SemaphoreSlim _csharpToRedbTypeCacheLock = new(1, 1);
 
     protected SchemeSyncProviderBase(
         IRedbContext context,
@@ -86,7 +91,11 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
     public async Task<IRedbScheme> EnsureSchemeFromTypeAsync<TProps>() where TProps : class
     {
-        return await EnsureSchemeFromTypeInternalAsync(typeof(TProps), GetSchemeAliasForType<TProps>());
+        var scheme = await EnsureSchemeFromTypeInternalAsync(typeof(TProps), GetSchemeAliasForType<TProps>());
+        // Same authoritative binding as SyncSchemeAsync, so the idempotent "ensure" path (which may
+        // early-return an already-existing scheme) also makes the type polymorphically loadable.
+        Cache.RegisterClrType(scheme.Name, scheme.Id, typeof(TProps));
+        return scheme;
     }
 
     /// <summary>
@@ -227,7 +236,13 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         // rolling/blue-green deployments where old and new app versions share a database.
         var structures = await SyncStructuresFromTypeAsync<TProps>(
             scheme, strictDeleteExtra: Configuration.DefaultStrictDeleteExtra);
-        
+
+        // Authoritatively bind scheme_id → TProps for polymorphic loads. This is the canonical write
+        // of the per-domain projection: Type and the freshly-synced scheme_id co-exist here, so the
+        // registry cannot drift from the DB regardless of assembly/ALC timing or which node synced.
+        // (Global, db-independent name↔Type lands in ClrSchemeTypeIndex.)
+        Cache.RegisterClrType(scheme.Name, scheme.Id, typeof(TProps));
+
         // Reload scheme from DB to get current state (including updated hash),
         // attach structures, and cache for subsequent queries
         var freshScheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), scheme.Id);
@@ -457,39 +472,57 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
     private async Task InitializeCSharpToRedbTypeMappingAsync()
     {
-        var allTypes = await Context.QueryAsync<RedbType>(Sql.Types_SelectAll());
-        _csharpToRedbTypeCache = new Dictionary<Type, string>();
+        await _csharpToRedbTypeCacheLock.WaitAsync();
+        try
+        {
+            // Double-check: another thread may have finished building the cache while we waited.
+            if (_csharpToRedbTypeCache != null)
+                return;
 
-        // Sort by ID to ensure base types (String, Long, etc.) are processed first
-        // Base types have more negative IDs (e.g., String=-9223372036854775700)
-        // Derived types like MimeType, FilePath have less negative IDs
-        foreach (var dbType in allTypes.OrderBy(t => t.Id))
-        {
-            var dotNetTypeName = dbType.Type1;
-            if (string.IsNullOrEmpty(dotNetTypeName))
-                continue;
+            var allTypes = await Context.QueryAsync<RedbType>(Sql.Types_SelectAll());
 
-            var csharpType = MapStringToType(dotNetTypeName);
-            // Don't overwrite base type mapping with derived types (e.g., String -> MimeType)
-            if (csharpType != null && !_csharpToRedbTypeCache.ContainsKey(csharpType))
+            // Build into a LOCAL dictionary and publish it only once fully populated, so
+            // concurrent readers in MapCSharpTypeToRedbTypeAsync never observe a half-filled
+            // (and mid-mutation) instance.
+            var cache = new Dictionary<Type, string>();
+
+            // Sort by ID to ensure base types (String, Long, etc.) are processed first
+            // Base types have more negative IDs (e.g., String=-9223372036854775700)
+            // Derived types like MimeType, FilePath have less negative IDs
+            foreach (var dbType in allTypes.OrderBy(t => t.Id))
             {
-                _csharpToRedbTypeCache[csharpType] = dbType.Name;
+                var dotNetTypeName = dbType.Type1;
+                if (string.IsNullOrEmpty(dotNetTypeName))
+                    continue;
+
+                var csharpType = MapStringToType(dotNetTypeName);
+                // Don't overwrite base type mapping with derived types (e.g., String -> MimeType)
+                if (csharpType != null && !cache.ContainsKey(csharpType))
+                {
+                    cache[csharpType] = dbType.Name;
+                }
             }
-        }
-        
-        if (!_csharpToRedbTypeCache.ContainsKey(typeof(DateTime)))
-        {
-            var dateTimeType = allTypes.FirstOrDefault(t => t.Name == "DateTime");
-            if (dateTimeType != null)
+
+            if (!cache.ContainsKey(typeof(DateTime)))
             {
-                _csharpToRedbTypeCache[typeof(DateTime)] = "DateTime";
+                var dateTimeType = allTypes.FirstOrDefault(t => t.Name == "DateTime");
+                if (dateTimeType != null)
+                {
+                    cache[typeof(DateTime)] = "DateTime";
+                }
             }
+
+            var numericType = allTypes.FirstOrDefault(t => t.Name == "Numeric");
+            if (numericType != null)
+            {
+                cache[typeof(decimal)] = "Numeric";
+            }
+
+            _csharpToRedbTypeCache = cache; // atomic publish — readers see null or a complete map
         }
-        
-        var numericType = allTypes.FirstOrDefault(t => t.Name == "Numeric");
-        if (numericType != null)
+        finally
         {
-            _csharpToRedbTypeCache[typeof(decimal)] = "Numeric";
+            _csharpToRedbTypeCacheLock.Release();
         }
     }
 

@@ -299,6 +299,8 @@ public static class Program
                 (typeof(redb.Postgres.RedbService).Assembly, "redb.Postgres.sql.redb_init.sql"),
             "mssql" or "sqlserver" =>
                 (typeof(redb.MSSql.RedbService).Assembly, "redb.MSSql.sql.redb_init.sql"),
+            "sqlite" =>
+                (typeof(redb.SQLite.RedbService).Assembly, "redb.SQLite.sql.redbSqlite.sql"),
             _ => throw new ArgumentException($"Unknown provider: {providerName}")
         };
         

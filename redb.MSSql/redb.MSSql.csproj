@@ -13,7 +13,7 @@
     <Product>REDB - Entity Database for .NET</Product>
     <Description>SQL Server provider for REDB. Includes optimized T-SQL generation, tree queries with CTEs, and full LINQ support.</Description>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>
-    <PackageTags>database;orm;sqlserver;mssql;linq;dotnet;redb</PackageTags>
+    <PackageTags>database;orm;redb;redbase;sqlserver;mssql;linq;dotnet;typed-storage;cte;tree-query</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   

@@ -548,6 +548,10 @@ ON _objects (_id_scheme, _date_modify DESC, _id);
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_name" 
 ON _objects (_id_scheme, _name, _id);
 
+-- CREATE INDEX IF NOT EXISTS ix__objects_parent_scheme
+-- ON _objects (_id_parent, _id_scheme)
+-- WHERE _id_parent IS NOT NULL;
+
 -- Comments for indexes
 COMMENT ON INDEX "IX__values__structure_object_lookup" IS 
 'Composite index for fast value search by structure and object. CRITICAL for faceted queries with filtering by Props fields. Updated: added _Numeric, _ListItem, _Object; _DateTime → _DateTimeOffset';

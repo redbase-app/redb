@@ -40,11 +40,12 @@ internal class DomainCache
     public readonly ConcurrentDictionary<string, long> TypeCache = new();
     public readonly ConcurrentDictionary<long, RedbTypeInfo> TypeById = new();
     
-    // CLR Type registry (for polymorphic deserialization)
-    public readonly ConcurrentDictionary<string, Type> SchemeNameToClrType = new();
+    // Per-domain CLR type projection. scheme_id is a per-database fact, so this must stay isolated
+    // per connection/domain. The database-independent schemeName↔Type mapping lives process-globally
+    // in ClrSchemeTypeIndex (one scan serves all domains; self-healing on assembly load).
     public readonly ConcurrentDictionary<long, Type> SchemeIdToClrType = new();
     public readonly ConcurrentDictionary<Type, long> ClrTypeToSchemeId = new();
-    public bool ClrTypeRegistryInitialized = false;
+    public bool ClrTypeRegistryInitialized = false;   // per-domain warm-up done (optimization only; resolution is lazy)
     
     // Statistics
     public long SchemeHits;
@@ -64,7 +65,7 @@ internal class DomainCache
         TypeCache.Clear();
         TypeById.Clear();
         // DO NOT clear CLR Type Registry - it's required for polymorphic deserialization
-        // SchemeNameToClrType, SchemeIdToClrType, ClrTypeToSchemeId stay intact
+        // SchemeIdToClrType, ClrTypeToSchemeId stay intact (name↔Type lives in ClrSchemeTypeIndex)
         Interlocked.Exchange(ref SchemeHits, 0);
         Interlocked.Exchange(ref SchemeMisses, 0);
         Interlocked.Exchange(ref TypeHits, 0);
@@ -81,7 +82,6 @@ internal class DomainCache
         SchemeById.Clear();
         TypeCache.Clear();
         TypeById.Clear();
-        SchemeNameToClrType.Clear();
         SchemeIdToClrType.Clear();
         ClrTypeToSchemeId.Clear();
         ClrTypeRegistryInitialized = false;
@@ -198,9 +198,9 @@ public class GlobalMetadataCache
         {
             cache.SchemeByName.TryRemove(scheme.Name, out _);
             cache.SchemeById.TryRemove(schemeId, out _);
-            // Also invalidate CLR type mapping
+            // Drop the per-domain scheme_id→Type projection (it can be lazily re-derived). The global
+            // name↔Type (ClrSchemeTypeIndex) is a code fact and is NOT touched by per-domain invalidation.
             cache.SchemeIdToClrType.TryRemove(schemeId, out _);
-            cache.SchemeNameToClrType.TryRemove(scheme.Name, out _);
         }
     }
     
@@ -214,9 +214,9 @@ public class GlobalMetadataCache
         {
             cache.SchemeByName.TryRemove(schemeName, out _);
             cache.SchemeById.TryRemove(scheme.Id, out _);
-            // Also invalidate CLR type mapping
+            // Drop the per-domain scheme_id→Type projection (lazily re-derivable). Global name↔Type
+            // (ClrSchemeTypeIndex) is a code fact and is NOT touched by per-domain invalidation.
             cache.SchemeIdToClrType.TryRemove(scheme.Id, out _);
-            cache.SchemeNameToClrType.TryRemove(schemeName, out _);
         }
     }
     
@@ -294,66 +294,49 @@ public class GlobalMetadataCache
     public bool IsClrTypeRegistryInitialized => GetCache().ClrTypeRegistryInitialized;
     
     /// <summary>
-    /// Initialize CLR type registry by scanning assemblies with RedbSchemeAttribute.
+    /// Best-effort warm-up of CLR type resolution for this domain:
+    /// (1) refreshes the process-global schemeName↔Type index (<see cref="ClrSchemeTypeIndex"/>), and
+    /// (2) pre-populates this domain's scheme_id→Type projection for schemes already present in the DB.
+    /// This is an OPTIMIZATION only — it is never a precondition for resolution, which is lazy and
+    /// self-healing (see <see cref="GetClrType(long)"/> / <see cref="ResolveClrTypeAsync"/>). The
+    /// per-domain warm pass runs once; the global index stays self-healing regardless.
     /// </summary>
     /// <param name="schemeProvider">Provider for scheme metadata</param>
     /// <param name="logger">Optional logger for diagnostics</param>
     public async Task InitializeClrTypeRegistryAsync(ISchemeSyncProvider schemeProvider, ILogger? logger = null)
     {
+        // Global, database-independent name↔Type layer — cheap no-op when no new assemblies loaded.
+        ClrSchemeTypeIndex.EnsureFresh();
+
         var cache = GetCache();
-        
         lock (_lock)
         {
             if (cache.ClrTypeRegistryInitialized)
                 return;
         }
 
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-        
-        foreach (var assembly in assemblies)
+        // Pre-pop the per-domain scheme_id→Type for types whose scheme already exists in THIS domain's DB.
+        foreach (var type in ClrSchemeTypeIndex.EnumerateSchemeTypes())
         {
             try
             {
-                var typesWithAttribute = assembly.GetTypes()
-                    .Where(t => t.GetCustomAttribute<RedbSchemeAttribute>() != null)
-                    .ToArray();
-                    
-                foreach (var type in typesWithAttribute)
+                var attr = type.GetCustomAttribute<RedbSchemeAttribute>();
+                if (attr == null) continue;
+
+                var schemeName = attr.GetSchemeName(type);
+                ClrSchemeTypeIndex.Register(schemeName, type);
+                if (!string.IsNullOrEmpty(attr.Alias)) ClrSchemeTypeIndex.Register(attr.Alias!, type);
+
+                var scheme = await schemeProvider.GetSchemeByNameAsync(schemeName);
+                if (scheme != null)
                 {
-                    var attr = type.GetCustomAttribute<RedbSchemeAttribute>()!;
-                    var schemeName = attr.GetSchemeName(type);
-                    
-                    // Register by scheme name
-                    cache.SchemeNameToClrType[schemeName] = type;
-                    
-                    // Also register by alias
-                    if (!string.IsNullOrEmpty(attr.Alias))
-                    {
-                        cache.SchemeNameToClrType[attr.Alias] = type;
-                    }
-                    
-                    // Get scheme_id from DB and register
-                    var scheme = await schemeProvider.GetSchemeByNameAsync(schemeName);
-                    if (scheme != null)
-                    {
-                        cache.SchemeIdToClrType[scheme.Id] = type;
-                        cache.ClrTypeToSchemeId[type] = scheme.Id;
-                    }
-                    else
-                    {
-                        logger?.LogWarning(
-                            "Scheme '{SchemeName}' not found in database for type '{TypeName}'",
-                            schemeName, type.Name);
-                    }
+                    cache.SchemeIdToClrType[scheme.Id] = type;
+                    cache.ClrTypeToSchemeId[type] = scheme.Id;
                 }
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                logger?.LogDebug(ex, "Skipping assembly {Assembly} due to type loading issues", assembly.FullName);
             }
             catch (Exception ex)
             {
-                logger?.LogDebug(ex, "Skipping assembly {Assembly} due to loading error", assembly.FullName);
+                logger?.LogDebug(ex, "Skipping type {Type} during CLR registry warm-up", type.FullName);
             }
         }
 
@@ -361,39 +344,83 @@ public class GlobalMetadataCache
         {
             cache.ClrTypeRegistryInitialized = true;
         }
-        
+
         logger?.LogInformation(
-            "CLR type registry initialized for domain '{Domain}': {TypeCount} types, {SchemeIdCount} scheme_id mappings",
-            _domain, cache.SchemeNameToClrType.Count, cache.SchemeIdToClrType.Count);
+            "CLR type registry warmed for domain '{Domain}': {NameCount} global names, {SchemeIdCount} scheme_id mappings",
+            _domain, ClrSchemeTypeIndex.Count, cache.SchemeIdToClrType.Count);
     }
-    
+
     /// <summary>
-    /// Get C# type by scheme ID.
+    /// Get C# type by scheme ID (this domain). Fast path is the per-domain cache; on a miss it lazily
+    /// self-heals by deriving the type from this domain's cached scheme name + the global
+    /// <see cref="ClrSchemeTypeIndex"/>, then backfills. Returns null if the scheme is not cached in this
+    /// domain or genuinely has no CLR type. For the cold case (scheme not cached here) use
+    /// <see cref="ResolveClrTypeAsync"/>, which can load the scheme by id.
     /// </summary>
     public Type? GetClrType(long schemeId)
     {
-        return GetCache().SchemeIdToClrType.TryGetValue(schemeId, out var type) ? type : null;
+        var cache = GetCache();
+        if (cache.SchemeIdToClrType.TryGetValue(schemeId, out var type))
+            return type;
+
+        // Lazy derive: scheme_id → (this domain's cached scheme name) → (global name↔Type).
+        if (cache.SchemeById.TryGetValue(schemeId, out var scheme))
+        {
+            var t = ClrSchemeTypeIndex.Resolve(scheme.Name);
+            if (t != null)
+            {
+                cache.SchemeIdToClrType[schemeId] = t;
+                cache.ClrTypeToSchemeId[t] = schemeId;
+                return t;
+            }
+        }
+        return null;
     }
-    
+
     /// <summary>
-    /// Get C# type by scheme name.
+    /// Get C# type by scheme name — served from the process-global <see cref="ClrSchemeTypeIndex"/>
+    /// (database-independent, self-healing on assembly load).
     /// </summary>
-    public Type? GetClrType(string schemeName)
-    {
-        return GetCache().SchemeNameToClrType.TryGetValue(schemeName, out var type) ? type : null;
-    }
-    
+    public Type? GetClrType(string schemeName) => ClrSchemeTypeIndex.Resolve(schemeName);
+
     /// <summary>
-    /// Register CLR type mapping manually.
+    /// Resolve scheme_id → Type with a cold fallback. Tries the sync path first (per-domain cache +
+    /// cached scheme); if the scheme is not cached in this domain, loads it by id and resolves via the
+    /// global index, caching both for next time. Covers the cross-domain case (scheme synced under a
+    /// different connection-hash domain, or created by another cluster node) with no per-call-site logic.
+    /// Returns null only when the scheme genuinely has no CLR type (a legitimately non-generic scheme).
+    /// </summary>
+    public async Task<Type?> ResolveClrTypeAsync(long schemeId, ISchemeSyncProvider schemeProvider)
+    {
+        var sync = GetClrType(schemeId);
+        if (sync != null) return sync;
+
+        var scheme = await schemeProvider.GetSchemeByIdAsync(schemeId);
+        if (scheme == null) return null;
+        CacheScheme(scheme);   // populate this domain's scheme cache so future sync lookups hit
+
+        var type = ClrSchemeTypeIndex.Resolve(scheme.Name);
+        if (type != null)
+        {
+            var cache = GetCache();
+            cache.SchemeIdToClrType[schemeId] = type;
+            cache.ClrTypeToSchemeId[type] = schemeId;
+        }
+        return type;
+    }
+
+    /// <summary>
+    /// Register CLR type mapping authoritatively: the database-independent name↔Type goes to the global
+    /// <see cref="ClrSchemeTypeIndex"/>, the per-database scheme_id↔Type goes to this domain.
     /// </summary>
     public void RegisterClrType(string schemeName, long schemeId, Type type)
     {
+        ClrSchemeTypeIndex.Register(schemeName, type);   // global (shared across domains/connections)
         var cache = GetCache();
-        cache.SchemeNameToClrType[schemeName] = type;
-        cache.SchemeIdToClrType[schemeId] = type;
+        cache.SchemeIdToClrType[schemeId] = type;        // per-domain (scheme_id is per-database)
         cache.ClrTypeToSchemeId[type] = schemeId;
     }
-    
+
     /// <summary>
     /// Get scheme_id by C# type.
     /// </summary>
@@ -401,14 +428,13 @@ public class GlobalMetadataCache
     {
         return GetCache().ClrTypeToSchemeId.TryGetValue(type, out var schemeId) ? schemeId : null;
     }
-    
+
     /// <summary>
     /// Get CLR type registry statistics.
     /// </summary>
     public (int SchemeNames, int SchemeIds) GetClrTypeStatistics()
     {
-        var cache = GetCache();
-        return (cache.SchemeNameToClrType.Count, cache.SchemeIdToClrType.Count);
+        return (ClrSchemeTypeIndex.Count, GetCache().SchemeIdToClrType.Count);
     }
     
     // ===== STATISTICS & DIAGNOSTICS =====

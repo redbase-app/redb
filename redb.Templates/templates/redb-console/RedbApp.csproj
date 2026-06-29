@@ -33,5 +33,15 @@
     <PackageReference Include="redb.MSSql" Version="1.*" />
   </ItemGroup>
   <!--#endif -->
+  <!--#if (UseSqlite && pro) -->
+  <ItemGroup>
+    <PackageReference Include="redb.SQLite.Pro" Version="1.*" />
+  </ItemGroup>
+  <!--#endif -->
+  <!--#if (UseSqlite && !pro) -->
+  <ItemGroup>
+    <PackageReference Include="redb.SQLite" Version="1.*" />
+  </ItemGroup>
+  <!--#endif -->
 
 </Project>

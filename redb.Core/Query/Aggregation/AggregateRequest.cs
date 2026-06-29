@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using redb.Core.Query.Utils;
 
 namespace redb.Core.Query.Aggregation;
 
@@ -30,7 +31,7 @@ public class AggregateResult
     {
         if (Values.TryGetValue(alias, out var value) && value != null)
         {
-            return (T)Convert.ChangeType(value, typeof(T));
+            return (T)TemporalDecoder.ChangeType(value, typeof(T));
         }
         return null;
     }
@@ -41,7 +42,7 @@ public class AggregateResult
         if (Values.TryGetValue(alias, out var value))
         {
             if (value == null) return null;
-            return (T)Convert.ChangeType(value, typeof(T));
+            return (T)TemporalDecoder.ChangeType(value, typeof(T));
         }
         return null;
     }

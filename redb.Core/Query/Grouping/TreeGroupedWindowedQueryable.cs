@@ -350,16 +350,28 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
 
     private object? ConvertJsonValue(JsonElement element, Type targetType)
     {
+        // Unwrap Nullable<T> so projection members like bool?/long? resolve to their core type.
+        var t = Nullable.GetUnderlyingType(targetType) ?? targetType;
         return element.ValueKind switch
         {
-            JsonValueKind.Number when targetType == typeof(long) => element.GetInt64(),
-            JsonValueKind.Number when targetType == typeof(int) => element.GetInt32(),
-            JsonValueKind.Number when targetType == typeof(decimal) => element.GetDecimal(),
-            JsonValueKind.Number when targetType == typeof(double) => element.GetDouble(),
-            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Null => null,
             JsonValueKind.True => true,
             JsonValueKind.False => false,
-            JsonValueKind.Null => null,
+            // SQLite stores bool as INTEGER 0/1 → JSON Number (PG returns true/false handled above).
+            JsonValueKind.Number when t == typeof(bool) => element.GetInt32() != 0,
+            JsonValueKind.Number when t == typeof(long) => element.GetInt64(),
+            JsonValueKind.Number when t == typeof(int) => element.GetInt32(),
+            JsonValueKind.Number when t == typeof(decimal) => element.GetDecimal(),
+            JsonValueKind.Number when t == typeof(double) => element.GetDouble(),
+            JsonValueKind.Number when t == typeof(float) => (float)element.GetDouble(),
+            // SQLite returns bool/Guid/DateTimeOffset as TEXT for some expressions.
+            JsonValueKind.String when t == typeof(bool) =>
+                element.GetString() is var s && (s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase)),
+            JsonValueKind.String when t == typeof(Guid) =>
+                element.TryGetGuid(out var g) ? g : (object?)element.GetString(),
+            JsonValueKind.String when t == typeof(DateTimeOffset) =>
+                element.TryGetDateTimeOffset(out var d) ? d : (object?)element.GetString(),
+            JsonValueKind.String => element.GetString(),
             _ => element.ToString()
         };
     }

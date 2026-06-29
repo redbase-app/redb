@@ -12,7 +12,7 @@
     <Product>REDB - Entity Database for .NET</Product>
     <Description>PostgreSQL provider for REDB. Includes optimized SQL generation, tree queries with CTEs, and full LINQ support.</Description>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>
-    <PackageTags>database;orm;postgresql;postgres;linq;dotnet;redb</PackageTags>
+    <PackageTags>database;orm;redb;redbase;postgresql;postgres;linq;dotnet;typed-storage;cte;tree-query</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   

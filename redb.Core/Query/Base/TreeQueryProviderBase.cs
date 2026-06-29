@@ -601,8 +601,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             if (context.ParentIds != null && context.ParentIds.Length > 0)
             {
                 // 🔍 DEBUG: Log SQL and parameters
-                _logger?.LogInformation($"🔍 SQL: {sql}");
-                _logger?.LogInformation($"🔍 Params: scheme_id={context.SchemeId}, parent_ids=[{string.Join(",", context.ParentIds)}], max_depth={context.MaxDepth ?? 1000}");
+                _logger?.LogDebug($"SQL: {sql}");
+                _logger?.LogDebug($"Params: scheme_id={context.SchemeId}, parent_ids=[{string.Join(",", context.ParentIds)}], max_depth={context.MaxDepth ?? 1000}");
                 
                 // ✅ ONE SQL query instead of loop! Pass entire parent_ids array
                 objectsJson = await _context.ExecuteJsonAsync(
@@ -641,7 +641,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                         {
                             treeObj._lazyLoader = _lazyPropsLoader;
                             treeObj._propsLoaded = false;
-                            _logger?.LogDebug("🔄 Lazy loader set for object {ObjectId} (on-demand mode)", treeObj.id);
+                            _logger?.LogDebug("Lazy loader set for object {ObjectId} (on-demand mode)", treeObj.id);
                         }
                     }
                 }
@@ -652,7 +652,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                     var baseObjects = combinedResults.Cast<RedbObject<TProps>>().ToList();
                     await _lazyPropsLoader.LoadPropsForManyAsync(baseObjects, context.PropsDepth);
                     sw.Stop();
-                    _logger?.LogInformation("⏱️  Props loaded via batch (tree, multiple roots) in {ElapsedMs} ms", sw.ElapsedMilliseconds);
+                    _logger?.LogDebug("Props loaded via batch (tree, multiple roots) in {ElapsedMs} ms", sw.ElapsedMilliseconds);
                 }
                 
                 // ✅ DISTINCT is now performed at SQL level (search_tree_objects_with_facets_base)
@@ -710,7 +710,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                 var baseObjects = result.Cast<RedbObject<TProps>>().ToList();
                 await _lazyPropsLoader.LoadPropsForManyAsync(baseObjects, context.PropsDepth);
                 sw.Stop();
-                _logger?.LogInformation("⏱️  Props loaded via batch (tree) in {ElapsedMs} ms", sw.ElapsedMilliseconds);
+                _logger?.LogDebug("Props loaded via batch (tree) in {ElapsedMs} ms", sw.ElapsedMilliseconds);
             }
             
             // ✅ DISTINCT is now performed at SQL level (search_tree_objects_with_facets)
@@ -825,7 +825,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         TreeQueryContext<TProps> context,
         TreeFilter hasAncestorFilter) where TProps : class, new()
     {
-        _logger?.LogInformation("   🔍 [DETAILED ANALYSIS] OPTION A - Step by step:");
+        _logger?.LogDebug("   [DETAILED ANALYSIS] OPTION A - Step by step:");
         
         var swTotal = System.Diagnostics.Stopwatch.StartNew();
         
@@ -835,7 +835,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             hasAncestorFilter.FilterConditions,
             new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
         sw1.Stop();
-        _logger?.LogInformation($"      ⏱️ A.1 - Condition serialization: {sw1.ElapsedMilliseconds} ms");
+        _logger?.LogDebug($"      A.1 - Condition serialization: {sw1.ElapsedMilliseconds} ms");
         
         // OPTIMIZATION: ALWAYS use _base functions for fast search
         string ancestorsSql;
@@ -880,8 +880,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             .ToArray();
         
         var sw2Elapsed = swTotal.ElapsedMilliseconds;
-        _logger?.LogInformation($"      ⏱️ A.2 - SQL ancestor search: {sw2Elapsed - sw1.ElapsedMilliseconds} ms");
-        _logger?.LogInformation($"      ✅ A.2 - Found {ancestorIds.Length} ancestors");
+        _logger?.LogDebug($"      A.2 - SQL ancestor search: {sw2Elapsed - sw1.ElapsedMilliseconds} ms");
+        _logger?.LogDebug($"A.2 - Found {ancestorIds.Length} ancestors");
         
         if (!ancestorIds.Any())
         {
@@ -896,7 +896,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         optimizedContext.ParentIds = ancestorIds;
         
         sw2.Stop();
-        _logger?.LogInformation($"      ⏱️ A.3 - Context creation: {sw2.ElapsedMilliseconds} ms");
+        _logger?.LogDebug($"      A.3 - Context creation: {sw2.ElapsedMilliseconds} ms");
         
         // Step 3: Execute with remaining filters (preserves Where, OrderBy, Limit/Offset)
         var sw3 = System.Diagnostics.Stopwatch.StartNew();
@@ -904,8 +904,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         sw3.Stop();
         
         swTotal.Stop();
-        _logger?.LogInformation($"      ⏱️ A.4 - Loading descendants: {sw3.ElapsedMilliseconds} ms ({result.Count} objects)");
-        _logger?.LogInformation($"      ⏱️ A - TOTAL TIME: {swTotal.ElapsedMilliseconds} ms");
+        _logger?.LogDebug($"      A.4 - Loading descendants: {sw3.ElapsedMilliseconds} ms ({result.Count} objects)");
+        _logger?.LogDebug($"      A - TOTAL TIME: {swTotal.ElapsedMilliseconds} ms");
         
         return result;
     }
@@ -920,7 +920,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         TreeQueryContext<TProps> context,
         TreeFilter hasDescendantFilter) where TProps : class, new()
     {
-        _logger?.LogInformation("🚀 OPTIMIZATION: Applying logic inversion for WhereHasDescendant");
+        _logger?.LogDebug("OPTIMIZATION: Applying logic inversion for WhereHasDescendant");
         
         var sw = System.Diagnostics.Stopwatch.StartNew();
         
@@ -945,11 +945,11 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             .ToList();
         
         sw.Stop();
-        _logger?.LogInformation($"   ⏱️  Step 1: Found {descendantIds.Count} descendants in {sw.ElapsedMilliseconds} ms");
+        _logger?.LogDebug($"   Step 1: Found {descendantIds.Count} descendants in {sw.ElapsedMilliseconds} ms");
         
         if (!descendantIds.Any())
         {
-            _logger?.LogInformation("   ⚠️  Descendants not found, returning empty result");
+            _logger?.LogDebug("Descendants not found, returning empty result");
             return new List<TreeRedbObject<TProps>>();
         }
         
@@ -958,11 +958,11 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         var parentIds = await GetParentIdsFromDescendants(descendantIds, hasDescendantFilter.MaxDepth);
         sw.Stop();
         
-        _logger?.LogInformation($"   ⏱️  Step 2: Found {parentIds.Length} unique ancestors in {sw.ElapsedMilliseconds} ms");
+        _logger?.LogDebug($"   Step 2: Found {parentIds.Length} unique ancestors in {sw.ElapsedMilliseconds} ms");
         
         if (!parentIds.Any())
         {
-            _logger?.LogInformation("   ⚠️  Ancestors not found, returning empty result");
+            _logger?.LogDebug("Ancestors not found, returning empty result");
             return new List<TreeRedbObject<TProps>>();
         }
         
@@ -971,8 +971,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         var result = await LoadObjectsByIdsWithFilters(parentIds, context);
         sw.Stop();
         
-        _logger?.LogInformation($"   ⏱️  Step 3: Loaded {result.Count} objects in {sw.ElapsedMilliseconds} ms");
-        _logger?.LogInformation($"✅ WhereHasDescendant optimization completed successfully");
+        _logger?.LogDebug($"   Step 3: Loaded {result.Count} objects in {sw.ElapsedMilliseconds} ms");
+        _logger?.LogDebug($"WhereHasDescendant optimization completed successfully");
         
         return result;
     }
@@ -1294,6 +1294,15 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         if (objectIds == null || !objectIds.Any())
             return new List<TreeRedbObject<TProps>>();
 
+        // Pro path: materialize entirely in C# (PVT) — NEVER call the server-side
+        // get_object_json function. Triggered when a Pro lazy loader is injected.
+        if (_lazyPropsLoader != null)
+        {
+            var rows = await _context.QueryAsync<RedbObjectRow>(
+                _sql.ObjectStorage_SelectObjectsByIds(), objectIds.ToArray());
+            return await MaterializeTreeObjectsFromRowsAsync<TProps>(rows, propsDepth);
+        }
+
         try
         {
             // Use dialect-specific SQL for loading objects by IDs
@@ -1340,6 +1349,37 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     {
         if (objectIds == null || !objectIds.Any())
             return new List<ITreeRedbObject>();
+
+        // Pro path: materialize entirely in C# (PVT) — NEVER call the server-side
+        // get_object_json function. Triggered when a Pro lazy loader is injected.
+        if (_lazyPropsLoader != null)
+        {
+            var rows = await _context.QueryAsync<RedbObjectRow>(
+                _sql.ObjectStorage_SelectObjectsByIds(), objectIds.ToArray());
+
+            var proResult = new List<ITreeRedbObject>();
+            foreach (var schemeGroup in rows.GroupBy(r => r.IdScheme))
+            {
+                var propsType = Cache.GetClrType(schemeGroup.Key)
+                    ?? throw new InvalidOperationException(
+                        $"Type not found for scheme_id={schemeGroup.Key}. Register type in AutomaticTypeRegistry.");
+
+                var method = typeof(TreeQueryProviderBase).GetMethod(
+                    nameof(MaterializeTreeObjectsFromRowsAsync),
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var genericMethod = method!.MakeGenericMethod(propsType);
+
+                var task = (Task)genericMethod.Invoke(this, new object[] { schemeGroup.ToList(), propsDepth! })!;
+                await task.ConfigureAwait(false);
+                var typed = (System.Collections.IEnumerable)task.GetType().GetProperty("Result")!.GetValue(task)!;
+                foreach (var o in typed)
+                {
+                    if (o is ITreeRedbObject treeObj)
+                        proResult.Add(treeObj);
+                }
+            }
+            return proResult;
+        }
 
         try
         {
@@ -1395,9 +1435,59 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     }
 
     /// <summary>
+    /// Pro materialization: builds TreeRedbObject&lt;TProps&gt; from base _objects rows and
+    /// loads Props via the injected lazy loader (ProLazyPropsLoader → PVT, in C#).
+    /// Used by the Pro branch of LoadObjectsByIdsAsync to avoid get_object_json.
+    /// </summary>
+    private async Task<List<TreeRedbObject<TProps>>> MaterializeTreeObjectsFromRowsAsync<TProps>(
+        List<RedbObjectRow> rows, int? propsDepth) where TProps : class, new()
+    {
+        var result = rows.Select(MapRowToTreeObject<TProps>).ToList();
+
+        if (_lazyPropsLoader != null && result.Count > 0)
+        {
+            var baseObjects = result.Cast<RedbObject<TProps>>().ToList();
+            await _lazyPropsLoader.LoadPropsForManyAsync(baseObjects, propsDepth);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Maps a base _objects row to a TreeRedbObject shell (Props loaded separately).
+    /// </summary>
+    private static TreeRedbObject<TProps> MapRowToTreeObject<TProps>(RedbObjectRow row) where TProps : class, new()
+    {
+        return new TreeRedbObject<TProps>
+        {
+            id = row.Id,
+            name = row.Name,
+            scheme_id = row.IdScheme,
+            parent_id = row.IdParent,
+            owner_id = row.IdOwner,
+            who_change_id = row.IdWhoChange,
+            date_create = row.DateCreate,
+            date_modify = row.DateModify,
+            date_begin = row.DateBegin,
+            date_complete = row.DateComplete,
+            key = row.Key,
+            value_long = row.ValueLong,
+            value_string = row.ValueString,
+            value_guid = row.ValueGuid,
+            value_bool = row.ValueBool,
+            value_double = row.ValueDouble,
+            value_numeric = row.ValueNumeric,
+            value_datetime = row.ValueDatetime,
+            value_bytes = row.ValueBytes,
+            note = row.Note,
+            hash = row.Hash
+        };
+    }
+
+    /// <summary>
     /// Returns SQL query for tree search that will be executed (for debugging)
     /// </summary>
-    public virtual async Task<string> GetSqlPreviewAsync<TProps>(TreeQueryContext<TProps> context) 
+    public virtual async Task<string> GetSqlPreviewAsync<TProps>(TreeQueryContext<TProps> context)
         where TProps : class, new()
     {
         var facetFilters = _facetBuilder.BuildFacetFilters(context.Filter);
@@ -1408,7 +1498,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         // OPTIMIZATION: ALWAYS use _base preview function
         var functionName = _sql.Query_TreeSqlPreviewBaseFunction();
         
-        _logger?.LogDebug("🔍 Getting Tree SQL Preview: Function={FunctionName}, SchemeId={SchemeId}, RootObjectId={RootObjectId}, MaxDepth={MaxDepth}", 
+        _logger?.LogDebug("Getting Tree SQL Preview: Function={FunctionName}, SchemeId={SchemeId}, RootObjectId={RootObjectId}, MaxDepth={MaxDepth}", 
             functionName, context.SchemeId, context.RootObjectId, context.MaxDepth);
         
         // Build parent_ids array for the SQL function

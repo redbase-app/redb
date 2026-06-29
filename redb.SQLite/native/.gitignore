@@ -1,0 +1,14 @@
+# CMake build trees + fetched SQLite amalgamation
+build/
+build-*/
+_deps/
+
+# Built extension artifacts
+*.dll
+*.so
+*.dylib
+*.exp
+*.lib
+*.pdb
+*.obj
+*.o

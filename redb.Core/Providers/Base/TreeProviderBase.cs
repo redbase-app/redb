@@ -374,20 +374,27 @@ public abstract class TreeProviderBase : ITreeProvider
         objectIds.Add(parentId);
 
         await Context.ExecuteAsync(Sql.Tree_DeleteValuesByObjectIds(), objectIds.ToArray());
-        var deletedCount = await Context.ExecuteAsync(Sql.Tree_DeleteObjectsByIds(), objectIds.ToArray());
-        
-        return deletedCount;
+        await Context.ExecuteAsync(Sql.Tree_DeleteObjectsByIds(), objectIds.ToArray());
+
+        // The collected id list IS the subtree (self + descendants), so its count is the correct,
+        // dialect-independent number of objects deleted. The raw DELETE rows-affected is unreliable
+        // here: on SQLite the `_id_parent ON DELETE CASCADE` FK removes child rows as a side effect of
+        // deleting the parent, so changes() under-counts them (it equals rows-affected on PG/MSSql,
+        // which have no such cascade on _id_parent).
+        return objectIds.Count;
     }
 
     private async Task CollectDescendantIds(long parentId, List<long> ids, int maxDepth, int currentDepth)
     {
         if (currentDepth >= maxDepth) return;
         
-        var children = await Context.QueryAsync<ChildObjectInfo>(Sql.Tree_SelectPolymorphicChildren(), parentId);
-        foreach (var child in children)
+        // Id-only: no get_object_json materialization (lighter, and works on tiers without that
+        // function such as SQLite Pro, where the heavier polymorphic recipe is unavailable).
+        var childIds = await Context.QueryScalarListAsync<long>(Sql.Tree_SelectChildrenIds(), parentId);
+        foreach (var childId in childIds)
         {
-            ids.Add(child.ObjectId);
-            await CollectDescendantIds(child.ObjectId, ids, maxDepth, currentDepth + 1);
+            ids.Add(childId);
+            await CollectDescendantIds(childId, ids, maxDepth, currentDepth + 1);
         }
     }
 

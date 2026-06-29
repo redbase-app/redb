@@ -2,7 +2,7 @@
 
 Blazor component library for editing REDB object properties. Built with [Fluent UI Blazor](https://www.fluentui-blazor.net/).
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](../LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](../LICENSE)
 
 ## Components
 

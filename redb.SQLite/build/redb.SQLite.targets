@@ -1,0 +1,61 @@
+<Project>
+  <!-- ===================================================================
+       redb.SQLite (Free) — native SQLite loadable extension delivery.
+       -------------------------------------------------------------------
+       The Free tier hosts its server-side SQL functions (get_object_json,
+       pvt_build_*_sql, soft-delete, permissions) as a native SQLite
+       loadable extension: redb.dll (Windows) / redb.so (Linux) /
+       redb.dylib (macOS). SQLite loads it by an explicit file path
+       (conn.LoadExtension), so — unlike a normal P/Invoke native lib —
+       the .NET host does NOT resolve it from the NuGet cache; the file
+       must physically sit in the app's output.
+
+       For a RID-specific publish (dotnet publish -r <rid>) NuGet already
+       flattens runtimes/<rid>/native into the publish folder. For a
+       framework-dependent build/run (no RID) it does not, so we copy the
+       matching-OS binary here, preserving the runtimes/<rid>/native layout
+       that SqliteDataSource.LocatePackagedExtension() probes.
+
+       Each entry is gated on the build OS and on the binary's presence in
+       the package, so a package that ships only some RIDs copies only what
+       it has. A fully cross-platform package needs each redb.{dll,so,dylib}
+       packed (CI matrix — see native/README.md).
+       =================================================================== -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == ''">
+    <!-- Windows x64 -->
+    <None Include="$(MSBuildThisFileDirectory)..\runtimes\win-x64\native\redb.dll"
+          Condition="$([MSBuild]::IsOSPlatform('Windows')) And Exists('$(MSBuildThisFileDirectory)..\runtimes\win-x64\native\redb.dll')">
+      <Link>runtimes\win-x64\native\redb.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    <!-- Linux x64 -->
+    <None Include="$(MSBuildThisFileDirectory)..\runtimes\linux-x64\native\redb.so"
+          Condition="$([MSBuild]::IsOSPlatform('Linux')) And Exists('$(MSBuildThisFileDirectory)..\runtimes\linux-x64\native\redb.so')">
+      <Link>runtimes\linux-x64\native\redb.so</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    <!-- Linux arm64 -->
+    <None Include="$(MSBuildThisFileDirectory)..\runtimes\linux-arm64\native\redb.so"
+          Condition="$([MSBuild]::IsOSPlatform('Linux')) And Exists('$(MSBuildThisFileDirectory)..\runtimes\linux-arm64\native\redb.so')">
+      <Link>runtimes\linux-arm64\native\redb.so</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    <!-- macOS x64 -->
+    <None Include="$(MSBuildThisFileDirectory)..\runtimes\osx-x64\native\redb.dylib"
+          Condition="$([MSBuild]::IsOSPlatform('OSX')) And Exists('$(MSBuildThisFileDirectory)..\runtimes\osx-x64\native\redb.dylib')">
+      <Link>runtimes\osx-x64\native\redb.dylib</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    <!-- macOS arm64 -->
+    <None Include="$(MSBuildThisFileDirectory)..\runtimes\osx-arm64\native\redb.dylib"
+          Condition="$([MSBuild]::IsOSPlatform('OSX')) And Exists('$(MSBuildThisFileDirectory)..\runtimes\osx-arm64\native\redb.dylib')">
+      <Link>runtimes\osx-arm64\native\redb.dylib</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+</Project>

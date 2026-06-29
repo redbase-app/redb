@@ -12,7 +12,7 @@
     <Product>REDB - Entity Database for .NET</Product>
     <Description>Core library for REDB - Entity Database for .NET. SQL speed, NoSQL flexibility. Define schemas in C#, forget migrations, query with LINQ. Built for complex domains where traditional ORMs fall short.</Description>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>
-    <PackageTags>database;orm;eav;linq;dotnet;entity;nosql;flexible-schema</PackageTags>
+    <PackageTags>database;orm;redb;redbase;linq;dotnet;typed-schema;typed-storage;soft-delete;tree;window-functions;no-migrations;flexible-schema</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   

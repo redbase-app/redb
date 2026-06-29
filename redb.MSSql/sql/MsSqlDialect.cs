@@ -66,7 +66,15 @@ public class MsSqlDialect : ISqlDialect
         => $"[{name}]";
     
     public string FormatCaseInsensitiveLike(string column, string parameter)
-        => $"{column} LIKE {parameter}";
+        // ESCAPE '\\' is REQUIRED because UserProviderBase.EscapeLikeWildcards
+        // escapes '_', '%', '\' with a leading backslash to make them literal.
+        // PG defaults to '\' as the LIKE escape, SQL Server does NOT — without
+        // this clause a search for an exact email like 'reset_53f4f0f9@…' (which
+        // becomes the pattern 'reset\_53f4f0f9@…') is compared as the literal
+        // string starting with 'reset\_' rather than 'reset_', and no row matches.
+        // MSSQL case-insensitivity comes from the column collation default
+        // (SQL_Latin1_General_CP1_CI_AS); no ILIKE / explicit COLLATE needed.
+        => $"{column} LIKE {parameter} ESCAPE '\\'";
     
     public string FormatDateTimeLiteral(DateTime dt)
         => $"'{DateTimeConverter.NormalizeForStorage(dt):yyyy-MM-ddTHH:mm:ss.ffffffZ}'";
@@ -307,12 +315,24 @@ public class MsSqlDialect : ISqlDialect
     
     public string Users_SelectByLogin() =>
         """
-        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password, 
+        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password,
                _phone AS Phone, _email AS Email, _enabled AS Enabled,
                _date_register AS DateRegister, _date_dismiss AS DateDismiss,
                _key AS [Key], _code_int AS CodeInt, _code_string AS CodeString,
                _code_guid AS CodeGuid, _note AS Note, _hash AS Hash
         FROM _users WHERE _login = @p0
+        """;
+
+    // Case-insensitive email lookup. Mirrors the PostgreSQL recipe — see PostgreSqlDialect
+    // for the contract notes.
+    public string Users_SelectByEmail() =>
+        """
+        SELECT TOP 1 _id AS Id, _login AS Login, _name AS Name, _password AS Password,
+               _phone AS Phone, _email AS Email, _enabled AS Enabled,
+               _date_register AS DateRegister, _date_dismiss AS DateDismiss,
+               _key AS [Key], _code_int AS CodeInt, _code_string AS CodeString,
+               _code_guid AS CodeGuid, _note AS Note, _hash AS Hash
+        FROM _users WHERE LOWER(_email) = LOWER(@p0) AND _enabled = 1
         """;
     
     public string Users_Insert() =>
@@ -331,8 +351,9 @@ public class MsSqlDialect : ISqlDialect
         WHERE _id = @p12
         """;
     
+    // _login is immutable (Postgres trigger contract; keep MSSql parity). Tombstone via _name only.
     public string Users_SoftDelete() =>
-        "UPDATE _users SET _login = @p0, _name = @p1, _enabled = @p2, _date_dismiss = @p3 WHERE _id = @p4";
+        "UPDATE _users SET _name = @p0, _enabled = @p1, _date_dismiss = @p2 WHERE _id = @p3";
     
     public string Users_UpdatePassword() =>
         "UPDATE _users SET _password = @p0 WHERE _id = @p1";
@@ -492,10 +513,13 @@ public class MsSqlDialect : ISqlDialect
         """
         SELECT o._id as ObjectId, o._id_scheme as SchemeId, dbo.get_object_json(o._id, 1) as JsonData
         FROM _objects o 
-        WHERE o._id_parent = @p0 
+        WHERE o._id_parent = @p0
         ORDER BY o._name, o._id
         """;
-    
+
+    public string Tree_SelectChildrenIds() =>
+        "SELECT o._id FROM _objects o WHERE o._id_parent = @p0 ORDER BY o._name, o._id";
+
     public string Tree_SelectSchemeAndJson() =>
         """
         SELECT o._id_scheme as SchemeId, dbo.get_object_json(o._id, 1) as JsonData
@@ -1077,7 +1101,7 @@ public class MsSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
 
     // Bump together with the literal in redb.MSSql/sql/v2-pvt/00_module_init.sql.
-    public string? Query_PvtRequiredVersion() => "0.1.2";
+    public string? Query_PvtRequiredVersion() => "0.1.4";
 
     // Native PVT projection orchestrator — not supported on MSSql (yet).
     // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these

@@ -712,8 +712,13 @@ namespace redb.Core.Providers.Base
                     trashId, deleted, totalCount - deleted, PurgeStatus.Cancelled, startedAt, effectiveUser.Id));
             }
             
-            _logger?.LogInformation(
-                "PurgeTrash completed. TrashId={TrashId}, Deleted={Deleted}, User={UserId}", 
+            // LogDebug, not LogInformation — each Identity-level DELETE produces its own
+            // trash container with 1 object, so this fires per-operation and floods INF
+            // logs with "Deleted=1" entries (worker restart compounds it via
+            // RecoverOrphanedTasksAsync draining the accumulated backlog one-by-one).
+            // Operators who need per-purge visibility enable DBG for this category.
+            _logger?.LogDebug(
+                "PurgeTrash completed. TrashId={TrashId}, Deleted={Deleted}, User={UserId}",
                 trashId, deleted, effectiveUser.Id);
         }
         
@@ -953,9 +958,11 @@ namespace redb.Core.Providers.Base
                 var schemeId = schemeGroup.Key;
                 var objectsForScheme = schemeGroup.ToList();
 
-                // Get type through AutomaticTypeRegistry
-                var propsType = Cache.GetClrType(schemeId);
-                
+                // Resolve scheme_id → Type: lazy, self-healing, cross-domain-safe (loads the scheme by
+                // id and derives via the global ClrSchemeTypeIndex if this domain hasn't seen it yet).
+                // Null means the scheme genuinely has no CLR type → a legitimately non-generic object.
+                var propsType = await Cache.ResolveClrTypeAsync(schemeId, SchemeSyncProvider);
+
                 if (propsType == null)
                 {
                     // Non-generic RedbObject (Object scheme) - create without Props

@@ -165,7 +165,7 @@ public class FacetFilterBuilder : IFacetFilterBuilder
                 {
                     // Convert 2000.0 to "2000.0" so SQL understands it's Double
                     finalValue = doubleVal.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);  // 2000 → "2000.0"
-                    _logger?.LogInformation($"   🔧 FIXED: Forcibly create double string: {finalValue}");
+                    _logger?.LogDebug($"FIXED: Forcibly create double string: {finalValue}");
                 }
             }
             
@@ -1180,11 +1180,11 @@ public class FacetFilterBuilder : IFacetFilterBuilder
                 {
                     // Already DateTimeOffset - use directly
                     dtofs = existingOffset;
-                    _logger?.LogInformation($"   🔍 DateTimeOffset from existing: {dtofs:yyyy-MM-dd HH:mm:ss zzz}");
+                    _logger?.LogDebug($"   DateTimeOffset from existing: {dtofs:yyyy-MM-dd HH:mm:ss zzz}");
                 }
                 else if (value is DateTime dtValue)
                 {
-                    _logger?.LogInformation($"   🔍 DateTimeOffset from DateTime: {dtValue:yyyy-MM-dd HH:mm:ss} (Kind: {dtValue.Kind})");
+                    _logger?.LogDebug($"   DateTimeOffset from DateTime: {dtValue:yyyy-MM-dd HH:mm:ss} (Kind: {dtValue.Kind})");
                     // DateTime → DateTimeOffset
                     // Consider Kind for correct conversion
                     if (dtValue.Kind == DateTimeKind.Utc)
@@ -1205,19 +1205,19 @@ public class FacetFilterBuilder : IFacetFilterBuilder
                 {
                     // Parse string
                     dtofs = DateTimeOffset.Parse(strValue);
-                    _logger?.LogInformation($"   🔍 DateTimeOffset from string: {dtofs:yyyy-MM-dd HH:mm:ss zzz}");
+                    _logger?.LogDebug($"   DateTimeOffset from string: {dtofs:yyyy-MM-dd HH:mm:ss zzz}");
                 }
                 else
                 {
                     // Fallback - try to convert
                     dtofs = new DateTimeOffset(Convert.ToDateTime(value));
-                    _logger?.LogInformation($"   🔍 DateTimeOffset from fallback: {dtofs:yyyy-MM-dd HH:mm:ss zzz}");
+                    _logger?.LogDebug($"   DateTimeOffset from fallback: {dtofs:yyyy-MM-dd HH:mm:ss zzz}");
                 }
                 
                 // Convert to UTC for uniformity with PostgreSQL timestamptz
                 // PostgreSQL stores timestamptz in UTC and compares in UTC
                 var result = dtofs.ToUniversalTime();
-                _logger?.LogInformation($"   🔄 DateTimeOffset → UTC: {result:yyyy-MM-dd HH:mm:ss zzz}");
+                _logger?.LogDebug($"DateTimeOffset → UTC: {result:yyyy-MM-dd HH:mm:ss zzz}");
                 return result;
             }
 

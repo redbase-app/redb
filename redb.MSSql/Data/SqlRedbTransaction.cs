@@ -51,9 +51,34 @@ public class SqlRedbTransaction : IRedbTransaction
     {
         if (!IsActive)
             throw new InvalidOperationException("Transaction is not active. Already committed or rolled back.");
-        
-        await _transaction.CommitAsync();
+
+        try
+        {
+            await _transaction.CommitAsync();
+        }
+        catch (Exception ex)
+        {
+            // Commit failed: SqlConnection._currentTransaction may still be set.
+            // Try speculative rollback so the connection returns to the pool clean;
+            // otherwise the next caller's BeginTransaction fails with
+            // "SqlConnection does not support parallel transactions".
+            // Console.WriteLine($"[Diag-TX-LIFECYCLE-MSSQL] CommitAsync FAILED: {ex.GetType().Name}: {ex.Message}. Attempting speculative rollback.");
+            try { await _transaction.RollbackAsync(); }
+            catch (Exception rbEx)
+            {
+                // Console.WriteLine($"[Diag-TX-LIFECYCLE-MSSQL] Speculative rollback after failed commit ALSO FAILED: {rbEx.GetType().Name}: {rbEx.Message}. Pool may receive a dirty SqlConnection (next BeginTransaction will throw 'parallel transactions').");
+            }
+            IsActive = false;
+            _onDispose();
+            throw;
+        }
         IsActive = false;
+        // Clear the connection's `_currentTransaction` slot now so commands
+        // issued between commit and dispose run against the autocommit
+        // connection (Microsoft.Data.SqlClient is more tolerant of
+        // cmd.Transaction=closedTx than Microsoft.Data.Sqlite, but the
+        // semantics should not depend on driver tolerance).
+        _onDispose();
     }
 
     /// <summary>
@@ -63,22 +88,35 @@ public class SqlRedbTransaction : IRedbTransaction
     {
         if (!IsActive)
             throw new InvalidOperationException("Transaction is not active. Already committed or rolled back.");
-        
-        await _transaction.RollbackAsync();
+
+        try
+        {
+            await _transaction.RollbackAsync();
+        }
+        catch (Exception ex)
+        {
+            // Console.WriteLine($"[Diag-TX-LIFECYCLE-MSSQL] RollbackAsync FAILED: {ex.GetType().Name}: {ex.Message}. Pool may receive a dirty SqlConnection (next BeginTransaction will throw 'parallel transactions').");
+            IsActive = false;
+            _onDispose();
+            throw;
+        }
         IsActive = false;
+        _onDispose();
     }
 
     /// <summary>
     /// Dispose transaction.
-    /// If still active - rollback automatically.
+    /// If still active - rollback automatically. The catch CANNOT throw (Dispose contract),
+    /// so a leaked SqlConnection (autocommit=off at the driver layer) is mitigated by
+    /// SqlDataSource.EnsureCleanTransactionState's speculative ROLLBACK on next pool acquire.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
             return;
-        
+
         _disposed = true;
-        
+
         // Auto-rollback if still active
         if (IsActive)
         {
@@ -86,13 +124,13 @@ public class SqlRedbTransaction : IRedbTransaction
             {
                 await _transaction.RollbackAsync();
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore rollback errors during dispose
+                // Console.WriteLine($"[Diag-TX-LIFECYCLE-MSSQL] DisposeAsync auto-rollback FAILED: {ex.GetType().Name}: {ex.Message}. Pool poisoning mitigated by SqlDataSource.EnsureCleanTransactionState on next acquire.");
             }
             IsActive = false;
         }
-        
+
         await _transaction.DisposeAsync();
         _onDispose();
     }

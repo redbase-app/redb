@@ -463,6 +463,22 @@ CREATE NONCLUSTERED INDEX IX__objects__id_parent
 ON _objects (_id_parent) 
 INCLUDE (_id, _hash, _id_scheme);
 
+-- 1. Проверка существования индекса
+IF NOT EXISTS (
+    SELECT 1 
+    FROM sys.indexes i
+    INNER JOIN sys.objects o ON i.object_id = o.object_id
+    WHERE o.name = '_objects' 
+        AND i.name = 'ix__objects_parent_scheme'
+)
+BEGIN
+    -- 2. Создание индекса с опцией ONLINE = ON
+    CREATE NONCLUSTERED INDEX ix__objects_parent_scheme
+    ON _objects (_id_parent, _id_scheme)
+    WHERE _id_parent IS NOT NULL
+    WITH (ONLINE = ON);
+END;
+
 GO
 
 -- =====================================================

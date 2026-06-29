@@ -93,7 +93,7 @@ This is the "elegant" path most apps want: a familiar Recycle Bin UX (mark → u
 
 ### Storage and tooling
 
-- OK — PostgreSQL provider (`redb.Postgres`) and Microsoft SQL Server provider (`redb.MSSql`).
+- OK — PostgreSQL provider (`redb.Postgres`), Microsoft SQL Server provider (`redb.MSSql`), and SQLite provider (`redb.SQLite` / `redb.SQLite.Pro` — embedded, Blazor WASM & mobile).
 - OK — Database bootstrap: `InitializeAsync(ensureCreated: true)`, `EnsureDatabaseAsync()`, `GetSchemaScript()`.
 - OK — Export/import as `.redb` files (JSONL/ZIP) for backup and PostgreSQL ↔ MSSQL migration.
 - OK — CLI tool (`redb.CLI`) for schema init, export, import.

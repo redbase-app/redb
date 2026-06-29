@@ -9,7 +9,7 @@ assignees: ''
 ## Environment
 - **redb.Core version**: 
 - **.NET version**: 
-- **Database**: PostgreSQL / MSSQL (version)
+- **Database**: PostgreSQL / MSSQL / SQLite (version)
 - **OS**: 
 
 ## Description

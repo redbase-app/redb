@@ -15,6 +15,10 @@ using redb.Postgres.Extensions;
 using redb.MSSql.Pro.Extensions;
 #elif (UseMsSql)
 using redb.MSSql.Extensions;
+#elif (UseSqlite && pro)
+using redb.SQLite.Pro.Extensions;
+#elif (UseSqlite)
+using redb.SQLite.Extensions;
 #endif
 using RedbApp.Models;
 
@@ -38,8 +42,10 @@ class Program
         services.AddRedbPro(options => options
 #if (UsePostgres)
             .UsePostgres("Host=localhost;Port=5432;Username=postgres;Password=YOUR_PASSWORD;Database=redb_app;Include Error Detail=true")
-#else
+#elif (UseMsSql)
             .UseMsSql("Server=localhost;Database=redb_app;User Id=sa;Password=YOUR_PASSWORD;TrustServerCertificate=true")
+#else
+            .UseSqlite("Data Source=redb_app.db")  // Pro tier runs in Blazor WASM / mobile too
 #endif
             // .WithLicense("YOUR_LICENSE_KEY")  // Uncomment when you have a Pro license
             .Configure(c =>
@@ -54,8 +60,10 @@ class Program
         {
 #if (UsePostgres)
             options.ConnectionString = "Host=localhost;Port=5432;Username=postgres;Password=YOUR_PASSWORD;Database=redb_app;Include Error Detail=true";
-#else
+#elif (UseMsSql)
             options.ConnectionString = "Server=localhost;Database=redb_app;User Id=sa;Password=YOUR_PASSWORD;TrustServerCertificate=true";
+#else
+            options.ConnectionString = "Data Source=redb_app.db";
 #endif
         });
 #endif

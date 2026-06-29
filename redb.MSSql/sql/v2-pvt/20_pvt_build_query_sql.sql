@@ -147,6 +147,14 @@ BEGIN
     ELSE IF @paging = N''
         SET @order_sql = N'';
 
+    -- DISTINCT (@distinct=1) wraps the row-source in a derived table `_dist` that
+    -- projects only [_id]; the OUTER ORDER BY must reference that projected column,
+    -- NOT the inner alias prefix (`o.`/`_pvt_cte.` don't exist outside the wrapper —
+    -- that caused "The multi-part identifier 'o._id' could not be bound" with .Take()).
+    -- T-SQL also forbids ORDER BY on columns absent from a DISTINCT SELECT, so only
+    -- the projected [_id] is orderable here; use it for deterministic paging.
+    DECLARE @order_sql_dist NVARCHAR(MAX) = CASE WHEN @paging <> N'' THEN CHAR(10) + N'ORDER BY [_id]' ELSE N'' END;
+
     -- DistinctBy emulation: T-SQL has no SELECT DISTINCT ON; use
     -- ROW_NUMBER() OVER (PARTITION BY key ORDER BY (SELECT 1)) and
     -- filter to rn=1 in an outer wrapper. Resolve the partition column.
@@ -215,7 +223,7 @@ BEGIN
                      + CHAR(10) + @innerT + CHAR(10) + N') _pvt_cte' + @joinT
                      + CHAR(10) + N'WHERE ' + @whereTp + CHAR(10)
                      + N') _dist'
-                     + @order_sql + @paging;
+                     + @order_sql_dist + @paging;
             RETURN N'SELECT '
                  + @rowSelT + N' FROM (' + CHAR(10) + @innerT + CHAR(10) + N') _pvt_cte' + @joinT
                  + CHAR(10) + N'WHERE ' + @whereTp
@@ -291,7 +299,7 @@ BEGIN
             RETURN N'SELECT [_id] FROM (' + CHAR(10)
                  + N'SELECT DISTINCT o.[_id] AS [_id] ' + @baseFrom + CHAR(10)
                  + N') _dist'
-                 + @order_sql + @paging;
+                 + @order_sql_dist + @paging;
         RETURN N'SELECT o.[_id] ' + @baseFrom
              + @order_sql + @paging;
     END;
@@ -329,7 +337,7 @@ BEGIN
              + CHAR(10) + @inner + CHAR(10) + N') _pvt_cte' + @joinC
              + CHAR(10) + N'WHERE ' + @whereC + CHAR(10)
              + N') _dist'
-             + @order_sql + @paging;
+             + @order_sql_dist + @paging;
     RETURN N'SELECT '
          + @rowSelC + N' FROM (' + CHAR(10) + @inner + CHAR(10) + N') _pvt_cte' + @joinC
          + CHAR(10) + N'WHERE ' + @whereC

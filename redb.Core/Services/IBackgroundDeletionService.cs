@@ -6,51 +6,48 @@ using redb.Core.Models.Contracts;
 namespace redb.Core.Services;
 
 /// <summary>
-/// Background deletion service with queue-based processing.
-/// Provides fire-and-forget deletion: mark objects, enqueue purge, return immediately.
-/// Purge runs in background thread with separate DB connection.
-/// Progress is stored in trash object in database (persistent).
+/// Background deletion service. Fire-and-forget delete: callers mark objects, return
+/// immediately, and a polling worker physically purges the trash on a separate DB
+/// connection. State of truth lives entirely in <c>_objects</c> rows (trash containers
+/// with <c>_value_string='pending'</c>) — the worker drives off DB polling, so a
+/// worker crash or force-kill leaves no in-memory state to recover from.
 /// </summary>
 public interface IBackgroundDeletionService
 {
     /// <summary>
-    /// Mark objects for deletion and enqueue background purge.
-    /// Returns immediately after marking - purge runs in background.
+    /// Mark objects for deletion. Returns once <see cref="IObjectStorageProvider.SoftDeleteAsync(IEnumerable{long}, long?)"/>
+    /// has re-parented the objects under the trash scheme — they disappear from regular
+    /// queries immediately. The physical purge of the <c>_values</c> cascade runs in
+    /// the next worker poll cycle.
     /// </summary>
-    /// <param name="objectIds">IDs of objects to delete</param>
-    /// <param name="user">User performing the operation</param>
-    /// <param name="batchSize">Objects to delete per batch (default: 10)</param>
-    /// <param name="trashParentId">Optional parent for trash container</param>
-    /// <returns>Deletion mark with trash ID and count</returns>
     Task<DeletionMark> DeleteAsync(
-        IEnumerable<long> objectIds, 
-        IRedbUser user, 
+        IEnumerable<long> objectIds,
+        IRedbUser user,
         int batchSize = 10,
         long? trashParentId = null);
-    
+
     /// <summary>
-    /// Enqueue purge for an existing trash container.
-    /// Use after manual SoftDeleteAsync call.
+    /// No-op in the DB-polling design. Kept on the interface so callers that did a
+    /// manual <c>SoftDeleteAsync</c> + <c>EnqueuePurge</c> handshake don't break — the
+    /// trash row they wrote is picked up by the worker's next poll cycle on its own.
     /// </summary>
-    /// <param name="trashId">Trash container ID</param>
-    /// <param name="totalCount">Total objects to delete</param>
-    /// <param name="userId">User ID for tracking</param>
-    /// <param name="batchSize">Objects to delete per batch</param>
     void EnqueuePurge(long trashId, int totalCount, long userId, int batchSize = 10);
-    
+
     /// <summary>
     /// Get current progress for a trash container from database.
     /// Returns null if trash container not found or already deleted.
     /// </summary>
     Task<PurgeProgress?> GetProgressAsync(long trashId);
-    
+
     /// <summary>
     /// Get all active (pending/running) deletions for a user from database.
     /// </summary>
     Task<List<PurgeProgress>> GetUserActiveProgressAsync(long userId);
-    
+
     /// <summary>
-    /// Number of pending tasks in queue.
+    /// Always 0 in the DB-polling design — there is no in-memory queue. Callers who
+    /// want the actual count of pending trash containers should query the DB directly
+    /// (see <c>IObjectStorageProvider.GetOrphanedDeletionTasksAsync</c>).
     /// </summary>
     int QueueLength { get; }
 }

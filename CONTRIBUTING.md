@@ -14,7 +14,7 @@ Thank you for your interest in RedBase!
 Please include:
 - RedBase package version (`redb.Core`, provider package)
 - .NET version
-- Database type and version (PostgreSQL / MSSQL)
+- Database type and version (PostgreSQL / MSSQL / SQLite)
 - Minimal code to reproduce the issue
 - Expected vs actual behavior
 
@@ -27,7 +27,7 @@ Open a [Discussion](https://github.com/redbase-app/redb/discussions/categories/i
 
 ## Code Contributions
 
-This repository contains **examples, CLI tool, and export library**. The core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`) are developed in a separate repository.
+This repository contains **examples, CLI tool, and export library**. The core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`) are developed in a separate repository.
 
 If you'd like to contribute examples:
 

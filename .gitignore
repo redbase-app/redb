@@ -444,5 +444,18 @@ FodyWeavers.xsd
 # REDB data dumps
 *.redb
 
+# Generated SQLite example/test databases
+redb_examples.db
+redb_examples.db-shm
+redb_examples.db-wal
+
+# Local SQLite runtime databases for redb.Tsak (worker/web local data — not source)
+redb.Tsak/redb.db
+redb.Tsak/redb.db-shm
+redb.Tsak/redb.db-wal
+redb.Tsak/src/redb.Tsak.Worker/redb.db
+redb.Tsak/src/redb.Tsak.Worker/redb.db-shm
+redb.Tsak/src/redb.Tsak.Worker/redb.db-wal
+
 # Production configs with secrets
 deploy/volumes/*/appsettings.Production.json

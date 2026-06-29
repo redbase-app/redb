@@ -43,8 +43,10 @@ public static class JsonValueConverter
             Type t when t == typeof(double) => elem.TryGetDouble(out var dbl) ? dbl : 0.0,
             Type t when t == typeof(float) => elem.TryGetSingle(out var f) ? f : 0f,
             
-            // Boolean
+            // Boolean — PostgreSQL emits JSON true/false; SQLite has no native bool and stores it as
+            // INTEGER 0/1, so a grouping/projection column arrives as a JSON Number → treat nonzero as true.
             Type t when t == typeof(bool) => elem.ValueKind == JsonValueKind.True ||
+                (elem.ValueKind == JsonValueKind.Number && elem.TryGetDouble(out var bn) && bn != 0) ||
                 (elem.ValueKind == JsonValueKind.String && bool.TryParse(elem.GetString(), out var bl) && bl),
             
             // DateTime / DateTimeOffset — with PostgreSQL row_to_json() format support
@@ -101,7 +103,10 @@ public static class JsonValueConverter
     {
         if (elem.ValueKind == JsonValueKind.Number)
         {
-            // Unix timestamp
+            // A numeric datetime → ask the registered backend decoder (e.g. SQLite REAL Julian day).
+            if (elem.TryGetDouble(out var num) && TemporalDecoder.TryDecode(num, typeof(DateTime), out var dec) && dec != null)
+                return (DateTime)dec;
+            // Legacy fallback: Unix timestamp seconds.
             return DateTimeOffset.FromUnixTimeSeconds(elem.GetInt64()).DateTime;
         }
         
@@ -116,7 +121,11 @@ public static class JsonValueConverter
     {
         if (elem.ValueKind == JsonValueKind.Number)
         {
-             return DateTimeOffset.FromUnixTimeSeconds(elem.GetInt64());
+            // A numeric datetime → ask the registered backend decoder (e.g. SQLite REAL Julian day).
+            if (elem.TryGetDouble(out var num) && TemporalDecoder.TryDecode(num, typeof(DateTimeOffset), out var dec) && dec != null)
+                return (DateTimeOffset)dec;
+            // Legacy fallback: Unix timestamp seconds.
+            return DateTimeOffset.FromUnixTimeSeconds(elem.GetInt64());
         }
         
         var str = elem.GetString();
