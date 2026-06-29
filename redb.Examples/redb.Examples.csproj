@@ -21,7 +21,7 @@
     <PackageReference Include="redb.Core.Pro" Version="3.2.0" />
     <PackageReference Include="redb.Postgres.Pro" Version="3.2.0" />
     <PackageReference Include="redb.MSSql.Pro" Version="3.2.0" />
-    <PackageReference Include="redb.SQLite.Pro" Version="3.2.0" />
+    <PackageReference Include="redb.SQLite.Pro" Version="3.2.1" />
   </ItemGroup>
 
 </Project>

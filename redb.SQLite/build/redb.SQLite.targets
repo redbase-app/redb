@@ -1,7 +1,6 @@
 <Project>
   <!-- ===================================================================
-       redb.SQLite (Free) — native SQLite loadable extension delivery.
-       -------------------------------------------------------------------
+       redb.SQLite (Free) - native SQLite loadable extension delivery.
        The Free tier hosts its server-side SQL functions (get_object_json,
        pvt_build_*_sql, soft-delete, permissions) as a native SQLite
        loadable extension: redb.dll (Windows) / redb.so (Linux) /

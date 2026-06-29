@@ -27,13 +27,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\redb.Core\redb.Core.csproj" />
-    <ProjectReference Include="..\redb.Core.Pro\redb.Core.Pro.csproj" />
+    <PackageReference Include="redb.Core.Pro" Version="3.2.0" />
     <ProjectReference Include="..\redb.MSSql\redb.MSSql.csproj" />
-    <ProjectReference Include="..\redb.MSSql.Pro\redb.MSSql.Pro.csproj" />
+    <PackageReference Include="redb.MSSql.Pro" Version="3.2.0" />
     <ProjectReference Include="..\redb.Postgres\redb.Postgres.csproj" />
-    <ProjectReference Include="..\redb.Postgres.Pro\redb.Postgres.Pro.csproj" />
+    <PackageReference Include="redb.Postgres.Pro" Version="3.2.0" />
     <ProjectReference Include="..\redb.SQLite\redb.SQLite.csproj" />
-    <ProjectReference Include="..\redb.SQLite.Pro\redb.SQLite.Pro.csproj" />
+    <PackageReference Include="redb.SQLite.Pro" Version="3.2.1" />
   </ItemGroup>
 
   <ItemGroup>
