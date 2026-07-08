@@ -2,7 +2,9 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <!-- Single TFM: a dotnet tool built for net8.0 also runs on net9/net10 hosts.
+         Multi-targeting would triple the packaged native SQLite payload for no benefit. -->
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>redb</AssemblyName>
@@ -42,5 +44,20 @@
     <ProjectReference Include="..\redb.MSSql\redb.MSSql.csproj" />
     <ProjectReference Include="..\redb.SQLite\redb.SQLite.csproj" />
   </ItemGroup>
+
+  <!-- Trim native runtime assets (SQLitePCLRaw e_sqlite3) down to platforms this CLI
+       actually runs on. Without this the bundle ships iOS/Android/browser/maccatalyst and
+       exotic-linux (mips/ppc64le/s390x/armel) natives, bloating the tool package ~30x. -->
+  <PropertyGroup>
+    <_CliKeepRids>;win-x64;win-arm64;linux-x64;linux-arm64;linux-musl-x64;linux-musl-arm64;osx-x64;osx-arm64;</_CliKeepRids>
+  </PropertyGroup>
+  <Target Name="TrimNativeRuntimeRids" AfterTargets="ResolvePackageAssets" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <RuntimeTargetsCopyLocalItems Remove="@(RuntimeTargetsCopyLocalItems)"
+        Condition="'%(RuntimeTargetsCopyLocalItems.AssetType)' == 'native' and !$(_CliKeepRids.Contains(';%(RuntimeTargetsCopyLocalItems.RuntimeIdentifier);'))" />
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+        Condition="'%(ReferenceCopyLocalPaths.AssetType)' == 'native' and '%(ReferenceCopyLocalPaths.RuntimeIdentifier)' != '' and !$(_CliKeepRids.Contains(';%(ReferenceCopyLocalPaths.RuntimeIdentifier);'))" />
+    </ItemGroup>
+  </Target>
 
 </Project>

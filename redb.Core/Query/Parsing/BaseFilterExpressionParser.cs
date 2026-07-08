@@ -343,6 +343,29 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
             };
         }
 
+        // C# 13 / .NET 9 resolves `array.Contains(x)` to the ReadOnlySpan overload
+        // (System.MemoryExtensions.Contains) instead of Enumerable.Contains — same
+        // 2-arg (source, value) shape, same IN translation. The source arg is a
+        // ReadOnlySpan Convert over the underlying array/list; a ref struct cannot
+        // be compiled by EvaluateExpression, so unwrap the conversion back to the
+        // collection first.
+        if (declaringType == typeof(MemoryExtensions)
+            && methodName == "Contains"
+            && method.Arguments.Count == 2)
+        {
+            // The receiver is a ReadOnlySpan<T> built from the underlying array —
+            // the compiler emits the array→span conversion as a Call (op_Implicit /
+            // AsSpan) or, less commonly, a Convert. A ref struct can't be compiled /
+            // invoked by EvaluateExpression, so peel it back to the source collection.
+            var source = method.Arguments[0] switch
+            {
+                UnaryExpression { NodeType: ExpressionType.Convert } u => u.Operand,
+                MethodCallExpression { Arguments.Count: >= 1 } c => c.Arguments[0],
+                var other => other
+            };
+            return VisitContainsCore(source, method.Arguments[1]);
+        }
+
         if (methodName == "Contains" && method.Object != null)
         {
             var objectType = method.Object.Type;
@@ -499,9 +522,19 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         if (method.Arguments.Count != 2)
             throw new ArgumentException("Contains method must have exactly 2 arguments");
 
-        var sourceExpression = method.Arguments[0];
-        var valueExpression = method.Arguments[1];
+        return VisitContainsCore(method.Arguments[0], method.Arguments[1]);
+    }
 
+    /// <summary>
+    /// Core of a 2-arg <c>Contains(source, value)</c> translation — shared by
+    /// <see cref="VisitEnumerableContains"/> (<c>Enumerable.Contains</c>) and the
+    /// <c>MemoryExtensions.Contains</c> span overload that C# 13 / .NET 9 binds
+    /// <c>array.Contains(x)</c> to. Produces an IN-clause (value is a row property,
+    /// source is a constant collection) or an array-contains (source is the row's
+    /// array property).
+    /// </summary>
+    protected FilterExpression VisitContainsCore(Expression sourceExpression, Expression valueExpression)
+    {
         if (IsPropertyAccess(valueExpression))
         {
             var property = ExtractProperty(valueExpression);

@@ -11,9 +11,9 @@
     <PackageId>redb.SQLite</PackageId>
     <!-- 3.2.1 hotfix: 3.2.0 shipped a buildTransitive/redb.SQLite.targets with an
          invalid XML comment (a row of dashes inside an XML comment), breaking every
-         consumer (MSB4024). Pinned ahead of the inherited 3.2.0 until the next bump. -->
-    <Version>3.2.1</Version>
-    <PackageVersion>3.2.1</PackageVersion>
+         consumer (MSB4024). That fix is folded into the 3.3.0 ecosystem bump below. -->
+    <Version>3.3.0</Version>
+    <PackageVersion>3.3.0</PackageVersion>
     <Product>REDB - Entity Database for .NET</Product>
     <Description>SQLite provider for REDB. Includes optimized SQL generation, tree queries with CTEs, and full LINQ support.</Description>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>

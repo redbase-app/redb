@@ -18,10 +18,10 @@
     <!-- <PackageReference Include="redb.Core.Pro" Version="1.2.*" /> -->
     <!-- <PackageReference Include="redb.Postgres.Pro" Version="1.2.*" /> -->
     <!-- <PackageReference Include="redb.MSSql.Pro" Version="1.2.*" /> -->
-    <PackageReference Include="redb.Core.Pro" Version="3.2.0" />
-    <PackageReference Include="redb.Postgres.Pro" Version="3.2.0" />
-    <PackageReference Include="redb.MSSql.Pro" Version="3.2.0" />
-    <PackageReference Include="redb.SQLite.Pro" Version="3.2.1" />
+    <PackageReference Include="redb.Core.Pro" Version="3.3.0" />
+    <PackageReference Include="redb.Postgres.Pro" Version="3.3.0" />
+    <PackageReference Include="redb.MSSql.Pro" Version="3.3.0" />
+    <PackageReference Include="redb.SQLite.Pro" Version="3.3.0" />
   </ItemGroup>
 
 </Project>

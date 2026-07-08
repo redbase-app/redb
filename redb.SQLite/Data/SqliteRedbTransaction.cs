@@ -131,8 +131,18 @@ namespace redb.SQLite.Data
                 IsActive = false;
             }
 
-            await _transaction.DisposeAsync();
-            _onDispose();
+            // Disposing a broken transaction must never block the connection's cleanup callback:
+            // _onDispose() clears _currentTransaction on the connection so it can return to the pool.
+            // finally guarantees that even if _transaction.DisposeAsync() throws — and the exception
+            // is NOT swallowed, it propagates so the fault stays observable.
+            try
+            {
+                await _transaction.DisposeAsync();
+            }
+            finally
+            {
+                _onDispose();
+            }
         }
     }
 }

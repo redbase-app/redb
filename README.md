@@ -144,7 +144,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRedbPro(options => options
     .UsePostgres("Host=localhost;Database=mydb;Username=postgres;Password=pass")
     // .UseMsSql("Server=localhost;Database=mydb;User Id=sa;Password=pass;TrustServerCertificate=true")
-    .WithLicense("YOUR-LICENSE-KEY")     // optional — trial works without it
     .Configure(c =>
     {
         c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;
@@ -656,7 +655,7 @@ var order = await redb.LoadAsync<OrderProps>(orderId);
 
 REDB Pro unlocks compiled query execution, parallel materialization, deep nested property queries, arithmetic and math expressions in WHERE, `Sql.Function<T>()` for calling arbitrary SQL functions, change tracking, schema migrations, and advanced analytics (window functions over grouped data). If performance matters — use Pro.
 
-**License is free** — register at [redbase.app](https://redbase.app) and send an email to request your license key.
+**Pro is free — no license key required.** Just add the `redb.*.Pro` packages and use them. Pro packages are proprietary (closed-source), but free of charge — starting from version 3.3.0 no license is needed.
 
 ---
 
@@ -681,4 +680,4 @@ Core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.Export`,
 [Apache License 2.0](LICENSE) starting from version 2.0.0.
 Versions ≤ 1.3.0 published on nuget.org remain under MIT.
 
-Pro packages are free — register at [redbase.app](https://redbase.app) and request a license key by email.
+Pro packages (`redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`) are proprietary (closed-source) but **free to use — no license key required** starting from version 3.3.0.

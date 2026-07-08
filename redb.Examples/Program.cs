@@ -156,9 +156,9 @@ class Program
         // base dir. (Harmless for the Pro run — Pro never calls those functions.)
         SqliteDataSource.NativeExtensionPath ??= ResolveSqliteNativeExtension();
 
-        // SQLite dev TRIAL license — type=trial, version=3.3.0, 30 days (hard expiry).
-        // Features: core.pro, postgres.pro, mssql.pro, sqlite.pro. Signed with the trusted RSA key (kid app-2025-01).
-        var TestLicense=@"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFwcC0yMDI1LTAxIn0.eyJqdGkiOiIwMWEyYzI3Zi0xMjRmLTQ2NzQtOWZlOS1kMDUxOWRhZWE4YTEiLCJsaWNlbnNlZSI6InJlbGlrdEBiay5ydSIsImVtYWlsIjoicmVsaWt0QGJrLnJ1IiwidmVyc2lvbiI6IjMuMy4wIiwidHlwZSI6InRyaWFsIiwiZmVhdHVyZXMiOlsiY29yZS5wcm8iLCJwb3N0Z3Jlcy5wcm8iLCJtc3NxbC5wcm8iLCJzcWxpdGUucHJvIiwidHNhay5jbHVzdGVyIiwidHNhay53ZWIucHJvIl0sIm1heF9ub2RlcyI6IjMiLCJ0c2FrX3ZlcnNpb24iOiIzLjMuMCIsIm5iZiI6MTc4MjE1MDk1NywiZXhwIjoxODEzMjU0OTU3LCJpc3MiOiJyZWRiLnJ1In0.I-62ha8_CrWoQGO39_532Gc3kw3Q6JDB7iijz6QPBgLzNB_M0VrRXTFd6jAkiFcWTq1jchC5vulRkr-0QOVgqr5nQT71nMpQo27AKt1f3RYyvNLO97YIg7C3aH8zccivTK5OXqRqmxJlMxtO9qj3_elyC23Zg8m-6YZdFD2h9CTmB4PV7IJq5pC8SMVCtCxh-owfsmtxmxlXRZeTV8Nck3J_9ozlcwdOkIBczzqFC-BFxw5iORqeeDLzs3lt3lmJfMwwRYtNZoBp_aZBmyFmYuYMliN8Cyy9zawv-GsbbIcKweq3I0q6H2Mv9Bd0S28Pii_kqzwcx4iFKlNfUlIWkA";
+        // Pro is free from 3.3.0 — no license key required for the entire 3.x line.
+        // Empty string = no key; set a JWT here only against a 4.x+ build that re-enables licensing.
+        var TestLicense=@"";
         services.AddRedbPro(options => options
             .WithLicense(TestLicense)
             .Configure(c =>

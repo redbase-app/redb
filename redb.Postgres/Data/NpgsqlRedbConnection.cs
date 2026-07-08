@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
 
@@ -20,6 +21,30 @@ namespace redb.Postgres.Data
         private NpgsqlConnection? _connection;
         private NpgsqlRedbTransaction? _currentTransaction;
         private bool _disposed = false;
+
+        // Fail-fast concurrency guard. A single NpgsqlRedbConnection wraps ONE physical connection
+        // (reused for every command — EF-DbContext model) and is NOT thread-safe. If two threads
+        // enter a command at once (i.e. one IRedbService instance was shared across concurrent
+        // exchanges/requests — resolve a SCOPED instance per exchange instead), fail immediately with
+        // a clear message rather than corrupting the connection ("command already in progress").
+        private int _inUse;
+
+        private CommandGuard EnterCommand()
+        {
+            if (Interlocked.CompareExchange(ref _inUse, 1, 0) != 0)
+                throw new InvalidOperationException(
+                    "IRedbService used concurrently: the same NpgsqlRedbConnection was entered from two threads. " +
+                    "Each exchange/request must resolve its OWN scoped IRedbService (ProcessWithRedb / controller.Redb()) — " +
+                    "one instance is a single, non-thread-safe DB connection.");
+            return new CommandGuard(this);
+        }
+
+        private readonly struct CommandGuard : IDisposable
+        {
+            private readonly NpgsqlRedbConnection _owner;
+            public CommandGuard(NpgsqlRedbConnection owner) => _owner = owner;
+            public void Dispose() => Interlocked.Exchange(ref _owner._inUse, 0);
+        }
         
         /// <summary>
         /// Connection string.
@@ -156,6 +181,7 @@ namespace redb.Postgres.Data
         /// </summary>
         public async Task<List<T>> QueryAsync<T>(string sql, params object[] parameters) where T : new()
         {
+            using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync();
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -176,6 +202,7 @@ namespace redb.Postgres.Data
         /// </summary>
         public async Task<T?> QueryFirstOrDefaultAsync<T>(string sql, params object[] parameters) where T : class, new()
         {
+            using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync();
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -194,6 +221,7 @@ namespace redb.Postgres.Data
         /// </summary>
         public async Task<T?> ExecuteScalarAsync<T>(string sql, params object[] parameters)
         {
+            using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync();
             await using var cmd = CreateCommand(conn, sql, parameters);
             var result = await cmd.ExecuteScalarAsync();
@@ -219,6 +247,7 @@ namespace redb.Postgres.Data
         /// </summary>
         public async Task<int> ExecuteAsync(string sql, params object[] parameters)
         {
+            using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync();
             await using var cmd = CreateCommand(conn, sql, parameters);
             return await cmd.ExecuteNonQueryAsync();
@@ -230,6 +259,7 @@ namespace redb.Postgres.Data
         /// </summary>
         public async Task<List<T>> QueryScalarListAsync<T>(string sql, params object[] parameters)
         {
+            using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync();
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -260,6 +290,7 @@ namespace redb.Postgres.Data
         /// </summary>
         public async Task<IRedbTransaction> BeginTransactionAsync()
         {
+            using var _guard = EnterCommand();
             if (_currentTransaction != null && _currentTransaction.IsActive)
                 throw new InvalidOperationException("Transaction already active. Commit or rollback first.");
             
@@ -334,6 +365,7 @@ namespace redb.Postgres.Data
         /// </summary>
         public async Task<string?> ExecuteJsonAsync(string sql, params object[] parameters)
         {
+            using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync();
             await using var cmd = CreateCommand(conn, sql, parameters);
             var result = await cmd.ExecuteScalarAsync();
@@ -349,6 +381,7 @@ namespace redb.Postgres.Data
         /// </summary>
         public async Task<List<string>> ExecuteJsonListAsync(string sql, params object[] parameters)
         {
+            using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync();
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -377,19 +410,25 @@ namespace redb.Postgres.Data
 
             _disposed = true;
 
-            if (_currentTransaction != null)
+            // The physical connection MUST return to the pool even if disposing a broken transaction
+            // throws (e.g. after a mid-query failure): finally guarantees the return, and the exception
+            // is NOT swallowed — it propagates so the fault stays observable. The route's ReleaseScopes
+            // loop is throw-resilient, so a propagated dispose fault won't strand sibling scopes.
+            try
             {
-                await _currentTransaction.DisposeAsync();
-                _currentTransaction = null;
+                if (_currentTransaction != null)
+                    await _currentTransaction.DisposeAsync();
             }
-
-            if (_connection != null)
+            finally
             {
-                await _connection.DisposeAsync();
+                _currentTransaction = null;
+                var conn = _connection;
                 _connection = null;
+                if (conn != null)
+                    await conn.DisposeAsync();
             }
         }
-        
+
         /// <summary>
         /// Synchronous dispose for DI container compatibility.
         /// </summary>
@@ -397,14 +436,20 @@ namespace redb.Postgres.Data
         {
             if (_disposed)
                 return;
-            
+
             _disposed = true;
-            
-            _currentTransaction?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            _currentTransaction = null;
-            
-            _connection?.Dispose();
-            _connection = null;
+
+            try
+            {
+                _currentTransaction?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            finally
+            {
+                _currentTransaction = null;
+                var conn = _connection;
+                _connection = null;
+                conn?.Dispose();
+            }
         }
         
         /// <summary>

@@ -75,8 +75,14 @@ namespace redb.Core.Utils
         /// Compute hash for arbitrary object via reflection.
         /// Returns null if object has no properties.
         /// </summary>
-        private static Guid? ComputeForObject(object obj)
+        private static Guid? ComputeForObject(object? obj)
         {
+            // No object → no data to hash. The reflection-based ComputeFor(IRedbObject)
+            // already returns null for a null Props (Props=null is a supported case —
+            // see ComputeForBaseFields). This aligns the generic ComputeForProps path
+            // with that contract instead of throwing NRE on obj.GetType().
+            if (obj is null) return null;
+
             var properties = obj.GetType()
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => !ShouldIgnoreForHash(p))  // ✅ Filter technical properties

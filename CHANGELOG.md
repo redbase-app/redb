@@ -19,6 +19,42 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] — 2026-07-09
+
+### Added
+- **Fail-fast concurrency guard on the provider connection (`RedBase.Postgres`, `RedBase.MSSql`,
+  `RedBase.SQLite` + `.Pro`).** An `IRedbService` wraps a single, non-thread-safe DB connection
+  (EF-DbContext model). If the same instance is entered from two threads at once, each provider now
+  throws a clear `InvalidOperationException` naming the cause — instead of an opaque driver error
+  (*"A command is already in progress"*, *"connection is busy"*, *"another read operation is already
+  in progress"*). Lightweight `Interlocked` check with zero cost on the normal single-threaded path;
+  correct scoped usage is never affected.
+
+### Fixed
+- **Query parser: `array.Contains(x)` in `WhereRedb` threw on .NET 9 / C# 13 (`RedBase.Core`).**
+  A `string[]` (or any array) `.Contains(x)` inside a `WhereRedb(...)` predicate now binds to the
+  `ReadOnlySpan` overload (`System.MemoryExtensions.Contains`) rather than `Enumerable.Contains`,
+  which the filter parser rejected with `NotSupportedException`. The parser now recognises
+  `MemoryExtensions.Contains`, unwraps the array→span conversion, and translates it to the same
+  `IN` clause as `Enumerable.Contains` / `List.Contains`. (Refactored the two-arg `Contains`
+  translation into a shared `VisitContainsCore`.)
+- **`ComputeHash()` NRE on an object with `Props == null` (`RedBase.Core`).** `RedbHash.ComputeForObject`
+  dereferenced the object before a null check, so the generic `ComputeFor<TProps>` path (used by
+  `RedbObject<TProps>.ComputeHash()`) threw `NullReferenceException` when `Props` was null — even
+  though null Props is a supported case (the reflection-based `ComputeFor(IRedbObject)` already
+  returned null, and `ComputeForBaseFields` exists for exactly this). Added the missing guard so the
+  generic path returns `null` (→ `Guid.Empty`) consistently, instead of throwing.
+- **Connection-pool leak on transaction/connection dispose (`RedBase.Postgres`, `RedBase.MSSql`,
+  `RedBase.SQLite` + `.Pro`).** Disposing the provider connection could skip returning the physical
+  connection to the pool: a throw from the driver's transaction `DisposeAsync()` (possible mid
+  error-storm on an already-broken connection) bypassed `_connection` disposal. Because `SaveAsync`
+  runs inside an explicit transaction, every write armed this path, so under a burst of failures the
+  leak was self-amplifying and eventually exhausted the pool (symptom: a healthy pool suddenly climbs
+  past `MaxPoolSize` with connection-timeout errors, cleared only by a restart). The connection's
+  `DisposeAsync`/`Dispose` and the transaction wrapper's `DisposeAsync` now use `try/finally`, so the
+  connection is always returned and the transaction-cleanup callback always runs; the dispose fault is
+  no longer swallowed — it propagates so it stays observable.
+
 ## [3.2.0] — 2026-06-29
 
 ### Added
