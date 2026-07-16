@@ -19,6 +19,31 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.3] — 2026-07-15
+
+> **Why 3.3.3 and not 3.3.1.** The number jumps to stay in step with the rest of the ecosystem, which
+> had drifted ahead: `redb.Route` and `redb.Tsak` were at **3.3.1**, and `redb.Route.Sql` / `redb.Route.Sqs`
+> at **3.3.2** (a partial connector release). From 3.3.3 **every package ships one number** — redb core,
+> redb.Route and redb.Tsak — so "which versions go together" stops being a question. There are no core
+> releases numbered 3.3.1 or 3.3.2; the fix below is the only functional change here.
+>
+> `redb.Identity` keeps its own line (**1.2.2**) but is released together with this — it depends on redb
+> storage, and without the rebuild its users would stay on the broken init below.
+
+### Fixed
+- **Schema init failed under a non-superuser database owner (`RedBase.Postgres`).** The embedded
+  `redb_init.sql` carried a single `ALTER FUNCTION migrate_structure_type(...) OWNER TO postgres;`
+  (a leftover from a debugging session — the only `OWNER TO` in the whole script). `EnsureCreated=true` runs
+  the script as one batch, so on a least-privilege setup (app user owns the database but is not a
+  member of the `postgres` role) the statement failed with *"must be able to SET ROLE postgres"*
+  and rolled back the entire first-start initialization. The statement is removed: no function in
+  the script is `SECURITY DEFINER`, so ownership never affected execution, and the function now
+  belongs to the connecting role like every other object — which also keeps future
+  `CREATE OR REPLACE` migrations working. Required app privileges are now just
+  `CONNECT` + `CREATE` on the schema + DML. Note: `CREATE EXTENSION IF NOT EXISTS pg_trgm` still
+  requires the extension to be preinstalled on PostgreSQL ≤ 12 (on PG 13+ `pg_trgm` is a trusted
+  extension, installable by the database owner).
+
 ## [3.3.0] — 2026-07-09
 
 ### Added

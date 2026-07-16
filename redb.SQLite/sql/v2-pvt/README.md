@@ -28,22 +28,12 @@
 15_pvt_order.sql              -- pvt_build_order_conditions
 
 20_pvt_build_query_sql.sql    -- pvt_build_query_sql (ЕДИНСТВЕННАЯ public entry-point модуля)
-
-99_smoke_tests.sql            -- manual SELECT smoke-tests (commented out)
-
-deprecated/                   -- старые helper-функции (НЕ деплоятся), оставлены для истории:
-  21_pvt_search_base.sql      -- pvt_search_objects_base / pvt_get_sql_preview_base
-  22_pvt_search_full.sql      -- pvt_search_objects / pvt_get_sql_preview
 ```
 
-> Файлы из `deprecated/` НЕ накатываются. Они оборачивали `pvt_build_query_sql` в `RETURN NEXT` / `get_object_json` — теперь это делает C#-сторона (см. ниже), а БД отдаёт только готовую SQL-строку. Любой клиент (C#, Python, Go) может попросить SQL и сам решить, выполнять, оборачивать или показывать пользователю как preview.
-
-Пример деплоя локально:
-
-```powershell
-$files = Get-ChildItem 'redb.SQLite/sql/v2-pvt/' -Filter '*.sql' | Sort-Object Name
-foreach ($f in $files) { psql -d redb -f $f.FullName }
-```
+> **SQLite-специфика**: эти файлы — PG plpgsql и в SQLite **не деплоятся**. Они хранятся как
+> логическая спецификация нативного C-порта (`native/src/redb_pvt.c` — "faithful port of
+> redb.SQLite/sql/v2-pvt/*.sql"). Смоук-тесты, `deprecated/` и генератор `pvt_bundle` живут
+> в каноническом PG-дереве: `redb.Postgres/sql/v2-pvt/`.
 
 ---
 
@@ -55,22 +45,16 @@ foreach ($f in $files) { psql -d redb -f $f.FullName }
 |---|---|
 | Таблицы `_objects`, `_values`, `_structures`, `_list_items`, `_scheme_metadata_cache` | core schema |
 | `get_scheme_definition(bigint)` | `redb_metadata_cache.sql` |
-| `get_object_json(bigint, integer)` | `redb_init.sql` — вызывается **из C#-обёртки**, не из самого pvt-модуля |
+| `get_object_json(bigint, integer)` | `redb_json_objects.sql` (C-порт в `native/src/redb_extension.c`) — вызывается **из C#-обёртки**, не из самого pvt-модуля |
 
 Ни одна `pvt_*` функция **не вызывает** unprefixed legacy-функцию (`_build_inner_condition`, `_parse_field_path`, и т.п.) — все они форкнуты в файлы 01..07.
 
 ---
 
-## Включение в `redb_init.sql`
-
-**Не делается автоматически.** Решение об активации модуля = отдельный шаг (после ревью и smoke-тестов). До тех пор модуль деплоится вручную.
-
----
-
 ## Замечание про legacy
 
-- `redb_facets_search.sql`, `redb_lazy_loading_search.sql`, `redb_init.sql`, `redb_metadata_cache.sql` — **не редактируем**.
-- При исправлении бага в legacy helper'е — зеркалить правку в `pvt_*` копии (см. маркер `-- Forked from ... on 2026-05-18` в шапке каждого forked-файла).
+- В SQLite нет `redb_init.sql`-бандла: движок хостится в нативном расширении, а не в БД-функциях.
+- При исправлении бага в PG-исходнике (`redb.Postgres/sql/v2-pvt/`) — зеркалить правку сюда и в C-порт (`native/src/redb_pvt.c`), см. маркер `-- Forked from ... on 2026-05-18` в шапке каждого forked-файла.
 
 ---
 

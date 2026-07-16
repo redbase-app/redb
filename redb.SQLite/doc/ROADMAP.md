@@ -27,8 +27,9 @@ Data layer — exactly the REWRITE files. Providers/Query/Dialect compile clean 
 - `SqliteDbType` ×6 (was `NpgsqlDbType` — → `SqliteType`, different members)
 - `SqliteTypes` ×2 (was `using NpgsqlTypes;` — remove)
 
-> Open: keep the `ConcatenateSql` MSBuild target? (Free needs SQLite DDL init; Pro needs none.) The `.sql`
-> sources are untouched PG plpgsql; the target still concatenates them into `redb_init.sql` (harmless for now).
+> Resolved: the `ConcatenateSql` MSBuild target was dropped — the csproj embeds only the hand-written
+> `sql/redbSqlite.sql`. The stale generated `redb_init.sql`/`pvt_bundle.sql` and the `deprecated/` PG
+> copies were deleted (2026-07-16); the remaining PG `.sql` files stay as the C-port logic spec.
 
 ## Phase 1 — Infrastructure (Data layer, shared by both tiers)
 

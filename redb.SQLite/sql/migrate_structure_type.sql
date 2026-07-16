@@ -274,9 +274,6 @@ BEGIN
 END;
 $BODY$;
 
-ALTER FUNCTION public.migrate_structure_type(bigint, text, text, boolean)
-    OWNER TO postgres;
-
 COMMENT ON FUNCTION public.migrate_structure_type(bigint, text, text, boolean)
     IS 'Atomic data migration when changing structure type.
 Parameters:

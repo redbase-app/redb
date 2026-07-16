@@ -52,7 +52,11 @@ Every file below was copied verbatim from the PG provider. Change types:
 | `sql/redb_metadata_cache.sql` | C: `sync_metadata_cache_for_scheme` + `_scheme_metadata_cache` table | shared dependency of both materializer & query gen. |
 | `sql/redb_soft_delete.sql`, `redb_structure_tree.sql`, `redb_migrations.sql`, `migrate_structure_type.sql`, `migration_drop_deleted_objects.sql` | C / SQLite SQL | port per function. |
 | `sql/redb_save_json_objects.sql` | (likely unused) | save path is already pure C# in Core; confirm no caller. |
-| `sql/redb_init.sql`, `sql/v2-pvt/pvt_bundle.sql` | **generated** | build artifacts — never hand-edit (see project memory). |
+
+> The PG build artifacts (`sql/redb_init.sql`, `sql/v2-pvt/pvt_bundle.sql`) and the `deprecated/`
+> copies were removed from this tree (2026-07-16) — SQLite has no `ConcatenateSql` target and embeds
+> only `sql/redbSqlite.sql`. The remaining `.sql` files are kept solely as the porting spec for the
+> native C extension (see C_EXTENSION.md); canonical PG sources live in `redb.Postgres/sql/`.
 
 ## redb.SQLite.Pro — C# (Phase 2 priority; no native code)
 
