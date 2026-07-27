@@ -162,6 +162,87 @@ CREATE TABLE [dbo].[_schemes](
 )
 GO
 
+-- Scheme name validation. Mirrors the PostgreSQL validate_scheme_name() trigger rule for rule so
+-- that a name accepted by one provider is accepted by all three.
+--
+-- This is a BACKSTOP against writes that bypass the library. The library validates explicit names
+-- in C# first (redb.Core/Attributes/SchemeNameValidator.cs), which is what reports the offending
+-- type instead of a bare error number, and which also covers databases created before this trigger
+-- existed -- EnsureDatabaseAsync skips initialisation entirely when _schemes is already present, so
+-- older databases never receive it.
+CREATE TRIGGER [dbo].[tr_validate_scheme_name]
+ON [dbo].[_schemes]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @name NVARCHAR(450), @reason NVARCHAR(400);
+
+    ;WITH changed AS (
+        -- Only rows whose _name was actually written; an UPDATE of the hash or alias must not pay
+        -- for validation, and must not fail on a legacy name that predates these rules.
+        SELECT i.[_name]
+        FROM inserted i
+        LEFT JOIN deleted d ON d.[_id] = i.[_id]
+        WHERE (d.[_id] IS NULL OR d.[_name] <> i.[_name])
+          AND i.[_name] NOT LIKE '@@%'   -- system schemes (e.g. @@__deleted) bypass validation
+    ),
+    parts AS (
+        SELECT c.[_name], s.value AS part
+        FROM changed c
+        CROSS APPLY STRING_SPLIT(REPLACE(c.[_name], '+', '.'), '.') s
+    ),
+    violations AS (
+        SELECT 1 AS rule_no, [_name], N'it cannot start with a digit' AS reason
+            FROM changed WHERE [_name] LIKE '[0-9]%'
+        UNION ALL
+        SELECT 2, [_name], N'it contains characters outside [a-zA-Z0-9_.+] or does not start with a letter/underscore'
+            FROM changed WHERE [_name] LIKE '%[^a-zA-Z0-9_.+]%' OR [_name] LIKE '[^a-zA-Z_]%'
+        UNION ALL
+        SELECT 3, [_name], N'it cannot end with a dot'
+            FROM changed WHERE [_name] LIKE '%.'
+        UNION ALL
+        SELECT 4, [_name], N'it cannot contain two consecutive dots'
+            FROM changed WHERE [_name] LIKE '%..%'
+        UNION ALL
+        SELECT 5, [_name], N'it cannot be empty'
+            FROM changed WHERE LEN(LTRIM(RTRIM([_name]))) = 0
+        UNION ALL
+        SELECT 6, [_name], N'it is longer than 128 characters'
+            FROM changed WHERE LEN([_name]) > 128
+        UNION ALL
+        SELECT 7, [_name], N'one of its parts is a C# reserved word'
+            FROM parts WHERE LOWER(part) IN (
+                N'abstract', N'as', N'bool', N'break', N'byte', N'case', N'catch', N'char', N'checked',
+                N'class', N'const', N'continue', N'decimal', N'default', N'delegate', N'do', N'double', N'else',
+                N'enum', N'event', N'explicit', N'extern', N'false', N'finally', N'fixed', N'float', N'for',
+                N'foreach', N'goto', N'if', N'implicit', N'in', N'int', N'interface', N'internal', N'is', N'lock',
+                N'long', N'namespace', N'new', N'null', N'object', N'operator', N'out', N'override', N'params',
+                N'private', N'protected', N'public', N'readonly', N'ref', N'return', N'sbyte', N'sealed',
+                N'short', N'sizeof', N'stackalloc', N'static', N'string', N'struct', N'switch', N'this',
+                N'throw', N'true', N'try', N'typeof', N'uint', N'ulong', N'unchecked', N'unsafe', N'ushort',
+                N'using', N'virtual', N'void', N'volatile', N'while')
+        UNION ALL
+        SELECT 8, [_name], N'one of its parts is not a valid identifier'
+            FROM parts WHERE LEN(LTRIM(RTRIM(part))) = 0
+                          OR part LIKE '[0-9]%'
+                          OR part LIKE '%[^a-zA-Z0-9_]%'
+                          OR part LIKE '[^a-zA-Z_]%'
+    )
+    -- Report the lowest-numbered broken rule, matching the order PostgreSQL checks them in.
+    SELECT TOP 1 @name = [_name], @reason = reason FROM violations ORDER BY rule_no;
+
+    IF @reason IS NOT NULL
+    BEGIN
+        DECLARE @msg NVARCHAR(700) =
+            N'Scheme name "' + ISNULL(@name, N'') + N'" is invalid: ' + @reason +
+            N'. Scheme names follow C# identifier rules; use _alias for human-readable titles.';
+        THROW 50000, @msg, 1;
+    END
+END
+GO
+
 -- Structures table (field definitions)
 CREATE TABLE [dbo].[_structures](
     [_id] BIGINT NOT NULL,
@@ -1789,7 +1870,11 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = '_migrations')
 BEGIN
     CREATE TABLE _migrations (
-        _id BIGINT IDENTITY(1,1) PRIMARY KEY,
+        -- No IDENTITY: like every other redb table, the id is supplied by the application
+        -- (NextObjectIdAsync) and MigrationExecutor passes it explicitly. IDENTITY made that
+        -- INSERT fail with "Cannot insert explicit value for identity column ... IDENTITY_INSERT
+        -- is OFF", so migration history could never be written on MSSql.
+        _id BIGINT NOT NULL PRIMARY KEY,
         _migration_id NVARCHAR(500) NOT NULL,                   -- уникальный ID миграции "OrderProps_TotalPrice_v1"
         _scheme_id BIGINT NOT NULL REFERENCES _schemes(_id) ON DELETE CASCADE,
         _structure_id BIGINT REFERENCES _structures(_id),       -- NULL = вся схема (ON DELETE SET NULL not supported with CASCADE on same table)

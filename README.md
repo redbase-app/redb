@@ -655,7 +655,9 @@ var order = await redb.LoadAsync<OrderProps>(orderId);
 
 REDB Pro unlocks compiled query execution, parallel materialization, deep nested property queries, arithmetic and math expressions in WHERE, `Sql.Function<T>()` for calling arbitrary SQL functions, change tracking, schema migrations, and advanced analytics (window functions over grouped data). If performance matters — use Pro.
 
-**Pro is free — no license key required.** Just add the `redb.*.Pro` packages and use them. Pro packages are proprietary (closed-source), but free of charge — starting from version 3.3.0 no license is needed.
+**Pro is free — no license key required.** Just add the `redb.*.Pro` packages and use them. Pro packages are proprietary (closed-source), but free of charge — starting from version 3.3.0 no license is needed. The whole 3.x line is covered, in production, with no request limits; licensing re-enables only at major 4.0, and versions you already run stay free forever.
+
+**Need the Pro sources?** Larger companies that require them — for a security audit, source escrow, or to build in-house — can ask, and we hand them over. Write to [redbase.app/pro](https://redbase.app/pro).
 
 ---
 
@@ -680,4 +682,4 @@ Core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.Export`,
 [Apache License 2.0](LICENSE) starting from version 2.0.0.
 Versions ≤ 1.3.0 published on nuget.org remain under MIT.
 
-Pro packages (`redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`) are proprietary (closed-source) but **free to use — no license key required** starting from version 3.3.0.
+Pro packages (`redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`) are proprietary (closed-source) but **free to use — no license key required** starting from version 3.3.0, for the entire 3.x line including commercial production use. Larger companies that need the Pro **sources** (audit, escrow, in-house builds) can request them — see [Pro](#pro).

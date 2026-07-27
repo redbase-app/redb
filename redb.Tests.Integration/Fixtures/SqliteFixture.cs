@@ -14,7 +14,7 @@ namespace redb.Tests.Integration.Fixtures;
 /// <summary>
 /// SQLite <b>Free</b> fixture — hosts the in-DB machinery as the native loadable extension
 /// (get_object_json / pvt_build_*_sql / ...). The native binary is located by walking up to
-/// redb.SQLite/native/build/redb.{dll,so,dylib}. A fresh DB file is used every run (the datetime
+/// redb.SQLite/native/build/redbsqlite.{dll,so,dylib}. A fresh DB file is used every run (the datetime
 /// columns are REAL Julian and an old TEXT-schema file is not auto-migrated).
 /// </summary>
 public sealed class SqliteFixture : IAsyncLifetime

@@ -5,7 +5,11 @@
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = '_migrations')
 BEGIN
     CREATE TABLE _migrations (
-        _id BIGINT IDENTITY(1,1) PRIMARY KEY,
+        -- No IDENTITY: like every other redb table, the id is supplied by the application
+        -- (NextObjectIdAsync) and MigrationExecutor passes it explicitly. IDENTITY made that
+        -- INSERT fail with "Cannot insert explicit value for identity column ... IDENTITY_INSERT
+        -- is OFF", so migration history could never be written on MSSql.
+        _id BIGINT NOT NULL PRIMARY KEY,
         _migration_id NVARCHAR(500) NOT NULL,                   -- уникальный ID миграции "OrderProps_TotalPrice_v1"
         _scheme_id BIGINT NOT NULL REFERENCES _schemes(_id) ON DELETE CASCADE,
         _structure_id BIGINT REFERENCES _structures(_id),       -- NULL = вся схема (ON DELETE SET NULL not supported with CASCADE on same table)

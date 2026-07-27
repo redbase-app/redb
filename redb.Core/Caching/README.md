@@ -2,325 +2,74 @@
 
 ## Обзор
 
-Система кеширования метаданных предназначена для минимизации обращений к базе данных за информацией о схемах, структурах и типах данных. Кеш работает прозрачно для пользовательского кода и обеспечивает значительное ускорение операций загрузки и сохранения объектов.
+Кеш метаданных минимизирует обращения к БД за схемами, структурами и типами. Работает прозрачно
+для пользовательского кода.
 
-## Архитектура
+> **История.** До версии 3.3.4 этот файл описывал слой интерфейсов
+> `ICompositeMetadataCache` / `ISchemeMetadataCache` / `IStructureMetadataCache` /
+> `ITypeMetadataCache` / `IStaticMetadataCache`, режим `MetadataCacheType.StaticInRedbObject` и
+> методы вида `WarmupCacheAsync` / `InvalidateSchemeCompletely`. Ни один из этих интерфейсов не был
+> реализован и ни один не использовался — вся ветка удалена вместе с описанием. Ниже — реальный
+> состав слоя.
 
-### Компоненты кеширования
+## Состав
 
-```
-ICompositeMetadataCache (композитный кеш)
-├── ISchemeMetadataCache (схемы объектов) 
-├── IStructureMetadataCache (структуры полей)
-├── ITypeMetadataCache (типы данных)
-└── IStaticMetadataCache (статический кеш)
-```
+| Класс | Область видимости | Что хранит |
+|---|---|---|
+| `GlobalMetadataCache` | **по домену кеша** | схемы (`SchemeByName`, `SchemeById`), типы, структуры, проекция `scheme_id → CLR-тип` |
+| `GlobalListCache` | по домену кеша | справочники (`_lists`), с TTL |
+| `GlobalPropsCache` | по домену кеша | объекты/props, поверх `IRedbObjectCache` |
+| `ClrSchemeTypeIndex` | **на процесс** | `имя схемы → CLR-тип` |
+| `MemoryRedbObjectCache` | реализация `IRedbObjectCache` | in-memory хранилище объектов для `GlobalPropsCache` |
 
-## Основные интерфейсы
+### Почему два уровня видимости
 
-### 1. ICompositeMetadataCache
-Главный интерфейс объединяющий все типы кеширования метаданных.
+`scheme_id` — факт конкретной базы: в разных БД у одной и той же схемы разные идентификаторы.
+Поэтому всё, что завязано на `scheme_id`, живёт **по домену**: домен задаётся
+`RedbServiceConfiguration.GetEffectiveCacheDomain()` и изолирует кеши разных подключений.
 
-**Ключевые методы:**
-- `GetCompleteMetadataAsync<T>()` - получить полные метаданные для .NET типа
-- `SetCompleteMetadata()` - установить полные метаданные в кеш
-- `WarmupCacheAsync()` - предварительная загрузка кеша
-- `InvalidateSchemeCompletely()` - полная инвалидация схемы
+Соответствие `имя схемы → CLR-тип` от базы не зависит вообще: имя берётся из `[RedbScheme]` на
+типе. Поэтому `ClrSchemeTypeIndex` — статический, один на процесс, общий для всех доменов. Он ещё и
+самозалечивающийся: загрузка сборки (в том числе в плагинный `AssemblyLoadContext`) поднимает
+счётчик поколений, и индекс перестраивается на следующем обращении.
 
-### 2. ISchemeMetadataCache  
-Специализированный кеш для схем объектов.
+## Инвалидация
 
-**Основные операции:**
-- Получение схем по .NET типу, ID, имени
-- Кеширование привязок тип → схема
-- Предварительная загрузка популярных схем
-
-### 3. IStructureMetadataCache
-Кеш структур полей с оптимизацией для массовых операций.
-
-**Особенности:**
-- Кеширование всех структур схемы одним блоком
-- Карты имя → структура для быстрого поиска
-- Поддержка иерархических структур
-
-### 4. ITypeMetadataCache
-Кеш типов данных с длительным временем жизни.
-
-**Функциональность:**
-- Загрузка всех типов при инициализации
-- Карты имя → тип и ID → тип
-- Кеширование метаинформации о типах
-
-### 5. IStaticMetadataCache
-Реализация предложения пользователя со статическим кешем в RedbObject.
-
-**Преимущества:**
-- Максимальная производительность
-- Простота использования
-- Автоматическое время жизни
-
-## Модели данных
-
-### CompleteSchemeMetadata
-Полные метаданные схемы включающие:
-- Схему объекта (_RScheme)
-- Все структуры схемы (List<_RStructure>)
-- Карты для быстрого поиска структур
-- Используемые типы данных
-- Статистику использования
-
-### Конфигурация
+`GlobalMetadataCache` ключуется и по имени, и по id — инвалидировать нужно оба:
 
 ```csharp
-public class MetadataCacheConfiguration
-{
-    public bool EnableMetadataCache { get; set; } = true;
-    public MetadataCacheType CacheType { get; set; } = MetadataCacheType.InMemory;
-    
-    public SchemeCacheConfiguration Schemes { get; set; }
-    public StructureCacheConfiguration Structures { get; set; }  
-    public TypeCacheConfiguration Types { get; set; }
-    public CompositeCacheConfiguration Composite { get; set; }
-    
-    public CacheWarmupConfiguration Warmup { get; set; }
-    public CacheMonitoringConfiguration Monitoring { get; set; }
-    public CachePerformanceConfiguration Performance { get; set; }
-}
+Cache.InvalidateScheme(scheme.Id);
+Cache.InvalidateScheme(scheme.Name);
 ```
 
-## Типы реализации кеша
-
-### MetadataCacheType.InMemory (по умолчанию)
-- Кеш в памяти приложения
-- Подходит для большинства сценариев
-- Настраиваемое время жизни и размер
-
-### MetadataCacheType.StaticInRedbObject (предложение пользователя)  
-- Статические поля в RedbObject
-- Максимальная производительность
-- Время жизни = время жизни приложения
-
-### MetadataCacheType.Hybrid (будущая версия)
-- Комбинация in-memory + distributed cache
-- Для кластерных развертываний
-
-### MetadataCacheType.None
-- Кеш отключен
-- Прямое обращение к БД
-- Для отладки и тестирования
-
-## Статистика и мониторинг
-
-Все компоненты кеша предоставляют детальную статистику:
+**При переименовании схемы** (`[RedbScheme(Name = "...")]`, см. `docs/SCHEME_EXPLICIT_NAME_PLAN.md`)
+ключей три — id, имя, под которым схему нашли, и новое имя; плюс немедленная перерегистрация в
+процесс-глобальном индексе, чтобы не ждать следующего скана сборок:
 
 ```csharp
-var stats = cache.GetStatistics();
-Console.WriteLine($"Hit ratio: {stats.HitRatio:P2}");
-Console.WriteLine($"Memory usage: {stats.EstimatedSizeBytes / 1024 / 1024}MB");
-Console.WriteLine($"Cached items: {stats.TotalCachedItems}");
+Cache.InvalidateScheme(scheme.Id);
+Cache.InvalidateScheme(previousName);
+Cache.InvalidateScheme(targetName);
+ClrSchemeTypeIndex.Register(targetName, type);
 ```
 
-## Диагностика
+Проекция `scheme_id → CLR-тип` при переименовании **не трогается**: переименование — это UPDATE
+одной строки `_schemes._name`, идентификатор схемы не меняется. Поэтому полиморфная загрузка
+переименование переживает без каких-либо действий.
+
+## Статистика и диагностика
 
 ```csharp
-var diagnostics = compositeCache.GetDiagnosticInfo();
-foreach (var issue in diagnostics.Issues)
-{
-    Console.WriteLine($"Issue: {issue}");
-}
-
-foreach (var recommendation in diagnostics.Recommendations)  
-{
-    Console.WriteLine($"Recommendation: {recommendation}");
-}
+var stats = redb.Cache.GetStatistics();
+var (names, ids) = redb.Cache.GetClrTypeStatistics();
+var diagnostics = redb.GetCacheDiagnosticInfo();   // ISchemeCacheProvider
 ```
 
-## Предварительная загрузка (Warmup)
+- `CacheStatistics` / `PropsCacheStatistics` — счётчики попаданий и промахов.
+- `CacheDiagnosticInfo` (+ `CacheHealthStatus`, `MemoryUsageInfo`, `PerformanceInfo`) — то, что
+  возвращает `ISchemeCacheProvider.GetCacheDiagnosticInfo()`.
 
-```csharp
-// Загрузка конкретных типов
-await cache.WarmupCacheAsync(new[] { typeof(Employee), typeof(Department) }, 
-    loadFromDatabase);
+## Важно про сырой SQL
 
-// Загрузка всех схем
-await cache.WarmupAllSchemesAsync(loadAllFromDatabase);
-```
-
-## Инвалидация кеша
-
-### По схеме
-```csharp
-// Инвалидация конкретной схемы
-cache.InvalidateSchemeCompletely(schemeId);
-```
-
-### По типу  
-```csharp
-// Инвалидация по .NET типу
-cache.InvalidateTypeCompletely<Employee>();
-```
-
-### Полная инвалидация
-```csharp
-// Очистка всех кешей
-cache.InvalidateAll();
-```
-
-## Интеграция в RedbServiceConfiguration
-
-Новые настройки кеширования интегрированы в существующую конфигурацию:
-
-```csharp
-var config = new RedbServiceConfiguration
-{
-    MetadataCache = new MetadataCacheConfiguration  
-    {
-        EnableMetadataCache = true,
-        CacheType = MetadataCacheType.StaticInRedbObject,
-        
-        Schemes = new SchemeCacheConfiguration 
-        { 
-            MaxItems = 1000, 
-            LifetimeMinutes = 240 
-        },
-        
-        Warmup = new CacheWarmupConfiguration
-        {
-            EnableWarmup = true,
-            WarmupTypes = new[] { "Employee", "Department" }
-        }
-    }
-};
-```
-
-## Обратная совместимость
-
-Существующие настройки помечены как `[Obsolete]` но продолжают работать:
-
-```csharp
-// Старое API (работает, но deprecated)
-config.EnableSchemaMetadataCache = true;
-config.SchemaMetadataCacheLifetimeMinutes = 30;
-
-// Новое API
-config.MetadataCache.EnableMetadataCache = true; 
-config.MetadataCache.Schemes.LifetimeMinutes = 30;
-```
-
-## Производительность
-
-### Ожидаемые результаты:
-- **Снижение нагрузки на БД**: 70-90% запросов к метаданным
-- **Ускорение загрузки объектов**: в 3-5 раз  
-- **Увеличение пропускной способности**: в 2-3 раза
-
-### Бенчмарки:
-```
-Операция                    Без кеша    С кешем     Ускорение
-Загрузка схемы по типу      15ms        0.05ms      300x
-Загрузка структур схемы     25ms        0.1ms       250x
-Полная загрузка объекта     45ms        8ms         5.6x
-```
-
-## Лучшие практики
-
-### 1. Выбор типа кеша
-- **InMemory**: для большинства приложений
-- **StaticInRedbObject**: для максимальной производительности
-- **None**: только для отладки
-
-### 2. Настройка времени жизни
-- **Схемы**: 4+ часов (редко изменяются)
-- **Структуры**: 2+ часа (средняя частота изменений)  
-- **Типы**: 24+ часа (практически не изменяются)
-
-### 3. Предварительная загрузка
-- Включайте warmup для production
-- Загружайте только активно используемые типы
-- Используйте фоновую загрузку
-
-### 4. Мониторинг
-- Отслеживайте hit ratio (должен быть >90%)
-- Контролируйте использование памяти
-- Настройте алерты при превышении лимитов
-
-## Примеры использования
-
-### Базовое использование
-```csharp
-// Получение метаданных через кеш
-var metadata = await cache.GetCompleteMetadataAsync<Employee>();
-if (metadata != null)
-{
-    var scheme = metadata.Scheme;
-    var structures = metadata.Structures;
-    var types = metadata.Types;
-}
-```
-
-### Статический кеш (предложение пользователя)
-```csharp
-// Прямой доступ к статическому кешу
-var staticCache = new StaticMetadataCache();
-var scheme = staticCache.GetSchemeForType<Employee>();
-
-// Статистика использования
-var stats = staticCache.GetStatistics();
-Console.WriteLine($"Hit ratio: {stats.HitRatio:P2}");
-Console.WriteLine($"Memory: {stats.MemoryUsageMB:F2}MB");
-```
-
-### Конфигурация для разных окружений
-```csharp
-// Development
-var devConfig = MetadataCacheConfiguration.Development();
-
-// Production  
-var prodConfig = MetadataCacheConfiguration.Production();
-
-// Custom
-var customConfig = new MetadataCacheConfiguration
-{
-    CacheType = MetadataCacheType.StaticInRedbObject,
-    Schemes = { MaxItems = 5000, LifetimeMinutes = 480 },
-    Warmup = { EnableWarmup = true, WarmupInBackground = true }
-};
-```
-
-## Миграция с существующего кеша
-
-1. **Обновите конфигурацию**:
-   ```csharp
-   // Было
-   config.EnableSchemaMetadataCache = true;
-   
-   // Стало  
-   config.MetadataCache.EnableMetadataCache = true;
-   ```
-
-2. **Настройте новые параметры**:
-   ```csharp
-   config.MetadataCache.CacheType = MetadataCacheType.StaticInRedbObject;
-   config.MetadataCache.Warmup.EnableWarmup = true;
-   ```
-
-3. **Протестируйте производительность** с разными настройками
-
-4. **Настройте мониторинг** для отслеживания эффективности кеша
-
-## Troubleshooting
-
-### Низкий hit ratio
-- Проверьте время жизни кеша
-- Увеличьте размер кеша
-- Включите warmup для популярных типов
-
-### Высокое потребление памяти  
-- Уменьшите MaxItems в конфигурации
-- Сократите время жизни элементов
-- Используйте более агрессивную стратегию eviction
-
-### Проблемы с инвалидацией
-- Проверьте правильность инвалидации при изменении схем
-- Рассмотрите использование event-based инвалидации
-- Добавьте периодическую очистку кеша
+Кеш не видит записей в обход библиотеки. Если тест или миграция правит `_schemes` напрямую —
+`Cache.Clear()` обязателен, иначе следующий поиск ответит из кеша схемой, которой уже нет.

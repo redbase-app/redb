@@ -68,17 +68,17 @@
          matrix: each OS job builds its binary, the pack job collects them here.
          The runtime loader (SqliteDataSource.LocatePackagedExtension) and the
          buildTransitive .targets pick the right file per OS/arch automatically. -->
-    <None Include="native\build\redb.dll"             Pack="true" PackagePath="runtimes/win-x64/native/redb.dll"     Visible="false" Condition="Exists('native\build\redb.dll')" />
-    <None Include="native\build-linux-x64\redb.so"    Pack="true" PackagePath="runtimes/linux-x64/native/redb.so"    Visible="false" Condition="Exists('native\build-linux-x64\redb.so')" />
-    <None Include="native\build-linux-arm64\redb.so"  Pack="true" PackagePath="runtimes/linux-arm64/native/redb.so"  Visible="false" Condition="Exists('native\build-linux-arm64\redb.so')" />
-    <None Include="native\build-osx-x64\redb.dylib"   Pack="true" PackagePath="runtimes/osx-x64/native/redb.dylib"   Visible="false" Condition="Exists('native\build-osx-x64\redb.dylib')" />
-    <None Include="native\build-osx-arm64\redb.dylib" Pack="true" PackagePath="runtimes/osx-arm64/native/redb.dylib" Visible="false" Condition="Exists('native\build-osx-arm64\redb.dylib')" />
+    <None Include="native\build\redbsqlite.dll"             Pack="true" PackagePath="runtimes/win-x64/native/redbsqlite.dll"     Visible="false" Condition="Exists('native\build\redbsqlite.dll')" />
+    <None Include="native\build-linux-x64\redbsqlite.so"    Pack="true" PackagePath="runtimes/linux-x64/native/redbsqlite.so"    Visible="false" Condition="Exists('native\build-linux-x64\redbsqlite.so')" />
+    <None Include="native\build-linux-arm64\redbsqlite.so"  Pack="true" PackagePath="runtimes/linux-arm64/native/redbsqlite.so"  Visible="false" Condition="Exists('native\build-linux-arm64\redbsqlite.so')" />
+    <None Include="native\build-osx-x64\redbsqlite.dylib"   Pack="true" PackagePath="runtimes/osx-x64/native/redbsqlite.dylib"   Visible="false" Condition="Exists('native\build-osx-x64\redbsqlite.dylib')" />
+    <None Include="native\build-osx-arm64\redbsqlite.dylib" Pack="true" PackagePath="runtimes/osx-arm64/native/redbsqlite.dylib" Visible="false" Condition="Exists('native\build-osx-arm64\redbsqlite.dylib')" />
     <None Include="build\redb.SQLite.targets"         Pack="true" PackagePath="buildTransitive/redb.SQLite.targets"  Visible="false" />
   </ItemGroup>
 
   <Target Name="WarnMissingNativeExtension" BeforeTargets="GenerateNuspec"
-          Condition="!Exists('native\build\redb.dll')">
-    <Warning Text="redb.SQLite: native extension 'native/build/redb.dll' not found — the NuGet package will NOT contain the Free SQLite loadable extension. Build it first: cmake --build redb.SQLite/native/build (see native/README.md)." />
+          Condition="!Exists('native\build\redbsqlite.dll')">
+    <Warning Text="redb.SQLite: native extension 'native/build/redbsqlite.dll' not found — the NuGet package will NOT contain the Free SQLite loadable extension. Build it first: cmake --build redb.SQLite/native/build (see native/README.md)." />
   </Target>
 
 </Project>

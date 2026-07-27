@@ -19,6 +19,144 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] — 2026-07-27
+
+> **Why 3.4.0 (a minor bump), not 3.3.4.** This release adds features, not just fixes: explicit scheme
+> names (`[RedbScheme(Name = "...")]`), scheme-name validation triggers on MSSql/SQLite, and the new
+> `ThrowOnSchemeMismatch` load-time guard. Under SemVer that is a minor version. The core packages
+> (`RedBase.Core`, the three providers Free/Pro, `RedBase.Export`, `RedBase.CLI`) move together to
+> **3.4.0**; `redb.Route`, `redb.Tsak` and `redb.Identity` keep their own version lines.
+
+### Added
+- **Explicit scheme names — `[RedbScheme(Name = "...")]` (`RedBase.Core` + all providers).** Until now
+  a scheme was always named after the CLR type's `FullName`, and the string in the attribute was only
+  a cosmetic `_alias`. A scheme name can now be pinned explicitly, which decouples the database
+  identity of a scheme from C# namespace/class refactoring.
+
+  The positional argument is, and stays, the **alias** — an explicit name is only settable through the
+  named `Name` parameter, so not one existing declaration changes meaning. Types that declare no
+  `Name` behave exactly as before.
+
+  On the first sync a type with an explicit name has its scheme **renamed in the database**. The
+  scheme is looked up along a three-step chain — explicit name, `FullName`, short type name — and the
+  first match is renamed in place. The rename is a single-row `UPDATE` of `_schemes._name`: the id is
+  preserved, so objects, structures and values are untouched, and polymorphic loading (which resolves
+  through `scheme_id`) is unaffected.
+
+  > **Renaming requires every consumer of that database to be updated together.** An application
+  > version that predates the explicit name will not find the scheme under its new name and will
+  > create a second one, splitting objects between them silently. If that has already happened, redb
+  > now detects it and refuses to continue rather than picking one of the two.
+
+  Explicit names must follow C# identifier rules (Latin letters, digits, `_`, `.`, `+`; no reserved
+  words; 128 characters max) and are validated in C# before any SQL is issued, so the error names the
+  offending type. Human-readable titles belong in `Alias`, which is free-form.
+
+- **Scheme-name validation in MSSql and SQLite (`RedBase.MSSql`, `RedBase.SQLite`).** Both providers
+  now carry a `_schemes` name-validation trigger mirroring the PostgreSQL `validate_scheme_name()`
+  rule for rule, so a name accepted by one provider is accepted by all three. Applies to
+  **newly created databases only** — `EnsureDatabaseAsync` skips initialisation when `_schemes`
+  already exists. The C#-level validation covers databases of any age.
+
+- **`RedbServiceConfiguration.ThrowOnSchemeMismatch` (`RedBase.Core`, default `false`).** Chooses how
+  `LoadAsync<TProps>` reacts when the object's scheme does not match `TProps` (see Fixed): `false`
+  returns `null` (so a soft-deleted object, scheme `-10`, reads as `null` — what soft-delete callers
+  expect); `true` throws `RedbSchemeMismatchException` to surface a genuine type mistake loudly.
+
+### Changed
+- **The SQLite native extension is renamed `redb` → `redbsqlite` (`RedBase.SQLite`, Free tier).**
+  The package now ships `runtimes/<rid>/native/redbsqlite.{dll,so}` (win-x64, linux-x64, linux-arm64)
+  instead of `redb.{dll,so}`. The generic name collided with the managed `redb.*` assemblies and with
+  the `redb.*` prune globs a host applies to its own bin directory — a native loadable module was
+  being swept up as if it were one of ours. **The C init symbol is unchanged (`sqlite3_redb_init`)**
+  and the binaries are byte-for-byte the ones shipped as `redb.*` in 3.3.3: this is a rename of the
+  file, not a rebuild, and `LoadExtension` has always been called with an explicit entry point.
+  - **Nothing to do** if you let the package resolve the extension (`SqliteDataSource
+    .LocatePackagedExtension()`, the default for the Free DI registration) — it looks for the new name.
+  - **Action required** if you pin the path yourself — `REDB_SQLITE_EXTENSION`, an explicit
+    `NativeExtensionPath`, a Dockerfile `COPY`, or a deploy script that copies `redb.so` by name:
+    point it at `redbsqlite.{dll,so}`. A stale path fails at connection open, not at build.
+
+### Fixed
+- **Concurrent start-up of several nodes could fail to create a scheme (`RedBase.Core` + all
+  providers).** Reproduced in production on a three-node cluster. When several instances started
+  against a database that did not yet have a given scheme, all of them missed the lookup and all
+  issued `INSERT INTO _schemes`; every instance but one failed with an unhandled `UNIQUE(_name)`
+  violation during initialisation.
+
+  Scheme creation now uses a conflict-free statement per dialect (`ON CONFLICT (_name) DO NOTHING` on
+  PostgreSQL and SQLite, `INSERT ... WHERE NOT EXISTS` with `UPDLOCK, HOLDLOCK` on MSSql) and the
+  instance that loses the race reads back the winner's row. Catching the violation instead would not
+  have worked: on PostgreSQL a failed statement inside a transaction poisons it, so the follow-up
+  read would fail with `25P02`. Both creation paths are covered — typed
+  (`EnsureSchemeFromTypeAsync<T>`) and untyped (`EnsureObjectSchemeAsync`).
+
+- **Pro data migrations never ran — on any provider (`RedBase.Core.Pro`, `RedBase.SQLite`,
+  `RedBase.MSSql`).** Four separate defects stacked on top of each other, and the feature had no test
+  coverage at all, so none of them had ever surfaced:
+
+  1. `MigrationExtensions.CreateExecutor` fetched the DB context by reflection asking for a
+     **NonPublic** `Context` property, but `RedbServiceBase.Context` is public — the lookup never
+     matched and every migration died with *"Cannot get IRedbContext from RedbService"*. It now uses
+     `redb.Context` and `(ISchemeSyncProvider)redb` directly; both are part of `IRedbService`.
+  2. The generated UPDATE was hardcoded to PostgreSQL syntax (`UPDATE _values target ...`). SQLite
+     forbids aliasing an UPDATE target (`near "target": syntax error`) and T-SQL needs the alias
+     bound in a trailing `FROM`. Added `ISqlDialectPro.Migration_UpdateTarget(table, alias)` with
+     one implementation per provider.
+  3. SQLite had no `_migrations` history table at all: PG/MSSql get it from the concatenated
+     `redb_init.sql`, and SQLite has no such concatenation step, so the shared `redb_migrations.sql`
+     never reached it. A SQLite-native DDL (INTEGER PK, REAL Julian `_applied_at`, INTEGER
+     `_dry_run`) now ships in `redbSqlite.sql`.
+  4. MSSql declared `_migrations._id` as `IDENTITY(1,1)` — the only IDENTITY in the whole MSSql
+     schema — while the executor supplies ids explicitly like every other redb table, so writing
+     history failed with *"Cannot insert explicit value for identity column"*. IDENTITY removed.
+
+  Covered by a new `MigrationTestsBase` suite (apply / history row / idempotency / dry-run) running
+  against all three Pro fixtures. Note: existing databases do not receive the corrected `_migrations`
+  DDL, since `EnsureDatabaseAsync` skips initialisation when `_schemes` already exists — but no
+  database can hold real migration history, because the feature could not complete a single run.
+
+- **A scheme's `_alias` was never updated after creation (`RedBase.Core` + all providers).** It was
+  written once on `INSERT` and then frozen: changing `[RedbScheme("...")]` on a class left the old
+  value in the database forever. Structure aliases have always synchronised (`Structures_UpdateAlias`);
+  schemes simply had no equivalent. They do now — the attribute is the source of truth, removing it
+  resets `_alias` to `NULL`, and a value edited by hand in the database is overwritten on the next sync.
+
+- **`ClrSchemeTypeIndex` pinned hot-reloaded plugin modules in memory (`RedBase.Core`).** The
+  process-global `schemeName → Type` index held **strong** `Type` references, and a `Type` keeps its
+  `AssemblyLoadContext` alive — so a collectible ALC (Tsak hot-swap) could never be collected, and after
+  a reload the stale instance produced a false `RedbSchemeNameConflictException` against the fresh one,
+  blocking the module from loading. Entries are now `WeakReference<Type>` (dead ones pruned on lookup),
+  and two instances of the same `FullName` from different ALCs are recognised as a reload, not a name
+  clash. Distinct types sharing one explicit `Name` still conflict, by design.
+
+- **`LoadAsync<TProps>` did not verify the loaded object's scheme (`RedBase.Core` + all providers).**
+  Loading an object of one scheme under an unrelated `TProps` deserialised garbage into the Props and —
+  with `EnablePropsCache` — cached it under `objectId`, so a later `GetWithoutHashValidation` kept
+  returning the garbage. `LoadAsync<TProps>` now checks the object's `_id_scheme` against the scheme
+  `TProps` maps to before anything is cached. By default a mismatch returns `null` — so a soft-deleted
+  object (scheme `-10`, set by `SoftDeleteAsync`) reads as `null`, which is what soft-delete callers
+  expect; set `RedbServiceConfiguration.ThrowOnSchemeMismatch = true` to instead throw
+  `RedbSchemeMismatchException` on a genuine type mistake. Either way garbage never reaches the cache.
+  The untyped `LoadAsync(objectId)` is never affected.
+
+- **Invalid explicit scheme names failed one at a time (`RedBase.Core`).** Auto-sync validates every
+  `[RedbScheme(Name = "...")]` and (by design) refuses to boot on an invalid name — but it stopped at
+  the first offender, so a codebase with several had to be fixed one rerun at a time. Names are now all
+  validated up front and reported together in a single `AggregateException`.
+
+### Removed
+- **Dead metadata-cache interface layer (`RedBase.Core`).** `ICompositeMetadataCache`,
+  `ISchemeMetadataCache`, `IStructureMetadataCache`, `ITypeMetadataCache`, `IStaticMetadataCache` and
+  `StaticMetadataCache` — 679 lines across five files that referenced only each other. None was ever
+  implemented, none was ever consumed; the live caches are `GlobalMetadataCache` (per cache domain),
+  `GlobalListCache`, `GlobalPropsCache` and `ClrSchemeTypeIndex` (per process). Formally a breaking
+  change since the types were public, but they could not be used for anything: the interfaces had no
+  implementations. `CacheDiagnosticInfo`, `CacheHealthStatus`, `MemoryUsageInfo` and `PerformanceInfo`
+  lived in the same file and are part of the live `ISchemeCacheProvider` contract — they moved
+  unchanged to `redb.Core/Caching/CacheDiagnosticInfo.cs`. `redb.Core/Caching/README.md`, which
+  documented only the removed layer, has been rewritten to describe the caches that actually exist.
+
 ## [3.3.3] — 2026-07-15
 
 > **Why 3.3.3 and not 3.3.1.** The number jumps to stay in step with the rest of the ecosystem, which

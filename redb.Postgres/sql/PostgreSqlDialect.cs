@@ -383,12 +383,20 @@ public class PostgreSqlDialect : ISqlDialect
     
     public string Schemes_Insert() =>
         "INSERT INTO _schemes (_id, _name, _alias, _type) VALUES ($1, $2, $3, $4)";
-    
+
+    // ON CONFLICT keeps the transaction alive: a raised unique violation would abort it and make the
+    // follow-up SELECT fail with 25P02.
+    public string Schemes_InsertIfAbsent() =>
+        "INSERT INTO _schemes (_id, _name, _alias, _type) VALUES ($1, $2, $3, $4) ON CONFLICT (_name) DO NOTHING";
+
     public string Schemes_UpdateHash() =>
         "UPDATE _schemes SET _structure_hash = $1 WHERE _id = $2";
-    
+
     public string Schemes_UpdateName() =>
         "UPDATE _schemes SET _name = $1 WHERE _id = $2";
+
+    public string Schemes_UpdateAlias() =>
+        "UPDATE _schemes SET _alias = $1 WHERE _id = $2";
     
     public string Schemes_SelectHashById() =>
         "SELECT _structure_hash FROM _schemes WHERE _id = $1";
@@ -401,6 +409,9 @@ public class PostgreSqlDialect : ISqlDialect
     
     public string Schemes_InsertObject() =>
         "INSERT INTO _schemes (_id, _name, _type) VALUES ($1, $2, $3)";
+
+    public string Schemes_InsertObjectIfAbsent() =>
+        "INSERT INTO _schemes (_id, _name, _type) VALUES ($1, $2, $3) ON CONFLICT (_name) DO NOTHING";
     
     // ============================================================
     // === STRUCTURES SQL ===

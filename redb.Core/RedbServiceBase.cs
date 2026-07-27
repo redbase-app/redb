@@ -13,6 +13,7 @@ using redb.Core.Models.Security;
 using redb.Core.Models.Entities;
 using redb.Core.Models.Configuration;
 using redb.Core.Attributes;
+using redb.Core.Exceptions;
 using redb.Core.Models;
 using redb.Core.Services;
 using System.Reflection;
@@ -1027,6 +1028,23 @@ public abstract class RedbServiceBase : IRedbService
             .ToList();
 
         if (typesToSync.Count == 0) return;
+
+        // Pre-flight: validate ALL explicit scheme names up front. A bad name is fatal by design
+        // (a scheme with an invalid name must not boot), but failing on the first offender hides the
+        // rest — the developer fixes one, reruns, hits the next. Reporting the full list in one
+        // AggregateException lets them fix everything in a single pass (H2).
+        var nameErrors = new List<Exception>();
+        foreach (var type in typesToSync)
+        {
+            var explicitName = type.GetCustomAttribute<RedbSchemeAttribute>()?.Name;
+            if (!string.IsNullOrWhiteSpace(explicitName) && !SchemeNameValidator.IsValid(explicitName, out var reason))
+                nameErrors.Add(new RedbSchemeNameException(type, explicitName, reason!));
+        }
+        if (nameErrors.Count == 1)
+            throw nameErrors[0];
+        if (nameErrors.Count > 1)
+            throw new AggregateException(
+                $"{nameErrors.Count} types declare invalid explicit scheme names — fix all of them:", nameErrors);
 
         foreach (var type in typesToSync)
         {

@@ -412,12 +412,20 @@ public class SqliteDialect : ISqlDialect
     
     public string Schemes_Insert() =>
         "INSERT INTO _schemes (_id, _name, _alias, _type) VALUES ($1, $2, $3, $4)";
-    
+
+    // Targeted at _name only — INSERT OR IGNORE would also swallow a PK collision on _id and hide a
+    // different bug. Upsert syntax needs SQLite 3.24+; the provider requires 3.44+.
+    public string Schemes_InsertIfAbsent() =>
+        "INSERT INTO _schemes (_id, _name, _alias, _type) VALUES ($1, $2, $3, $4) ON CONFLICT(_name) DO NOTHING";
+
     public string Schemes_UpdateHash() =>
         "UPDATE _schemes SET _structure_hash = $1 WHERE _id = $2";
-    
+
     public string Schemes_UpdateName() =>
         "UPDATE _schemes SET _name = $1 WHERE _id = $2";
+
+    public string Schemes_UpdateAlias() =>
+        "UPDATE _schemes SET _alias = $1 WHERE _id = $2";
     
     public string Schemes_SelectHashById() =>
         "SELECT _structure_hash FROM _schemes WHERE _id = $1";
@@ -430,6 +438,9 @@ public class SqliteDialect : ISqlDialect
     
     public string Schemes_InsertObject() =>
         "INSERT INTO _schemes (_id, _name, _type) VALUES ($1, $2, $3)";
+
+    public string Schemes_InsertObjectIfAbsent() =>
+        "INSERT INTO _schemes (_id, _name, _type) VALUES ($1, $2, $3) ON CONFLICT(_name) DO NOTHING";
     
     // ============================================================
     // === STRUCTURES SQL ===
@@ -1070,7 +1081,7 @@ public class SqliteDialect : ISqlDialect
     //   - the Free tier will host equivalents in the native C extension later.
     // Returning null from Query_PvtModuleVersionFunction also disables the
     // init-time `SELECT pvt_module_version()` probe in RedbServiceBase.
-    // v2-pvt is hosted in the native C extension (redb.dll/.so/.dylib). The Free
+    // v2-pvt is hosted in the native C extension (redbsqlite.dll/.so/.dylib). The Free
     // query path (QueryProviderBase) asks the DB to BUILD the inner _id-list SQL
     // via pvt_build_query_sql(...), then wraps it client-side. filter/order are
     // bound as $1/$2; scheme/limit/offset/depth/distinct/mode/treeIds are inlined.

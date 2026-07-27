@@ -152,7 +152,7 @@ class Program
         // FREE SQLite needs the native extension loaded on every connection (it hosts
         // get_object_json / pvt_build_*_sql in-DB). Make the example run out-of-the-box:
         // honor REDB_SQLITE_EXTENSION if it's set (that's the env default), otherwise
-        // locate redb.SQLite/native/build/redb.{dll,so,dylib} by walking up from the app
+        // locate redb.SQLite/native/build/redbsqlite.{dll,so,dylib} by walking up from the app
         // base dir. (Harmless for the Pro run — Pro never calls those functions.)
         SqliteDataSource.NativeExtensionPath ??= ResolveSqliteNativeExtension();
 
@@ -177,7 +177,7 @@ class Program
     }
 
     /// <summary>
-    /// Locate the FREE SQLite native extension (redb.dll/.so/.dylib) by walking up the
+    /// Locate the FREE SQLite native extension (redbsqlite.dll/.so/.dylib) by walking up the
     /// directory tree from the running app to the repo's redb.SQLite/native/build folder.
     /// Returns the full path (suffix included) or null if not found / not yet built.
     /// </summary>
@@ -188,12 +188,12 @@ class Program
                    : ".so";
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
         {
-            var candidate = Path.Combine(dir.FullName, "redb.SQLite", "native", "build", "redb" + suffix);
+            var candidate = Path.Combine(dir.FullName, "redb.SQLite", "native", "build", "redbsqlite" + suffix);
             if (File.Exists(candidate))
                 return candidate;
         }
         Console.WriteLine(
-            "[WARN] FREE SQLite native extension not found (redb.SQLite/native/build/redb" + suffix +
+            "[WARN] FREE SQLite native extension not found (redb.SQLite/native/build/redbsqlite" + suffix +
             "). Build it (cmake --build redb.SQLite/native/build) or set REDB_SQLITE_EXTENSION. " +
             "Without it, get_object_json / pvt_build_*_sql are missing and most examples FAIL.");
         return null;

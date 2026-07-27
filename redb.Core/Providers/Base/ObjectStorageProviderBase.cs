@@ -126,6 +126,34 @@ namespace redb.Core.Providers.Base
         /// MAIN loading method - all other LoadAsync methods call it
         /// Returns null if object not found and config.ThrowOnObjectNotFound = false
         /// </summary>
+        /// <summary>
+        /// Checks whether a loaded object's scheme matches the scheme <typeparamref name="TProps"/> maps to.
+        /// Returns <c>true</c> when it matches (or when the type has no known scheme yet — nothing to compare
+        /// against). On a mismatch the behaviour depends on <c>ThrowOnSchemeMismatch</c>: by default returns
+        /// <c>false</c> so the caller returns <c>null</c> (a soft-deleted object, scheme <c>-10</c>, reads as
+        /// <c>null</c>); when the flag is set, throws <see cref="Exceptions.RedbSchemeMismatchException"/>.
+        /// Either way garbage never reaches the cache — the check runs before any caching.
+        /// </summary>
+        private async Task<bool> IsSchemeValidForLoadAsync<TProps>(long objectId, long actualSchemeId) where TProps : class, new()
+        {
+            // Expected scheme_id for TProps: fast per-domain projection first, then a lazy resolve that
+            // also warms the projection. Null → the type has no scheme yet; accept rather than block loads.
+            var expected = Cache.GetSchemeIdByClrType(typeof(TProps));
+            if (expected == null)
+            {
+                var scheme = await _schemeSync.GetSchemeByTypeAsync<TProps>();
+                expected = scheme?.Id;
+            }
+
+            if (!expected.HasValue || expected.Value == actualSchemeId)
+                return true;
+
+            if (_configuration.ThrowOnSchemeMismatch)
+                throw new Exceptions.RedbSchemeMismatchException(objectId, typeof(TProps), expected.Value, actualSchemeId);
+
+            return false;   // soft default: caller returns null instead of garbage
+        }
+
         public async Task<RedbObject<TProps>?> LoadAsync<TProps>(long objectId, IRedbUser user, int depth = 10, bool? lazyLoadProps = null) where TProps : class, new()
         {
             // Permission check according to configuration
@@ -166,7 +194,13 @@ namespace redb.Core.Providers.Base
                         throw new InvalidOperationException($"Object with ID {objectId} not found");
                     return null;
                 }
-                
+
+                // Guard against loading an object under the wrong Props type (garbage + cache poisoning).
+                // Done before any caching so poison never enters the cache. Mismatch → null by default
+                // (a soft-deleted object, scheme -10, reads as null), or throws under ThrowOnSchemeMismatch.
+                if (!await IsSchemeValidForLoadAsync<TProps>(objectId, baseObj.IdScheme))
+                    return null;
+
                 // Check cache with obtained hash (if validation is not skipped)
                 if (_configuration.EnablePropsCache && !_configuration.SkipHashValidationOnCacheCheck && PropsCache.Instance != null && baseObj.Hash.HasValue)
                 {
@@ -227,9 +261,10 @@ namespace redb.Core.Providers.Base
                 }
             }
             
-            // Cache MISS or hash check enabled - query ID + Hash to distinguish "object not found" and "hash=null"
+            // Cache MISS or hash check enabled - query ID + Hash (+ scheme, for the scheme-match guard
+            // below) to distinguish "object not found" and "hash=null"
             var eagerBaseObj = await _context.QueryFirstOrDefaultAsync<RedbObjectRow>(
-                Sql.ObjectStorage_SelectIdHash(), objectId);
+                Sql.ObjectStorage_SelectIdHashScheme(), objectId);
             
             if (eagerBaseObj == null)
             {
@@ -237,7 +272,12 @@ namespace redb.Core.Providers.Base
                     throw new InvalidOperationException($"Object with ID {objectId} not found");
                 return null;
             }
-            
+
+            // Guard against loading an object under the wrong Props type (garbage + cache poisoning).
+            // Mismatch → null by default (soft-deleted scheme -10 reads as null), or throws under the flag.
+            if (!await IsSchemeValidForLoadAsync<TProps>(objectId, eagerBaseObj.IdScheme))
+                return null;
+
             // Object found, but hash may be null
             var objectHash = eagerBaseObj.Hash;
 

@@ -403,12 +403,22 @@ public class MsSqlDialect : ISqlDialect
     
     public string Schemes_Insert() =>
         "INSERT INTO _schemes (_id, _name, _alias, _type) VALUES (@p0, @p1, @p2, @p3)";
-    
+
+    // T-SQL has no ON CONFLICT. UPDLOCK+HOLDLOCK on the probe is what makes this safe: without them
+    // READ COMMITTED lets two sessions both see "not exists" and the loser still gets 2627.
+    public string Schemes_InsertIfAbsent() =>
+        "INSERT INTO _schemes (_id, _name, _alias, _type) " +
+        "SELECT @p0, @p1, @p2, @p3 " +
+        "WHERE NOT EXISTS (SELECT 1 FROM _schemes WITH (UPDLOCK, HOLDLOCK) WHERE _name = @p1)";
+
     public string Schemes_UpdateHash() =>
         "UPDATE _schemes SET _structure_hash = @p0 WHERE _id = @p1";
-    
+
     public string Schemes_UpdateName() =>
         "UPDATE _schemes SET _name = @p0 WHERE _id = @p1";
+
+    public string Schemes_UpdateAlias() =>
+        "UPDATE _schemes SET _alias = @p0 WHERE _id = @p1";
     
     public string Schemes_SelectHashById() =>
         "SELECT _structure_hash FROM _schemes WHERE _id = @p0";
@@ -421,6 +431,11 @@ public class MsSqlDialect : ISqlDialect
     
     public string Schemes_InsertObject() =>
         "INSERT INTO _schemes (_id, _name, _type) VALUES (@p0, @p1, @p2)";
+
+    public string Schemes_InsertObjectIfAbsent() =>
+        "INSERT INTO _schemes (_id, _name, _type) " +
+        "SELECT @p0, @p1, @p2 " +
+        "WHERE NOT EXISTS (SELECT 1 FROM _schemes WITH (UPDLOCK, HOLDLOCK) WHERE _name = @p1)";
     
     // ============================================================
     // === STRUCTURES SQL ===

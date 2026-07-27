@@ -23,16 +23,19 @@ Microsoft.Data.Sqlite (.NET), Python's `sqlite3`, the `sqlite3` CLI, etc.
 
 ## Output
 
-One file, base name `redb`, per platform/arch:
+One file, base name `redbsqlite`, per platform/arch:
 
 | Platform | File |
 |----------|------|
-| Windows x64 | `redb.dll` |
-| Linux x64 / arm64 (glibc) | `redb.so` |
-| macOS x64 / arm64 | `redb.dylib` |
+| Windows x64 | `redbsqlite.dll` |
+| Linux x64 / arm64 (glibc) | `redbsqlite.so` |
+| macOS x64 / arm64 | `redbsqlite.dylib` |
 
-The base name `redb` makes the default entry point `sqlite3_redb_init`, so hosts
-load it with no explicit entry-point argument.
+> The base name is **`redbsqlite`** (specific), NOT the generic `redb` — the latter
+> collides with the managed `redb.*` assemblies and the host's `redb.*` prune globs.
+> The C init symbol stays **`sqlite3_redb_init`** (SQLite would otherwise derive
+> `sqlite3_redbsqlite_init` from the file name), so hosts must load with an **explicit
+> entry point**: `sqlite3_redb_init`.
 
 ## Toolchain
 
@@ -67,7 +70,7 @@ cmake --build build-arm64
 
 ```sh
 sqlite3
-sqlite> .load ./build/redb
+sqlite> .load ./build/redbsqlite sqlite3_redb_init
 sqlite> SELECT redb_version();
 0.1.0-m1
 ```
@@ -79,7 +82,7 @@ the default.)
 
 ```csharp
 connection.EnableExtensions(true);
-connection.LoadExtension("/path/to/redb");   // no extension/entry-point needed
+connection.LoadExtension("/path/to/redbsqlite", "sqlite3_redb_init");
 ```
 
 Wiring this into `SqliteRedbConnection` (Free path only, behind config) is done

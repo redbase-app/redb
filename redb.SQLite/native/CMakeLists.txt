@@ -29,11 +29,15 @@ FetchContent_MakeAvailable(sqlite_amalgamation)
 
 # ----------------------------------------------------------------------------
 # The extension itself — built as a shared MODULE (dlopen/LoadLibrary target).
-# Output base name is "redb" on every platform so the default entry-point
-# derivation in sqlite3_load_extension() resolves to sqlite3_redb_init:
-#   Windows : redb.dll
-#   Linux   : redb.so      (PREFIX "" → not libredb.so)
-#   macOS   : redb.dylib
+# Output base name is "redbsqlite" on every platform (a specific name, not the
+# generic/dangerous "redb", which collides with the managed redb.* assemblies and
+# the host's redb.* prune globs):
+#   Windows : redbsqlite.dll
+#   Linux   : redbsqlite.so   (PREFIX "" → not libredbsqlite.so)
+#   macOS   : redbsqlite.dylib
+# The C init symbol stays sqlite3_redb_init (see src/redb_extension.c); because the
+# file base name no longer derives it, consumers load with an EXPLICIT entry point:
+#   conn.LoadExtension(path, "sqlite3_redb_init")   (SqliteDataSource.LoadNativeExtension)
 # ----------------------------------------------------------------------------
 add_library(redb MODULE
     src/redb_extension.c
@@ -43,7 +47,7 @@ add_library(redb MODULE
 target_include_directories(redb PRIVATE "${sqlite_amalgamation_SOURCE_DIR}")
 set_target_properties(redb PROPERTIES
     PREFIX ""
-    OUTPUT_NAME "redb")
+    OUTPUT_NAME "redbsqlite")
 if(APPLE)
     set_target_properties(redb PROPERTIES SUFFIX ".dylib")
 endif()

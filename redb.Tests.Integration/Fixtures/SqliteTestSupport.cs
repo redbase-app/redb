@@ -6,7 +6,7 @@ namespace redb.Tests.Integration.Fixtures;
 internal static class SqliteTestSupport
 {
     /// <summary>
-    /// Locate the Free native loadable extension (redb.{dll,so,dylib}) by walking up from the test
+    /// Locate the Free native loadable extension (redbsqlite.{dll,so,dylib}) by walking up from the test
     /// output directory to redb.SQLite/native/build/. Returns null to fall back to the packaged locator.
     /// </summary>
     public static string? ResolveNativeExtension()
@@ -17,7 +17,7 @@ internal static class SqliteTestSupport
 
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
         {
-            var candidate = Path.Combine(dir.FullName, "redb.SQLite", "native", "build", "redb" + suffix);
+            var candidate = Path.Combine(dir.FullName, "redb.SQLite", "native", "build", "redbsqlite" + suffix);
             if (File.Exists(candidate)) return candidate;
         }
         return null;

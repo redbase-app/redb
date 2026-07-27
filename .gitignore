@@ -6,11 +6,18 @@
 # Lumi — separate project (reliktbk/lumi-app), lives locally but not tracked here
 Lumi/
 
-# tsum_web-develop — separate project, lives locally but not tracked here
-tsum_web-develop/
+# tsum_web-develop — эталон сложных серверных запросов redb (агрегации, оконные,
+# GroupBy, WhereRedb) для SixPillars/TGChatLmm. Уходит в приватную репу как пример.
+# (bin/obj/секреты по-прежнему ловятся общими правилами VS ниже.)
 
 # redbase-app/redb — public org repo, lives locally but not tracked here
 redbase-app/
+
+# supervishlist-bot-ops1 — Telegram-бот вишлистов (чужой проект, свой релизный цикл):
+# поставка разработки + наш патч парсера, наши доки и архив для передачи обратно.
+# Живёт локально, деплоится образом через ghcr.io, в этой репе не трекается.
+supervishlist-bot-ops1/
+supervishlist-bot-ops1.zip
 
 # Strong-name key for redb Pro / Licensing assemblies — must NEVER be committed.
 # Public token (redb.PublicKey) IS committed for InternalsVisibleTo and AssemblyIntegrity check.
@@ -459,3 +466,16 @@ redb.Tsak/src/redb.Tsak.Worker/redb.db-wal
 
 # Production configs with secrets
 deploy/volumes/*/appsettings.Production.json
+# Build artefacts — never in git (the repo must stay self-sufficient, not a binary store).
+# A .tpkg is a ZIP of compiled DLLs, regenerated on demand:
+#   redb.Identity/scripts/pack-tpkg.ps1  ->  scripts/output/*.tpkg
+#   demo builds                          ->  demos/**/output/*.tpkg
+# They were tracked before and rewrote themselves on every build: redb.Identity.Core.Module.tpkg
+# alone landed in 64 commits (~1.9 MB each), bloating history for zero benefit.
+*.tpkg
+
+# Release staging: signed archives + manifests, all reproducible from source.
+redb.Route/publish/output/
+redb.Tsak/publish/output/
+redb.Identity/publish/output/
+nupkg/

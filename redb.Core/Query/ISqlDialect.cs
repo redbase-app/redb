@@ -424,7 +424,24 @@ public interface ISqlDialect
     /// INSERT new scheme. Params: $1=id, $2=name, $3=alias, $4=type
     /// </summary>
     string Schemes_Insert();
-    
+
+    /// <summary>
+    /// INSERT a new scheme, doing nothing when the name is already taken.
+    /// Params: $1=id, $2=name, $3=alias, $4=type. Returns 0 affected rows on conflict.
+    /// <para>
+    /// Exists because several nodes starting simultaneously all miss the lookup and all try to create
+    /// the same scheme. The conflict must be suppressed by the statement itself rather than caught:
+    /// on PostgreSQL a failed INSERT inside a transaction poisons that transaction, so a catch-and-retry
+    /// cannot re-read the winner's row.
+    /// </para>
+    /// </summary>
+    string Schemes_InsertIfAbsent();
+
+    /// <summary>
+    /// UPDATE scheme alias by ID. Params: $1=alias (nullable), $2=schemeId
+    /// </summary>
+    string Schemes_UpdateAlias();
+
     /// <summary>
     /// UPDATE scheme structure hash. Params: $1=hash, $2=schemeId
     /// </summary>
@@ -456,7 +473,14 @@ public interface ISqlDialect
     /// INSERT Object scheme. Params: $1=id, $2=name, $3=type
     /// </summary>
     string Schemes_InsertObject();
-    
+
+    /// <summary>
+    /// INSERT an Object scheme, doing nothing when the name is already taken.
+    /// Params: $1=id, $2=name, $3=type. Returns 0 affected rows on conflict.
+    /// Same race as <see cref="Schemes_InsertIfAbsent"/>, on the untyped path.
+    /// </summary>
+    string Schemes_InsertObjectIfAbsent();
+
     // ============================================================
     // === STRUCTURES SQL ===
     // ============================================================

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using redb.Core.Attributes;
 using redb.Core.Caching;
 using redb.Core.Data;
+using redb.Core.Exceptions;
 using redb.Core.Models.Configuration;
 using redb.Core.Models.Contracts;
 using redb.Core.Models.Entities;
@@ -99,63 +100,169 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     }
 
     /// <summary>
-    /// Ensures scheme exists for the given type. 
-    /// Uses FullName (with namespace) as scheme name.
-    /// Performs automatic migration from short name to full name if legacy scheme found.
+    /// Ensures a scheme exists for the given type and carries its name to the target.
+    /// <para>
+    /// The target name is the explicit <c>[RedbScheme(Name = "...")]</c> when declared, otherwise
+    /// FullName. The scheme is looked up along a three-step chain — target name, FullName, short type
+    /// name — and the first match is renamed in place. Renaming is a single-row UPDATE of
+    /// <c>_schemes._name</c>: the id is preserved, so objects, structures and values are untouched.
+    /// </para>
+    /// <para>
+    /// With no explicit name the target equals FullName, the first two steps collapse into one, and the
+    /// behaviour is byte-for-byte the legacy one: FullName, then migrate from the short name, then create.
+    /// </para>
     /// </summary>
     private async Task<IRedbScheme> EnsureSchemeFromTypeInternalAsync(Type type, string? alias = null)
     {
         var fullName = type.FullName ?? type.Name;
         var shortName = type.Name;
-        
-        // 1. Try to find by full name first
+        var explicitName = GetExplicitSchemeName(type);
+        var targetName = explicitName ?? fullName;
+
+        if (explicitName != null)
+        {
+            // Fail before touching the database, naming the type — a raw constraint violation from the
+            // driver would say nothing about which class is at fault.
+            SchemeNameValidator.Validate(explicitName, type);
+            ClrSchemeTypeIndex.ThrowIfNameConflict(explicitName, type);
+        }
+
+        // 1. Try the target name first.
         var existingScheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
-            Sql.Schemes_SelectByName(), fullName);
+            Sql.Schemes_SelectByName(), targetName);
 
         if (existingScheme != null)
-            return existingScheme;
-
-        // 2. Fallback: try to find by short name (legacy scheme)
-        var legacyScheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
-            Sql.Schemes_SelectByName(), shortName);
-        
-        if (legacyScheme != null)
         {
-            // Migrate: update short name to full name
+            // The rename already happened, so nothing should still sit under a previous name. If
+            // something does, the type maps to two schemes at once — an older binary re-created the
+            // old one after the rename — and objects are quietly being split between them. Fail loudly;
+            // silently picking one would hide real data loss.
+            //
+            // Only checked for explicitly named types: without an explicit name this is the untouched
+            // legacy path, and tightening it would break projects that never opted in.
+            if (explicitName != null)
+            {
+                foreach (var previousName in new[] { fullName, shortName })
+                {
+                    if (previousName == targetName)
+                        continue;
+
+                    var strayId = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), previousName);
+                    if (strayId.HasValue)
+                    {
+                        throw new RedbSchemeNameTakenException(
+                            type, targetName, existingScheme.Id, previousName, strayId.Value);
+                    }
+                }
+            }
+
+            await SyncSchemeAliasAsync(existingScheme, alias);
+            return existingScheme;
+        }
+
+        // 2-3. Fallback: find the scheme under a previous name and rename it in place.
+        //      FullName covers "type used to live by its CLR name"; the short name covers schemes
+        //      created by redb versions that predate FullName naming. Dropping the short-name step
+        //      would silently orphan those old databases.
+        foreach (var previousName in explicitName != null
+                     ? new[] { fullName, shortName }
+                     : new[] { shortName })
+        {
+            if (previousName == targetName)
+                continue;
+
+            var legacyScheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
+                Sql.Schemes_SelectByName(), previousName);
+
+            if (legacyScheme == null)
+                continue;
+
             var hasTransaction = Context.CurrentTransaction != null;
             Logger?.LogInformation(
-                "Migrating scheme '{OldName}' to full name '{NewName}' (ID: {SchemeId}, InTransaction: {InTx})",
-                shortName, fullName, legacyScheme.Id, hasTransaction);
-            
-            var rowsAffected = await Context.ExecuteAsync(Sql.Schemes_UpdateName(), fullName, legacyScheme.Id);
+                "Renaming scheme '{OldName}' to '{NewName}' (ID: {SchemeId}, InTransaction: {InTx})",
+                previousName, targetName, legacyScheme.Id, hasTransaction);
+
+            var rowsAffected = await Context.ExecuteAsync(Sql.Schemes_UpdateName(), targetName, legacyScheme.Id);
             if (rowsAffected == 0)
             {
                 Logger?.LogWarning(
-                    "Migration UPDATE affected 0 rows for scheme ID {SchemeId}. SQL: {Sql}",
+                    "Rename UPDATE affected 0 rows for scheme ID {SchemeId}. SQL: {Sql}",
                     legacyScheme.Id, Sql.Schemes_UpdateName());
             }
-            
-            legacyScheme.Name = fullName;
-            
-            // Invalidate cache for both old and new names
+
+            legacyScheme.Name = targetName;
+
+            // Three keys: the id, the name it was found under, and the target name (in case a stale
+            // entry sits there). The process-global name -> Type index is refreshed immediately rather
+            // than waiting for the next assembly rescan.
             Cache.InvalidateScheme(legacyScheme.Id);
-            Cache.InvalidateScheme(shortName);
-            
+            Cache.InvalidateScheme(previousName);
+            Cache.InvalidateScheme(targetName);
+            ClrSchemeTypeIndex.Register(targetName, type);
+
+            await SyncSchemeAliasAsync(legacyScheme, alias);
             return legacyScheme;
         }
 
-        // 3. Create new scheme with full name
+        // 4. Nothing to rename — create the scheme.
         var newId = await Context.NextObjectIdAsync();
         var newScheme = new RedbScheme
         {
             Id = newId,
-            Name = fullName,
+            Name = targetName,
             Alias = alias,
             Type = RedbTypeIds.Class
         };
 
-        await Context.ExecuteAsync(Sql.Schemes_Insert(), newScheme.Id, newScheme.Name, newScheme.Alias, newScheme.Type);
+        // Conflict-safe INSERT: several nodes starting at once all miss the lookups above and all
+        // reach this line. A plain INSERT would let all but one fail on UNIQUE(_name) — and inside a
+        // transaction on PostgreSQL that error also poisons the transaction, so catching it and
+        // re-reading is not an option. The dialect suppresses the conflict instead, and the loser
+        // simply reads back the winner's row.
+        var inserted = await Context.ExecuteAsync(
+            Sql.Schemes_InsertIfAbsent(), newScheme.Id, newScheme.Name, newScheme.Alias, newScheme.Type);
+
+        if (inserted == 0)
+        {
+            var winner = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
+                Sql.Schemes_SelectByName(), targetName);
+
+            if (winner == null)
+            {
+                throw new InvalidOperationException(
+                    $"Scheme '{targetName}' was not inserted (conflict) but cannot be read back. " +
+                    "The scheme was likely removed concurrently.");
+            }
+
+            Logger?.LogInformation(
+                "Lost the creation race for scheme '{SchemeName}'; using the existing scheme (ID: {SchemeId})",
+                targetName, winner.Id);
+
+            await SyncSchemeAliasAsync(winner, alias);
+            return winner;
+        }
+
+        if (explicitName != null)
+            ClrSchemeTypeIndex.Register(targetName, type);
+
         return newScheme;
+    }
+
+    /// <summary>
+    /// Brings <c>_schemes._alias</c> in line with the attribute. The attribute is the source of truth,
+    /// mirroring how structure aliases already behave — a value edited by hand in the database is
+    /// overwritten, and removing the attribute resets the alias to NULL.
+    /// </summary>
+    private async Task SyncSchemeAliasAsync(RedbScheme scheme, string? alias)
+    {
+        if (scheme.Alias == alias)
+            return;
+
+        await Context.ExecuteAsync(Sql.Schemes_UpdateAlias(), (object?)alias ?? DBNull.Value, scheme.Id);
+        scheme.Alias = alias;
+
+        Cache.InvalidateScheme(scheme.Id);
+        Cache.InvalidateScheme(scheme.Name);
     }
 
     public async Task<List<IRedbStructure>> SyncStructuresFromTypeAsync<TProps>(IRedbScheme scheme, bool strictDeleteExtra = true) where TProps : class
@@ -702,8 +809,8 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
     public async Task<IRedbScheme?> GetSchemeByTypeAsync<TProps>() where TProps : class
     {
-        var schemeName = typeof(TProps).FullName ?? typeof(TProps).Name;
-        
+        var schemeName = GetSchemeNameForType<TProps>();
+
         // Check cache first
         var cached = Cache.GetScheme(schemeName);
         if (cached != null)
@@ -723,8 +830,8 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
     public async Task<IRedbScheme?> GetSchemeByTypeAsync(Type type)
     {
-        var schemeName = type.FullName ?? type.Name;
-        
+        var schemeName = GetSchemeNameForType(type);
+
         // Check cache first
         var cached = Cache.GetScheme(schemeName);
         if (cached != null)
@@ -748,10 +855,14 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     /// </summary>
     public IRedbScheme? GetSchemeFromCache<TProps>() where TProps : class
     {
-        // Schemes are typically cached by FullName (e.g. "redb.Tsak.Core.Services.Storage.TsakModuleProps").
-        // Fallback to short Name for backward compatibility with manually registered schemes.
-        return Cache.GetScheme(typeof(TProps).FullName ?? typeof(TProps).Name)
-            ?? Cache.GetScheme(typeof(TProps).Name);
+        // Mirrors the three-step lookup chain used when syncing: the effective name first (an explicit
+        // [RedbScheme(Name = "...")] or FullName), then FullName for the window where the type declares
+        // an explicit name but the cache still holds the pre-rename entry, then the short type name for
+        // backward compatibility with manually registered schemes.
+        var t = typeof(TProps);
+        return Cache.GetScheme(GetSchemeNameForType(t))
+            ?? Cache.GetScheme(t.FullName ?? t.Name)
+            ?? Cache.GetScheme(t.Name);
     }
     
     /// <summary>
@@ -810,14 +921,14 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
     public async Task<bool> SchemeExistsForTypeAsync<TProps>() where TProps : class
     {
-        var schemeName = typeof(TProps).FullName ?? typeof(TProps).Name;
+        var schemeName = GetSchemeNameForType<TProps>();
         var result = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), schemeName);
         return result.HasValue;
     }
 
     public async Task<bool> SchemeExistsForTypeAsync(Type type)
     {
-        var schemeName = type.FullName ?? type.Name;
+        var schemeName = GetSchemeNameForType(type);
         var result = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), schemeName);
         return result.HasValue;
     }
@@ -832,8 +943,30 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     // === NAME/ALIAS HELPERS ===
     // ============================================================
 
-    public string GetSchemeNameForType<TProps>() where TProps : class => typeof(TProps).FullName ?? typeof(TProps).Name;
-    public string GetSchemeNameForType(Type type) => type.FullName ?? type.Name;
+    /// <summary>
+    /// THE single place that turns a CLR type into a scheme name. Returns the explicit
+    /// <see cref="RedbSchemeAttribute.Name"/> when the type declares one, otherwise FullName.
+    /// <para>
+    /// Every lookup, existence check and creation path in this class must go through here. A path
+    /// that computes <c>type.FullName</c> on its own does not fail loudly — it silently misses the
+    /// lookup and ends up creating a second scheme for the same type.
+    /// </para>
+    /// </summary>
+    public string GetSchemeNameForType<TProps>() where TProps : class => GetSchemeNameForType(typeof(TProps));
+
+    /// <inheritdoc cref="GetSchemeNameForType{TProps}()"/>
+    public string GetSchemeNameForType(Type type)
+        => GetRedbSchemeAttribute(type)?.GetSchemeName(type) ?? type.FullName ?? type.Name;
+
+    /// <summary>
+    /// The explicit name declared by the type, or null when the type lives by FullName.
+    /// Distinguishes "renaming requested" from "default naming" for the sync chain.
+    /// </summary>
+    private static string? GetExplicitSchemeName(Type type)
+    {
+        var name = GetRedbSchemeAttribute(type)?.Name;
+        return string.IsNullOrWhiteSpace(name) ? null : name;
+    }
 
     public string? GetSchemeAliasForType<TProps>() where TProps : class
         => GetRedbSchemeAttribute<TProps>()?.Alias;
@@ -867,10 +1000,35 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             Name = name,
             Type = RedbTypeIds.Object
         };
-        
-        await Context.ExecuteAsync(Sql.Schemes_InsertObject(), newScheme.Id, newScheme.Name, newScheme.Type);
+
+        // Same creation race as the typed path — several nodes can reach this line for the same name.
+        // The dialect suppresses the unique-name conflict so the transaction survives, and the loser
+        // reads back the winner's row.
+        var inserted = await Context.ExecuteAsync(
+            Sql.Schemes_InsertObjectIfAbsent(), newScheme.Id, newScheme.Name, newScheme.Type);
+
+        if (inserted == 0)
+        {
+            var winner = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
+                Sql.Schemes_SelectObjectByName(), name, RedbTypeIds.Object);
+
+            if (winner == null)
+            {
+                throw new InvalidOperationException(
+                    $"Object scheme '{name}' was not inserted (conflict) but cannot be read back. " +
+                    "A non-Object scheme may already hold that name.");
+            }
+
+            Logger?.LogInformation(
+                "Lost the creation race for object scheme '{SchemeName}'; using the existing scheme (ID: {SchemeId})",
+                name, winner.Id);
+
+            Cache.CacheScheme(winner);
+            return winner;
+        }
+
         Cache.CacheScheme(newScheme);
-        
+
         return newScheme;
     }
     

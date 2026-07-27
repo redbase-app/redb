@@ -179,6 +179,20 @@ namespace redb.Core.Models.Configuration
         /// </summary>
         public bool SkipHashValidationOnCacheCheck { get; set; } = false;
 
+        /// <summary>
+        /// Controls what <c>LoadAsync&lt;TProps&gt;</c> does when the loaded object belongs to a different
+        /// scheme than <c>TProps</c> maps to. The check itself always runs (garbage never reaches the
+        /// cache); this flag only chooses the reaction:
+        /// <list type="bullet">
+        /// <item><c>false</c> (default) — return <c>null</c>. A soft-deleted object (scheme <c>-10</c>)
+        /// therefore reads as <c>null</c>, which is what callers that soft-delete expect.</item>
+        /// <item><c>true</c> — throw <c>RedbSchemeMismatchException</c>, to surface a genuine type mistake
+        /// loudly.</item>
+        /// </list>
+        /// The untyped <c>LoadAsync(objectId)</c> is never affected.
+        /// </summary>
+        public bool ThrowOnSchemeMismatch { get; set; } = false;
+
         // === LIST CACHE SETTINGS ===
 
         /// <summary>
@@ -331,6 +345,7 @@ namespace redb.Core.Models.Configuration
                 PropsCacheMaxSize = PropsCacheMaxSize,
                 PropsCacheTtl = PropsCacheTtl,
                 SkipHashValidationOnCacheCheck = SkipHashValidationOnCacheCheck,
+                ThrowOnSchemeMismatch = ThrowOnSchemeMismatch,
                 EnableListCache = EnableListCache,
                 ListCacheTtl = ListCacheTtl,
                 EnableMetadataCache = EnableMetadataCache,

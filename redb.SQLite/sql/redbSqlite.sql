@@ -112,6 +112,116 @@ CREATE TABLE _schemes(
     CONSTRAINT FK__schemes__types   FOREIGN KEY (_type)      REFERENCES _types (_id)
 );
 
+-- Scheme name validation. Mirrors the PostgreSQL validate_scheme_name() trigger rule for rule so
+-- that a name accepted by one provider is accepted by all three.
+--
+-- This is a BACKSTOP against writes that bypass the library. The library validates explicit names
+-- in C# first (redb.Core/Attributes/SchemeNameValidator.cs), which is what reports the offending
+-- type instead of a bare constraint error, and which also covers databases created before this
+-- trigger existed -- EnsureDatabaseAsync skips initialisation entirely when _schemes is already
+-- present, so older databases never receive it.
+--
+-- Two triggers because SQLite has no combined INSERT OR UPDATE form. The UPDATE one fires only
+-- when _name is written, so touching the hash or alias costs nothing and cannot fail on a legacy
+-- name that predates these rules.
+CREATE TRIGGER tr_validate_scheme_name_insert
+BEFORE INSERT ON _schemes
+FOR EACH ROW
+WHEN NEW._name NOT GLOB '@@*'   -- system schemes (e.g. @@__deleted) bypass validation
+BEGIN
+    SELECT RAISE(ABORT, 'Scheme name cannot be empty')
+    WHERE length(trim(NEW._name)) = 0;
+
+    SELECT RAISE(ABORT, 'Scheme name cannot start with a digit')
+    WHERE NEW._name GLOB '[0-9]*';
+
+    SELECT RAISE(ABORT, 'Scheme name contains characters outside [a-zA-Z0-9_.+] or does not start with a letter/underscore')
+    WHERE NEW._name GLOB '*[^a-zA-Z0-9_.+]*' OR NEW._name NOT GLOB '[a-zA-Z_]*';
+
+    SELECT RAISE(ABORT, 'Scheme name cannot end with a dot')
+    WHERE NEW._name GLOB '*.';
+
+    SELECT RAISE(ABORT, 'Scheme name cannot contain two consecutive dots')
+    WHERE instr(NEW._name, '..') > 0;
+
+    SELECT RAISE(ABORT, 'Scheme name is longer than 128 characters')
+    WHERE length(NEW._name) > 128;
+
+    -- Rules 7 and 8: split on '.' and '+', then check every part. The seed row carries an empty
+    -- part and is filtered out; genuinely empty parts are already rejected by the '..' rule above.
+    SELECT RAISE(ABORT, 'Scheme name has a part that is not a valid identifier or is a C# reserved word')
+    WHERE EXISTS (
+        WITH RECURSIVE parts(part, rest) AS (
+            SELECT '', replace(NEW._name, '+', '.') || '.'
+            UNION ALL
+            SELECT substr(rest, 1, instr(rest, '.') - 1), substr(rest, instr(rest, '.') + 1)
+            FROM parts WHERE rest <> ''
+        )
+        SELECT 1 FROM parts
+        WHERE part <> ''
+          AND (part GLOB '*[^a-zA-Z0-9_]*'
+            OR part GLOB '[0-9]*'
+            OR lower(part) IN (
+                'abstract','as','bool','break','byte','case','catch','char','checked',
+                'class','const','continue','decimal','default','delegate','do','double','else',
+                'enum','event','explicit','extern','false','finally','fixed','float','for',
+                'foreach','goto','if','implicit','in','int','interface','internal','is','lock',
+                'long','namespace','new','null','object','operator','out','override','params',
+                'private','protected','public','readonly','ref','return','sbyte','sealed',
+                'short','sizeof','stackalloc','static','string','struct','switch','this',
+                'throw','true','try','typeof','uint','ulong','unchecked','unsafe','ushort',
+                'using','virtual','void','volatile','while'))
+    );
+END;
+
+CREATE TRIGGER tr_validate_scheme_name_update
+BEFORE UPDATE OF _name ON _schemes
+FOR EACH ROW
+WHEN NEW._name <> OLD._name AND NEW._name NOT GLOB '@@*'
+BEGIN
+    SELECT RAISE(ABORT, 'Scheme name cannot be empty')
+    WHERE length(trim(NEW._name)) = 0;
+
+    SELECT RAISE(ABORT, 'Scheme name cannot start with a digit')
+    WHERE NEW._name GLOB '[0-9]*';
+
+    SELECT RAISE(ABORT, 'Scheme name contains characters outside [a-zA-Z0-9_.+] or does not start with a letter/underscore')
+    WHERE NEW._name GLOB '*[^a-zA-Z0-9_.+]*' OR NEW._name NOT GLOB '[a-zA-Z_]*';
+
+    SELECT RAISE(ABORT, 'Scheme name cannot end with a dot')
+    WHERE NEW._name GLOB '*.';
+
+    SELECT RAISE(ABORT, 'Scheme name cannot contain two consecutive dots')
+    WHERE instr(NEW._name, '..') > 0;
+
+    SELECT RAISE(ABORT, 'Scheme name is longer than 128 characters')
+    WHERE length(NEW._name) > 128;
+
+    SELECT RAISE(ABORT, 'Scheme name has a part that is not a valid identifier or is a C# reserved word')
+    WHERE EXISTS (
+        WITH RECURSIVE parts(part, rest) AS (
+            SELECT '', replace(NEW._name, '+', '.') || '.'
+            UNION ALL
+            SELECT substr(rest, 1, instr(rest, '.') - 1), substr(rest, instr(rest, '.') + 1)
+            FROM parts WHERE rest <> ''
+        )
+        SELECT 1 FROM parts
+        WHERE part <> ''
+          AND (part GLOB '*[^a-zA-Z0-9_]*'
+            OR part GLOB '[0-9]*'
+            OR lower(part) IN (
+                'abstract','as','bool','break','byte','case','catch','char','checked',
+                'class','const','continue','decimal','default','delegate','do','double','else',
+                'enum','event','explicit','extern','false','finally','fixed','float','for',
+                'foreach','goto','if','implicit','in','int','interface','internal','is','lock',
+                'long','namespace','new','null','object','operator','out','override','params',
+                'private','protected','public','readonly','ref','return','sbyte','sealed',
+                'short','sizeof','stackalloc','static','string','struct','switch','this',
+                'throw','true','try','typeof','uint','ulong','unchecked','unsafe','ushort',
+                'using','virtual','void','volatile','while'))
+    );
+END;
+
 CREATE TABLE _structures(
     _id              INTEGER NOT NULL PRIMARY KEY,
     _id_parent       INTEGER NULL,
@@ -240,6 +350,38 @@ CREATE TABLE _functions(
     CONSTRAINT IX__functions_scheme_name UNIQUE (_id_scheme, _name),
     CONSTRAINT FK__functions__schemes FOREIGN KEY (_id_scheme) REFERENCES _schemes (_id)
 );
+
+-- Pro data-migration history (ported 1:1 from redb_migrations.sql, PG types mapped:
+-- BIGSERIAL->INTEGER PK (the id is supplied explicitly by NextObjectIdAsync),
+-- TIMESTAMPTZ->REAL UTC Julian day like every other date column here,
+-- BOOLEAN->INTEGER 0/1).
+--
+-- Unlike PG/MSSql, SQLite has no redb_init.sql concatenation step, so the shared
+-- redb_migrations.sql never reached this provider and the table was missing entirely —
+-- MigrationExecutor's very first statement (the idempotency probe in
+-- ProSqliteDialect.Migration_SelectExisting) failed with "no such table: _migrations",
+-- making Pro data migrations unusable on SQLite. See docs/SQLITE_PARITY_PLAN.md §1.
+CREATE TABLE _migrations(
+    _id              INTEGER NOT NULL PRIMARY KEY,
+    _migration_id    TEXT    NOT NULL,   -- "OrderProps_TotalPrice_v1"
+    _scheme_id       INTEGER NOT NULL,
+    _structure_id    INTEGER NULL,       -- NULL = whole scheme
+    _property_name   TEXT    NULL,
+    _expression_hash TEXT    NULL,       -- MD5 of the Expression, to detect changes
+    _migration_type  TEXT    NOT NULL,   -- ComputedFrom, TypeChange, DefaultValue, Transform
+    _applied_at      REAL    NOT NULL DEFAULT (julianday('now')),  -- UTC Julian day (REAL)
+    _applied_by      TEXT    NULL,
+    _sql_executed    TEXT    NULL,       -- executed SQL, kept for audit
+    _affected_rows   INTEGER NULL,
+    _duration_ms     INTEGER NULL,
+    _dry_run         INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT uq_migration_scheme UNIQUE (_scheme_id, _migration_id),
+    CONSTRAINT FK__migrations__schemes    FOREIGN KEY (_scheme_id)    REFERENCES _schemes (_id)    ON DELETE CASCADE,
+    CONSTRAINT FK__migrations__structures FOREIGN KEY (_structure_id) REFERENCES _structures (_id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_migrations_scheme  ON _migrations(_scheme_id);
+CREATE INDEX idx_migrations_applied ON _migrations(_applied_at DESC);
 
 -- ============================================================================
 -- Metadata cache (ported 1:1 from redb_metadata_cache.sql). Denormalized

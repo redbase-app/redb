@@ -38,7 +38,7 @@ namespace redb.SQLite.Data
         }
 
         /// <summary>
-        /// Path to the REDB native loadable extension (redb.dll/.so/.dylib, WITHOUT
+        /// Path to the REDB native loadable extension (redbsqlite.dll/.so/.dylib, WITHOUT
         /// the file suffix — SQLite appends it). When set, every connection loads it
         /// after PRAGMAs, so the FREE tier's in-DB functions (get_object_json,
         /// save_object_json, pvt_build_query_sql, ...) become callable. REQUIRED for
@@ -90,7 +90,9 @@ namespace redb.SQLite.Data
             var path = NativeExtensionPath;
             if (string.IsNullOrEmpty(path)) return;
             conn.EnableExtensions(true);
-            conn.LoadExtension(path);   // entry point sqlite3_redb_init (default by basename)
+            // Explicit entry point: the file is redbsqlite.<ext> but the C init symbol is
+            // sqlite3_redb_init, so we can't rely on SQLite's basename derivation.
+            conn.LoadExtension(path, "sqlite3_redb_init");
         }
 
         /// <summary>
@@ -108,9 +110,9 @@ namespace redb.SQLite.Data
         /// </summary>
         public static string? LocatePackagedExtension()
         {
-            var lib = OperatingSystem.IsWindows() ? "redb.dll"
-                    : OperatingSystem.IsMacOS()   ? "redb.dylib"
-                    : "redb.so";
+            var lib = OperatingSystem.IsWindows() ? "redbsqlite.dll"
+                    : OperatingSystem.IsMacOS()   ? "redbsqlite.dylib"
+                    : "redbsqlite.so";
             var baseDir = AppContext.BaseDirectory;
             var rid = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
 
@@ -136,7 +138,7 @@ namespace redb.SQLite.Data
             }
 
             // 3. Dev fallback: walk up the source tree to the CMake build output
-            //    (redb.SQLite/native/build/redb.<ext>). Lets a ProjectReference run
+            //    (redb.SQLite/native/build/redbsqlite.<ext>). Lets a ProjectReference run
             //    straight from the repo (worker, tests, console) load the extension
             //    without REDB_SQLITE_EXTENSION — mirrors redb.Examples' resolver.
             for (var dir = new DirectoryInfo(baseDir); dir != null; dir = dir.Parent)

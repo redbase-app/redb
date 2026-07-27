@@ -1,0 +1,10 @@
+using redb.Tests.Integration.Fixtures;
+using redb.Tests.Integration.Tests.Base;
+
+namespace redb.Tests.Integration.Tests.MsSqlPro;
+
+[Collection("MsSqlPro")]
+public class MsSqlProSchemeNamingTests : SchemeNamingTestsBase
+{
+    public MsSqlProSchemeNamingTests(MsSqlProFixture fixture) : base(fixture.Redb) { }
+}
