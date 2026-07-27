@@ -1,8 +1,8 @@
 # v2-pvt (MSSql) — PVT-based search engine
 
 Mirror of `redb.Postgres/sql/v2-pvt/`. Migration plan: see
-[`docs/MsSqlPvtQuery/PLAN.md`](../../../docs/MsSqlPvtQuery/PLAN.md).
-Delta register: [`docs/MsSqlPvtQuery/MSSQL-FREE-GAPS.md`](../../../docs/MsSqlPvtQuery/MSSQL-FREE-GAPS.md).
+`docs/MsSqlPvtQuery/PLAN.md`.
+Delta register: `docs/MsSqlPvtQuery/MSSQL-FREE-GAPS.md`.
 
 ## File order
 

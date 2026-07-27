@@ -2,7 +2,7 @@
 
 This document tracks what RedBase ships today, what is coming next, and the long-term direction for both the open-source (Apache 2.0) and Pro editions.
 
-It is intentionally high-level. Day-to-day changes live in [CHANGELOG.md](CHANGELOG.md); detailed design notes for individual features live under [docs/](docs/).
+It is intentionally high-level. Day-to-day changes live in [CHANGELOG.md](CHANGELOG.md); detailed design notes for individual features live under docs/.
 
 > **Editions in one sentence**
 >
@@ -140,20 +140,20 @@ RedbPrimitive<long>                        // PLANNED
 RedbPrimitive<string>                      // PLANNED
 ```
 
-- SQL layer: **OK** — new `Array`, `Dictionary`, `JsonDocument`, `XDocument` types in `_types`; `_schemes._type` column added; storage hierarchy via the system `@@_value` structure. See [docs/dict/DICTIONARY_ARRAY_IMPLEMENTATION.md](docs/dict/DICTIONARY_ARRAY_IMPLEMENTATION.md).
+- SQL layer: **OK** — new `Array`, `Dictionary`, `JsonDocument`, `XDocument` types in `_types`; `_schemes._type` column added; storage hierarchy via the system `@@_value` structure. See docs/dict/DICTIONARY_ARRAY_IMPLEMENTATION.md.
 - .NET layer: **WIP** — serializer, query builder and materialiser updates.
 
 ### Direct nested collections — PLANNED
 
 Today, `Dictionary<K, V[]>`, `List<List<T>>`, `T[][]` and `T[,]` require a wrapper class. The plan is to lift this restriction so nested collections work out of the box.
 
-Tracked in [docs/dict/NESTED_COLLECTIONS_LIMITATIONS.md](docs/dict/NESTED_COLLECTIONS_LIMITATIONS.md).
+Tracked in docs/dict/NESTED_COLLECTIONS_LIMITATIONS.md.
 
 ### Custom scheme names — PLANNED
 
 Restore first-class support for `[RedbScheme("MyName")]` as the actual scheme identifier (currently `Alias` is cosmetic and the FQN is always used). Includes a one-shot migration that renames an existing FQN-named scheme to its custom name on first sync.
 
-Tracked in [docs/dict/SCHEME_NAMING_ANALYSIS.md](docs/dict/SCHEME_NAMING_ANALYSIS.md).
+Tracked in docs/dict/SCHEME_NAMING_ANALYSIS.md.
 
 ### JSON and XML documents — PLANNED
 
@@ -196,7 +196,7 @@ var stats  = await query.SelectPath(new {
 
 ### Algorithm
 
-A **single CTE** with cumulative path tracking and early pruning. One algorithm covers JSON, XML, arrays and dictionaries — no per-shape special cases, no JOIN chains, no `jsonb_path_query` fallbacks. Full design in [docs/dict/PATH_QUERY_API_PLAN.md](docs/dict/PATH_QUERY_API_PLAN.md).
+A **single CTE** with cumulative path tracking and early pruning. One algorithm covers JSON, XML, arrays and dictionaries — no per-shape special cases, no JOIN chains, no `jsonb_path_query` fallbacks. Full design in docs/dict/PATH_QUERY_API_PLAN.md.
 
 ---
 
@@ -231,10 +231,10 @@ These features are deeply tied to the parallelisation primitives and incremental
 
 Things we are looking at, with no commitment yet:
 
-- RESEARCH — More LLM-friendly schema discovery: `redb.CLI` emitting a machine-readable scheme catalogue suitable for prompt grounding (see [docs/LLM_DISCOVERY_AND_TRAINING.md](docs/LLM_DISCOVERY_AND_TRAINING.md)).
-- RESEARCH — Cluster mode for high-concurrency writes — builds on the existing per-connection cache domains; adds coordinated invalidation across nodes (see [docs/CLUSTER_CONCURRENCY_PLAN.md](docs/CLUSTER_CONCURRENCY_PLAN.md)).
-- RESEARCH — Native `Include` for `RedbObject` graph navigation across schemes (see [docs/INCLUDE_REDBOBJECT_PLAN.md](docs/INCLUDE_REDBOBJECT_PLAN.md)).
-- RESEARCH — `Where` expressions over tree shape (not just data) and `LINQ-over-tree` syntactic sugar (see [docs/TreeLinqDemo.md](docs/TreeLinqDemo.md)).
+- RESEARCH — More LLM-friendly schema discovery: `redb.CLI` emitting a machine-readable scheme catalogue suitable for prompt grounding (see docs/LLM_DISCOVERY_AND_TRAINING.md).
+- RESEARCH — Cluster mode for high-concurrency writes — builds on the existing per-connection cache domains; adds coordinated invalidation across nodes (see docs/CLUSTER_CONCURRENCY_PLAN.md).
+- RESEARCH — Native `Include` for `RedbObject` graph navigation across schemes (see docs/INCLUDE_REDBOBJECT_PLAN.md).
+- RESEARCH — `Where` expressions over tree shape (not just data) and `LINQ-over-tree` syntactic sugar (see docs/TreeLinqDemo.md).
 
 ---
 

@@ -510,7 +510,7 @@ mkdir Extensions
 5. Dependency Injection
 
 ### Полезные ресурсы
-- [redb.Postgres.Pro](../redb.Postgres.Pro/) - референсная реализация
+- redb.Postgres.Pro - референсная реализация
 - [SQL Server Documentation](https://docs.microsoft.com/sql/)
 - [EF Core Documentation](https://docs.microsoft.com/ef/core/)
 - [SQL Comparison Guide](./SQL_DIALECT_COMPARISON.md)

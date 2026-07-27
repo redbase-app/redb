@@ -911,13 +911,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `_values._id_structure`, while MSSQL achieves the same effect through the
   `TR__structures__cascade_values` `INSTEAD OF DELETE` trigger (MSSQL FK is
   `NO ACTION` only to work around the multiple-cascade-paths restriction).
-- Rewrote [docs/FreePvtQuery/FREE-OVER-PRO.md](docs/FreePvtQuery/FREE-OVER-PRO.md)
+- Rewrote docs/FreePvtQuery/FREE-OVER-PRO.md
   §4: marked F0+F1 (this release) as done, demoted F3 (default flip) to a
   major-version task, made the cache-state-dependent nature of the Pro
   ChangeTracking destructiveness explicit (per-instance cache refresh window),
   and corrected §4.1 — the previous "obligatory `DefaultStrictDeleteExtra = false`"
   guidance was non-functional before v2.0.3 and is now actually wired.
-- Updated [docs/FreePvtQuery/FREE-OVER-PRO.md](docs/FreePvtQuery/FREE-OVER-PRO.md):
+- Updated docs/FreePvtQuery/FREE-OVER-PRO.md:
   H1 (`Take(0)`) marked fixed; H8 (tree `DistinctBy`) re-classified as
   already implemented in both tiers; §0 and §2.x updated for §2.2 /
   §2.3-null / §2.4 closures; §1 #5 (`Sql.Function`) no longer marked
