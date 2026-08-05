@@ -206,6 +206,47 @@ redb init --connection "Host=localhost;Database=mydb;..." --provider postgres
 redb schema --provider postgres --output redb_schema.sql
 ```
 
+### Client-side: Blazor WebAssembly & mobile
+
+Both run on `redb.SQLite.Pro` — it is pure C#, while the Free tier hosts its SQL functions in a native
+loadable extension, which a browser cannot load. Pro requires no license key on the 3.x line.
+
+**Mobile (.NET MAUI)** needs nothing special: point the connection string at the app data directory.
+
+```csharp
+builder.Services.AddRedbPro(o => o
+    .UseSqlite($"Data Source={Path.Combine(FileSystem.AppDataDirectory, "app.db")}"));
+```
+
+**Blazor WebAssembly** needs three things beyond the usual setup:
+
+1. **Native relink.** For `browser-wasm` SQLite arrives as a static archive (`e_sqlite3.a`) rather than
+   a shared library, so it must be linked into the runtime at build time. Install the workload and, for
+   Debug runs, enable the relink explicitly:
+
+   ```bash
+   dotnet workload install wasm-tools
+   ```
+   ```xml
+   <WasmBuildNative>true</WasmBuildNative>
+   ```
+   Without it the app builds against the stock runtime and fails in the browser, not at compile time.
+
+2. **Manual initialization.** `WebAssemblyHost` does not start hosted services, so the automatic startup
+   initialization never runs:
+
+   ```csharp
+   var host = builder.Build();
+   var redb = host.Services.GetRequiredService<IRedbService>();
+   await redb.InitializeAsync(ensureCreated: true);
+   await redb.SyncSchemeAsync<NoteProps>();
+   await host.RunAsync();
+   ```
+
+3. **Persistence is yours to add.** The database file lives in the browser's in-memory filesystem, so it
+   is gone on reload. Persisting it (IDBFS + `syncfs`, a copy into IndexedDB/Cache API, or OPFS) is
+   application-level work — RedBase does not provide it.
+
 ---
 
 ## Capabilities

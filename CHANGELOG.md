@@ -19,6 +19,77 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Hashing threw on Blazor WebAssembly, breaking every write (`RedBase.Core`, `RedBase.Core.Pro`).**
+  The browser-wasm runtime ships no MD5 provider, so `MD5.Create()` raised
+  `CryptographicException: Cryptography_UnknownHashAlgorithm, MD5` — and since object and scheme hashes
+  are computed on every save, `SyncSchemeAsync` and `SaveAsync` failed outright in the browser. All MD5
+  call sites now go through `RedbMd5`, which uses the platform provider where one exists and a managed
+  RFC 1321 implementation where none does (today: browser-wasm only).
+
+  **The algorithm did not change and existing databases are untouched.** Hashes are stored as `Guid`
+  (16 bytes) and compared by change tracking and cache validation, so the managed implementation is
+  asserted bit-for-bit identical to `System.Security.Cryptography.MD5` — RFC 1321 vectors, every block
+  boundary where padding implementations go wrong (54–57, 63–65, 119–120, 127–129 bytes), and random
+  buffers. On every non-browser target the executed code path is exactly what it was before.
+
+- **Android apps shipped ~360 KB of unusable Linux binaries in every APK (`RedBase.SQLite`).** The Free
+  tier's native loadable extension was packed into the idiomatic `runtimes/<rid>/native/` layout — but
+  the .NET Android SDK harvests every `runtimes/*/native/*.so` and maps it into the APK by architecture,
+  so `linux-arm64/redbsqlite.so` landed in `lib/arm64-v8a/` and `linux-x64/redbsqlite.so` in
+  `lib/x86_64/`. Besides the dead weight, this raised `XA0141`: Android 16 requires 16 KB page
+  alignment, so the app would fail to start there. Affected every Android consumer, including those on
+  `RedBase.SQLite.Pro` (which depends on the Free package).
+
+  The extension now ships under `buildTransitive/native/<rid>/`, where no platform SDK looks for it, and
+  `redb.SQLite.targets` performs the delivery. The targets file previously handled only the
+  no-RuntimeIdentifier case — RID-specific publish relied on NuGet flattening `runtimes/` — so it was
+  extended to cover both. The output layout is unchanged (`runtimes/<rid>/native/`), so extension
+  resolution behaves exactly as before on desktop and server.
+
+- **Props cache could serve a stale ("dirty") object mutated in place after it was cached
+  (`RedBase.Core` + all providers).** `MemoryRedbObjectCache` stores a **reference** to the object,
+  not a copy. When a caller mutated a loaded object in place *before* saving it, the cache — pointing
+  at the same object — instantly reflected the mutation, but its stored hash (fixed at `Set`) did not.
+  A subsequent `LoadAsync` saw hash-matches-DB and returned the mutated object as if it were the
+  committed state. The cache now recomputes the object's live hash on every read
+  (`Get` / `GetWithoutHashValidation` / `GetInternal`) and compares it to the hash captured at `Set`;
+  if they differ, the cached snapshot is dirty → treated as a MISS so the caller reloads the committed
+  state from the DB. Surfaces only with `EnablePropsCache=true` (off by default). No clone/allocation
+  on read — just the hash recompute.
+
+- **`RedbHash` was order-dependent for `Dictionary` properties (`RedBase.Core` + all providers).** A
+  `Dictionary<K,V>` was hashed in enumeration order, but .NET does not guarantee that order (it also
+  changes after removals), and the same logical map is rebuilt in a different order when materialized
+  from `_values` than when first created. So one logical object produced **different hashes** on the
+  create path vs the load path, desynchronizing `_objects._hash` from the cache and corrupting any
+  hash-based cache validation for Dictionary-bearing Props. Dictionaries are now hashed by **content**,
+  order-independent (pairs canonicalized as sorted `key=valueHash`). Arrays and lists are unchanged —
+  their order is significant.
+
+- **Base-field aggregations silently ignored the query filter on Pro (`RedBase.*.Pro`).**
+  `SumRedbAsync` / `AverageRedbAsync` / `MinRedbAsync` / `MaxRedbAsync` / `AggregateRedbAsync` (and the
+  Props-based `GetStatisticsAsync`) routed their `Where`/`WhereRedb` filter through the legacy
+  `filterJson` provider overload. The Pro providers deliberately drop `filterJson` — real filtering
+  happens through the compiled `FilterExpression` overload — so those aggregations ran over the **whole
+  scheme**, returning a sum/average/min/max/count as if no filter were applied. (Free was correct: it
+  converts `filterJson` to facet-JSON.) These call sites now pass the `FilterExpression` directly, the
+  same path `AggregateAsync` already used. Enriched aggregation tests now exercise every `*RedbAsync`
+  method with a filter across all six Free/Pro × Postgres/MSSql/SQLite fixtures — the previous suite had
+  zero filtered-`*RedbAsync` coverage, which is why the defect shipped.
+
+- **Integer aggregate results collapsed to 0 on MSSql (`RedBase.Core`, all providers via MSSql).**
+  MSSql renders `SUM`/`MIN`/`MAX` of a base `bigint` field as `numeric(38,10)`, so `FOR JSON` emits it
+  with a zero fraction (`2130762.0000000000`). `JsonValueConverter` read integer targets with
+  `TryGetInt64`, which rejects any JSON number carrying a decimal point, and silently fell back to `0` —
+  so e.g. `AggregateRedbAsync(o => new { Sum = Agg.Sum(o.Id) })` returned 0 on MSSql while Postgres and
+  SQLite (which render plain integers) were correct. The converter now reads integer targets through a
+  `numeric`-tolerant path that truncates a zero fraction, mirroring the provider-rendering tolerance it
+  already applies to `bool` (SQLite 0/1) and `DateTime`. A value beyond the target type's range now
+  overflows loudly instead of collapsing to 0.
+
 ## [3.4.0] — 2026-07-27
 
 > **Why 3.4.0 (a minor bump), not 3.3.4.** This release adds features, not just fixes: explicit scheme

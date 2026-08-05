@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using redb.Core.Models.Entities;
 
@@ -32,11 +33,15 @@ public static class JsonValueConverter
             // Build a minimal stub so callers can surface the key without an extra ListProvider lookup.
             Type t when t == typeof(RedbListItem) => BuildListItemStub(elem),
             
-            // Integers (all mapped to _Long)
-            Type t when t == typeof(long) => elem.TryGetInt64(out var l) ? l : 0L,
-            Type t when t == typeof(int) => elem.TryGetInt32(out var i) ? i : 0,
-            Type t when t == typeof(short) => elem.TryGetInt16(out var s) ? s : (short)0,
-            Type t when t == typeof(byte) => elem.TryGetByte(out var b) ? b : (byte)0,
+            // Integers (all mapped to _Long). Read via ReadIntegral, NOT bare TryGetInt64: MSSql renders
+            // SUM/MIN/MAX of a base bigint field as numeric(38,10), so FOR JSON emits "2130762.0000000000".
+            // TryGetInt64 rejects any number carrying a decimal point and would silently fall back to 0 —
+            // ReadIntegral truncates the zero fraction instead. Same provider-rendering tolerance already
+            // applied to bool (SQLite 0/1) and DateTime formats below.
+            Type t when t == typeof(long) => (long)ReadIntegral(elem),
+            Type t when t == typeof(int) => (int)ReadIntegral(elem),
+            Type t when t == typeof(short) => (short)ReadIntegral(elem),
+            Type t when t == typeof(byte) => (byte)ReadIntegral(elem),
             
             // Decimals
             Type t when t == typeof(decimal) => elem.TryGetDecimal(out var d) ? d : 0m,
@@ -59,6 +64,30 @@ public static class JsonValueConverter
             // Fallback
             _ => elem.GetRawText()
         };
+    }
+
+    /// <summary>
+    /// Reads a JSON scalar as an integral value, tolerating provider-specific numeric rendering.
+    /// A plain integer takes the fast <see cref="JsonElement.TryGetInt64"/> path; a number with a
+    /// (zero) fraction — MSSql's numeric(38,10) aggregate rendering — is read as decimal and truncated;
+    /// an integer-as-string is parsed defensively. Returns 0 for a non-numeric scalar. The caller casts
+    /// the returned decimal to the concrete integer type, so a value beyond that type's range overflows
+    /// loudly rather than silently collapsing to 0.
+    /// </summary>
+    private static decimal ReadIntegral(JsonElement elem)
+    {
+        if (elem.ValueKind == JsonValueKind.Number)
+        {
+            if (elem.TryGetInt64(out var l)) return l;
+            if (elem.TryGetDecimal(out var d)) return decimal.Truncate(d);
+            if (elem.TryGetDouble(out var db)) return (decimal)Math.Truncate(db);
+        }
+        else if (elem.ValueKind == JsonValueKind.String &&
+                 decimal.TryParse(elem.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var ds))
+        {
+            return decimal.Truncate(ds);
+        }
+        return 0m;
     }
 
     /// <summary>

@@ -479,3 +479,9 @@ redb.Route/publish/output/
 redb.Tsak/publish/output/
 redb.Identity/publish/output/
 nupkg/
+
+# Local Claude Code permissions — per-machine, never shared.
+.claude/settings.local.json
+
+# Личный срез состояния TGChatLmm — пишется для владельца, не часть проектной документации.
+TGChatLmm/build/STATUS.md

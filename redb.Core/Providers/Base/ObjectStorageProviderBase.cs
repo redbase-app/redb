@@ -291,7 +291,7 @@ namespace redb.Core.Providers.Base
                     return cachedObj;
                 }
             }
-            
+
             // Cache MISS - load via get_object_json
             return await LoadEagerAsync<TProps>(objectId, depth);
         }

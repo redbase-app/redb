@@ -100,9 +100,11 @@ namespace redb.SQLite.Data
         /// the running application (<see cref="AppContext.BaseDirectory"/>). Returns the full
         /// path (suffix included) or null if not found.
         ///
-        /// Probes the idiomatic <c>runtimes/&lt;rid&gt;/native</c> layout (populated by a
-        /// RID-specific publish and by the package's buildTransitive .targets for
-        /// framework-dependent builds), then a flattened copy next to the app. Used by the
+        /// Probes the <c>runtimes/&lt;rid&gt;/native</c> layout, then a flattened copy next to the
+        /// app. Note the package does NOT ship that layout: the binaries live under
+        /// <c>buildTransitive/native/&lt;rid&gt;/</c> so platform SDKs (notably .NET Android, which
+        /// harvests every <c>runtimes/*/native/*.so</c> into the APK) cannot pick them up. The
+        /// package's .targets reproduces this layout in consumer output instead. Used by the
         /// Free DI registration to auto-configure <see cref="NativeExtensionPath"/> without
         /// an explicit <c>REDB_SQLITE_EXTENSION</c> env var. As a dev fallback it also walks
         /// up the source tree to the CMake build output, so a ProjectReference run straight

@@ -46,8 +46,7 @@ public static class SchemeHashCalculator
         }
         
         // Compute MD5 and convert to Guid
-        using var md5 = MD5.Create();
-        var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
+        var hash = RedbMd5.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
         return new Guid(hash);
     }
 }

@@ -11,10 +11,17 @@ Core library for **RedBase (REDB)** — Entity Database for .NET.
 - `IRedbService` — main service interface (CRUD, queries, trees, lists)
 - LINQ query builder with SQL translation
 - Schema management via `[RedbScheme]` attribute
-- EAV storage engine with typed Props
+- Typed Props storage engine — every property maps to a typed column, not a JSON blob
 - Tree structures (CTE-based), list items, object references
 - Aggregation (Sum, Avg, Min, Max, GroupBy) and window functions
 - Caching, serialization, security providers
+
+## Platforms
+
+Runs on any .NET 8/9/10 target, including **Blazor WebAssembly** and **mobile** (with the SQLite Pro
+provider). Object and scheme hashing goes through `RedbMd5`, which uses the platform MD5 provider where
+one exists and a managed RFC 1321 implementation where none does — browser-wasm ships no MD5 provider.
+The two are bit-for-bit identical, so hashes written by a browser and by a server are interchangeable.
 
 ## Installation
 

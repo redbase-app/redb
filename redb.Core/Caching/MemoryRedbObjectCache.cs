@@ -71,29 +71,41 @@ namespace redb.Core.Caching
                     return null;  // Expired by time
                 }
                 
-                // Hash check
+                // Hash check (against the DB hash the caller passed in)
                 if (entry.Hash != currentHash)
                 {
                     Interlocked.Increment(ref _missCount);
                     return null;  // Hash changed → data outdated
                 }
-                
+
+                // Dirty-snapshot check. The cache holds a REFERENCE to a shared object. If it was mutated
+                // in place after Set (e.g. OpenIddict's SetStatus BEFORE Save), entry.Hash is stale — it
+                // reflects the state at Set, not the current Props. Recompute the live hash; if it drifted,
+                // the cached object no longer matches its stored hash → MISS, so the caller reloads the
+                // committed state from the DB instead of getting a stale ("already redeemed") snapshot.
+                var typed = entry.RedbObject as RedbObject<TProps>;
+                if (typed != null && typed.ComputeHash() != entry.Hash)
+                {
+                    Interlocked.Increment(ref _missCount);
+                    return null;
+                }
+
                 // All checks passed - Cache HIT
                 Interlocked.Increment(ref _hitCount);
-                
+
                 // Update access metadata
                 _lock.EnterWriteLock();
                 try
                 {
                     entry.LastAccessAt = DateTime.UtcNow;
                     entry.AccessCount++;
-                    
+
                     // Add current user as co-owner
                     if (_getUserIdFunc != null)
                     {
                         var userId = _getUserIdFunc();
                         entry.OwnerUserIds.Add(userId);
-                        
+
                         // Register in user accounting
                         if (!_userOwnedObjects.ContainsKey(userId))
                         {
@@ -106,15 +118,15 @@ namespace redb.Core.Caching
                 {
                     _lock.ExitWriteLock();
                 }
-                
-                return entry.RedbObject as RedbObject<TProps>;
+
+                return typed;
             }
             finally
             {
                 _lock.ExitUpgradeableReadLock();
             }
         }
-        
+
         /// <summary>
         /// Get WHOLE RedbObject from cache WITHOUT hash validation.
         /// Used for monolithic applications (SkipHashValidationOnCacheCheck = true).
@@ -137,24 +149,32 @@ namespace redb.Core.Caching
                     return null;  // Expired by time
                 }
                 
-                // ✅ Skip hash check - trust cache
-                
+                // ✅ Skip DB-hash validation - trust cache. But still guard against an in-place mutation
+                // of the shared cached object (dirty snapshot): if the live hash drifted from the one
+                // stored at Set, the object was mutated after caching → MISS, reload committed from DB.
+                var typed = entry.RedbObject as RedbObject<TProps>;
+                if (typed != null && typed.ComputeHash() != entry.Hash)
+                {
+                    Interlocked.Increment(ref _missCount);
+                    return null;
+                }
+
                 // Cache HIT
                 Interlocked.Increment(ref _hitCount);
-                
+
                 // Update access metadata
                 _lock.EnterWriteLock();
                 try
                 {
                     entry.LastAccessAt = DateTime.UtcNow;
                     entry.AccessCount++;
-                    
+
                     // Add current user as co-owner
                     if (_getUserIdFunc != null)
                     {
                         var userId = _getUserIdFunc();
                         entry.OwnerUserIds.Add(userId);
-                        
+
                         // Register in user accounting
                         if (!_userOwnedObjects.ContainsKey(userId))
                         {
@@ -167,15 +187,15 @@ namespace redb.Core.Caching
                 {
                     _lock.ExitWriteLock();
                 }
-                
-                return entry.RedbObject as RedbObject<TProps>;
+
+                return typed;
             }
             finally
             {
                 _lock.ExitUpgradeableReadLock();
             }
         }
-        
+
         /// <summary>
         /// Save WHOLE RedbObject to cache.
         /// </summary>
@@ -674,7 +694,16 @@ namespace redb.Core.Caching
                 Interlocked.Increment(ref _missCount);
                 return null;
             }
-            
+
+            // Dirty-snapshot guard (same as Get): the batch path (FilterNeedToLoad) must not serve a
+            // cached object that was mutated in place after Set — its live hash would drift from the one
+            // stored at Set. Treat as MISS so the object is reloaded committed from the DB.
+            if (result.ComputeHash() != entry.Hash)
+            {
+                Interlocked.Increment(ref _missCount);
+                return null;
+            }
+
             Interlocked.Increment(ref _hitCount);
             return result;
         }

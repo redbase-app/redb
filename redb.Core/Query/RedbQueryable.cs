@@ -714,19 +714,20 @@ where TField : struct
         where TField : struct
     {
         var fieldPath = ExtractFieldPathRedb(selector);
-        var filterJson = BuildFilterJson();
-        
+
         // Use aggregate_grouped with empty group_fields
         var groupFields = Array.Empty<Grouping.GroupFieldRequest>();
-        var aggregations = new[] { new Aggregation.AggregateRequest 
-        { 
-            FieldPath = $"0$:{fieldPath}", 
-            Function = Aggregation.AggregateFunction.Sum, 
-            Alias = "result" 
+        var aggregations = new[] { new Aggregation.AggregateRequest
+        {
+            FieldPath = $"0$:{fieldPath}",
+            Function = Aggregation.AggregateFunction.Sum,
+            Alias = "result"
         }};
-        
+
+        // Pass FilterExpression directly: Pro's filterJson grouped-overload drops the filter and
+        // aggregates the whole scheme (same defect fixed in AggregateAsync). Free converts it to facet-JSON.
         var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, filterJson);
+            _context.SchemeId, groupFields, aggregations, _context.Filter);
         
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
@@ -748,18 +749,18 @@ where TField : struct
         where TField : struct
     {
         var fieldPath = ExtractFieldPathRedb(selector);
-        var filterJson = BuildFilterJson();
-        
+
         var groupFields = Array.Empty<Grouping.GroupFieldRequest>();
-        var aggregations = new[] { new Aggregation.AggregateRequest 
-        { 
-            FieldPath = $"0$:{fieldPath}", 
-            Function = Aggregation.AggregateFunction.Average, 
-            Alias = "result" 
+        var aggregations = new[] { new Aggregation.AggregateRequest
+        {
+            FieldPath = $"0$:{fieldPath}",
+            Function = Aggregation.AggregateFunction.Average,
+            Alias = "result"
         }};
-        
+
+        // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
         var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, filterJson);
+            _context.SchemeId, groupFields, aggregations, _context.Filter);
         
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
@@ -779,18 +780,18 @@ where TField : struct
         where TField : struct
     {
         var fieldPath = ExtractFieldPathRedb(selector);
-        var filterJson = BuildFilterJson();
-        
+
         var groupFields = Array.Empty<Grouping.GroupFieldRequest>();
-        var aggregations = new[] { new Aggregation.AggregateRequest 
-        { 
-            FieldPath = $"0$:{fieldPath}", 
-            Function = Aggregation.AggregateFunction.Min, 
-            Alias = "result" 
+        var aggregations = new[] { new Aggregation.AggregateRequest
+        {
+            FieldPath = $"0$:{fieldPath}",
+            Function = Aggregation.AggregateFunction.Min,
+            Alias = "result"
         }};
-        
+
+        // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
         var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, filterJson);
+            _context.SchemeId, groupFields, aggregations, _context.Filter);
         
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
@@ -810,18 +811,18 @@ where TField : struct
         where TField : struct
     {
         var fieldPath = ExtractFieldPathRedb(selector);
-        var filterJson = BuildFilterJson();
-        
+
         var groupFields = Array.Empty<Grouping.GroupFieldRequest>();
-        var aggregations = new[] { new Aggregation.AggregateRequest 
-        { 
-            FieldPath = $"0$:{fieldPath}", 
-            Function = Aggregation.AggregateFunction.Max, 
-            Alias = "result" 
+        var aggregations = new[] { new Aggregation.AggregateRequest
+        {
+            FieldPath = $"0$:{fieldPath}",
+            Function = Aggregation.AggregateFunction.Max,
+            Alias = "result"
         }};
-        
+
+        // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
         var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, filterJson);
+            _context.SchemeId, groupFields, aggregations, _context.Filter);
         
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
@@ -841,9 +842,8 @@ where TField : struct
         Expression<Func<TProps, TField>> selector) where TField : struct
     {
         var fieldPath = ExtractFieldPath(selector);
-        var filterJson = BuildFilterJson();
         var schemeId = _context.SchemeId;
-        
+
         // ONE SQL query for all aggregations!
         var requests = new[]
         {
@@ -853,8 +853,10 @@ where TField : struct
             new Aggregation.AggregateRequest { FieldPath = fieldPath, Function = Aggregation.AggregateFunction.Max, Alias = "Max" },
             new Aggregation.AggregateRequest { FieldPath = fieldPath, Function = Aggregation.AggregateFunction.Count, Alias = "Count" }
         };
-        
-        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, filterJson);
+
+        // Pass FilterExpression directly: Pro's filterJson batch-overload drops the filter (whole-scheme
+        // stats). Same fix as AggregateAsync; Free converts to facet-JSON.
+        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, _context.Filter);
         
         return new Aggregation.FieldStatistics<TField>
         {
@@ -942,27 +944,27 @@ where TField : struct
     /// </summary>
     public virtual async Task<TResult> AggregateRedbAsync<TResult>(Expression<Func<IRedbObject, TResult>> selector)
     {
-        var filterJson = BuildFilterJson();
         var schemeId = _context.SchemeId;
-        
+
         // Parse expression and find all Agg.* calls
         var aggregations = ParseAggregateRedbExpression(selector);
-        
+
         // Use aggregate_grouped with EMPTY grouping
         var groupFields = Array.Empty<Grouping.GroupFieldRequest>();
         var requests = aggregations.Select(agg => new Aggregation.AggregateRequest
         {
             // COUNT(*) - don't add 0$: (field is empty or "*")
             // For other base fields - add 0$:
-            FieldPath = (agg.Function == Aggregation.AggregateFunction.Count && 
+            FieldPath = (agg.Function == Aggregation.AggregateFunction.Count &&
                         (string.IsNullOrEmpty(agg.FieldPath) || agg.FieldPath == "*"))
                 ? agg.FieldPath  // COUNT(*) - leave as is
                 : $"0$:{agg.FieldPath}",  // Base field - add prefix
             Function = agg.Function,
             Alias = agg.PropertyName
         });
-        
-        var jsonResult = await _provider.ExecuteGroupedAggregateAsync(schemeId, groupFields, requests, filterJson);
+
+        // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
+        var jsonResult = await _provider.ExecuteGroupedAggregateAsync(schemeId, groupFields, requests, _context.Filter);
         
         // Parse result (first row, since no grouping)
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
@@ -970,7 +972,7 @@ where TField : struct
             var firstRow = jsonResult.RootElement[0];
             return BuildAggregateRedbResultFromJson<TResult>(selector, firstRow);
         }
-        
+
         throw new InvalidOperationException("AggregateRedbAsync returned no results");
     }
     

@@ -220,4 +220,54 @@ public abstract class AggregationTestsBase
 
         all.Should().BeTrue();
     }
+
+    // ===== FILTER-AWARE base-field (RedbAsync) aggregations =====
+    // These cover the gap that let a defect ship: base-field aggregations (SumRedbAsync / AggregateRedbAsync)
+    // routed the filter through the filterJson provider overload, which Pro drops → aggregate over the WHOLE
+    // scheme. Free was fine. Runs on all six fixtures (Free + Pro × 3), so both paths are checked.
+
+    [Fact]
+    public async Task SumRedbAsync_WithFilter_ScopesToFilteredObjects()
+    {
+        var ids = await SeedAsync();
+        var oneId = ids[0];
+
+        var allSum = await Redb.Query<EmployeeProps>().SumRedbAsync(o => o.Id);
+        var filteredSum = await Redb.Query<EmployeeProps>()
+            .WhereRedb(o => o.Id == oneId)
+            .SumRedbAsync(o => o.Id);
+
+        filteredSum.Should().Be(oneId, "the filter must scope the base-field sum to the one matching object");
+        filteredSum.Should().NotBe(allSum, "a dropped filter would sum Id over the whole scheme");
+    }
+
+    [Fact]
+    public async Task AggregateRedbAsync_WithFilter_ScopesToFilteredObjects()
+    {
+        var ids = await SeedAsync();
+        var oneId = ids[0];
+
+        var stats = await Redb.Query<EmployeeProps>()
+            .WhereRedb(o => o.Id == oneId)
+            .AggregateRedbAsync(o => new { Count = Agg.Count(), SumId = Agg.Sum(o.Id) });
+
+        ((int)stats.Count).Should().Be(1, "the filter must scope the base-field aggregate to one object");
+        ((long)stats.SumId).Should().Be(oneId);
+    }
+
+    [Fact]
+    public async Task GetStatisticsAsync_WithFilter_ScopesToFilteredObjects()
+    {
+        // GetStatisticsAsync is the Props path, but shares the same filterJson-drop defect on Pro.
+        var ids = await SeedAsync();
+
+        var allStats = await Redb.Query<EmployeeProps>().GetStatisticsAsync(e => e.Salary);
+        var remoteStats = await Redb.Query<EmployeeProps>()
+            .Where(e => e.IsRemote)
+            .GetStatisticsAsync(e => e.Salary);
+
+        remoteStats.Count.Should().BeLessThan(allStats.Count,
+            "the filter must scope the statistics; a dropped filter would count the whole scheme");
+        remoteStats.Count.Should().BeGreaterThan(0);
+    }
 }

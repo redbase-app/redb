@@ -37,8 +37,7 @@ namespace redb.Core.Utils
             };
             
             var payload = string.Join("|", parts);
-            using var md5 = MD5.Create();
-            return new Guid(md5.ComputeHash(Encoding.UTF8.GetBytes(payload)));
+            return new Guid(RedbMd5.ComputeHash(Encoding.UTF8.GetBytes(payload)));
         }
         /// <summary>
         /// Compute hash for any IRedbObject - only from business data (Props).
@@ -97,9 +96,8 @@ namespace redb.Core.Utils
                 .Select(p => SafeGetValue(p, obj));
 
             var payload = string.Join("|", ordered);
-            using var md5 = MD5.Create();
             var bytes = Encoding.UTF8.GetBytes(payload);
-            var hash = md5.ComputeHash(bytes);
+            var hash = RedbMd5.ComputeHash(bytes);
             return new Guid(hash);
         }
         
@@ -133,8 +131,35 @@ namespace redb.Core.Utils
                 // Primitives and simple types - just ToString
                 if (IsPrimitiveOrSimple(type))
                     return value.ToString() ?? "";
-                
-                // Arrays and collections - hash each element
+
+                // Dictionaries — hash by CONTENT, order-independent. A Dictionary is an UNORDERED set of
+                // key/value pairs: {a:1,b:2} equals {b:2,a:1}, so equal maps must hash equally. .NET does
+                // not guarantee enumeration order (and it changes after removals), and the same logical
+                // map is rebuilt in a different order when materialized from _values than when first
+                // created — hashing it in enumeration order desynchronizes _objects._hash vs the cache.
+                // Canonicalize by sorting "key=valueHash" pairs before hashing.
+                if (value is System.Collections.IDictionary dictionary)
+                {
+                    var entries = new System.Collections.Generic.List<string>(dictionary.Count);
+                    foreach (System.Collections.DictionaryEntry entry in dictionary)
+                    {
+                        var keyStr = entry.Key?.ToString() ?? "null";
+                        string valStr;
+                        if (entry.Value == null)
+                            valStr = "null";
+                        else if (entry.Value is decimal decVal)
+                            valStr = decVal.ToString("G29");
+                        else if (IsPrimitiveOrSimple(entry.Value.GetType()))
+                            valStr = entry.Value.ToString() ?? "";
+                        else
+                            valStr = ComputeForObject(entry.Value)?.ToString("N") ?? "null";
+                        entries.Add($"{keyStr}={valStr}");
+                    }
+                    entries.Sort(StringComparer.Ordinal);
+                    return $"{{{string.Join(",", entries)}}}";
+                }
+
+                // Arrays and collections - hash each element (ORDER MATTERS here — lists/arrays are ordered)
                 if (value is System.Collections.IEnumerable enumerable && type != typeof(string))
                 {
                     var elementHashes = new System.Collections.Generic.List<string>();
@@ -201,9 +226,8 @@ namespace redb.Core.Utils
             
             // Combine all hashes into string and compute MD5
             var payload = string.Join("|", hashes.Select(h => h.ToString("N")));
-            using var md5 = MD5.Create();
             var bytes = Encoding.UTF8.GetBytes(payload);
-            var hash = md5.ComputeHash(bytes);
+            var hash = RedbMd5.ComputeHash(bytes);
             return new Guid(hash);
         }
     }
