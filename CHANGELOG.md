@@ -19,7 +19,25 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.5.0] — 2026-08-05
+
+> **Why 3.5.0 (a minor bump) when the core packages carry only fixes.** The number is shared across the
+> ecosystem, and this release adds public API surface in `redb.Route`: the Message History, XSLT and
+> Routing Slip EIPs, plus `{{key}}` property placeholders in endpoint URIs. Under SemVer that is a
+> minor, and a minor may legitimately contain nothing but fixes for the packages that got none —
+> the reverse (shipping new public API as a patch) would not be legitimate.
+>
+> **The whole ecosystem moves together**, as it has since 3.3.3: the core packages (`RedBase.Core`,
+> the three providers Free/Pro, `RedBase.Export`, `RedBase.CLI`, `RedBase.Templates`,
+> `RedBase.Licensing`), all of `redb.Route`, plus `redb.Tsak` and `redb.Identity` — the latter two
+> carry no code changes of their own and are rebuilt onto the new core.
+>
+> **Why they are not left behind on 3.4.0.** Tsak's shared-runtime layer is gated on the **minor**
+> version, so a 3.4.x worker refuses to start with a 3.5.0 framework dropped into `Libs/shared` —
+> "patch the framework without rebuilding the worker" holds within a minor only. Since Identity runs
+> as modules inside Tsak, leaving both behind would mean the two fixes below that affect every
+> consumer — the stale props-cache entry and the order-dependent `Dictionary` hash — never reach
+> their users at all.
 
 ### Fixed
 - **Hashing threw on Blazor WebAssembly, breaking every write (`RedBase.Core`, `RedBase.Core.Pro`).**
