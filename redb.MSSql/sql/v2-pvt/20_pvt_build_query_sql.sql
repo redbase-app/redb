@@ -243,9 +243,25 @@ BEGIN
         DECLARE @treeWhere NVARCHAR(MAX);
 
         IF @source_mode = N'tree_roots'
-            SET @treeWhere = N'o.[_id_parent] IS NULL';
+        BEGIN
+            -- Root-scoped: WhereRoots() on TreeQuery(rootObj) means the root of THIS tree — the seed
+            -- object itself — not every _id_parent IS NULL object in the scheme (the cross-tree leak).
+            IF @escapedIds IS NOT NULL
+                SET @treeWhere = N'o.[_id] IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))';
+            ELSE
+                SET @treeWhere = N'o.[_id_parent] IS NULL';
+        END;
         ELSE IF @source_mode = N'tree_leaves'
+        BEGIN
+            -- Root-scoped: WhereLeaves() on TreeQuery(rootObj) must return leaves of THAT subtree —
+            -- childless descendants of the seed — not every leaf in the scheme (the cross-tree leak).
+            -- pvt_is_descendant_of() is inclusive, so exclude the seed root itself (empty tree => none).
             SET @treeWhere = N'NOT EXISTS (SELECT 1 FROM dbo._objects _lc WHERE _lc.[_id_parent] = o.[_id])';
+            IF @escapedIds IS NOT NULL
+                SET @treeWhere += N' AND o.[_id] NOT IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))'
+                    + N' AND EXISTS (SELECT 1 FROM OPENJSON(N''' + @escapedIds
+                    + N''') _s WHERE dbo.pvt_is_descendant_of(o.[_id], CAST(_s.[value] AS BIGINT)) = 1)';
+        END;
         ELSE IF @source_mode = N'tree_children'
         BEGIN
             IF @escapedIds IS NULL RETURN NULL;

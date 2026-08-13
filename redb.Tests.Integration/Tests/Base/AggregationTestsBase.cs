@@ -256,6 +256,34 @@ public abstract class AggregationTestsBase
     }
 
     [Fact]
+    public async Task SumRedbAsync_EmptySelection_ReturnsZero_DoesNotThrow()
+    {
+        // The second defect the filter fix exposed: once WhereRedb actually narrows, a filter matching
+        // nothing yields an EMPTY selection → SUM is NULL in SQL → reading it as a number threw
+        // InvalidOperationException. Before the filter fix the selection was never empty (filter was
+        // dropped), so this path was unreachable. "A ledger with no movements" must sum to 0, not throw.
+        await SeedAsync();
+
+        var sum = await Redb.Query<EmployeeProps>()
+            .WhereRedb(o => o.Id == -1)   // no object has id -1 → empty selection
+            .SumRedbAsync(o => o.Id);
+
+        sum.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task AverageRedbAsync_EmptySelection_ReturnsZero_DoesNotThrow()
+    {
+        await SeedAsync();
+
+        var avg = await Redb.Query<EmployeeProps>()
+            .WhereRedb(o => o.Id == -1)
+            .AverageRedbAsync(o => o.Id);
+
+        avg.Should().Be(0m);
+    }
+
+    [Fact]
     public async Task GetStatisticsAsync_WithFilter_ScopesToFilteredObjects()
     {
         // GetStatisticsAsync is the Props path, but shares the same filterJson-drop defect on Pro.

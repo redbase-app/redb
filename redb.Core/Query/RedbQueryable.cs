@@ -732,15 +732,19 @@ where TField : struct
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
             var firstRow = jsonResult.RootElement[0];
-            if (firstRow.TryGetProperty("result", out var value))
+            // SUM over an EMPTY selection is NULL in SQL (an aggregate with no GROUP BY still returns one
+            // row). Now that the filter is honoured, WhereRedb(...) matching nothing produces exactly that.
+            // Read it as a number and it throws (JsonElement.GetDecimal requires a Number kind) — so treat
+            // NULL as 0m: an empty sum is 0 (Enumerable.Sum semantics; a ledger with no movements is 0).
+            if (firstRow.TryGetProperty("result", out var value) && value.ValueKind != JsonValueKind.Null)
             {
                 return value.GetDecimal();
             }
         }
-        
+
         return 0m;
     }
-    
+
     /// <summary>
     /// Average value of base IRedbObject field
     /// SQL: uses aggregate_grouped with empty grouping
@@ -765,10 +769,11 @@ where TField : struct
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
             var firstRow = jsonResult.RootElement[0];
-            if (firstRow.TryGetProperty("result", out var value))
+            // AVG over an empty selection is NULL (see SumRedbAsync) — guard against GetDecimal throwing.
+            if (firstRow.TryGetProperty("result", out var value) && value.ValueKind != JsonValueKind.Null)
                 return value.GetDecimal();
         }
-        
+
         return 0m;
     }
     

@@ -88,6 +88,11 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $BODY$
 BEGIN
+    -- 0.6.4 — Scoped WhereLeaves()/WhereRoots() cross-tree leak fix:
+    --   * 12_pvt_cte_builder.sql tree_leaves/tree_roots now honour the seed as a
+    --     SUBTREE ROOT (descend, then apply the leaf/root predicate) instead of an
+    --     exact-id membership, so TreeQuery(rootObj).WhereLeaves() returns the leaves
+    --     of that subtree — not every leaf in the scheme.
     -- 0.6.3 — Soft-delete read-path fix + object-json materializer ownership:
     --   * The whole object->JSON materializer (get_object_json, get_objects_json,
     --     build_hierarchical_properties_optimized, build_listitem_jsonb) moved
@@ -163,7 +168,7 @@ BEGIN
     --   * `_array_index IS NULL` filter for scalars (NOT `_array_parent_id IS NULL`).
     --   * `0$:` base-field prefix stripping in pvt_normalize_base_field_name.
     --   * full collection / nested / dictionary / ListItem.Value/Alias / array-op support.
-    RETURN '0.6.3';
+    RETURN '0.6.4';
 END;
 $BODY$;
 

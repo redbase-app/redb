@@ -50,21 +50,70 @@ One file, base name `redbsqlite`, per platform/arch:
 
 ## Build
 
-```sh
-cd redb.SQLite/native
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release
+One `redb_pvt.c` (and siblings) → one loadable module per platform/arch. There is **no CI for the native
+extension** — it is rebuilt by hand whenever the C sources change, and the artifacts are git-ignored
+(packed at publish time from the `build*/` directories below). The recipes below are the verified ones.
+
+### Windows x64 → `build/redbsqlite.dll`
+
+Uses the compiler + CMake + Ninja bundled with Visual Studio (no separate CMake install needed). Run
+from **PowerShell** — piping a `vcvarsXX.bat` through Git Bash mangles the quoting.
+
+```powershell
+$vs     = "C:\Program Files\Microsoft Visual Studio\18\Insiders"   # adjust edition/year
+$vcvars = "$vs\VC\Auxiliary\Build\vcvars64.bat"
+$cmake  = "$vs\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+$nat    = "C:\Work\redb_code\csharp\redb\redb.SQLite\native"
+cmd /c "`"$vcvars`" && `"$cmake`" -S `"$nat`" -B `"$nat\build`" -G Ninja -DCMAKE_BUILD_TYPE=Release"
+cmd /c "`"$vcvars`" && `"$cmake`" --build `"$nat\build`" --clean-first"
 ```
 
-The artifact lands in `build/` (or `build/Release/` with MSVC multi-config).
+Artifact: `build/redbsqlite.dll`.
 
-### Cross-compiling Linux arm64 (example)
+### Linux x64 + arm64 → `build-linux-x64/` and `build-linux-arm64/` (Docker, from a Windows/any host)
+
+x64 builds natively; arm64 cross-compiles. **The arm64 cross-compiler needs the arm64 C runtime**
+(`crossbuild-essential-arm64` — a bare `gcc-aarch64-linux-gnu` fails at link with
+`cannot find Scrt1.o / crti.o`).
 
 ```sh
-cmake -S . -B build-arm64 -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc
-cmake --build build-arm64
+docker run --rm -v "/abs/path/to/redb.SQLite/native":/src debian:12 bash -c '
+  set -e; export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y --no-install-recommends build-essential cmake crossbuild-essential-arm64 ca-certificates
+  # x64 (native cc)
+  cmake -S /src -B /tmp/bx64 -DCMAKE_BUILD_TYPE=Release && cmake --build /tmp/bx64
+  cp /tmp/bx64/redbsqlite.so /src/build-linux-x64/redbsqlite.so
+  # arm64 (cross)
+  cmake -S /src -B /tmp/barm -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc
+  cmake --build /tmp/barm
+  cp /tmp/barm/redbsqlite.so /src/build-linux-arm64/redbsqlite.so'
 ```
+
+> On Windows Git Bash, prefix with `MSYS_NO_PATHCONV=1` and use a forward-slash absolute path for `-v`
+> (`"C:/Work/.../redb.SQLite/native":/src`) so the mount path is not rewritten. First run pulls
+> `debian:12` and ~190 MB of arm64 cross packages — the slow part is `apt`, not the compile.
+
+### macOS x64/arm64 → `.dylib`
+
+Xcode Command Line Tools + `cmake` (`brew install cmake`), same `cmake -S . -B build && cmake --build build`
+on a macOS host (no cross-build from Windows/Linux).
+
+## Verify a rebuilt artifact
+
+```sh
+# 1. Right arch:
+file build-linux-arm64/redbsqlite.so         # → ELF ... ARM aarch64
+
+# 2. Carries the current SQL (spot-check a literal that only the new code emits):
+grep -a "depth > 0) AND NOT EXISTS" build-linux-x64/redbsqlite.so
+
+# 3. Loads + reports version (native-arch host only):
+sqlite3 ":memory:" ".load ./build-linux-x64/redbsqlite.so sqlite3_redb_init" "SELECT redb_version();"
+```
+
+The full functional check is the .NET Free-path integration suite
+(`redb.Tests.Integration`, the `Sqlite*` fixtures), which loads the platform artifact.
 
 ## Quick check
 

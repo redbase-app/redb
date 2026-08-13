@@ -1116,7 +1116,7 @@ public class MsSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
 
     // Bump together with the literal in redb.MSSql/sql/v2-pvt/00_module_init.sql.
-    public string? Query_PvtRequiredVersion() => "0.1.4";
+    public string? Query_PvtRequiredVersion() => "0.1.6";
 
     // Native PVT projection orchestrator — not supported on MSSql (yet).
     // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these

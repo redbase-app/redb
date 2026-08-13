@@ -175,10 +175,25 @@ public partial class MssqlTreeQueryProvider
         else if (isRoot)
         {
             sourceMode = "tree_roots";
+            // Respect root scoping: TreeQuery(rootObj).WhereRoots() means "the root of THIS tree",
+            // not every root in the scheme. Seed with the scoped root so the SQL restricts to it;
+            // an empty seed keeps the whole-scheme "all roots" behavior.
+            if (context.ParentIds != null && context.ParentIds.Length > 0)
+                treeIds = context.ParentIds;
+            else if (context.RootObjectId.HasValue)
+                treeIds = new[] { context.RootObjectId.Value };
         }
         else if (isLeaf)
         {
             sourceMode = "tree_leaves";
+            // Respect root scoping: TreeQuery(rootObj).WhereLeaves() means "leaves of THIS subtree",
+            // not every leaf in the scheme (the cross-tree leak). Seed with the scoped root so the SQL
+            // descends from it and applies the leaf predicate over its subtree; an empty seed keeps the
+            // whole-scheme "all leaves" behavior.
+            if (context.ParentIds != null && context.ParentIds.Length > 0)
+                treeIds = context.ParentIds;
+            else if (context.RootObjectId.HasValue)
+                treeIds = new[] { context.RootObjectId.Value };
         }
         else if (context.RootObjectId.HasValue
                  || (context.ParentIds != null && context.ParentIds.Length > 0))

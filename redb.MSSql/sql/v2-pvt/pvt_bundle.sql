@@ -119,9 +119,18 @@ BEGIN
     --           _Object reference to a trashed object resolves to NULL instead
     --           of materializing the tombstone. The _values pointer stays
     --           intact, so soft-delete remains reversible.
+    -- 0.1.6 - Scoped WhereLeaves()/WhereRoots() cross-tree leak fix:
+    --         * 20_pvt_build_query_sql.sql tree_leaves/tree_roots fast-path now
+    --           honours the seed: leaves = childless descendants of the seed root
+    --           (via pvt_is_descendant_of), roots = the seed object itself —
+    --           instead of a whole-scheme scan that ignored @tree_ids. So
+    --           TreeQuery(rootObj).WhereLeaves() returns the leaves of that
+    --           subtree, not every leaf in the scheme.
+    --         * pvt_tree_leaves / pvt_tree_roots (08_pvt_tree_functions.sql) —
+    --           the pvt_build_cte_sql (props-shape) path — seeded the same way.
     -- 0.1.0 - skeleton: module bootstrap, drop-all, version function.
     --         Builder functions (pvt_build_query_sql etc.) not implemented yet.
-    RETURN N'0.1.4';
+    RETURN N'0.1.6';
 END;
 GO
 
@@ -1090,15 +1099,12 @@ BEGIN
     END
     ELSE
     BEGIN
-        ;WITH seeds(_id) AS (
-            SELECT CAST([value] AS BIGINT) FROM OPENJSON(@seed_ids)
-        )
+        -- Root-scoped: WhereRoots() on TreeQuery(rootObj) means the root of THIS tree — the seed
+        -- object itself — not every _id_parent IS NULL object in the scheme.
         INSERT INTO @T(_id, depth)
-        SELECT o.[_id], 0
+        SELECT DISTINCT o.[_id], 0
         FROM dbo._objects o
-        JOIN seeds s ON s._id = o.[_id]
-        WHERE o.[_id_parent] IS NULL
-          AND o.[_id_scheme] = @scheme_id;
+        JOIN (SELECT CAST([value] AS BIGINT) AS _id FROM OPENJSON(@seed_ids)) s ON s._id = o.[_id];
     END;
 
     RETURN;
@@ -1128,18 +1134,27 @@ BEGIN
     END
     ELSE
     BEGIN
+        -- Root-scoped: leaves of THIS subtree, not every scheme leaf (the cross-tree leak). Descend
+        -- from the seed root(s), then keep only childless descendants (depth > 0 drops the container
+        -- root itself). MAXRECURSION 0 lifts the 100-level cap for deep chains (trees can't cycle).
         ;WITH seeds(_id) AS (
             SELECT CAST([value] AS BIGINT) FROM OPENJSON(@seed_ids)
+        ),
+        walk(_id, depth) AS (
+            SELECT s._id, 0 FROM seeds s
+            UNION ALL
+            SELECT o.[_id], w.depth + 1
+            FROM dbo._objects o
+            JOIN walk w ON o.[_id_parent] = w._id
         )
         INSERT INTO @T(_id, depth)
-        SELECT o.[_id], 0
-        FROM dbo._objects o
-        JOIN seeds s ON s._id = o.[_id]
-        WHERE o.[_id_scheme] = @scheme_id
-          AND NOT EXISTS (
-              SELECT 1 FROM dbo._objects c
-              WHERE c.[_id_parent] = o.[_id]
-          );
+        SELECT d._id, 0
+        FROM (SELECT DISTINCT _id FROM walk WHERE depth > 0) d
+        WHERE NOT EXISTS (
+            SELECT 1 FROM dbo._objects c
+            WHERE c.[_id_parent] = d._id
+        )
+        OPTION (MAXRECURSION 0);
     END;
 
     RETURN;
@@ -5148,9 +5163,25 @@ BEGIN
         DECLARE @treeWhere NVARCHAR(MAX);
 
         IF @source_mode = N'tree_roots'
-            SET @treeWhere = N'o.[_id_parent] IS NULL';
+        BEGIN
+            -- Root-scoped: WhereRoots() on TreeQuery(rootObj) means the root of THIS tree — the seed
+            -- object itself — not every _id_parent IS NULL object in the scheme (the cross-tree leak).
+            IF @escapedIds IS NOT NULL
+                SET @treeWhere = N'o.[_id] IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))';
+            ELSE
+                SET @treeWhere = N'o.[_id_parent] IS NULL';
+        END;
         ELSE IF @source_mode = N'tree_leaves'
+        BEGIN
+            -- Root-scoped: WhereLeaves() on TreeQuery(rootObj) must return leaves of THAT subtree —
+            -- childless descendants of the seed — not every leaf in the scheme (the cross-tree leak).
+            -- pvt_is_descendant_of() is inclusive, so exclude the seed root itself (empty tree => none).
             SET @treeWhere = N'NOT EXISTS (SELECT 1 FROM dbo._objects _lc WHERE _lc.[_id_parent] = o.[_id])';
+            IF @escapedIds IS NOT NULL
+                SET @treeWhere += N' AND o.[_id] NOT IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))'
+                    + N' AND EXISTS (SELECT 1 FROM OPENJSON(N''' + @escapedIds
+                    + N''') _s WHERE dbo.pvt_is_descendant_of(o.[_id], CAST(_s.[value] AS BIGINT)) = 1)';
+        END;
         ELSE IF @source_mode = N'tree_children'
         BEGIN
             IF @escapedIds IS NULL RETURN NULL;

@@ -1238,18 +1238,39 @@ char *pvtBuildCteSql(sqlite3 *db, sqlite3_int64 scheme, const char *fields,
       seed, (!polymorphic)?scheme_pred:"");
     tree_filter = sqlite3_mprintf("o._id IN (SELECT _id FROM _pvt_tree)");
   }else if(!strcmp(source_mode,"tree_roots")){
-    tree_cte = sqlite3_mprintf(
-      "_pvt_tree(_id, depth) AS (\n    SELECT o._id, 0 FROM _objects o WHERE o._id_parent IS NULL AND o._id_scheme = %lld%s%s\n)",
-      (long long)scheme, seed?" AND o._id IN (":"", seed?seed:"");
-    if(seed){ char *t = sqlite3_mprintf("%s)", tree_cte); sqlite3_free(tree_cte); tree_cte = t; }
+    if(seed){
+      /* Root-scoped: WhereRoots() on TreeQuery(rootObj) means the root of THIS tree — the seed object
+         itself — NOT every _id_parent IS NULL object in the scheme. */
+      tree_cte = sqlite3_mprintf(
+        "_pvt_tree(_id, depth) AS (\n    SELECT o._id, 0 FROM _objects o WHERE o._id IN (%s)\n)", seed);
+    }else{
+      tree_cte = sqlite3_mprintf(
+        "_pvt_tree(_id, depth) AS (\n    SELECT o._id, 0 FROM _objects o WHERE o._id_parent IS NULL AND o._id_scheme = %lld\n)",
+        (long long)scheme);
+    }
     tree_filter = sqlite3_mprintf("o._id IN (SELECT _id FROM _pvt_tree)");
   }else if(!strcmp(source_mode,"tree_leaves")){
-    tree_cte = sqlite3_mprintf(
-      "_pvt_tree(_id, depth) AS (\n    SELECT o._id, 0 FROM _objects o WHERE o._id_scheme = %lld"
-      " AND NOT EXISTS (SELECT 1 FROM _objects c WHERE c._id_parent = o._id)%s%s\n)",
-      (long long)scheme, seed?" AND o._id IN (":"", seed?seed:"");
-    if(seed){ char *t = sqlite3_mprintf("%s)", tree_cte); sqlite3_free(tree_cte); tree_cte = t; }
-    tree_filter = sqlite3_mprintf("o._id IN (SELECT _id FROM _pvt_tree)");
+    if(seed){
+      /* Root-scoped: WhereLeaves() on TreeQuery(rootObj) must return leaves of THAT subtree, not every
+         leaf in the scheme (the cross-tree leak). Descend from the seed root(s), then keep only
+         childless descendants (depth > 0 excludes the container root itself). */
+      char *cap = has_max_depth ? sqlite3_mprintf("t.depth < %d", max_depth) : sqlite3_mprintf("TRUE");
+      int needw = has_max_depth || !polymorphic;
+      tree_cte = sqlite3_mprintf(
+        "_pvt_tree(_id, depth) AS (\n    SELECT _id, 0 FROM _objects WHERE _id IN (%s)\n    UNION ALL\n"
+        "    SELECT o._id, t.depth + 1 FROM _objects o JOIN _pvt_tree t ON o._id_parent = t._id%s%s%s\n)",
+        seed, needw?" WHERE ":"", needw?cap:"", (!polymorphic)?scheme_pred:"");
+      sqlite3_free(cap);
+      has_recursive = 1;
+      tree_filter = sqlite3_mprintf(
+        "o._id IN (SELECT _id FROM _pvt_tree WHERE depth > 0) AND NOT EXISTS (SELECT 1 FROM _objects c WHERE c._id_parent = o._id)");
+    }else{
+      tree_cte = sqlite3_mprintf(
+        "_pvt_tree(_id, depth) AS (\n    SELECT o._id, 0 FROM _objects o WHERE o._id_scheme = %lld"
+        " AND NOT EXISTS (SELECT 1 FROM _objects c WHERE c._id_parent = o._id)\n)",
+        (long long)scheme);
+      tree_filter = sqlite3_mprintf("o._id IN (SELECT _id FROM _pvt_tree)");
+    }
   }else if(!strcmp(source_mode,"tree_ancestors")){
     if(!seed){ sqlite3_free(pivot_cols); sqlite3_free(alias_wrap); sqlite3_free(sids); return 0; }
     char *cap = has_max_depth ? sqlite3_mprintf(" AND t.depth < %d", max_depth) : sqlite3_mprintf("");

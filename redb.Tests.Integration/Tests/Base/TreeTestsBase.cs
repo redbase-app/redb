@@ -171,6 +171,38 @@ public abstract class TreeTestsBase
     }
 
     [Fact]
+    public async Task TreeQuery_WhereLeaves_ScopedToRoot_DoesNotLeakOtherTrees()
+    {
+        // Regression for the cross-tree leak: WhereLeaves() replaced the root-scoped CTE with a
+        // scheme-wide leaf scan, so TreeQuery(rootObj).WhereLeaves() returned the newest leaf of ANY
+        // tree in the scheme — a critical data leak (a fresh conversation received another user's leaf).
+        var (rootA, eng, be, fe, mkt) = await SeedTreeAsync();
+
+        // Tree B: a lone root with NO children — a brand-new, empty "conversation".
+        var rootB = TestDataFactory.CreateTreeNode("IsolationEmptyRoot", "ISO_EMPTY", 1m);
+        rootB.id = await Redb.SaveAsync(rootB);
+
+        // Scoped to A → exactly A's three leaves, and nothing from B.
+        var rootAObj = await Redb.LoadAsync<TreeNodeProps>(rootA);
+        var leavesA = await Redb.TreeQuery<TreeNodeProps>(rootAObj)
+            .WhereLeaves()
+            .ToListAsync();
+
+        leavesA.Select(l => l.Props.Name).Should().BeEquivalentTo(new[] { "Backend", "Frontend", "Marketing" });
+        leavesA.Should().NotContain(l => l.id == rootB.id, "B's root is not part of A's subtree");
+        leavesA.Should().NotContain(l => l.id == rootA, "A's root has children, so it is not a leaf");
+
+        // Scoped to the EMPTY B → NO leaves. This is the exact leak path: before the fix it returned
+        // A's freshest leaf instead of empty.
+        var rootBObj = await Redb.LoadAsync<TreeNodeProps>(rootB.id);
+        var leavesB = await Redb.TreeQuery<TreeNodeProps>(rootBObj)
+            .WhereLeaves()
+            .ToListAsync();
+
+        leavesB.Should().BeEmpty("a root with no children has no leaves — other trees' leaves must not leak in");
+    }
+
+    [Fact]
     public async Task TreeQuery_WhereLevel_FiltersLevel()
     {
         var (root, eng, be, fe, mkt) = await SeedTreeAsync();

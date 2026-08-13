@@ -3101,6 +3101,11 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $BODY$
 BEGIN
+    -- 0.6.4 — Scoped WhereLeaves()/WhereRoots() cross-tree leak fix:
+    --   * 12_pvt_cte_builder.sql tree_leaves/tree_roots now honour the seed as a
+    --     SUBTREE ROOT (descend, then apply the leaf/root predicate) instead of an
+    --     exact-id membership, so TreeQuery(rootObj).WhereLeaves() returns the leaves
+    --     of that subtree — not every leaf in the scheme.
     -- 0.6.3 — Soft-delete read-path fix + object-json materializer ownership:
     --   * The whole object->JSON materializer (get_object_json, get_objects_json,
     --     build_hierarchical_properties_optimized, build_listitem_jsonb) moved
@@ -3176,7 +3181,7 @@ BEGIN
     --   * `_array_index IS NULL` filter for scalars (NOT `_array_parent_id IS NULL`).
     --   * `0$:` base-field prefix stripping in pvt_normalize_base_field_name.
     --   * full collection / nested / dictionary / ListItem.Value/Alias / array-op support.
-    RETURN '0.6.3';
+    RETURN '0.6.4';
 END;
 $BODY$;
 
@@ -7159,27 +7164,53 @@ BEGIN
             v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree)';
 
         ELSIF p_source_mode = 'tree_roots' THEN
-            v_cte_parts := v_cte_parts || (
-                '_pvt_tree(_id, depth) AS ('
-                || E'\n    SELECT o._id, 0 FROM _objects o '
-                || 'WHERE o._id_parent IS NULL AND o._id_scheme = ' || p_scheme_id::text
-                || CASE WHEN v_seed_arr IS NOT NULL
-                        THEN ' AND o._id = ANY(' || v_seed_arr || ')'
-                        ELSE '' END
-                || E'\n)');
+            IF v_seed_arr IS NOT NULL THEN
+                -- Root-scoped: WhereRoots() on TreeQuery(rootObj) means the root of THIS tree — the seed
+                -- object itself — not every _id_parent IS NULL object in the scheme.
+                v_cte_parts := v_cte_parts || (
+                    '_pvt_tree(_id, depth) AS ('
+                    || E'\n    SELECT o._id, 0 FROM _objects o WHERE o._id = ANY(' || v_seed_arr || ')'
+                    || E'\n)');
+            ELSE
+                v_cte_parts := v_cte_parts || (
+                    '_pvt_tree(_id, depth) AS ('
+                    || E'\n    SELECT o._id, 0 FROM _objects o '
+                    || 'WHERE o._id_parent IS NULL AND o._id_scheme = ' || p_scheme_id::text
+                    || E'\n)');
+            END IF;
             v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree)';
 
         ELSIF p_source_mode = 'tree_leaves' THEN
-            v_cte_parts := v_cte_parts || (
-                '_pvt_tree(_id, depth) AS ('
-                || E'\n    SELECT o._id, 0 FROM _objects o '
-                || 'WHERE o._id_scheme = ' || p_scheme_id::text
-                || ' AND NOT EXISTS (SELECT 1 FROM _objects c WHERE c._id_parent = o._id)'
-                || CASE WHEN v_seed_arr IS NOT NULL
-                        THEN ' AND o._id = ANY(' || v_seed_arr || ')'
-                        ELSE '' END
-                || E'\n)');
-            v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree)';
+            IF v_seed_arr IS NOT NULL THEN
+                -- Root-scoped: leaves of THIS subtree, not every scheme leaf (the cross-tree leak).
+                -- Descend from the seed root(s), then keep only childless descendants (depth > 0 drops
+                -- the container root itself).
+                v_cte_parts := v_cte_parts || (
+                    '_pvt_tree(_id, depth) AS ('
+                    || E'\n    SELECT _id, 0 FROM _objects WHERE _id = ANY(' || v_seed_arr || ')'
+                    || E'\n    UNION ALL'
+                    || E'\n    SELECT o._id, t.depth + 1 FROM _objects o '
+                    || 'JOIN _pvt_tree t ON o._id_parent = t._id'
+                    || CASE WHEN p_max_depth IS NOT NULL OR NOT p_polymorphic
+                            THEN ' WHERE '
+                                 || CASE WHEN p_max_depth IS NOT NULL
+                                         THEN 't.depth < ' || p_max_depth::text
+                                         ELSE 'TRUE' END
+                                 || CASE WHEN NOT p_polymorphic THEN v_scheme_pred ELSE '' END
+                            ELSE '' END
+                    || E'\n)');
+                v_has_recursive := true;
+                v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree WHERE depth > 0)'
+                              || ' AND NOT EXISTS (SELECT 1 FROM _objects c WHERE c._id_parent = o._id)';
+            ELSE
+                v_cte_parts := v_cte_parts || (
+                    '_pvt_tree(_id, depth) AS ('
+                    || E'\n    SELECT o._id, 0 FROM _objects o '
+                    || 'WHERE o._id_scheme = ' || p_scheme_id::text
+                    || ' AND NOT EXISTS (SELECT 1 FROM _objects c WHERE c._id_parent = o._id)'
+                    || E'\n)');
+                v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree)';
+            END IF;
 
         ELSIF p_source_mode = 'tree_ancestors' THEN
             IF v_seed_arr IS NULL THEN

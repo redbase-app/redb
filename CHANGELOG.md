@@ -19,6 +19,49 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] — 2026-08-13
+
+> **Why 3.6.0 and not 3.5.2.** `redb.Route` adds public API in this release —
+> `.PropagateToolHeaders(...)` and the matching `?propagateToolHeaders=` endpoint option — and new
+> surface cannot ship as a patch. The core packages carry only fixes, but the ecosystem moves on one
+> number, and a minor is allowed to contain nothing but fixes for the packages that got none.
+>
+> This also re-unifies the line: 3.5.1 covered `redb.Route`, `redb.Tsak` and `redb.Identity` while the
+> core stayed at 3.5.0. From 3.6.0 all four are on the same number again.
+>
+> **The SQLite native extension was rebuilt for every RID.** The tree-scope fix below changes
+> `redb_pvt.c`, so a package carrying the previous binaries would have shipped the fix on the managed
+> side and left the Free tier leaking across trees — silently, with no error. win-x64, linux-x64 and
+> linux-arm64 are all rebuilt from the current source and verified byte-different from 3.5.0.
+> macOS still ships no extension (it needs a macOS runner).
+
+### Fixed
+- **`SumRedbAsync` / `AverageRedbAsync` threw `InvalidOperationException` on an empty selection
+  (`RedBase.Core`, all providers).** A `SUM`/`AVG` with no matching rows is `NULL` in SQL (an aggregate
+  without `GROUP BY` still returns one row), and the result was read straight through
+  `JsonElement.GetDecimal`, which requires a `Number` kind and throws on `null`. This path became
+  reachable only after 3.5.0 made base-field aggregations honour the filter: before that `WhereRedb(...)`
+  was dropped, so the aggregate always spanned the whole (non-empty) scheme and never produced `NULL` —
+  the filter defect was masking this one. Both methods now treat a `NULL` result as `0m` (an empty sum
+  is 0 — `Enumerable.Sum` semantics; a ledger with no movements balances to 0), matching the `NULL`
+  guard `MinRedbAsync`/`MaxRedbAsync` already had. New empty-selection tests cover both across all six
+  Free/Pro fixtures.
+
+- **`TreeQuery(rootObj).WhereLeaves()` / `.WhereRoots()` ignored the root and scanned the whole scheme
+  (all six providers — Free and Pro).** The `IsLeaf` / `IsRoot` tree branches built their query from
+  `_id_scheme` alone and dropped `context.RootObjectId` / `ParentIds`, so a root-scoped leaf/root query
+  returned the leaves/roots of EVERY tree in the scheme. For tree-per-entity storage this leaks across
+  trees — e.g. `LoadPathAsync(leaf: null)` picked the newest leaf of another tree, attaching a fresh
+  tree's first node under a foreign root. All providers now descend from the root and apply the
+  leaf/root predicate over that subtree; unscoped queries keep the whole-scheme behavior (no perf
+  regression). Fixed in the Pro CTE builders, and — with full Free/Pro parity — in the Free PVT layer:
+  PostgreSQL plpgsql (`12_pvt_cte_builder.sql`), SQL Server (`20_pvt_build_query_sql.sql` fast-path +
+  `08_pvt_tree_functions.sql` TVFs, v2-pvt module `0.1.4` → `0.1.6`; PG `0.6.3` → `0.6.4`), and the
+  SQLite native extension (`redb_pvt.c`; the prebuilt Windows `redbsqlite.dll` is rebuilt — Linux/macOS
+  `.so`/`.dylib` must be recompiled from source per platform). Regression test:
+  `TreeTestsBase.TreeQuery_WhereLeaves_ScopedToRoot_DoesNotLeakOtherTrees` asserts isolation on all six
+  fixtures. Details in `docs/TREE_SCOPED_LEAF_ISOLATION.md`.
+
 ## [3.5.0] — 2026-08-05
 
 > **Why 3.5.0 (a minor bump) when the core packages carry only fixes.** The number is shared across the
