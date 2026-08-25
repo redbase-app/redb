@@ -194,3 +194,56 @@ public class CityProps
     public bool IsCapital { get; set; }
     public double[]? Coordinates { get; set; }
 }
+
+// ───────────────────────────────────────────────
+// Temporal model — exercises every temporal type REDB supports.
+// The rest of the suite only ever uses DateTime with Kind=Utc, where the
+// zone-less and the instant reading coincide, so none of the temporal
+// conversion paths were reachable from a test before this model existed.
+// ───────────────────────────────────────────────
+
+[RedbScheme("TestTemporal")]
+public class TemporalProps
+{
+    /// <summary>Zone-less clock reading. 14:00 written is 14:00 read, on any host.</summary>
+    public DateTime When { get; set; }
+
+    /// <summary>Native .NET semantics: a real instant with an offset.</summary>
+    public DateTimeOffset Moment { get; set; }
+
+    public DateOnly Day { get; set; }
+    public TimeOnly Clock { get; set; }
+    public TimeSpan Span { get; set; }
+
+    public string Label { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Same shape as <see cref="TemporalProps"/>, own scheme. Round-trip tests insert ad-hoc rows and
+/// must not pollute the deterministic row set the comparison tests count on.
+/// </summary>
+[RedbScheme("TestTemporalRoundTrip")]
+public class TemporalRoundTripProps
+{
+    public DateTime When { get; set; }
+    public DateTimeOffset Moment { get; set; }
+    public DateOnly Day { get; set; }
+    public TimeOnly Clock { get; set; }
+    public TimeSpan Span { get; set; }
+    public string Label { get; set; } = string.Empty;
+}
+
+// ───────────────────────────────────────────────
+// Case-folding model. Text in several scripts, so a search can be checked
+// against languages whose case mapping behaves differently.
+// ───────────────────────────────────────────────
+
+[RedbScheme("TestCollation")]
+public class CollationProps
+{
+    /// <summary>The searched text.</summary>
+    public string Text { get; set; } = string.Empty;
+
+    /// <summary>Stable identity of the row, ASCII only so it is never itself affected.</summary>
+    public string Label { get; set; } = string.Empty;
+}

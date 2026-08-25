@@ -58,6 +58,31 @@ public interface ISqlDialect
     /// Case-insensitive LIKE: ILIKE for PostgreSQL, LIKE for MSSQL (CI collation)
     /// </summary>
     string FormatCaseInsensitiveLike(string column, string parameter);
+
+    /// <summary>
+    /// Wraps a text expression so the database folds its case for ALL scripts, not just ASCII.
+    ///
+    /// <para>
+    /// Every case-insensitive operation goes through here, so the three of them
+    /// (<c>ILIKE</c>/<c>LIKE</c>, <c>LOWER</c>, <c>UPPER</c>) can never drift apart: fixing one and
+    /// forgetting another is exactly how a search finds a row that an equality check then rejects.
+    /// </para>
+    ///
+    /// <para>
+    /// The mechanism differs per provider and that is deliberate, because the providers differ in
+    /// kind and not merely in syntax. PostgreSQL attaches a <c>COLLATE</c> clause to the operand.
+    /// MSSQL needs nothing: its default collation already folds every script. SQLite has no
+    /// collation that could help (its only case-insensitive one, <c>NOCASE</c>, is ASCII-only, and
+    /// <c>LIKE</c> is a function that ignores collations entirely), so its provider fixes the
+    /// problem one level down by overriding the built-in functions on the connection and returns
+    /// the expression untouched here.
+    /// </para>
+    ///
+    /// Returns <paramref name="expression"/> unchanged when the feature is off, so generated SQL is
+    /// byte-for-byte what it was.
+    /// </summary>
+    /// <param name="expression">A SQL text expression, already quoted or parenthesised as needed.</param>
+    string FoldCase(string expression);
     
     /// <summary>
     /// Format DateTime as SQL literal. PostgreSQL: '...'::timestamptz, MSSQL: '...' (parsed natively)

@@ -1822,7 +1822,18 @@ namespace redb.Core.Providers.Base
             {
                 case "String":
                 case "Text":
-                    valueRecord.String = processedValue?.ToString();
+                    // TimeOnly and TimeSpan carry db_type "String" (_types seed). Their plain
+                    // ToString() uses the CURRENT culture — "2:30 PM" under en-US, "14:30" under
+                    // ru-RU — so a value written under one culture failed or silently mis-parsed
+                    // under another. Route them through the invariant round-trip form, the same
+                    // one the JSON converters use.
+                    valueRecord.String = processedValue switch
+                    {
+                        TimeOnly timeOnly => Core.Utils.RedbTemporalFormat.ToText(timeOnly),
+                        TimeSpan timeSpan => Core.Utils.RedbTemporalFormat.ToText(timeSpan),
+                        DateOnly dateOnly => Core.Utils.RedbTemporalFormat.ToText(dateOnly),
+                        _ => processedValue?.ToString()
+                    };
                     break;
                 case "Long":
                 case "bigint":
@@ -1858,16 +1869,27 @@ namespace redb.Core.Providers.Base
                     else if (bool.TryParse(processedValue?.ToString(), out var parsedBool))
                         valueRecord.Boolean = parsedBool;
                     break;
+                // db_type "DateTime" belongs to DateOnly (the CLR DateTime type carries db_type
+                // "DateTimeOffset" and is handled in the branch below, discriminated by the
+                // runtime type of the value).
                 case "DateTime":
-                    if (processedValue is DateTime dateTime)
+                    if (processedValue is DateOnly dateOnlyValue)
+                    {
+                        // Midnight of that date, as a zone-less clock reading. Was previously
+                        // DateTime.TryParse(dateOnly.ToString()) — a round-trip through the
+                        // current culture's short date pattern.
+                        valueRecord.DateTimeOffset = Core.Utils.DateTimeConverter.NormalizeForStorage(
+                            dateOnlyValue.ToDateTime(TimeOnly.MinValue));
+                    }
+                    else if (processedValue is DateTime dateTime)
                     {
                         // ✅ Use centralized converter: DateTime → UTC
                         valueRecord.DateTimeOffset = Core.Utils.DateTimeConverter.NormalizeForStorage(dateTime);
                     }
-                    else if (DateTime.TryParse(processedValue?.ToString(), out var parsedDate))
+                    else if (Core.Utils.RedbTemporalFormat.TryParseDateOnly(processedValue?.ToString(), out var parsedDateOnly))
                     {
-                        // ✅ Use centralized converter: DateTime → UTC
-                        valueRecord.DateTimeOffset = Core.Utils.DateTimeConverter.NormalizeForStorage(parsedDate);
+                        valueRecord.DateTimeOffset = Core.Utils.DateTimeConverter.NormalizeForStorage(
+                            parsedDateOnly.ToDateTime(TimeOnly.MinValue));
                     }
                     break;
                 case "DateTimeOffset":
@@ -1875,7 +1897,15 @@ namespace redb.Core.Providers.Base
                         valueRecord.DateTimeOffset = dateTimeOffset;
                     else if (processedValue is DateTime dt)
                         valueRecord.DateTimeOffset = Core.Utils.DateTimeConverter.NormalizeForStorage(dt);
-                    else if (DateTimeOffset.TryParse(processedValue?.ToString(), out var parsedDate))
+                    // DateOnly stores midnight of that date as a zone-less reading. It carries
+                    // db_type "DateTimeOffset" so that every JSON projection, PVT builder and the
+                    // SQLite native extension handle it through the branch they already have.
+                    else if (processedValue is DateOnly dateOnlyForOffset)
+                        valueRecord.DateTimeOffset = Core.Utils.DateTimeConverter.NormalizeForStorage(
+                            dateOnlyForOffset.ToDateTime(TimeOnly.MinValue));
+                    else if (DateTimeOffset.TryParse(processedValue?.ToString(),
+                                 System.Globalization.CultureInfo.InvariantCulture,
+                                 System.Globalization.DateTimeStyles.RoundtripKind, out var parsedDate))
                         valueRecord.DateTimeOffset = parsedDate;
                     break;
                 case "ByteArray":

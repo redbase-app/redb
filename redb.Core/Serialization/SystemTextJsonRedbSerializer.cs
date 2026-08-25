@@ -178,9 +178,9 @@ namespace redb.Core.Serialization
             if (reader.TokenType == JsonTokenType.String)
             {
                 var dateString = reader.GetString();
-                if (DateTime.TryParse(dateString, out var dateTime))
+                if (Utils.RedbTemporalFormat.TryParseDateOnly(dateString, out var dateOnly))
                 {
-                    return DateOnly.FromDateTime(dateTime);
+                    return dateOnly;
                 }
             }
             throw new JsonException($"Unable to convert '{reader.GetString()}' to DateOnly.");
@@ -188,7 +188,7 @@ namespace redb.Core.Serialization
 
         public override void Write(Utf8JsonWriter writer, DateOnly value, JsonSerializerOptions options)
         {
-            writer.WriteStringValue(value.ToString("yyyy-MM-dd"));
+            writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value));
         }
     }
 
@@ -208,9 +208,9 @@ namespace redb.Core.Serialization
                 if (string.IsNullOrEmpty(dateString))
                     return null;
                     
-                if (DateTime.TryParse(dateString, out var dateTime))
+                if (Utils.RedbTemporalFormat.TryParseDateOnly(dateString, out var dateOnly))
                 {
-                    return DateOnly.FromDateTime(dateTime);
+                    return dateOnly;
                 }
             }
             throw new JsonException($"Unable to convert '{reader.GetString()}' to DateOnly?.");
@@ -219,7 +219,7 @@ namespace redb.Core.Serialization
         public override void Write(Utf8JsonWriter writer, DateOnly? value, JsonSerializerOptions options)
         {
             if (value.HasValue)
-                writer.WriteStringValue(value.Value.ToString("yyyy-MM-dd"));
+                writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value.Value));
             else
                 writer.WriteNullValue();
         }
@@ -235,9 +235,9 @@ namespace redb.Core.Serialization
             if (reader.TokenType == JsonTokenType.String)
             {
                 var timeString = reader.GetString();
-                if (TimeSpan.TryParse(timeString, out var timeSpan))
+                if (Utils.RedbTemporalFormat.TryParseTimeOnly(timeString, out var timeOnly))
                 {
-                    return TimeOnly.FromTimeSpan(timeSpan);
+                    return timeOnly;
                 }
             }
             throw new JsonException($"Unable to convert '{reader.GetString()}' to TimeOnly.");
@@ -245,7 +245,7 @@ namespace redb.Core.Serialization
 
         public override void Write(Utf8JsonWriter writer, TimeOnly value, JsonSerializerOptions options)
         {
-            writer.WriteStringValue(value.ToString("HH:mm:ss"));
+            writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value));
         }
     }
 
@@ -265,9 +265,9 @@ namespace redb.Core.Serialization
                 if (string.IsNullOrEmpty(timeString))
                     return null;
                     
-                if (TimeSpan.TryParse(timeString, out var timeSpan))
+                if (Utils.RedbTemporalFormat.TryParseTimeOnly(timeString, out var timeOnly))
                 {
-                    return TimeOnly.FromTimeSpan(timeSpan);
+                    return timeOnly;
                 }
             }
             throw new JsonException($"Unable to convert '{reader.GetString()}' to TimeOnly?.");
@@ -276,7 +276,7 @@ namespace redb.Core.Serialization
         public override void Write(Utf8JsonWriter writer, TimeOnly? value, JsonSerializerOptions options)
         {
             if (value.HasValue)
-                writer.WriteStringValue(value.Value.ToString("HH:mm:ss"));
+                writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value.Value));
             else
                 writer.WriteNullValue();
         }
@@ -293,7 +293,7 @@ namespace redb.Core.Serialization
             if (reader.TokenType == JsonTokenType.String)
             {
                 var timeString = reader.GetString();
-                if (TimeSpan.TryParse(timeString, out var timeSpan))
+                if (Utils.RedbTemporalFormat.TryParseTimeSpan(timeString, out var timeSpan))
                 {
                     return timeSpan;
                 }
@@ -303,7 +303,7 @@ namespace redb.Core.Serialization
 
         public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options)
         {
-            writer.WriteStringValue(value.ToString(@"hh\:mm\:ss"));
+            writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value));
         }
     }
 
@@ -323,7 +323,7 @@ namespace redb.Core.Serialization
                 if (string.IsNullOrEmpty(timeString))
                     return null;
                     
-                if (TimeSpan.TryParse(timeString, out var timeSpan))
+                if (Utils.RedbTemporalFormat.TryParseTimeSpan(timeString, out var timeSpan))
                 {
                     return timeSpan;
                 }
@@ -334,7 +334,7 @@ namespace redb.Core.Serialization
         public override void Write(Utf8JsonWriter writer, TimeSpan? value, JsonSerializerOptions options)
         {
             if (value.HasValue)
-                writer.WriteStringValue(value.Value.ToString(@"hh\:mm\:ss"));
+                writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value.Value));
             else
                 writer.WriteNullValue();
         }
@@ -357,8 +357,10 @@ namespace redb.Core.Serialization
                 if (stringValue == "infinity")
                     return DateTimeOffset.MaxValue;
                 
-                // Parse standard ISO8601 with timezone
-                if (DateTimeOffset.TryParse(stringValue, out var result))
+                // Parse standard ISO8601 with timezone. Invariant culture: the wire form is always
+                // ISO, and the ambient culture must never influence how a stored value is read.
+                if (DateTimeOffset.TryParse(stringValue, System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var result))
                 {
                     return result.ToUniversalTime();
                 }
@@ -377,7 +379,7 @@ namespace redb.Core.Serialization
             else if (value == DateTimeOffset.MaxValue)
                 writer.WriteStringValue("infinity");
             else
-                writer.WriteStringValue(value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz"));
+                writer.WriteStringValue(value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz", System.Globalization.CultureInfo.InvariantCulture));
         }
     }
 
@@ -400,7 +402,7 @@ namespace redb.Core.Serialization
                 if (stringValue == "infinity")
                     return DateTimeOffset.MaxValue;
                 
-                if (DateTimeOffset.TryParse(stringValue, out var result))
+                if (DateTimeOffset.TryParse(stringValue, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var result))
                 {
                     return result.ToUniversalTime();
                 }
@@ -418,7 +420,7 @@ namespace redb.Core.Serialization
             else if (value == DateTimeOffset.MaxValue)
                 writer.WriteStringValue("infinity");
             else
-                writer.WriteStringValue(value.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz"));
+                writer.WriteStringValue(value.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz", System.Globalization.CultureInfo.InvariantCulture));
         }
     }
 
@@ -446,8 +448,11 @@ namespace redb.Core.Serialization
                     return DateTime.MaxValue;
                 }
 
-                // Regular DateTime deserialization
-                if (DateTimeOffset.TryParse(stringValue, out var dateTimeOffset))
+                // Regular DateTime deserialization. Parsed as DateTimeOffset and reduced to the UTC
+                // instant, so the stored clock reading comes back unchanged regardless of the
+                // reader's time zone — REDB's contract is that DateTime carries no zone.
+                if (DateTimeOffset.TryParse(stringValue, System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var dateTimeOffset))
                 {
                     return Utils.DateTimeConverter.DenormalizeFromStorage(dateTimeOffset);
                 }
@@ -480,7 +485,7 @@ namespace redb.Core.Serialization
             else
             {
                 // Standard serialization
-                writer.WriteStringValue(value.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK"));
+                writer.WriteStringValue(value.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK", System.Globalization.CultureInfo.InvariantCulture));
             }
         }
     }
@@ -514,7 +519,7 @@ namespace redb.Core.Serialization
                 }
                 
                 // Standard DateTime deserialization
-                if (DateTimeOffset.TryParse(stringValue, out var dateTime))
+                if (DateTimeOffset.TryParse(stringValue, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var dateTime))
                 {
                     // ✅ FIXED: Return UTC instead of Local
                     return Utils.DateTimeConverter.DenormalizeFromStorage(dateTime);
@@ -545,7 +550,7 @@ namespace redb.Core.Serialization
             else
             {
                 // Standard serialization
-                writer.WriteStringValue(value.Value.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK"));
+                writer.WriteStringValue(value.Value.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK", System.Globalization.CultureInfo.InvariantCulture));
             }
         }
     }

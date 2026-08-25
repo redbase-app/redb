@@ -541,8 +541,9 @@ ON [dbo].[_values] ([_id_structure], [_array_index], [_id_object])
 INCLUDE ([_string], [_Long], [_Double], [_DateTimeOffset])
 
 CREATE NONCLUSTERED INDEX IX__objects__id_parent 
-ON _objects (_id_parent) 
-INCLUDE (_id, _hash, _id_scheme);
+ON [dbo].[_objects] ([_id_parent]) 
+INCLUDE ([_id], [_hash], [_id_scheme])
+WHERE [_id_parent] IS NOT NULL;
 
 -- 1. Проверка существования индекса
 IF NOT EXISTS (
@@ -649,7 +650,7 @@ INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-922337
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775689, 'Xml', 'String', 'string')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775688, 'Base64', 'String', 'string')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775687, 'Color', 'String', 'string')
-INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775686, 'DateOnly', 'DateTime', 'DateOnly')
+INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775686, 'DateOnly', 'DateTimeOffset', 'DateOnly')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775685, 'TimeOnly', 'String', 'TimeOnly')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775684, 'TimeSpan', 'String', 'TimeSpan')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775683, 'Enum', 'String', 'Enum')

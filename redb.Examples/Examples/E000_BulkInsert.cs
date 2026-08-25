@@ -80,13 +80,19 @@ public class E000_BulkInsert : ExampleBase
     /// <summary>
     /// Creates employee records with meaningful data for queries.
     /// </summary>
-    private static List<RedbObject<EmployeeProps>> CreateEmployees(int count)
+    /// <param name="startIndex">
+    /// Offset for the generated identities, so repeated batches do not collide.
+    /// Every derived value (position, department, salary, dates) keeps its cyclic
+    /// distribution, only the identity-bearing fields move. Used by E203 to seed volume.
+    /// </param>
+    internal static List<RedbObject<EmployeeProps>> CreateEmployees(int count, int startIndex = 0)
     {
-        var result = new List<RedbObject<EmployeeProps>>();
+        var result = new List<RedbObject<EmployeeProps>>(count);
         var baseDate = DateTime.Today.AddYears(-5);
 
-        for (int i = 0; i < count; i++)
+        for (int n = 0; n < count; n++)
         {
+            int i = startIndex + n;
             var position = Positions[i % Positions.Length];
             var department = Departments[i % Departments.Length];
             var city = Cities[i % Cities.Length];
@@ -106,7 +112,10 @@ public class E000_BulkInsert : ExampleBase
             var salary = baseSalary + (i % 20) * 1000;
 
             // Hire dates spread over 5 years
-            var hireDate = baseDate.AddDays(i * 30);
+            // Modulo keeps the span inside DateTime range for large startIndex (E203 seeds
+            // ~100k, and i * 30 days would run past year 9999). For i < 365 the result is
+            // unchanged, so E000's own output is identical.
+            var hireDate = baseDate.AddDays((i % 365) * 30);
 
             var emp = new RedbObject<EmployeeProps>
             {

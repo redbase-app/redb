@@ -42,7 +42,7 @@ namespace redb.SQLite.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(config.ConnectionString))
             {
-                var dataSource = Data.SqliteDataSource.Create(config.ConnectionString);
+                var dataSource = Data.SqliteDataSource.Create(config.ConnectionString, config.StringCollation != null);
                 services.AddSingleton(dataSource);
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.SqliteRedbContext(sp.GetRequiredService<Data.SqliteDataSource>()));
@@ -93,7 +93,7 @@ namespace redb.SQLite.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(config.ConnectionString))
             {
-                var dataSource = Data.SqliteDataSource.Create(config.ConnectionString);
+                var dataSource = Data.SqliteDataSource.Create(config.ConnectionString, config.StringCollation != null);
                 services.AddSingleton(dataSource);
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.SqliteRedbContext(sp.GetRequiredService<Data.SqliteDataSource>()));
@@ -137,7 +137,7 @@ namespace redb.SQLite.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(configuration.ConnectionString))
             {
-                var dataSource = Data.SqliteDataSource.Create(configuration.ConnectionString);
+                var dataSource = Data.SqliteDataSource.Create(configuration.ConnectionString, configuration.StringCollation != null);
                 services.AddSingleton(dataSource);
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.SqliteRedbContext(sp.GetRequiredService<Data.SqliteDataSource>()));

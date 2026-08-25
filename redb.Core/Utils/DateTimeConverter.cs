@@ -4,40 +4,48 @@ namespace redb.Core.Utils
 {
     /// <summary>
     /// Centralized DateTime conversion logic.
-    /// RULE: DateTime is ALWAYS treated as UTC in REDB system.
-    /// 
-    /// CONTRACT:
-    /// - On save: any DateTime → UTC (via NormalizeForStorage)
-    /// - On read: DateTimeOffset from DB → DateTime with Kind=Utc (via DenormalizeFromStorage)
-    /// - On search: any DateTime → UTC (via NormalizeForStorage)
-    /// - On JSON: DateTimeOffset → DateTime with Kind=Utc (via DenormalizeFromStorage)
-    /// 
-    /// IMPORTANT: DateTimeOffset remains as is (preserves timezone information)
+    ///
+    /// RULE: in REDB a <see cref="DateTime"/> carries NO time zone. The clock reading is the
+    /// datum and is preserved end to end: 14:00 written is 14:00 read, on any machine, in any
+    /// zone, through any read path. Kind is set to Utc purely so the value has one unambiguous
+    /// representation on the wire and in the column; it is a label, not a conversion.
+    ///
+    /// CONTRACT (all three points use the SAME transform, which is why they agree):
+    /// - On save:   DateTime → same reading, Kind=Utc (NormalizeForStorage)
+    /// - On search: DateTime → same reading, Kind=Utc (NormalizeForStorage)
+    /// - On read:   DateTimeOffset from DB → same reading, Kind=Utc (DenormalizeFromStorage)
+    ///
+    /// IMPORTANT: <see cref="DateTimeOffset"/> is a different contract and is NOT touched. It is
+    /// the native .NET type and keeps native semantics: it carries a real instant with an offset.
+    /// Base object fields (_date_create, _date_modify, _date_begin, _date_complete) are
+    /// DateTimeOffset and are therefore instants, matching the DB-side now() defaults.
+    /// Use DateTime for zone-less business data, DateTimeOffset when the moment matters.
     /// </summary>
     public static class DateTimeConverter
     {
         /// <summary>
-        /// Normalize DateTime for saving to DB.
-        /// DateTime.Unspecified and DateTime.Local are converted to UTC.
-        /// 
+        /// Normalize a <see cref="DateTime"/> for storage: relabel the clock reading as UTC
+        /// WITHOUT shifting it. This is deliberate, not an oversight.
+        ///
+        /// <para>
+        /// In REDB a <see cref="DateTime"/> carries no zone. The number on the clock is the datum,
+        /// and it must survive unchanged: 14:00 written on any machine is 14:00 read on any other.
+        /// Converting Local to UTC here would make the stored value depend on where the writer
+        /// happened to run, which is exactly what this type is defined not to do. Code that needs
+        /// a zone-aware instant uses <see cref="DateTimeOffset"/>, which keeps native .NET
+        /// semantics throughout REDB.
+        /// </para>
+        ///
         /// Examples:
-        /// - new DateTime(2025, 11, 16) [Unspecified] → 2025-11-16 00:00:00 UTC
-        /// - DateTime.Now [Local MSK 14:00] → UTC 11:00
-        /// - DateTime.UtcNow [Utc] → no changes
+        /// - new DateTime(2025, 11, 16) [Unspecified] → 2025-11-16 00:00:00, Kind=Utc
+        /// - DateTime.Now [Local MSK 14:00] → 14:00, Kind=Utc (the reading, not the instant)
+        /// - DateTime.UtcNow [Utc] → unchanged
         /// </summary>
         /// <param name="dateTime">Original DateTime value</param>
-        /// <returns>DateTime with Kind=Utc</returns>
+        /// <returns>The same clock reading, with Kind=Utc</returns>
         public static DateTime NormalizeForStorage(DateTime dateTime)
         {
             return DateTime.SpecifyKind(dateTime, DateTimeKind.Utc);
-            //return dateTime.Kind switch
-            //{
-            //    DateTimeKind.Utc => dateTime,
-            //    DateTimeKind.Local => dateTime.ToUniversalTime(),
-            //    // Treat Unspecified as UTC (NOT as Local!)
-            //    DateTimeKind.Unspecified => DateTime.SpecifyKind(dateTime, DateTimeKind.Utc),
-            //    _ => throw new ArgumentException($"Unknown DateTimeKind: {dateTime.Kind}")
-            //};
         }
         
         /// <summary>

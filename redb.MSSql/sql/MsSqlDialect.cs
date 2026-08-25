@@ -64,7 +64,17 @@ public class MsSqlDialect : ISqlDialect
     
     public string QuoteIdentifier(string name)
         => $"[{name}]";
-    
+
+    /// <summary>
+    /// Returns the expression unchanged, and unlike SQLite this is not a gap being papered over.
+    /// SQL Server's default collation (SQL_Latin1_General_CP1_CI_AS and its regional siblings) is
+    /// already case-insensitive for every script, Cyrillic and Greek included, so LIKE, LOWER and
+    /// UPPER fold correctly with no help. A database deliberately created with a case-SENSITIVE
+    /// collation is a decision by whoever created it, and silently overriding it here would defeat
+    /// that decision.
+    /// </summary>
+    public string FoldCase(string expression) => expression;
+
     public string FormatCaseInsensitiveLike(string column, string parameter)
         // ESCAPE '\\' is REQUIRED because UserProviderBase.EscapeLikeWildcards
         // escapes '_', '%', '\' with a leading backslash to make them literal.
@@ -1116,7 +1126,7 @@ public class MsSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
 
     // Bump together with the literal in redb.MSSql/sql/v2-pvt/00_module_init.sql.
-    public string? Query_PvtRequiredVersion() => "0.1.6";
+    public string? Query_PvtRequiredVersion() => "0.1.7";
 
     // Native PVT projection orchestrator — not supported on MSSql (yet).
     // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these

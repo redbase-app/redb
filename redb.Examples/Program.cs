@@ -169,10 +169,13 @@ class Program
                 //c.EnablePropsCache = false;
                 //c.PropsCacheMaxSize = 10000;
                 //c.PropsCacheTtl = TimeSpan.FromMinutes(60);
+                // PVT prefilter (Pro + PostgreSQL, opt-in). Flip to true and re-run E202 to
+                // diff the SQL with and without the cutting step. See docs/PVT_PREFILTER_PLAN.md.
+                c.EnablePvtPrefilter = true;// Environment.GetEnvironmentVariable("REDB_PVT_PREFILTER") == "1";
             })
             //.UsePostgres("Host=localhost;Port=5432;Username=postgres;Password=1;Database=redb;Pooling=true;Include Error Detail=true;Options=-c jit=off")
             //.UseMsSql("Server=127.0.0.1,1433;Database=redb;User Id=sa;Password=1;TrustServerCertificate=true;Command Timeout=600;")  // 127.0.0.1 (not localhost): localhost->::1 hits docker [::]:1433 and hangs ~63s
-            .UseSqlite("Data Source=redb_examples.db")
+            .UseSqlite(@"redb_examples.db")
             );
     }
 

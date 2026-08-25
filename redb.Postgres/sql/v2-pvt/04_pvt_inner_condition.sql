@@ -71,7 +71,7 @@ BEGIN
             WHEN '$containsIgnoreCase' THEN pattern := '%' || operator_value || '%';
         END CASE;
         
-        RETURN format('fv._String ILIKE %L', pattern);
+        RETURN format('%s ILIKE %L', pvt_fold_case('fv._String'), pattern);
     
     -- IN operator
     -- 🚀 OPTIMIZATION: removed fs.db_type checks - use db_type from type_info directly

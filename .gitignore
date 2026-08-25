@@ -485,3 +485,12 @@ nupkg/
 
 # Личный срез состояния TGChatLmm — пишется для владельца, не часть проектной документации.
 TGChatLmm/build/STATUS.md
+
+# Секреты тестового контура — по машине, никогда не в репозиторий.
+# Образец с пустыми значениями лежит рядом: TGChatLmm/deploy/local.env.example
+TGChatLmm/deploy/local.env
+
+# Dev drop dir for hot-reloaded modules: .tpkg packages and their context.json.
+# Never committed and never shipped — the csproj excludes it from publish, and a leaked
+# context.json once carried live dev passwords into a release artifact (3.6.0).
+redb.Tsak/src/redb.Tsak.Worker/modules/

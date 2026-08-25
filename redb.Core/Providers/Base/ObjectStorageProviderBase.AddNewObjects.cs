@@ -180,16 +180,16 @@ namespace redb.Core.Providers.Base
 
                     if (_configuration.AutoSetModifyDate)
                     {
-                        record.DateCreate = DateTimeOffset.Now;
-                        record.DateModify = DateTimeOffset.Now;
+                        record.DateCreate = DateTimeOffset.UtcNow;
+                        record.DateModify = DateTimeOffset.UtcNow;
                     }
                     else
                     {
                         var dateCreate = obj.DateCreate;
-                        record.DateCreate = dateCreate == DateTimeOffset.MinValue ? DateTimeOffset.Now : dateCreate;
+                        record.DateCreate = dateCreate == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : dateCreate;
 
                         var dateModify = obj.DateModify;
-                        record.DateModify = dateModify == DateTimeOffset.MinValue ? DateTimeOffset.Now : dateModify;
+                        record.DateModify = dateModify == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : dateModify;
                     }
 
                     return record;

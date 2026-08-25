@@ -1,16 +1,28 @@
+name: Question
+description: Ask anything about REDB — usage, behaviour, or design
+title: "[Question] "
 labels:
   - question
-  - discussion
 body:
   - type: markdown
     attributes:
       value: |
-        Use [Discussions](https://github.com/redbase-app/redb/discussions) for questions and general topics.
-        Use this form only for issues that don't fit bug reports or feature requests.
+        Anyone can open this — no permissions or prior contributions needed.
+
+        For open-ended topics, [Discussions → Q&A](https://github.com/redbase-app/redb/discussions/categories/q-a)
+        is usually a better fit. Use this form when you would rather have it tracked as an issue.
   - type: textarea
-    id: description
+    id: question
     attributes:
-      label: Description
-      description: Describe your question or topic
+      label: Question
+      description: What would you like to know?
     validations:
       required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context (optional)
+      description: Versions, provider (PostgreSQL / MSSQL / SQLite), code snippet — whatever helps.
+      render: text
+    validations:
+      required: false

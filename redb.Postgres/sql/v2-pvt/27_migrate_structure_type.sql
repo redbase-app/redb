@@ -157,17 +157,24 @@ BEGIN
                 'UPDATE _values SET %I = %I::numeric, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~ ''^-?[0-9]+\.?[0-9]*$''',
                 v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
         ELSIF v_target_col = '_boolean' THEN
+            -- The IN-list is repeated as a predicate on purpose. Without it the CASE fell through to
+            -- NULL for anything unrecognised while the same statement cleared the source column, so a
+            -- value like 'maybe' was DESTROYED — and counted as a success, because success is measured
+            -- by rows updated. Every other text conversion here is guarded; this one was not.
             v_conversion_sql := format(
-                'UPDATE _values SET %I = CASE WHEN LOWER(%I) IN (''true'', ''1'', ''yes'', ''t'', ''y'') THEN TRUE WHEN LOWER(%I) IN (''false'', ''0'', ''no'', ''f'', ''n'') THEN FALSE ELSE NULL END, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                'UPDATE _values SET %I = CASE WHEN LOWER(%I) IN (''true'', ''1'', ''yes'', ''t'', ''y'') THEN TRUE ELSE FALSE END, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND LOWER(%I) IN (''true'', ''1'', ''yes'', ''t'', ''y'', ''false'', ''0'', ''no'', ''f'', ''n'')',
                 v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
         ELSIF v_target_col = '_datetimeoffset' THEN
+            -- Guarded like the numeric branches, and like MSSQL's TRY_CAST. A bare ::timestamptz raised
+            -- on the first unparseable row and aborted the whole migration, so one bad value blocked
+            -- every good one — and the failure arrived as a raw SQL error rather than a report.
             v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::timestamptz, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
+                'UPDATE _values SET %I = %I::timestamptz, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~ ''^\d{4}-\d{2}-\d{2}''',
+                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
         ELSIF v_target_col = '_guid' THEN
             v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::uuid, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
+                'UPDATE _values SET %I = %I::uuid, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~* ''^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''',
+                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
         END IF;
     
     -- LONG -> *

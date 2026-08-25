@@ -70,7 +70,7 @@ public static class SqliteOptionsExtensions
         // DataSource and Context
         if (!string.IsNullOrEmpty(config.ConnectionString))
         {
-            var dataSource = Data.SqliteDataSource.Create(config.ConnectionString);
+            var dataSource = Data.SqliteDataSource.Create(config.ConnectionString, config.StringCollation != null);
             services.AddSingleton(dataSource);
             services.AddScoped<IRedbContext>(sp => 
                 new SqliteRedbContext(sp.GetRequiredService<Data.SqliteDataSource>()));

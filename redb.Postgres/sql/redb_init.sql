@@ -543,6 +543,20 @@ CREATE INDEX IF NOT EXISTS "IX__objects__root_objects"
 ON _objects (_id_scheme, _id)
 WHERE _id_parent IS NULL;
 
+-- 7a. 🧬 Tree walk that needs the object hash (transparent cache).
+-- Analogue of IX__objects__id_parent in redbMSSQL.sql. IX__objects__parent_scheme_id
+-- above stops at (_id_parent, _id_scheme, _id) and does NOT carry _hash, so a walk
+-- that reads the hash falls back to the heap on every row. INCLUDE keeps _hash out
+-- of the key: it is not searched by, only returned. Verified on PostgreSQL 18.1 —
+-- the plan for SELECT _id, _hash, _id_scheme WHERE _id_parent = ? is Index Only Scan.
+-- No deduplicate_items here, matching the other indexes in this section. Filtered on
+-- _id_parent IS NOT NULL: a lookup by parent never matches NULL, so root objects would
+-- sit in the index as dead weight.
+CREATE INDEX IF NOT EXISTS "IX__objects__id_parent"
+ON _objects (_id_parent)
+INCLUDE (_id, _hash, _id_scheme)
+WHERE _id_parent IS NOT NULL;
+
 -- 8. 📅 Sorting by dates
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_date_create" 
 ON _objects (_id_scheme, _date_create DESC, _id);
@@ -751,7 +765,7 @@ INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775688, '
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775687, 'Color', 'String', 'string');     -- Colors (hex, rgb)
 
 -- 4. Temporal types
-INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775686, 'DateOnly', 'DateTime', 'DateOnly');     -- .NET 6+ DateOnly
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775686, 'DateOnly', 'DateTimeOffset', 'DateOnly'); -- .NET 6+ DateOnly, stored as a midnight reading in _DateTimeOffset
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775685, 'TimeOnly', 'String', 'TimeOnly');      -- .NET 6+ TimeOnly (as string)
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775684, 'TimeSpan', 'String', 'TimeSpan');      -- TimeSpan (format "HH:MM:SS" for JSON compatibility)
 
@@ -1686,302 +1700,45 @@ Cache warmup:
 --   _collection_type IS NULL = not a collection
 -- ============================================================
 
--- ===== migrate_structure_type.sql =====
--- ============================================================
--- HELPER FUNCTION: get_value_column
--- Returns the _values column name for a given type name
--- ============================================================
+-- ===== migrate_dateonly_db_type.sql =====
+-- =====================================================
+-- MIGRATION: DateOnly gets db_type 'DateTimeOffset' (PostgreSQL)
+-- =====================================================
+-- DateOnly was seeded with _db_type = 'DateTime', a value no other type uses and
+-- no JSON projection knows about: get_object_json switches on _db_type and has
+-- branches for 'DateTimeOffset', 'String', 'Long', ... but none for 'DateTime'.
+-- The column was written correctly and then dropped on the way out, so every
+-- DateOnly property materialised as 0001-01-01 on every provider.
+--
+-- Retyping it to 'DateTimeOffset' routes it through the branch that already
+-- exists everywhere — JSON projections, PVT builders and the SQLite native
+-- extension — with no change to any SQL function and no PVT version bump.
+-- Storage is unchanged: the value already lives in _values._DateTimeOffset as
+-- midnight of that date.
+--
+-- Idempotent. Run on existing databases; new ones get the right value from
+-- redbPostgre.sql.
+-- =====================================================
 
--- DROP FUNCTION IF EXISTS public.get_value_column(text);
+UPDATE _types
+   SET _db_type = 'DateTimeOffset'
+ WHERE _id = -9223372036854775686        -- DateOnly
+   AND _db_type <> 'DateTimeOffset';
 
-CREATE OR REPLACE FUNCTION public.get_value_column(p_type_name text)
-RETURNS text
-LANGUAGE 'plpgsql'
-IMMUTABLE
-AS $BODY$
-BEGIN
-    RETURN CASE LOWER(p_type_name)
-        WHEN 'string' THEN '_string'
-        WHEN 'text' THEN '_string'
-        WHEN 'mimetype' THEN '_string'
-        WHEN 'filepath' THEN '_string'
-        WHEN 'filename' THEN '_string'
-        WHEN 'long' THEN '_long'
-        WHEN 'int' THEN '_long'
-        WHEN 'short' THEN '_long'
-        WHEN 'byte' THEN '_long'
-        WHEN 'object' THEN '_object'
-        WHEN 'double' THEN '_double'
-        WHEN 'float' THEN '_double'
-        WHEN 'boolean' THEN '_boolean'
-        WHEN 'datetime' THEN '_datetimeoffset'
-        WHEN 'datetimeoffset' THEN '_datetimeoffset'
-        WHEN 'dateonly' THEN '_datetimeoffset'
-        WHEN 'timeonly' THEN '_datetimeoffset'
-        WHEN 'timespan' THEN '_long'
-        WHEN 'guid' THEN '_guid'
-        WHEN 'bytearray' THEN '_bytearray'
-        WHEN 'numeric' THEN '_numeric'
-        WHEN 'listitem' THEN '_listitem'
-        ELSE NULL
-    END;
-END;
-$BODY$;
+-- The scheme metadata cache copies _db_type; refresh it for every scheme that
+-- has a DateOnly field, otherwise readers keep answering from the stale copy.
+SELECT sync_metadata_cache_for_scheme(s._id)
+  FROM _schemes s
+ WHERE EXISTS (SELECT 1 FROM _structures st
+                WHERE st._id_scheme = s._id
+                  AND st._id_type = -9223372036854775686);
 
-COMMENT ON FUNCTION public.get_value_column(text)
-    IS 'Returns the _values column name for a given REDB type name.
-Examples:
-  SELECT get_value_column(''String'');  -- returns ''_string''
-  SELECT get_value_column(''Long'');    -- returns ''_long''';
+-- =====================================================
+-- VERIFICATION
+-- =====================================================
+-- SELECT _name, _db_type, _type FROM _types WHERE _id = -9223372036854775686;
+--   expected: DateOnly | DateTimeOffset | DateOnly
 
--- ============================================================
--- FUNCTION: public.migrate_structure_type(bigint, text, text, boolean)
--- ============================================================
-
--- DROP FUNCTION IF EXISTS public.migrate_structure_type(bigint, text, text, boolean);
-
-CREATE OR REPLACE FUNCTION public.migrate_structure_type(
-    p_structure_id bigint,
-    p_old_type_name text,
-    p_new_type_name text,
-    p_dry_run boolean DEFAULT false)
-    RETURNS TABLE(affected_rows integer, success_count integer, error_count integer, errors text) 
-    LANGUAGE 'plpgsql'
-    COST 100
-    VOLATILE PARALLEL UNSAFE
-    ROWS 1000
-
-AS $BODY$
-DECLARE
-    v_source_col TEXT;
-    v_target_col TEXT;
-    v_affected_rows INT := 0;
-    v_success_count INT := 0;
-    v_has_collision BOOLEAN;
-    v_conversion_sql TEXT;
-BEGIN
-    -- Get column names
-    v_source_col := get_value_column(p_old_type_name);
-    v_target_col := get_value_column(p_new_type_name);
-    
-    -- Type validation
-    IF v_source_col IS NULL THEN
-        RETURN QUERY SELECT 0, 0, 0, format('Unknown source type: %s', p_old_type_name);
-        RETURN;
-    END IF;
-    
-    IF v_target_col IS NULL THEN
-        RETURN QUERY SELECT 0, 0, 0, format('Unknown target type: %s', p_new_type_name);
-        RETURN;
-    END IF;
-    
-    -- Same columns - migration not needed (e.g., Int->Long both in _Long)
-    IF v_source_col = v_target_col THEN
-        RETURN QUERY SELECT 0, 0, 0, NULL::TEXT;
-        RETURN;
-    END IF;
-    
-    -- Check if structure exists
-    IF NOT EXISTS (SELECT 1 FROM _structures WHERE _id = p_structure_id) THEN
-        RETURN QUERY SELECT 0, 0, 0, format('Structure %s not found', p_structure_id);
-        RETURN;
-    END IF;
-    
-    -- Count affected rows
-    EXECUTE format(
-        'SELECT COUNT(*) FROM _values WHERE _id_structure = $1 AND %I IS NOT NULL',
-        v_source_col
-    ) INTO v_affected_rows USING p_structure_id;
-    
-    -- Dry run - only counting
-    IF p_dry_run THEN
-        RETURN QUERY SELECT v_affected_rows, 0, 0, NULL::TEXT;
-        RETURN;
-    END IF;
-    
-    -- ========================================
-    -- COLLISION CHECK (key point!)
-    -- If target is filled and source is empty - data was already migrated manually
-    -- ========================================
-    EXECUTE format(
-        'SELECT EXISTS(
-            SELECT 1 FROM _values 
-            WHERE _id_structure = $1 
-              AND %I IS NOT NULL
-              AND %I IS NULL
-            LIMIT 1
-        )', v_target_col, v_source_col
-    ) INTO v_has_collision USING p_structure_id;
-    
-    IF v_has_collision THEN
-        RETURN QUERY SELECT v_affected_rows, 0, v_affected_rows, 
-            format('TYPE_MIGRATION_COLLISION: Data already in %s but _id_type = %s. Fix manually: UPDATE _structures SET _id_type = (SELECT _id FROM _types WHERE _name = ''%s'') WHERE _id = %s',
-                v_target_col, p_old_type_name, p_new_type_name, p_structure_id);
-        RETURN;
-    END IF;
-    
-    -- No data to migrate
-    IF v_affected_rows = 0 THEN
-        RETURN QUERY SELECT 0, 0, 0, NULL::TEXT;
-        RETURN;
-    END IF;
-    
-    -- ========================================
-    -- CONVERSION MATRIX
-    -- ========================================
-    v_conversion_sql := NULL;
-    
-    -- STRING -> *
-    IF v_source_col = '_string' THEN
-        IF v_target_col = '_long' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::bigint, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~ ''^-?[0-9]+$''',
-                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_double' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::double precision, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~ ''^-?[0-9]+\.?[0-9]*$''',
-                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_numeric' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::numeric, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~ ''^-?[0-9]+\.?[0-9]*$''',
-                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_boolean' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = CASE WHEN LOWER(%I) IN (''true'', ''1'', ''yes'', ''t'', ''y'') THEN TRUE WHEN LOWER(%I) IN (''false'', ''0'', ''no'', ''f'', ''n'') THEN FALSE ELSE NULL END, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_datetimeoffset' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::timestamptz, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_guid' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::uuid, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        END IF;
-    
-    -- LONG -> *
-    ELSIF v_source_col = '_long' THEN
-        IF v_target_col = '_string' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_double' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::double precision, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_numeric' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::numeric, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_boolean' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = (%I != 0), %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_datetimeoffset' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = to_timestamp(%I), %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        END IF;
-    
-    -- DOUBLE -> *
-    ELSIF v_source_col = '_double' THEN
-        IF v_target_col = '_string' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_long' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = ROUND(%I)::bigint, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_numeric' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::numeric, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        END IF;
-    
-    -- NUMERIC -> *
-    ELSIF v_source_col = '_numeric' THEN
-        IF v_target_col = '_string' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_long' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = ROUND(%I)::bigint, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_double' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::double precision, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        END IF;
-    
-    -- BOOLEAN -> *
-    ELSIF v_source_col = '_boolean' THEN
-        IF v_target_col = '_string' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = CASE WHEN %I THEN ''true'' ELSE ''false'' END, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_long' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = CASE WHEN %I THEN 1 ELSE 0 END, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        END IF;
-    
-    -- DATETIMEOFFSET -> *
-    ELSIF v_source_col = '_datetimeoffset' THEN
-        IF v_target_col = '_string' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        ELSIF v_target_col = '_long' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = EXTRACT(EPOCH FROM %I)::bigint, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        END IF;
-    
-    -- GUID -> *
-    ELSIF v_source_col = '_guid' THEN
-        IF v_target_col = '_string' THEN
-            v_conversion_sql := format(
-                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
-                v_target_col, v_source_col, v_source_col, v_source_col);
-        END IF;
-    END IF;
-    
-    -- Conversion not supported
-    IF v_conversion_sql IS NULL THEN
-        RETURN QUERY SELECT v_affected_rows, 0, v_affected_rows, 
-            format('Conversion %s -> %s not supported', p_old_type_name, p_new_type_name);
-        RETURN;
-    END IF;
-    
-    -- Execute migration
-    EXECUTE v_conversion_sql USING p_structure_id;
-    GET DIAGNOSTICS v_success_count = ROW_COUNT;
-    
-    RETURN QUERY SELECT v_affected_rows, v_success_count, v_affected_rows - v_success_count, NULL::TEXT;
-END;
-$BODY$;
-
-COMMENT ON FUNCTION public.migrate_structure_type(bigint, text, text, boolean)
-    IS 'Atomic data migration when changing structure type.
-Parameters:
-  p_structure_id - structure ID in _structures
-  p_old_type_name - old type name (String, Long, Double, etc.)
-  p_new_type_name - new type name
-  p_dry_run - TRUE for test run without changes
-
-Returns:
-  affected_rows - total rows with data
-  success_count - successfully migrated
-  error_count - failed to migrate
-  errors - error text (NULL if success)
-
-Returns TYPE_MIGRATION_COLLISION error if data is already in target column.
-
-Examples:
-  SELECT * FROM migrate_structure_type(12345, ''String'', ''Long'', TRUE);  -- dry run
-  SELECT * FROM migrate_structure_type(12345, ''String'', ''Long'', FALSE); -- execute';
 
 -- ===== migration_drop_deleted_objects.sql =====
 -- =====================================================
@@ -3101,6 +2858,28 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $BODY$
 BEGIN
+    -- 0.6.6 — migrate_structure_type joins the module, and its text conversions
+    --   are guarded:
+    --   * 27_migrate_structure_type.sql moved in from sql/. It used to ship only
+    --     in redb_init.sql, which is applied to fresh databases only, so a fix to
+    --     it never reached an existing one. Living in the module means the
+    --     version check redeploys it like everything else here.
+    --   * String -> Boolean destroyed unrecognised values: the CASE fell through
+    --     to NULL while the same statement cleared _String, and the row counted
+    --     as a success. Now predicated on the accepted token list, so anything
+    --     else stays put and lands in error_count.
+    --   * String -> DateTimeOffset and String -> Guid were bare casts that raised
+    --     on the first bad row and aborted the whole migration. Now guarded, as
+    --     the numeric branches always were and as MSSQL's TRY_CAST already did.
+    -- 0.6.5 — Unicode-aware case folding for the Free query path:
+    --   * new pvt_fold_case(text): wraps an expression in COLLATE when the
+    --     redb.string_collation GUC is set, and returns it untouched otherwise.
+    --     Case folding is driven by the database ctype, so on a database created
+    --     with LC_CTYPE=C the ILIKE/LOWER/UPPER family folds ASCII only and
+    --     'Привет' ILIKE '%привет%' is false. The GUC is set by the C# provider
+    --     per connection, which keeps every existing function signature intact.
+    --   * applied in 13_pvt_condition.sql and 17_pvt_expr.sql at every ILIKE,
+    --     and at $lower/$upper, so the three operations cannot disagree.
     -- 0.6.4 — Scoped WhereLeaves()/WhereRoots() cross-tree leak fix:
     --   * 12_pvt_cte_builder.sql tree_leaves/tree_roots now honour the seed as a
     --     SUBTREE ROOT (descend, then apply the leaf/root predicate) instead of an
@@ -3181,9 +2960,52 @@ BEGIN
     --   * `_array_index IS NULL` filter for scalars (NOT `_array_parent_id IS NULL`).
     --   * `0$:` base-field prefix stripping in pvt_normalize_base_field_name.
     --   * full collection / nested / dictionary / ListItem.Value/Alias / array-op support.
-    RETURN '0.6.4';
+    RETURN '0.6.6';
 END;
 $BODY$;
+
+-- ---------- 3a. Unicode-aware case folding -----------------------------
+-- Case folding in PostgreSQL is driven by the collation's ctype. A database
+-- created with LC_CTYPE=C folds ASCII and nothing else, so on such a database
+--     'Привет' ILIKE '%привет%'   -> false
+--     lower('Привет')             -> 'Привет'
+-- while the same statements are correct on a database created with a real
+-- locale. The fix is to attach an explicit collation to the operand.
+--
+-- The collation name arrives through a GUC rather than a function parameter.
+-- That is deliberate: every entry point of this module (pvt_build_query_sql and
+-- friends) would otherwise need an extra argument threaded through five layers,
+-- which is a signature change on each. The GUC costs nothing at the call sites
+-- and the C# provider sets it once per connection.
+--
+-- Unset GUC means unchanged behaviour, byte for byte, which is what makes this
+-- safe to deploy to a database whose owner never asked for it.
+--
+-- STABLE, not IMMUTABLE: the result depends on a run-time setting.
+CREATE OR REPLACE FUNCTION pvt_fold_case(p_expr text)
+RETURNS text
+LANGUAGE plpgsql
+STABLE
+AS $BODY$
+DECLARE
+    v_collation text;
+BEGIN
+    -- The second argument makes a missing setting return NULL instead of raising.
+    v_collation := btrim(coalesce(current_setting('redb.string_collation', true), ''));
+
+    IF v_collation = '' THEN
+        RETURN p_expr;
+    END IF;
+
+    -- quote_ident is the escaping, not decoration: the name is an identifier and
+    -- therefore cannot be a bound parameter, so it is concatenated into SQL text.
+    -- It doubles embedded quotes, which neutralises an injected name.
+    RETURN '(' || p_expr || ' COLLATE ' || quote_ident(v_collation) || ')';
+END;
+$BODY$;
+
+COMMENT ON FUNCTION pvt_fold_case(text) IS
+    'Wraps a text expression in COLLATE when redb.string_collation is set, so ILIKE/LOWER/UPPER fold every script and not just ASCII. Returns the expression untouched when the GUC is unset.';
 
 COMMENT ON FUNCTION pvt_module_version() IS
     'Returns the semver of the v2-pvt module. Used by the C# client on InitializeAsync to enforce compatibility (major must match, deployed minor >= required).';
@@ -3813,7 +3635,7 @@ BEGIN
             WHEN '$containsIgnoreCase' THEN pattern := '%' || operator_value || '%';
         END CASE;
         
-        RETURN format('fv._String ILIKE %L', pattern);
+        RETURN format('%s ILIKE %L', pvt_fold_case('fv._String'), pattern);
     
     -- IN operator
     -- 🚀 OPTIMIZATION: removed fs.db_type checks - use db_type from type_info directly
@@ -4392,11 +4214,11 @@ BEGIN
                                     END
                                 WHEN '$in' THEN format('%I.%I IN (%s)', table_alias, sql_field_name, _format_json_array_for_in(condition_value->'$in'))
                                 WHEN '$contains' THEN format('%I.%I LIKE %L', table_alias, sql_field_name, '%' || operator_value || '%')
-                                WHEN '$containsIgnoreCase' THEN format('%I.%I ILIKE %L', table_alias, sql_field_name, '%' || operator_value || '%')
+                                WHEN '$containsIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case(format('%I.%I', table_alias, sql_field_name)), '%' || operator_value || '%')
                                 WHEN '$startsWith' THEN format('%I.%I LIKE %L', table_alias, sql_field_name, operator_value || '%')
-                                WHEN '$startsWithIgnoreCase' THEN format('%I.%I ILIKE %L', table_alias, sql_field_name, operator_value || '%')
+                                WHEN '$startsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case(format('%I.%I', table_alias, sql_field_name)), operator_value || '%')
                                 WHEN '$endsWith' THEN format('%I.%I LIKE %L', table_alias, sql_field_name, '%' || operator_value)
-                                WHEN '$endsWithIgnoreCase' THEN format('%I.%I ILIKE %L', table_alias, sql_field_name, '%' || operator_value)
+                                WHEN '$endsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case(format('%I.%I', table_alias, sql_field_name)), '%' || operator_value)
                                 WHEN '$exists' THEN 
                                     CASE WHEN operator_value = 'true' THEN format('%I.%I IS NOT NULL', table_alias, sql_field_name)
                                          ELSE format('%I.%I IS NULL', table_alias, sql_field_name)
@@ -4759,9 +4581,9 @@ BEGIN
                                     WHEN '$contains' THEN format('dv._String LIKE %L', '%' || dict_op_value || '%')
                                     WHEN '$startsWith' THEN format('dv._String LIKE %L', dict_op_value || '%')
                                     WHEN '$endsWith' THEN format('dv._String LIKE %L', '%' || dict_op_value)
-                                    WHEN '$containsIgnoreCase' THEN format('dv._String ILIKE %L', '%' || dict_op_value || '%')
-                                    WHEN '$startsWithIgnoreCase' THEN format('dv._String ILIKE %L', dict_op_value || '%')
-                                    WHEN '$endsWithIgnoreCase' THEN format('dv._String ILIKE %L', '%' || dict_op_value)
+                                    WHEN '$containsIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case('dv._String'), '%' || dict_op_value || '%')
+                                    WHEN '$startsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case('dv._String'), dict_op_value || '%')
+                                    WHEN '$endsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case('dv._String'), '%' || dict_op_value)
                                     -- Regex
                                     WHEN '$regex' THEN format('dv._String ~ %L', dict_op_value)
                                     WHEN '$iregex' THEN format('dv._String ~* %L', dict_op_value)
@@ -7711,8 +7533,11 @@ BEGIN
             END IF;
 
         ELSIF v_op_norm IN ('$like', '$ilike') THEN
+            -- Only the case-INSENSITIVE half is folded. $like is case-sensitive by
+            -- definition, and attaching a collation to it would cost the index for
+            -- no behavioural gain.
             v_parts := v_parts || format('%s %s %L',
-                v_col,
+                CASE v_op_norm WHEN '$like' THEN v_col ELSE pvt_fold_case(v_col) END,
                 CASE v_op_norm WHEN '$like' THEN 'LIKE' ELSE 'ILIKE' END,
                 v_op_val #>> '{}');
 
@@ -7724,11 +7549,11 @@ BEGIN
             v_parts := v_parts || format('%s LIKE %L', v_col, '%' || (v_op_val #>> '{}') || '%');
 
         ELSIF v_op_norm = '$startswithignorecase' THEN
-            v_parts := v_parts || format('%s ILIKE %L', v_col, (v_op_val #>> '{}') || '%');
+            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), (v_op_val #>> '{}') || '%');
         ELSIF v_op_norm = '$endswithignorecase' THEN
-            v_parts := v_parts || format('%s ILIKE %L', v_col, '%' || (v_op_val #>> '{}'));
+            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), '%' || (v_op_val #>> '{}'));
         ELSIF v_op_norm = '$containsignorecase' THEN
-            v_parts := v_parts || format('%s ILIKE %L', v_col, '%' || (v_op_val #>> '{}') || '%');
+            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), '%' || (v_op_val #>> '{}') || '%');
 
         ELSIF v_op_norm IN ('$null', '$isnull') THEN
             v_parts := v_parts || (CASE
@@ -9019,8 +8844,12 @@ BEGIN
         IF lower(v_op_key) = '$abs'    THEN RETURN 'ABS('    || v_a || ')'; END IF;
         IF lower(v_op_key) = '$floor'  THEN RETURN 'FLOOR('  || v_a || ')'; END IF;
         IF lower(v_op_key) = '$ceil'   THEN RETURN 'CEIL('   || v_a || ')'; END IF;
-        IF lower(v_op_key) = '$upper'  THEN RETURN 'UPPER('  || v_a || ')'; END IF;
-        IF lower(v_op_key) = '$lower'  THEN RETURN 'LOWER('  || v_a || ')'; END IF;
+        -- Folded for the same reason ILIKE is: UPPER/LOWER take their case mapping from
+        -- the collation's ctype, so on a C-ctype database lower('Привет') is a no-op.
+        -- These back .ToLower()/.ToUpper() in LINQ, and leaving them unfolded while
+        -- fixing ILIKE would let a search match a row that a comparison then rejects.
+        IF lower(v_op_key) = '$upper'  THEN RETURN 'UPPER('  || pvt_fold_case(v_a) || ')'; END IF;
+        IF lower(v_op_key) = '$lower'  THEN RETURN 'LOWER('  || pvt_fold_case(v_a) || ')'; END IF;
         IF lower(v_op_key) = '$trim'   THEN RETURN 'TRIM('   || v_a || ')'; END IF;
         IF lower(v_op_key) = '$length' THEN
             -- Polymorphic: array → array_length, otherwise → text length.
@@ -9504,7 +9333,9 @@ BEGIN
     IF v_op = '$gte' THEN RETURN '(' || v_l || ' >= ' || v_r || ')'; END IF;
 
     IF v_op IN ('$like', '$ilike') THEN
-        RETURN '(' || v_l || CASE WHEN v_op = '$like' THEN ' LIKE ' ELSE ' ILIKE ' END || v_r || ')';
+        -- Only the case-insensitive half is folded; $like is case-sensitive by definition.
+        RETURN '(' || CASE WHEN v_op = '$like' THEN v_l ELSE pvt_fold_case(v_l) END
+                   || CASE WHEN v_op = '$like' THEN ' LIKE ' ELSE ' ILIKE ' END || v_r || ')';
     END IF;
 
     -- Sugar over LIKE/ILIKE: RHS must be a string literal so we can
@@ -9523,14 +9354,16 @@ BEGIN
         DECLARE
             v_lit text;
             v_kw  text;
+            v_ci  boolean;
         BEGIN
-            v_kw  := CASE WHEN right(v_op, length('ignorecase')) = 'ignorecase' THEN ' ILIKE ' ELSE ' LIKE ' END;
+            v_ci  := right(v_op, length('ignorecase')) = 'ignorecase';
+            v_kw  := CASE WHEN v_ci THEN ' ILIKE ' ELSE ' LIKE ' END;
             v_lit := CASE
                 WHEN v_op IN ('$contains', '$containsignorecase')   THEN quote_literal('%' || v_pat || '%')
                 WHEN v_op IN ('$startswith', '$startswithignorecase') THEN quote_literal(v_pat || '%')
                 WHEN v_op IN ('$endswith', '$endswithignorecase')     THEN quote_literal('%' || v_pat)
             END;
-            RETURN '(' || v_l || v_kw || v_lit || ')';
+            RETURN '(' || CASE WHEN v_ci THEN pvt_fold_case(v_l) ELSE v_l END || v_kw || v_lit || ')';
         END;
     END IF;
 
@@ -12323,4 +12156,308 @@ $BODY$;
 COMMENT ON FUNCTION pvt_build_array_groupby_sql(bigint, text, jsonb, jsonb, jsonb, jsonb, jsonb, integer, integer) IS
 'Builds a GROUP BY query over array elements. Element fields are projected into an inner subquery via LEFT JOINs on _values keyed by _array_parent_id; the outer query groups by inner aliases and applies HAVING through pvt_build_bool_expr.';
 
+
+-- ===== 27_migrate_structure_type.sql =====
+-- ============================================================
+-- HELPER FUNCTION: get_value_column
+-- Returns the _values column name for a given type name
+-- ============================================================
+
+-- DROP FUNCTION IF EXISTS public.get_value_column(text);
+
+CREATE OR REPLACE FUNCTION public.get_value_column(p_type_name text)
+RETURNS text
+LANGUAGE 'plpgsql'
+IMMUTABLE
+AS $BODY$
+BEGIN
+    RETURN CASE LOWER(p_type_name)
+        WHEN 'string' THEN '_string'
+        WHEN 'text' THEN '_string'
+        WHEN 'mimetype' THEN '_string'
+        WHEN 'filepath' THEN '_string'
+        WHEN 'filename' THEN '_string'
+        WHEN 'long' THEN '_long'
+        WHEN 'int' THEN '_long'
+        WHEN 'short' THEN '_long'
+        WHEN 'byte' THEN '_long'
+        WHEN 'object' THEN '_object'
+        WHEN 'double' THEN '_double'
+        WHEN 'float' THEN '_double'
+        WHEN 'boolean' THEN '_boolean'
+        WHEN 'datetime' THEN '_datetimeoffset'
+        WHEN 'datetimeoffset' THEN '_datetimeoffset'
+        WHEN 'dateonly' THEN '_datetimeoffset'
+        WHEN 'timeonly' THEN '_datetimeoffset'
+        WHEN 'timespan' THEN '_long'
+        WHEN 'guid' THEN '_guid'
+        WHEN 'bytearray' THEN '_bytearray'
+        WHEN 'numeric' THEN '_numeric'
+        WHEN 'listitem' THEN '_listitem'
+        ELSE NULL
+    END;
+END;
+$BODY$;
+
+COMMENT ON FUNCTION public.get_value_column(text)
+    IS 'Returns the _values column name for a given REDB type name.
+Examples:
+  SELECT get_value_column(''String'');  -- returns ''_string''
+  SELECT get_value_column(''Long'');    -- returns ''_long''';
+
+-- ============================================================
+-- FUNCTION: public.migrate_structure_type(bigint, text, text, boolean)
+-- ============================================================
+
+-- DROP FUNCTION IF EXISTS public.migrate_structure_type(bigint, text, text, boolean);
+
+CREATE OR REPLACE FUNCTION public.migrate_structure_type(
+    p_structure_id bigint,
+    p_old_type_name text,
+    p_new_type_name text,
+    p_dry_run boolean DEFAULT false)
+    RETURNS TABLE(affected_rows integer, success_count integer, error_count integer, errors text) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+DECLARE
+    v_source_col TEXT;
+    v_target_col TEXT;
+    v_affected_rows INT := 0;
+    v_success_count INT := 0;
+    v_has_collision BOOLEAN;
+    v_conversion_sql TEXT;
+BEGIN
+    -- Get column names
+    v_source_col := get_value_column(p_old_type_name);
+    v_target_col := get_value_column(p_new_type_name);
+    
+    -- Type validation
+    IF v_source_col IS NULL THEN
+        RETURN QUERY SELECT 0, 0, 0, format('Unknown source type: %s', p_old_type_name);
+        RETURN;
+    END IF;
+    
+    IF v_target_col IS NULL THEN
+        RETURN QUERY SELECT 0, 0, 0, format('Unknown target type: %s', p_new_type_name);
+        RETURN;
+    END IF;
+    
+    -- Same columns - migration not needed (e.g., Int->Long both in _Long)
+    IF v_source_col = v_target_col THEN
+        RETURN QUERY SELECT 0, 0, 0, NULL::TEXT;
+        RETURN;
+    END IF;
+    
+    -- Check if structure exists
+    IF NOT EXISTS (SELECT 1 FROM _structures WHERE _id = p_structure_id) THEN
+        RETURN QUERY SELECT 0, 0, 0, format('Structure %s not found', p_structure_id);
+        RETURN;
+    END IF;
+    
+    -- Count affected rows
+    EXECUTE format(
+        'SELECT COUNT(*) FROM _values WHERE _id_structure = $1 AND %I IS NOT NULL',
+        v_source_col
+    ) INTO v_affected_rows USING p_structure_id;
+    
+    -- Dry run - only counting
+    IF p_dry_run THEN
+        RETURN QUERY SELECT v_affected_rows, 0, 0, NULL::TEXT;
+        RETURN;
+    END IF;
+    
+    -- ========================================
+    -- COLLISION CHECK (key point!)
+    -- If target is filled and source is empty - data was already migrated manually
+    -- ========================================
+    EXECUTE format(
+        'SELECT EXISTS(
+            SELECT 1 FROM _values 
+            WHERE _id_structure = $1 
+              AND %I IS NOT NULL
+              AND %I IS NULL
+            LIMIT 1
+        )', v_target_col, v_source_col
+    ) INTO v_has_collision USING p_structure_id;
+    
+    IF v_has_collision THEN
+        RETURN QUERY SELECT v_affected_rows, 0, v_affected_rows, 
+            format('TYPE_MIGRATION_COLLISION: Data already in %s but _id_type = %s. Fix manually: UPDATE _structures SET _id_type = (SELECT _id FROM _types WHERE _name = ''%s'') WHERE _id = %s',
+                v_target_col, p_old_type_name, p_new_type_name, p_structure_id);
+        RETURN;
+    END IF;
+    
+    -- No data to migrate
+    IF v_affected_rows = 0 THEN
+        RETURN QUERY SELECT 0, 0, 0, NULL::TEXT;
+        RETURN;
+    END IF;
+    
+    -- ========================================
+    -- CONVERSION MATRIX
+    -- ========================================
+    v_conversion_sql := NULL;
+    
+    -- STRING -> *
+    IF v_source_col = '_string' THEN
+        IF v_target_col = '_long' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::bigint, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~ ''^-?[0-9]+$''',
+                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_double' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::double precision, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~ ''^-?[0-9]+\.?[0-9]*$''',
+                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_numeric' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::numeric, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~ ''^-?[0-9]+\.?[0-9]*$''',
+                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_boolean' THEN
+            -- The IN-list is repeated as a predicate on purpose. Without it the CASE fell through to
+            -- NULL for anything unrecognised while the same statement cleared the source column, so a
+            -- value like 'maybe' was DESTROYED — and counted as a success, because success is measured
+            -- by rows updated. Every other text conversion here is guarded; this one was not.
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = CASE WHEN LOWER(%I) IN (''true'', ''1'', ''yes'', ''t'', ''y'') THEN TRUE ELSE FALSE END, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND LOWER(%I) IN (''true'', ''1'', ''yes'', ''t'', ''y'', ''false'', ''0'', ''no'', ''f'', ''n'')',
+                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_datetimeoffset' THEN
+            -- Guarded like the numeric branches, and like MSSQL's TRY_CAST. A bare ::timestamptz raised
+            -- on the first unparseable row and aborted the whole migration, so one bad value blocked
+            -- every good one — and the failure arrived as a raw SQL error rather than a report.
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::timestamptz, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~ ''^\d{4}-\d{2}-\d{2}''',
+                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_guid' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::uuid, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL AND %I ~* ''^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''',
+                v_target_col, v_source_col, v_source_col, v_source_col, v_source_col);
+        END IF;
+    
+    -- LONG -> *
+    ELSIF v_source_col = '_long' THEN
+        IF v_target_col = '_string' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_double' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::double precision, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_numeric' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::numeric, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_boolean' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = (%I != 0), %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_datetimeoffset' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = to_timestamp(%I), %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        END IF;
+    
+    -- DOUBLE -> *
+    ELSIF v_source_col = '_double' THEN
+        IF v_target_col = '_string' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_long' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = ROUND(%I)::bigint, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_numeric' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::numeric, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        END IF;
+    
+    -- NUMERIC -> *
+    ELSIF v_source_col = '_numeric' THEN
+        IF v_target_col = '_string' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_long' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = ROUND(%I)::bigint, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_double' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::double precision, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        END IF;
+    
+    -- BOOLEAN -> *
+    ELSIF v_source_col = '_boolean' THEN
+        IF v_target_col = '_string' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = CASE WHEN %I THEN ''true'' ELSE ''false'' END, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_long' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = CASE WHEN %I THEN 1 ELSE 0 END, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        END IF;
+    
+    -- DATETIMEOFFSET -> *
+    ELSIF v_source_col = '_datetimeoffset' THEN
+        IF v_target_col = '_string' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        ELSIF v_target_col = '_long' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = EXTRACT(EPOCH FROM %I)::bigint, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        END IF;
+    
+    -- GUID -> *
+    ELSIF v_source_col = '_guid' THEN
+        IF v_target_col = '_string' THEN
+            v_conversion_sql := format(
+                'UPDATE _values SET %I = %I::text, %I = NULL WHERE _id_structure = $1 AND %I IS NOT NULL',
+                v_target_col, v_source_col, v_source_col, v_source_col);
+        END IF;
+    END IF;
+    
+    -- Conversion not supported
+    IF v_conversion_sql IS NULL THEN
+        RETURN QUERY SELECT v_affected_rows, 0, v_affected_rows, 
+            format('Conversion %s -> %s not supported', p_old_type_name, p_new_type_name);
+        RETURN;
+    END IF;
+    
+    -- Execute migration
+    EXECUTE v_conversion_sql USING p_structure_id;
+    GET DIAGNOSTICS v_success_count = ROW_COUNT;
+    
+    RETURN QUERY SELECT v_affected_rows, v_success_count, v_affected_rows - v_success_count, NULL::TEXT;
+END;
+$BODY$;
+
+COMMENT ON FUNCTION public.migrate_structure_type(bigint, text, text, boolean)
+    IS 'Atomic data migration when changing structure type.
+Parameters:
+  p_structure_id - structure ID in _structures
+  p_old_type_name - old type name (String, Long, Double, etc.)
+  p_new_type_name - new type name
+  p_dry_run - TRUE for test run without changes
+
+Returns:
+  affected_rows - total rows with data
+  success_count - successfully migrated
+  error_count - failed to migrate
+  errors - error text (NULL if success)
+
+Returns TYPE_MIGRATION_COLLISION error if data is already in target column.
+
+Examples:
+  SELECT * FROM migrate_structure_type(12345, ''String'', ''Long'', TRUE);  -- dry run
+  SELECT * FROM migrate_structure_type(12345, ''String'', ''Long'', FALSE); -- execute';
 

@@ -1,3 +1,4 @@
+using redb.Core.Query;
 using redb.Core.Data;
 using redb.Core.Models.Contracts;
 using redb.Core.Providers.Base;
@@ -23,11 +24,19 @@ public class PostgresUserProvider : UserProviderBase
     /// <param name="context">Database context for executing queries</param>
     /// <param name="securityContext">Security context for authorization</param>
     /// <param name="logger">Optional logger for diagnostics</param>
+    /// <param name="dialect">
+    /// Configured dialect. Optional so hand-construction keeps working, but DI supplies the
+    /// singleton built from <c>RedbServiceConfiguration</c>, and that is how <c>StringCollation</c>
+    /// reaches user search. This provider is the only one that needs it: its base class is the sole
+    /// caller of <c>FormatCaseInsensitiveLike</c>. The other Postgres providers construct a bare
+    /// dialect deliberately, because they use it only for pagination, quoting and literals.
+    /// </param>
     public PostgresUserProvider(
-        IRedbContext context, 
+        IRedbContext context,
         IRedbSecurityContext securityContext,
-        ILogger? logger = null)
-        : base(context, securityContext, new PostgreSqlDialect(), new SimplePasswordHasher(), logger)
+        ILogger? logger = null,
+        ISqlDialect? dialect = null)
+        : base(context, securityContext, dialect ?? new PostgreSqlDialect(), new SimplePasswordHasher(), logger)
     {
     }
 
@@ -42,8 +51,9 @@ public class PostgresUserProvider : UserProviderBase
         IRedbContext context, 
         IRedbSecurityContext securityContext, 
         IPasswordHasher passwordHasher,
-        ILogger? logger = null)
-        : base(context, securityContext, new PostgreSqlDialect(), passwordHasher, logger)
+        ILogger? logger = null,
+        ISqlDialect? dialect = null)
+        : base(context, securityContext, dialect ?? new PostgreSqlDialect(), passwordHasher, logger)
     {
     }
 

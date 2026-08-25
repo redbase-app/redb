@@ -57,6 +57,8 @@ public sealed class MsSqlFixture : IAsyncLifetime
         await Redb.SyncSchemeAsync<TeamProps>();
         await Redb.SyncSchemeAsync<PersonProps>();
         await Redb.SyncSchemeAsync<CityProps>();
+        // Case-folding suite: MSSQL is asserted to need no setting at all (MsSqlCaseFoldingTests).
+        await Redb.SyncSchemeAsync<CollationProps>();
 
         await Redb.InitializeTypeRegistryAsync();
     }

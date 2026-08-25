@@ -471,8 +471,8 @@ namespace redb.Core.Providers.Base
                     
                     if (_configuration.AutoSetModifyDate)
                     {
-                        obj.DateCreate = DateTimeOffset.Now;
-                        obj.DateModify = DateTimeOffset.Now;
+                        obj.DateCreate = DateTimeOffset.UtcNow;
+                        obj.DateModify = DateTimeOffset.UtcNow;
                     }
                     
                     if (_configuration.AutoRecomputeHash)
@@ -2377,7 +2377,7 @@ namespace redb.Core.Providers.Base
         /// </summary>
         private async Task EnsureMainObjectSaved<TProps>(IRedbObject<TProps> obj, IRedbUser user) where TProps : class, new()
         {
-            var now = DateTimeOffset.Now;
+            var now = DateTimeOffset.UtcNow;
             
             if (obj.Id == 0)
             {

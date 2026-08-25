@@ -113,6 +113,17 @@ BEGIN
     --           _Object reference to a trashed object resolves to NULL instead
     --           of materializing the tombstone. The _values pointer stays
     --           intact, so soft-delete remains reversible.
+    -- 0.1.7 - migrate_structure_type joins the module, and its String -> Boolean
+    --         conversion is guarded:
+    --         * 27_migrate_structure_type.sql moved in from sql/. It used to ship
+    --           only in redb_init.sql, applied to fresh databases only, so a fix
+    --           to it never reached an existing one. In the module, the version
+    --           check redeploys it like everything else here.
+    --         * String -> Boolean destroyed unrecognised values: the CASE fell
+    --           through to NULL while the same statement cleared _String, and the
+    --           row counted as a success. It is now predicated on the accepted
+    --           token list, like every other text conversion in that procedure,
+    --           which already used TRY_CAST(...) IS NOT NULL.
     -- 0.1.6 - Scoped WhereLeaves()/WhereRoots() cross-tree leak fix:
     --         * 20_pvt_build_query_sql.sql tree_leaves/tree_roots fast-path now
     --           honours the seed: leaves = childless descendants of the seed root
@@ -124,7 +135,7 @@ BEGIN
     --           the pvt_build_cte_sql (props-shape) path — seeded the same way.
     -- 0.1.0 - skeleton: module bootstrap, drop-all, version function.
     --         Builder functions (pvt_build_query_sql etc.) not implemented yet.
-    RETURN N'0.1.6';
+    RETURN N'0.1.7';
 END;
 GO
 

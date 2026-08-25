@@ -39,6 +39,7 @@ public sealed class SqliteProFixture : IAsyncLifetime
                     c.SkipHashValidationOnCacheCheck = false;
                     c.EnableLazyLoadingForProps = false;
                     c.EnablePropsCache = false;
+                    c.EnablePvtPrefilter = ProTestOptions.PvtPrefilter;
                 });
             if (!string.IsNullOrWhiteSpace(license))
                 options.WithLicense(license);

@@ -61,6 +61,21 @@ namespace redb.SQLite.Data
         public static SqliteDataSource Create(string connectionString)
             => new SqliteDataSource(connectionString);
 
+        /// <summary>
+        /// Create a data source that additionally installs Unicode-aware case folding on every
+        /// connection it opens. See <see cref="SqliteCaseFolding"/> for why this is a connection
+        /// concern in SQLite rather than a SQL one.
+        /// </summary>
+        public static SqliteDataSource Create(string connectionString, bool unicodeCaseFolding)
+            => new SqliteDataSource(connectionString) { UnicodeCaseFolding = unicodeCaseFolding };
+
+        /// <summary>
+        /// When true, every opened connection gets <c>like</c>, <c>lower</c> and <c>upper</c>
+        /// replaced by Unicode-aware implementations. Off by default: generated SQL and stock
+        /// behaviour stay exactly as they were.
+        /// </summary>
+        public bool UnicodeCaseFolding { get; private init; }
+
         /// <summary>Open a new pooled connection with REDB pragmas applied.</summary>
         public SqliteConnection OpenConnection()
         {
@@ -68,6 +83,7 @@ namespace redb.SQLite.Data
             conn.Open();
             LoadNativeExtension(conn);
             ApplyPragmas(conn);
+            SqliteCaseFolding.Install(conn, UnicodeCaseFolding);
             EnsureCleanTransactionState(conn);
             return conn;
         }
@@ -79,6 +95,7 @@ namespace redb.SQLite.Data
             await conn.OpenAsync();
             LoadNativeExtension(conn);
             await ApplyPragmasAsync(conn);
+            SqliteCaseFolding.Install(conn, UnicodeCaseFolding);
             await EnsureCleanTransactionStateAsync(conn);
             return conn;
         }

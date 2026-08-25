@@ -1,4 +1,5 @@
 using redb.Core;
+using redb.Core.Models.Users;
 using redb.Core.Query.Aggregation;
 using redb.Tests.Integration.Helpers;
 using redb.Tests.Integration.Models;
@@ -316,5 +317,26 @@ public abstract class BugRegressionTestsBase
 
         hits.Should().NotBeEmpty(
             "string concatenation inside ToLower().Contains(...) must compile to SQL `||` + ILIKE");
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    //  GitHub #4 — ChangePasswordAsync is Task<bool> ("true if changed"),
+    //  so a WRONG current password must return false, not throw
+    //  UnauthorizedAccessException. A plain change-password form built
+    //  against the documented contract otherwise 500s on the most common
+    //  user error.
+    // ──────────────────────────────────────────────────────────────────
+    [Fact]
+    public async Task ChangePassword_WrongCurrent_ReturnsFalse_NotThrows()
+    {
+        var login = "pw_" + Guid.NewGuid().ToString("N").Substring(0, 12);
+        var user = await Redb.UserProvider.CreateUserAsync(
+            new CreateUserRequest { Login = login, Name = login, Password = "correct-horse" });
+
+        var wrong = await Redb.UserProvider.ChangePasswordAsync(user, "definitely-wrong", "new-password-123");
+        wrong.Should().BeFalse("a wrong current password is a user error, not an exception");
+
+        var ok = await Redb.UserProvider.ChangePasswordAsync(user, "correct-horse", "new-password-123");
+        ok.Should().BeTrue("the correct current password changes it");
     }
 }

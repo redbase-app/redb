@@ -56,25 +56,25 @@ namespace redb.Core.Providers.Base
             {
                 if (record.Id == 0)
                 {
-                    record.DateCreate = DateTimeOffset.Now;
+                    record.DateCreate = DateTimeOffset.UtcNow;
                 }
                 else
                 {
                     // For existing objects - take the old value
                     var existingDate = redbObj?.date_create ?? obj.DateCreate;
                     // If the date was not set (MinValue), use the current one
-                    record.DateCreate = existingDate == DateTimeOffset.MinValue ? DateTimeOffset.Now : existingDate;
+                    record.DateCreate = existingDate == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : existingDate;
                 }
-                record.DateModify = DateTimeOffset.Now;
+                record.DateModify = DateTimeOffset.UtcNow;
             }
             else
             {
                 var dateCreate = redbObj?.date_create ?? obj.DateCreate;
                 // If the date was not set (MinValue), use the current one
-                record.DateCreate = dateCreate == DateTimeOffset.MinValue ? DateTimeOffset.Now : dateCreate;
+                record.DateCreate = dateCreate == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : dateCreate;
                 
                 var dateModify = redbObj?.date_modify ?? obj.DateModify;
-                record.DateModify = dateModify == DateTimeOffset.MinValue ? DateTimeOffset.Now : dateModify;
+                record.DateModify = dateModify == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : dateModify;
             }
             
             return record;

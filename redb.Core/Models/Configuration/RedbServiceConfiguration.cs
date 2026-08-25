@@ -121,6 +121,68 @@ namespace redb.Core.Models.Configuration
         // === PERFORMANCE SETTINGS ===
 
         /// <summary>
+        /// Enable the PVT prefilter: a cutting step that narrows the object set BEFORE the
+        /// pivot aggregate runs, so a selective filter stops costing a full scheme scan.
+        /// The prefilter is a superset and never changes results; when the planner cannot
+        /// analyse a filter it emits nothing and behaviour is identical to disabled.
+        /// Pro only, PostgreSQL only for now. See docs/PVT_PREFILTER_PLAN.md.
+        /// Default is false (opt-in while the feature is being validated).
+        /// </summary>
+        public bool EnablePvtPrefilter { get; set; } = false;
+
+        /// <summary>
+        /// Unicode-aware case folding for case-insensitive text operations
+        /// (<c>ContainsIgnoreCase</c>, <c>StartsWithIgnoreCase</c>, <c>EndsWithIgnoreCase</c>,
+        /// <c>ToLower</c>, <c>ToUpper</c>).
+        ///
+        /// <para>
+        /// <b>Why it exists.</b> Case folding is driven by the database's own rules, and those cover
+        /// only ASCII in two of the three providers. On PostgreSQL created with <c>LC_CTYPE=C</c>,
+        /// <c>'Привет' ILIKE '%привет%'</c> is false and <c>lower('Привет')</c> returns the string
+        /// unchanged. On SQLite this is unconditional: <c>LIKE</c>, <c>lower()</c>, <c>upper()</c> and
+        /// <c>COLLATE NOCASE</c> are ASCII-only in every database. MSSQL is unaffected because its
+        /// default collation is case-insensitive for all scripts.
+        /// </para>
+        ///
+        /// <para>
+        /// <b>What it fixes.</b> Every script whose case mapping is one character to one character:
+        /// Cyrillic, Greek, Hungarian, Polish, Czech, French, most of German. There is no per-language
+        /// work; one setting covers all of them.
+        /// </para>
+        ///
+        /// <para>
+        /// <b>What it does NOT fix</b>, and cannot, because no collation can:
+        /// foldings that change length (German <c>ß</c> against <c>SS</c>: <c>upper()</c> expands it,
+        /// pattern matching does not, so the two disagree); language-dependent foldings (Turkish
+        /// <c>İ</c> does not fold to <c>i</c>, and Turkish wants <c>I</c>→<c>ı</c> where every other
+        /// locale wants <c>I</c>→<c>i</c>); and insensitivity to diacritics (<c>Müller</c> against
+        /// <c>muller</c>), which is a different feature and is rejected outright by PostgreSQL for
+        /// pattern matching. See COLLATION.md.
+        /// </para>
+        ///
+        /// <para>
+        /// <b>Cost on PostgreSQL.</b> A collated operand cannot use an index built with the database's
+        /// own collation, so a trigram index on the text column stops being usable and the search
+        /// degrades to a full scan, silently. Add a matching expression index yourself:
+        /// <c>CREATE INDEX ... USING gin ((_String COLLATE "und-x-icu") gin_trgm_ops)</c>.
+        /// </para>
+        ///
+        /// Default is null: behaviour is exactly what it was, on every provider.
+        /// </summary>
+        private string? _stringCollation;
+        public string? StringCollation
+        {
+            get => _stringCollation;
+            set
+            {
+                var normalised = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+                if (normalised != null)
+                    Core.Query.CollationNameValidator.Validate(normalised);
+                _stringCollation = normalised;
+            }
+        }
+
+        /// <summary>
         /// Enable lazy loading for RedbObject Props.
         /// true = Props loaded on demand when accessing obj.Props
         /// false = Props in main JSON (everything at once)
@@ -129,9 +191,9 @@ namespace redb.Core.Models.Configuration
         public bool EnableLazyLoadingForProps { get; set; } = false;
 
         /// <summary>
-        /// Enable transparent Props object caching.
-        /// Works only when EnableLazyLoadingForProps = true
-        /// Default is false
+        /// Enable transparent whole-object (Props) caching, validated by object hash.
+        /// Independent of <see cref="EnableLazyLoadingForProps"/> — works with lazy loading on or off.
+        /// Default is false.
         /// </summary>
         public bool EnablePropsCache { get; set; } = false;
 

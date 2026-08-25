@@ -19,6 +19,314 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] — 2026-08-25
+
+> **Why 3.7.0 and not 3.6.1.** New public surface lands across the ecosystem — two new packages
+> (`redb.Route.Soap`, `redb.Identity.Grpc`, plus `redb.Identity.Management` split out of the HTTP
+> facade) and new API in `redb.Route` — and new surface cannot ship as a patch. The core packages
+> carry mostly fixes, but the ecosystem moves on one number.
+>
+> **`ExpressionSqlCache` and `CompiledQuery` are gone from `RedBase.Core`.** That is a public API
+> removal, which strict SemVer would put in a major. It ships as a minor deliberately: both types were
+> verified dead four ways before removal (see **Removed** below), nothing in REDB referenced them, and
+> a major would flip `LicensePolicy.FreeThroughMajor` and start charging for Pro. A consumer who did
+> reference either type directly has to drop that reference.
+
+### Fixed
+- **A property changing type could silently lose its values (all providers, Free and Pro).** Scheme
+  synchronisation migrates a structure's stored values when the CLR property's type changes, then
+  switches `_structures._id_type`. The migration was called with the old type's numeric **id** passed
+  into a lookup keyed by **name**, so it matched nothing, fell back to the literal `"unknown"`, and
+  every provider answered "unknown source type". That answer was then discarded and the type switched
+  anyway — leaving the values in the old column, reading as `null`, and physically deleted by the next
+  save under the default `DeleteInsert` strategy.
+
+  Four independent layers had to line up for this to stay quiet: an id used as a name, a `?? "unknown"`
+  swallowing the miss, providers reporting failure as data rather than raising, and the caller throwing
+  the result away. Each is now closed: the type is resolved by id, a missing type raises, the result is
+  inspected, and `_id_type` is changed only after a migration that actually completed.
+
+  A migration that cannot complete now raises **`RedbTypeMigrationException`** and stops synchronisation.
+  That is deliberate and is the whole point: the alternative outcomes are a structure whose values read
+  as missing, or a CLR class and a structure that quietly disagree. The exception carries the scheme,
+  property, both type names, how many values moved and how many did not, and the SQL to migrate by hand.
+  A structure with no stored values is not affected — there is nothing to strand, so those type changes
+  still pass.
+
+  On SQLite this bug also disabled the provider's own safety net: its refusal to move values across
+  storage columns was never reached, because the resolution failed one step earlier.
+
+- **SQLite refused every cross-column type migration.** PostgreSQL and MSSQL convert between scalar
+  types; SQLite rejected all of them wholesale — a stopgap from the fix for the missing
+  `migrate_structure_type` function (GitHub #5) that swept up conversions which cannot fail. `bool` to
+  `int` is the plain case: `_Boolean` and `_Long` are both `INTEGER`, so the value is copied as is.
+
+  SQLite now implements the same matrix PostgreSQL does, for scalars: numeric and boolean moves, any
+  scalar to text, and the temporal pairs (`_DateTimeOffset` holds a UTC Julian day precisely so
+  SQLite's own `strftime`/`julianday` read it). Text **sources** are guarded per row rather than cast
+  blindly — SQLite has affinity, not types, and `CAST('abc' AS INTEGER)` is `0`, not an error — so an
+  unreadable value stays where it is and is reported, which is what PostgreSQL's regex predicate does.
+  Reference columns (`_ListItem`, `_Object`) stay refused: an FK cannot be produced from a scalar.
+
+  SQLite also reports a refusal as a result now instead of throwing `NotSupportedException`, matching
+  the other two providers; the scheme-sync path turns it into the same `RedbTypeMigrationException`
+  everywhere.
+
+- **`String` to `Boolean` migration destroyed values it could not read (PostgreSQL, MSSQL).** The
+  conversion mapped an unrecognised token to `NULL` through a `CASE` while the same statement cleared
+  `_String`. The value was gone, and — because success is counted as rows updated — it was reported as
+  a success: no error, no count, nothing to notice. Every neighbouring text conversion was already
+  guarded (`~ '^-?[0-9]+$'` on PostgreSQL, `TRY_CAST(...) IS NOT NULL` on MSSQL); this one was not, on
+  both providers. It is now predicated on the accepted token list, so anything else stays where it is
+  and lands in `error_count`.
+
+  PostgreSQL's `String` to `DateTimeOffset` and `String` to `Guid` were bare casts with no guard, so a
+  single unparseable row raised and aborted the whole migration — every good value blocked by one bad
+  one, and the failure arriving as a raw SQL error rather than a report. Both are now guarded, which is
+  what MSSQL already did.
+
+- **`migrate_structure_type` now ships in the versioned module, so fixes to it reach existing
+  databases.** It lived in `sql/`, which lands only in `redb_init.sql` — applied when the tables are
+  absent, i.e. to fresh databases only. Any correction to it was therefore unreachable for every
+  database already in use. Moved to `sql/v2-pvt/27_migrate_structure_type.sql`, so the module version
+  check redeploys it automatically on the next start like the rest of the module. PostgreSQL
+  `pvt_module_version` 0.6.5 → **0.6.6**, MSSQL 0.1.6 → **0.1.7**.
+
+### Added
+- **Covering index on `_objects(_id_parent)` carrying `_hash` — now on all three providers
+  (`RedBase.Postgres`, `RedBase.SQLite`).** MSSQL has had `IX__objects__id_parent` with
+  `INCLUDE (_id, _hash, _id_scheme)` for some time; PostgreSQL and SQLite had no equivalent. Their
+  nearest index, `IX__objects__parent_scheme_id`, stops at `(_id_parent, _id_scheme, _id)` and does
+  not carry `_hash`, so a tree walk that reads the object hash — which is what the transparent cache
+  does — left the index for the heap on every row.
+
+  PostgreSQL uses `INCLUDE`, keeping `_hash` out of the key since it is returned rather than searched
+  by. SQLite has no `INCLUDE`, so the columns are folded into the key, matching the indexes already
+  written that way in that file. The index name is the same on all three.
+
+  Verified on live engines rather than taken from documentation: PostgreSQL 18.1 plans
+  `SELECT _id, _hash, _id_scheme WHERE _id_parent = ?` as `Index Only Scan`, SQLite 3.46.1 as
+  `SEARCH ... USING COVERING INDEX`.
+
+  New databases pick this up from the schema script. Existing ones do not: the initialisation script
+  is applied only when the tables are absent, so the index has to be created by hand there.
+- **PVT prefilter — a cutting step before the pivot aggregate (`RedBase.Core.Pro` + all three Pro
+  providers).** A filter over Props compiled into a condition sitting **above** `GROUP BY`, so by the
+  time it was evaluated `_values` had already been read and folded for every object in the scheme.
+  No index could apply: the predicate filtered the result of an aggregate, not a column. The practical
+  consequence was that query cost did not depend on selectivity at all — searching for one rare order
+  number cost exactly as much as an empty search, and the trigram GIN index on `_String` sat unused.
+
+  The prefilter narrows the object set *before* the aggregate runs. It is built as a **superset**: it
+  may let extra objects through, it may never lose one, and the authoritative filter stays where it
+  was. Anything the planner cannot analyse yields no prefilter and today's behaviour exactly, so the
+  worst outcome is the absence of a speedup rather than a change of results.
+
+  Opt-in through `RedbServiceConfiguration.EnablePvtPrefilter`, **off by default**.
+
+  Measured on all three engines seeded to the same size, 100 000 objects and roughly 8.4M rows in
+  `_values`, statistics refreshed, server-side time, best of three:
+
+  | query | PG before | PG after | SQLite before | SQLite after | MSSql before | MSSql after |
+  |---|---|---|---|---|---|---|
+  | one needle across two string fields, as the provider emits it | 184.6 ms | 100.4 ms | 6 ms | 6 ms (rule below) | 55 ms | 17 ms |
+  | the same, with an `ORDER BY` | 188.3 ms | 90.8 ms | 1150 ms | 311 ms | 55 ms | 17 ms |
+  | the same, whole result, no paging | 337.9 ms | 156.4 ms | 1201 ms | 314 ms | 7037 ms | 1327 ms |
+  | date range, 1.25% selective, paged | 153.7 ms | 1.5 ms | 17 ms | under 1 ms | 2 ms | 2 ms |
+  | date range, whole result | | | | | 88 ms | 65 ms |
+
+  The three engines win for three different reasons, which is worth knowing before predicting numbers
+  on your own data. PostgreSQL engages the trigram GIN and reads far fewer rows: the string index
+  returns 40 958 rows where the structure index returns 200 000. SQLite engages a covering partial
+  index and stops going back to the table. MSSql reads the same pages and saves CPU instead, because
+  `_String` is `NVARCHAR(MAX)` and the comparison carries an explicit collation. The date range shows
+  the spread plainly: a hundredfold gain on PostgreSQL, sixteenfold on SQLite, nothing at all on SQL
+  Server, which already streamed by `_id_object` and stopped at the hundredth group.
+
+  An earlier tree measurement, taken on a separate PostgreSQL seed of 99 200 nodes six levels deep,
+  gave 933.5 ms against 362.7 ms for the same needle.
+
+  Scope of what actually gets a prefilter today: a top-level `OR` over selective leaves, and a range or
+  equality on a single field. A top-level `AND` across *different* fields does not, because the row-level
+  form can only express a disjunction and the guard against nulling out uncovered pivot columns then
+  suppresses it. Filters touching arrays, dictionaries, `== null`, cross-field comparisons or computed
+  expressions are recognised as unanalysable and produce no prefilter.
+
+  **Two guards, not one.** The row form drops rows, not objects, so having a branch is not the same as
+  keeping a value: a branch is a predicate, and a row failing its own branch is dropped like any other.
+  With several branches an object can qualify through branch A while its branch-B row is thrown away,
+  leaving column B NULL. The object set survives, which is why this went unnoticed by 1606 existing
+  tests, but every value read from column B is then a lie. So on top of the coverage check a multi-branch
+  plan is emitted only when nothing outside the disjunction reads those columns: no `OrderBy` or
+  `DistinctBy` over Props, no projection, no `Distinct`. A single-branch plan needs no such guard, since
+  an object survives only if that very row matched. For the same reason a disjunction nested inside a
+  conjunction is never taken as a candidate: the sibling conjunct would read a column the prefilter had
+  already nulled out, and there the objects are lost outright rather than merely misordered.
+
+### Fixed
+- **Case-insensitive search folded ASCII only, so it did not work for most of the world's text
+  (`RedBase.Core`, `RedBase.Core.Pro`, all three providers).** `Contains(needle,
+  OrdinalIgnoreCase)` found `HELLO` but not `ПРИВЕТ`, and the same held for Greek, Hungarian, Polish,
+  Czech and French. Case folding comes from the database's own rules: on SQLite that is ASCII-only
+  unconditionally (`LIKE`, `lower()`, `upper()` and even `COLLATE NOCASE`), on PostgreSQL whenever the
+  database was created with `LC_CTYPE=C`, and never on SQL Server, whose default collation already
+  folds every script.
+  New opt-in setting `RedbServiceConfiguration.StringCollation` fixes every script whose case mapping
+  is one character to one character, in one place, with no per-language work. It covers the whole
+  family together — `ContainsIgnoreCase`, `StartsWithIgnoreCase`, `EndsWithIgnoreCase`, `ToLower`,
+  `ToUpper` and the case-insensitive regex — so a search can never disagree with a comparison.
+  Implemented per provider because the providers differ in kind: PostgreSQL attaches `COLLATE` to the
+  folded operand (Pro in C#, Free through the new `pvt_fold_case()` reading a `redb.string_collation`
+  GUC, which needed no change to any function signature); SQLite has nothing to attach a collation to,
+  so it replaces the built-in `like`, `lower` and `upper` with Unicode-aware ones on the connection,
+  the same technique SQLite's own ICU extension uses and with no native rebuild; SQL Server needs
+  nothing. Unset, the generated SQL is byte for byte what it was.
+  Two caveats that are documented rather than hidden: on PostgreSQL a collated operand cannot use an
+  index built with the database's collation, so a trigram search degrades to a full scan until a
+  matching expression index is created (the DDL is in COLLATION.md, and RedBase does not create it for
+  you); and diacritics, German `ß`/`SS` and the Turkish dotted `İ` are not case folding and are not
+  fixed — what the last two do differs per provider, which the test suite now pins per provider rather
+  than assuming.
+  See COLLATION.md.
+- **Pro discarded the configured SQL dialect (`RedBase.Postgres.Pro`).** `ProRedbService` resolved both
+  `ISqlDialect` and `ISqlDialectPro` from the container but handed only the base one to
+  `ProQueryableProvider`; `ProQueryProvider` then narrowed it with `as ProPostgreSqlDialect`, a base
+  instance failed that cast, and the fallback silently constructed `new ProPostgreSqlDialect()` with no
+  configuration at all. Latent for as long as the dialect carried no settings — `StringCollation` was
+  the first, and it vanished on every Pro query while working correctly on Free. The Pro dialect is now
+  passed through explicitly and preferred over the base one wherever both are available.
+- **Temporal semantics: `DateTime` keeps its clock reading on every read path, and `DateOnly` works at
+  all (`RedBase.Core`, `RedBase.Core.Pro`, all three providers).**
+  In REDB a `DateTime` carries no time zone: 14:00 written is 14:00 read, on any host. Object
+  materialization honoured that; the analytics path did not. `JsonValueConverter` parsed a zoned ISO
+  string with the default `DateTimeStyles`, which converts it *into the caller's local zone*, so
+  `MinRedbAsync`, `GroupBy`, `Window` and scalar projections answered with a different value than the
+  object did for the same stored field.
+  Separately, `DateOnly` never round-tripped on any provider: it was seeded with
+  `_db_type = 'DateTime'`, a value no `get_object_json` branch knows about, so the column was written
+  correctly and dropped on the way out, and every `DateOnly` property materialized as `0001-01-01`.
+  Retyped to `DateTimeOffset`, which routes it through the branch that already exists everywhere: no
+  SQL function changed, no PVT version bump, no native SQLite rebuild. Migrations for existing
+  databases: `redb.{Postgres,MSSql,SQLite}/sql/migrate_dateonly_db_type.sql`.
+  Also fixed: `DateOnly`, `TimeOnly` and `TimeSpan` went into `_values._String` through the *current*
+  culture's short pattern and were parsed back the same way, so a row written under ru-RU stopped
+  loading under en-US; the `TimeSpan` JSON form dropped the day component and the sign
+  (`3.02:00:00` came back as `02:00:00`); and the filter needed the same invariant spelling in both
+  the Free (`FacetFilterBuilder`) and Pro (`SqlParameterCollector`) paths, or a saved row was
+  unfindable by its own value. All temporal text now goes through a single `RedbTemporalFormat`.
+  An unassigned `DateOnly` also threw on load, because Npgsql writes `DateTime.MinValue` as
+  `-infinity` and only the `DateTime` converters recognised that marker.
+  See [DATETIME.md](DATETIME.md) for the contract, the precision table and the boundaries left open.
+- **Phantom `_date_delete` base field (`RedBase.Core`, `RedBase.Core.Pro`).** `BaseFieldMapper` and
+  `ProSqlBuilderBase` claimed `DateDelete` as a base field and mapped it to `_date_delete`, a column
+  present in none of the three DDLs and a leftover of the removed `_deleted_objects` table. Typed
+  LINQ could not reach it, but a string-addressed query passed validation and compiled SQL against a
+  column that is not there.
+- **Ambiguous `_id` when a `== null` filter met a filter on the base `Id` (all three Pro providers).**
+  A props null check switches the PVT CTE into a form whose `FROM` carries both `_objects` and
+  `_values`, while the base-field filter was compiled without a table alias. `_id` is the only column
+  present in both tables, so the combination produced `column reference "_id" is ambiguous` on
+  PostgreSQL and its equivalents elsewhere. Every `_objects` subquery emitted by the pivot generator
+  now carries the `o_src` alias and the compiled filter is qualified against it.
+
+  Reachable from ordinary code: `.Where(p => p.Field == null).WhereRedb(o => ids.Contains(o.Id))`.
+  Only `_id` was affected; `_id_parent`, `_hash`, `_value_*` and the rest do not collide.
+
+- **`ChangePasswordAsync` threw `UnauthorizedAccessException` on a wrong current password instead of
+  returning `false` (`RedBase.Core`, GitHub #4).** The method is `Task<bool>` documented as "true if
+  changed", so a change-password form built against the contract 500'd on the most common user error.
+  A wrong current password now returns `false`; precondition failures (null args, disabled/system user)
+  still throw. Regression test on all six Free/Pro fixtures.
+
+- **SQLite: any property type change crashed `InitializeAsync` with `no such table:
+  migrate_structure_type` (`RedBase.SQLite`, GitHub #5).** The scheme-sync path runs
+  `SELECT * FROM migrate_structure_type(...)`, a stored function that only exists on PostgreSQL/SQL
+  Server — SQLite has none, and its `redb.SQLite/sql/migrate_structure_type.sql` is a dead PostgreSQL
+  copy. `SqliteSchemeSyncProvider` now performs the migration in C#: a type change that keeps the same
+  `_values` storage column (e.g. `Int` → `Long`, `DateTime` → `DateOnly`) is a clean no-op, and a
+  cross-column change that actually holds data raises a clear, actionable error instead of the cryptic
+  missing-table one. Regression tests on Free and Pro SQLite.
+
+- **Docs & packaging notes from a first SQLite + Pro integration (GitHub #6).** (1) The
+  `EnablePropsCache` XML summary claimed it "works only when `EnableLazyLoadingForProps = true`" —
+  false; the cache is independent of lazy loading (the code gates on neither), and the summary now says
+  so. (2) `redb.CLI` README's *Supported Providers* table omitted SQLite though `--provider sqlite`
+  works; it is now listed. (3) `redb.CLI` targets `net8.0` only (deliberately, to avoid tripling the
+  native SQLite payload) but lacked roll-forward, so a host with only a newer major runtime failed to
+  start it; `RollForward=LatestMajor` now lets the net8.0 tool run on net9/net10-only machines.
+
+
+### Removed
+- **`ExpressionSqlCache` and `CompiledQuery` (`RedBase.Core`).** Both were public types that nothing
+  ever used: an SQL-template cache that was never wired into any query path, and the record it
+  returned. Verified dead four ways before removal — a repository-wide search found references only
+  in its own file, an architecture plan under `docs/` and two documentation pages; the only assembly
+  scanning in the codebase looks for types carrying `[RedbScheme]`; `CompiledQuery` had no consumer
+  besides the cache; and the full solution builds with both files gone.
+  This is a public API removal, so a consumer who referenced either type directly (nothing in REDB
+  did) needs to drop that reference. The architecture pages on the documentation site described this
+  cache as a `ConcurrentDictionary` keyed by expression string and shared for the lifetime of an
+  `IRedbService`. It was none of those things: the implementation was a static `MemoryCache` singleton
+  with TTL and eviction, keyed by expression structure with constants stripped. That block is gone:
+  nothing caches in the SQL-compilation layer any more, and the caches that do exist keep their own
+  section further down the same page.
+
+### Changed
+- **The prefilter steps aside on SQLite when a limit meets no ordering (`RedBase.SQLite.Pro`).**
+  Without a prefilter SQLite walks `IX__values__object_structure_lookup`, so rows reach `GROUP BY`
+  already ordered by `_id_object`, the aggregate streams, and `LIMIT` stops after the Nth group. A
+  multi-branch prefilter makes the planner switch to MULTI-INDEX OR over `IX__values__String_not_null`:
+  the rows now arrive ordered by structure and value, `GROUP BY` needs `USE TEMP B-TREE`, everything is
+  materialised and the limit saves nothing.
+
+  Measured on 100 000 objects and 8.4M rows in `_values`, one needle across two string fields, seven
+  interleaved repetitions of each form after warming both: 8-12 ms without the prefilter against
+  388-521 ms with it. The ranges do not overlap, and the plans differ structurally, so this is not
+  timing noise.
+
+  The rule is narrow by construction: only SQLite, only a plan with more than one branch, only a query
+  that carries a limit and no ordering at all. Add any `ORDER BY` and the aggregate is materialised
+  either way, so the prefilter wins again, 1150 ms against 311 ms on the same data. A single-branch
+  plan never triggers MULTI-INDEX OR and keeps its own win, 16x on a date range.
+
+  Neither of the other two engines needs this. PostgreSQL materialises the aggregate regardless and
+  gains 1.8x to 2.2x on all three shapes. SQL Server cannot even produce the offending shape: its
+  `OFFSET/FETCH` requires an `ORDER BY`, so every paged query carries one, and the prefilter gains
+  there too, 3x paged and 5.3x on the full result. The rule therefore lives in the SQLite provider
+  (`SqlitePrefilterGuards`) and not in the shared planner, which stays dialect-agnostic.
+
+- **The pivot scan no longer re-checks the scheme (all three Pro providers).**
+  Every PVT CTE carried `AND v._id_object IN (SELECT _id FROM _objects WHERE _id_scheme = @p0)`, and
+  tree queries additionally joined `_objects oo` only to state `oo._id_scheme = @p0`. Both were
+  redundant: `_values` rows are selected by `_id_structure`, a structure belongs to exactly one scheme,
+  and the outer `SELECT ... WHERE o._id_scheme = @p0` re-applies the check anyway. The subquery and the
+  join are now dropped whenever the outer statement carries that filter itself.
+
+  Two callers must keep the check and say so explicitly. `ExecuteDeleteAsync` builds a `DELETE` whose
+  only scheme filter is the one inside the CTE, so it passes `schemeCheckRequired: true`; without it a
+  soft-deleted object, which moves to scheme `-10` while its `_values` keep their structures, would be
+  matched and hard-deleted. The other is a filter attached directly to the object set. Tree queries have
+  no delete path today; a future one must carry its own `WHERE _id_scheme`.
+
+  Verified by comparing sorted id sets before and after on all three engines, flat and tree: identical
+  everywhere. On SQLite the flat form also ran 28% faster (1209 ms → 865 ms on 100 100 objects).
+
+- **The string value index in SQLite lost its length guard (`RedBase.SQLite`).**
+  `IX__values__String_not_null` carried `AND length(_String) < 2000` alongside `IS NOT NULL`. That guard
+  belongs to PostgreSQL, where a btree key over roughly 2700 bytes overflows the page; SQLite has no
+  such limit and the condition had been copied across. Its effect there was to make the index unusable:
+  SQLite does not prove implications between a query and a partial index predicate, it looks for a
+  matching term, and no query states `length(_String) < 2000`.
+
+  **Upgrade note.** `CREATE INDEX IF NOT EXISTS` does not replace an existing index, so databases
+  created before this change keep the guarded version and see no benefit. Recreate it once:
+
+  ```sql
+  DROP INDEX IF EXISTS "IX__values__String_not_null";
+  CREATE INDEX "IX__values__String_not_null"
+      ON _values (_id_structure, _id_object, _String) WHERE _String IS NOT NULL;
+  ```
+
 ## [3.6.0] — 2026-08-13
 
 > **Why 3.6.0 and not 3.5.2.** `redb.Route` adds public API in this release —

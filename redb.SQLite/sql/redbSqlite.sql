@@ -520,8 +520,16 @@ CREATE INDEX IF NOT EXISTS "IX__values__object_structure_array_index"
     ON _values (_id_object, _id_structure, _array_index) WHERE _array_index IS NOT NULL;
 
 -- Partial NOT NULL value indexes
+-- NOTE: unlike PostgreSQL there is NO length guard here, and that is deliberate.
+-- The guard in redbPostgre.sql exists because a btree key over ~2700 bytes overflows the page;
+-- SQLite has no such limit. Copying it across made the index unusable for string prefilters:
+-- SQLite does not prove implications between a query and a partial index predicate, it looks
+-- for a matching term, and "length(_String) < 2000" is a term no query states. Measured on
+-- 100100 objects, a LIKE prefilter went from 1230 ms to 294 ms once the guard was dropped
+-- (see docs/PVT_PREFILTER_PLAN.md). The prefilter must also spell out "IS NOT NULL", because
+-- SQLite derives it from a range comparison but never from LIKE.
 CREATE INDEX IF NOT EXISTS "IX__values__String_not_null"
-    ON _values (_id_structure, _id_object, _String) WHERE _String IS NOT NULL AND length(_String) < 2000;
+    ON _values (_id_structure, _id_object, _String) WHERE _String IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__values__Long_not_null"
     ON _values (_id_structure, _id_object, _Long) WHERE _Long IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__values__DateTimeOffset_not_null"
@@ -550,6 +558,18 @@ CREATE INDEX IF NOT EXISTS "IX__objects__id_parent_scheme"
     ON _objects (_id, _id_parent, _id_scheme) WHERE _id_parent IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent_owner"
     ON _objects (_id_scheme, _id_parent, _id, _id_owner, _date_create, _date_modify, _name) WHERE _id_parent IS NOT NULL;
+
+-- Tree walk that needs the object hash (transparent cache). Analogue of
+-- IX__objects__id_parent in redbMSSQL.sql, whose INCLUDE (_id, _hash, _id_scheme) is
+-- folded into the key here — SQLite has no INCLUDE. IX__objects__parent_scheme_id above
+-- stops at (_id_parent, _id_scheme, _id) and does NOT carry _hash, so a walk that reads
+-- the hash falls back to the table on every row. Filtered on _id_parent IS NOT NULL: a lookup
+-- by parent never matches NULL, so root objects would sit in the index as dead weight.
+-- Verified on SQLite 3.46.1: SELECT _id, _hash, _id_scheme WHERE _id_parent = ? plans as
+-- SEARCH ... USING COVERING INDEX. (_id is the rowid alias and is therefore already in
+-- every index; it is listed to keep the column set identical to the MSSQL analogue.)
+CREATE INDEX IF NOT EXISTS "IX__objects__id_parent"
+    ON _objects (_id_parent, _id, _hash, _id_scheme) WHERE _id_parent IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS "IX__values__parent_structure"
     ON _values (_array_parent_id, _id_structure) WHERE _array_parent_id IS NOT NULL;
@@ -587,7 +607,7 @@ INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775690, '
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775689, 'Xml', 'String', 'string');
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775688, 'Base64', 'String', 'string');
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775687, 'Color', 'String', 'string');
-INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775686, 'DateOnly', 'DateTime', 'DateOnly');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775686, 'DateOnly', 'DateTimeOffset', 'DateOnly');
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775685, 'TimeOnly', 'String', 'TimeOnly');
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775684, 'TimeSpan', 'String', 'TimeSpan');
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775683, 'Enum', 'String', 'Enum');

@@ -193,11 +193,15 @@ BEGIN
             SET @v_conversion_sql = N'UPDATE _values SET _Numeric = TRY_CAST(_String AS DECIMAL(38,18)), _String = NULL 
                 WHERE _id_structure = @sid AND _String IS NOT NULL AND TRY_CAST(_String AS DECIMAL(38,18)) IS NOT NULL';
         ELSE IF @v_target_col = '_Boolean'
-            SET @v_conversion_sql = N'UPDATE _values SET _Boolean = CASE 
-                WHEN LOWER(_String) IN (''true'', ''1'', ''yes'', ''t'', ''y'') THEN 1 
-                WHEN LOWER(_String) IN (''false'', ''0'', ''no'', ''f'', ''n'') THEN 0 
-                ELSE NULL END, _String = NULL 
-                WHERE _id_structure = @sid AND _String IS NOT NULL';
+            -- Guarded like every other text conversion in this procedure. Without the predicate the
+            -- CASE fell through to NULL for anything unrecognised while the same statement cleared
+            -- _String, so a value like 'maybe' was DESTROYED — and counted as a success, because
+            -- success is measured by rows updated.
+            SET @v_conversion_sql = N'UPDATE _values SET _Boolean = CASE
+                WHEN LOWER(_String) IN (''true'', ''1'', ''yes'', ''t'', ''y'') THEN 1
+                ELSE 0 END, _String = NULL
+                WHERE _id_structure = @sid AND _String IS NOT NULL
+                  AND LOWER(_String) IN (''true'', ''1'', ''yes'', ''t'', ''y'', ''false'', ''0'', ''no'', ''f'', ''n'')';
         ELSE IF @v_target_col = '_DateTimeOffset'
             SET @v_conversion_sql = N'UPDATE _values SET _DateTimeOffset = TRY_CAST(_String AS DATETIMEOFFSET), _String = NULL 
                 WHERE _id_structure = @sid AND _String IS NOT NULL AND TRY_CAST(_String AS DATETIMEOFFSET) IS NOT NULL';

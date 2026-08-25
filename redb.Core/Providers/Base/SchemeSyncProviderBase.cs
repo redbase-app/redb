@@ -454,7 +454,11 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     {
         if (structure.IdType != typeId)
         {
-            await MigrateStructureTypeInternalAsync(structure.Id, structure.IdType, typeName);
+            // Order matters and is load-bearing: the migration either moves the values or throws, and
+            // only a completed migration is allowed to reach Structures_UpdateType. Switching the type
+            // on a failed migration is what turned a bad type change into silently missing values.
+            await MigrateStructureTypeInternalAsync(
+                structure.Id, structure.IdType, typeName, structure.Name, structure.IdScheme);
             await Context.ExecuteAsync(Sql.Structures_UpdateType(), typeId, structure.Id);
             structure.IdType = typeId;
         }
@@ -514,13 +518,105 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     }
 
     /// <summary>
-    /// Migrate structure type (internal version with oldTypeId).
+    /// Moves a structure's stored values to the column the new type reads from, during scheme sync.
+    /// Throws <see cref="RedbTypeMigrationException"/> when it cannot, so the caller never switches
+    /// <c>_id_type</c> on values that stayed behind.
+    ///
+    /// <para>
+    /// <paramref name="propertyName"/> and <paramref name="schemeId"/> only enrich the error message and
+    /// are optional so that the pre-existing signature keeps compiling for anyone who overrode it.
+    /// </para>
     /// </summary>
-    protected virtual async Task MigrateStructureTypeInternalAsync(long structureId, long oldTypeId, string newTypeName)
+    protected virtual async Task MigrateStructureTypeInternalAsync(
+        long structureId, long oldTypeId, string newTypeName,
+        string? propertyName = null, long? schemeId = null)
     {
-        var oldType = await Context.QueryFirstOrDefaultAsync<RedbType>(Sql.Types_SelectByName(), oldTypeId.ToString());
-        var oldTypeName = oldType?.Name ?? "unknown";
-        await MigrateStructureTypeAsync(structureId, oldTypeName, newTypeName, false);
+        // Resolve by ID. Passing the id into a lookup keyed by NAME is what used to happen here: it
+        // matched nothing, fell back to the literal "unknown", and every provider then reported an
+        // unknown source type — an error nobody read, because the result was discarded.
+        var oldTypeName = await ResolveTypeNameByIdAsync(oldTypeId);
+
+        var result = await MigrateStructureTypeAsync(structureId, oldTypeName, newTypeName, false);
+
+        // Providers report failure as data, not as an exception: an `errors` string when the migration
+        // never ran, a non-zero error count when it ran and left rows behind. Both are failures here.
+        var failed = !string.IsNullOrWhiteSpace(result.Errors) || result.ErrorCount > 0;
+        if (!failed)
+            return;
+
+        // A structure with no stored values has nothing to strand. This is the ordinary case for a type
+        // with no scalar storage column of its own (a nested class), where every provider reports an
+        // unknown source type and there is genuinely nothing to move. Refusing here would break type
+        // changes on empty schemes for no gain.
+        var storedRows = await CountStructureValuesAsync(structureId);
+        if (storedRows == 0)
+            return;
+
+        // A migration that never started reports zero affected rows even though the values are sitting
+        // right there — it bailed out before counting anything. Reporting that zero would tell the
+        // reader nothing is at stake, which is the opposite of the truth, so fall back to the rows we
+        // just counted ourselves.
+        var affected = result.AffectedRows > 0 ? result.AffectedRows : (int)storedRows;
+
+        throw new RedbTypeMigrationException(
+            structureId,
+            propertyName ?? $"structure {structureId}",
+            schemeId ?? 0,
+            schemeId.HasValue ? await TryResolveSchemeNameAsync(schemeId.Value) : null,
+            oldTypeName,
+            newTypeName,
+            affected,
+            result.SuccessCount,
+            affected - result.SuccessCount,
+            result.Errors);
+    }
+
+    /// <summary>
+    /// REDB type name for a type id, from the by-id metadata cache and falling back to one query for
+    /// the whole (tiny, seed-only) <c>_types</c> table. No new dialect method: the id-keyed cache and
+    /// <c>Types_SelectAll</c> already exist.
+    /// </summary>
+    private async Task<string> ResolveTypeNameByIdAsync(long typeId)
+    {
+        var cached = Cache.GetTypeById(typeId);
+        if (cached != null)
+            return cached.Name;
+
+        var allTypes = (await Context.QueryAsync<RedbTypeInfo>(Sql.Types_SelectAll())).ToList();
+        Cache.CacheTypesById(allTypes);
+
+        var found = allTypes.FirstOrDefault(t => t.Id == typeId);
+        if (found == null)
+            throw new InvalidOperationException(
+                $"Type id={typeId} is referenced by a structure but is missing from the _types table. " +
+                "The database schema is inconsistent.");
+
+        return found.Name;
+    }
+
+    /// <summary>
+    /// Rows in <c>_values</c> for a structure, regardless of which typed column holds them. Composed
+    /// here rather than added to ISqlDialect: it is one portable statement and the parameter form is
+    /// the only provider-specific part. COUNT(*) is cast because its natural width differs by engine.
+    /// </summary>
+    private async Task<long> CountStructureValuesAsync(long structureId)
+    {
+        var sql = $"SELECT CAST(COUNT(*) AS BIGINT) FROM _values WHERE _id_structure = {Sql.FormatParameter(1)}";
+        return await Context.ExecuteScalarAsync<long?>(sql, structureId) ?? 0;
+    }
+
+    /// <summary>Best-effort scheme name for an error message; never the reason a call fails.</summary>
+    private async Task<string?> TryResolveSchemeNameAsync(long schemeId)
+    {
+        try
+        {
+            var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), schemeId);
+            return scheme?.Name;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <inheritdoc />

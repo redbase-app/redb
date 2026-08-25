@@ -537,6 +537,20 @@ CREATE INDEX IF NOT EXISTS "IX__objects__root_objects"
 ON _objects (_id_scheme, _id)
 WHERE _id_parent IS NULL;
 
+-- 7a. 🧬 Tree walk that needs the object hash (transparent cache).
+-- Analogue of IX__objects__id_parent in redbMSSQL.sql. IX__objects__parent_scheme_id
+-- above stops at (_id_parent, _id_scheme, _id) and does NOT carry _hash, so a walk
+-- that reads the hash falls back to the heap on every row. INCLUDE keeps _hash out
+-- of the key: it is not searched by, only returned. Verified on PostgreSQL 18.1 —
+-- the plan for SELECT _id, _hash, _id_scheme WHERE _id_parent = ? is Index Only Scan.
+-- No deduplicate_items here, matching the other indexes in this section. Filtered on
+-- _id_parent IS NOT NULL: a lookup by parent never matches NULL, so root objects would
+-- sit in the index as dead weight.
+CREATE INDEX IF NOT EXISTS "IX__objects__id_parent"
+ON _objects (_id_parent)
+INCLUDE (_id, _hash, _id_scheme)
+WHERE _id_parent IS NOT NULL;
+
 -- 8. 📅 Sorting by dates
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_date_create" 
 ON _objects (_id_scheme, _date_create DESC, _id);
@@ -745,7 +759,7 @@ INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775688, '
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775687, 'Color', 'String', 'string');     -- Colors (hex, rgb)
 
 -- 4. Temporal types
-INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775686, 'DateOnly', 'DateTime', 'DateOnly');     -- .NET 6+ DateOnly
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775686, 'DateOnly', 'DateTimeOffset', 'DateOnly'); -- .NET 6+ DateOnly, stored as a midnight reading in _DateTimeOffset
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775685, 'TimeOnly', 'String', 'TimeOnly');      -- .NET 6+ TimeOnly (as string)
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775684, 'TimeSpan', 'String', 'TimeSpan');      -- TimeSpan (format "HH:MM:SS" for JSON compatibility)
 

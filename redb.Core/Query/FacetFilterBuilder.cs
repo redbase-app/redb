@@ -1122,7 +1122,24 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             // Unspecified is treated as UTC (NOT as Local!)
             return Core.Utils.DateTimeConverter.NormalizeForStorage(dt);
         }
-        
+
+        // 🔧 Zone-less text temporals, BEFORE the "types already match" shortcut below — that
+        // shortcut would hand a TimeOnly/TimeSpan straight to the JSON writer, whose default form
+        // ("12:30:00") differs from the invariant round-trip form the writer stored
+        // ("12:30:00.0000000"), and the row became unfindable by its own value. Both ends must
+        // spell it the same way, so both go through RedbTemporalFormat.
+        if (value is TimeOnly timeOnlyValue && targetType == typeof(TimeOnly))
+            return Core.Utils.RedbTemporalFormat.ToText(timeOnlyValue);
+
+        if (value is TimeSpan timeSpanValue && targetType == typeof(TimeSpan))
+            return Core.Utils.RedbTemporalFormat.ToText(timeSpanValue);
+
+        // DateOnly is stored in _DateTimeOffset at midnight (db_type "DateTime"), so the filter has
+        // to compare against the same zone-less reading the writer produced.
+        if (value is DateOnly dateOnlyValue && targetType == typeof(DateOnly))
+            return Core.Utils.DateTimeConverter.NormalizeForStorage(
+                dateOnlyValue.ToDateTime(TimeOnly.MinValue));
+
         // If types already match (NOT DateTime!) - return as is
         if (value.GetType() == targetType)
             return value;

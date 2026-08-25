@@ -167,8 +167,8 @@ namespace redb.Core.Models
             // ID will be set on save
             // Update only timestamps
             var redbObj = (RedbObject<TProps>)obj;
-            redbObj.date_create = DateTimeOffset.Now;
-            redbObj.date_modify = DateTimeOffset.Now;
+            redbObj.date_create = DateTimeOffset.UtcNow;
+            redbObj.date_modify = DateTimeOffset.UtcNow;
 
             return redbObj;
         }
@@ -192,7 +192,7 @@ namespace redb.Core.Models
             var obj = new RedbObject<TProps>(properties);
 
             // Basic initialization without accessing provider
-            var now = DateTimeOffset.Now;
+            var now = DateTimeOffset.UtcNow;
             var securityContext = AmbientSecurityContext.GetOrCreateDefault();
             var effectiveUser = securityContext.GetEffectiveUser();
 
@@ -217,7 +217,7 @@ namespace redb.Core.Models
         {
             var obj = new RedbObject<TProps>(properties);
 
-            var now = DateTimeOffset.Now;
+            var now = DateTimeOffset.UtcNow;
             var securityContext = AmbientSecurityContext.GetOrCreateDefault();
             var effectiveUser = securityContext.GetEffectiveUser();
 
@@ -239,7 +239,7 @@ namespace redb.Core.Models
         /// </summary>
         private static async Task InitializeMetadataAsync<TProps>(RedbObject<TProps> obj) where TProps : class, new()
         {
-            var now = DateTimeOffset.Now;
+            var now = DateTimeOffset.UtcNow;
             var securityContext = AmbientSecurityContext.GetOrCreateDefault();
             var effectiveUser = securityContext.GetEffectiveUser();
 
@@ -414,7 +414,7 @@ namespace redb.Core.Models
         {
             var obj = new RedbObject();
             
-            var now = DateTimeOffset.Now;
+            var now = DateTimeOffset.UtcNow;
             var securityContext = AmbientSecurityContext.GetOrCreateDefault();
             var effectiveUser = securityContext.GetEffectiveUser();
             

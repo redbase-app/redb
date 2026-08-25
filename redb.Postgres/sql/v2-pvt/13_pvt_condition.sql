@@ -220,8 +220,11 @@ BEGIN
             END IF;
 
         ELSIF v_op_norm IN ('$like', '$ilike') THEN
+            -- Only the case-INSENSITIVE half is folded. $like is case-sensitive by
+            -- definition, and attaching a collation to it would cost the index for
+            -- no behavioural gain.
             v_parts := v_parts || format('%s %s %L',
-                v_col,
+                CASE v_op_norm WHEN '$like' THEN v_col ELSE pvt_fold_case(v_col) END,
                 CASE v_op_norm WHEN '$like' THEN 'LIKE' ELSE 'ILIKE' END,
                 v_op_val #>> '{}');
 
@@ -233,11 +236,11 @@ BEGIN
             v_parts := v_parts || format('%s LIKE %L', v_col, '%' || (v_op_val #>> '{}') || '%');
 
         ELSIF v_op_norm = '$startswithignorecase' THEN
-            v_parts := v_parts || format('%s ILIKE %L', v_col, (v_op_val #>> '{}') || '%');
+            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), (v_op_val #>> '{}') || '%');
         ELSIF v_op_norm = '$endswithignorecase' THEN
-            v_parts := v_parts || format('%s ILIKE %L', v_col, '%' || (v_op_val #>> '{}'));
+            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), '%' || (v_op_val #>> '{}'));
         ELSIF v_op_norm = '$containsignorecase' THEN
-            v_parts := v_parts || format('%s ILIKE %L', v_col, '%' || (v_op_val #>> '{}') || '%');
+            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), '%' || (v_op_val #>> '{}') || '%');
 
         ELSIF v_op_norm IN ('$null', '$isnull') THEN
             v_parts := v_parts || (CASE

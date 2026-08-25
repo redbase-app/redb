@@ -8,11 +8,11 @@ public static class BaseFieldMapper
 {
     private static readonly HashSet<string> _baseFieldNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Id", "Name", "ParentId", "SchemeId", "DateCreate", "DateModify", "DateDelete",
+        "Id", "Name", "ParentId", "SchemeId", "DateCreate", "DateModify",
         "Hash", "ValueLong", "ValueString", "ValueGuid", "ValueBool", "OwnerId", "WhoChangeId",
         "ValueDouble", "ValueNumeric", "ValueDatetime", "ValueBytes",
         "Note", "Key", "DateBegin", "DateComplete",
-        "_id", "_name", "_id_parent", "_id_scheme", "_date_create", "_date_modify", "_date_delete",
+        "_id", "_name", "_id_parent", "_id_scheme", "_date_create", "_date_modify",
         "_hash", "_value_long", "_value_string", "_value_guid", "_value_bool", "_id_owner", "_id_who_change",
         "_value_double", "_value_numeric", "_value_datetime", "_value_bytes",
         "_note", "_key", "_date_begin", "_date_complete"
@@ -35,7 +35,6 @@ public static class BaseFieldMapper
         "schemeid" or "_id_scheme" or "scheme_id" => "_id_scheme",
         "datecreate" or "_date_create" or "date_create" => "_date_create",
         "datemodify" or "_date_modify" or "date_modify" => "_date_modify",
-        "datedelete" or "_date_delete" or "date_delete" => "_date_delete",
         "hash" or "_hash" => "_hash",
         "valuelong" or "_value_long" or "value_long" => "_value_long",
         "valuestring" or "_value_string" or "value_string" => "_value_string",

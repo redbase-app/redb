@@ -336,7 +336,7 @@ public abstract class TreeProviderBase : ITreeProvider
         var rowsAffected = await Context.ExecuteAsync(
             Sql.Tree_UpdateParent(),
             newParentId.HasValue ? (object)newParentId.Value : DBNull.Value,
-            DateTimeOffset.Now,
+            DateTimeOffset.UtcNow,
             userId,
             objectId);
         

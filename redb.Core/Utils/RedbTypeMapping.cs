@@ -26,6 +26,11 @@ public static class RedbTypeMapping
             RedbTypeIds.Float => "_Double",
             RedbTypeIds.DateTimeOffset => "_DateTimeOffset",
             RedbTypeIds.DateTime => "_DateTimeOffset",
+            // DateOnly is seeded with _db_type 'DateTime' and resolves to _DateTimeOffset on the
+            // SQL side (pvt_db_type_to_value_column); C# used to throw "Unknown type ID" here.
+            RedbTypeIds.DateOnly => "_DateTimeOffset",
+            RedbTypeIds.TimeOnly => "_String",
+            RedbTypeIds.TimeSpan => "_String",
             RedbTypeIds.Boolean => "_Boolean",
             RedbTypeIds.ByteArray => "_ByteArray",
             RedbTypeIds.Numeric => "_Numeric",
@@ -98,6 +103,9 @@ public static class RedbTypeMapping
             RedbTypeIds.Float => "_value_double",
             RedbTypeIds.DateTimeOffset => "_value_datetime",
             RedbTypeIds.DateTime => "_value_datetime",
+            RedbTypeIds.DateOnly => "_value_datetime",
+            RedbTypeIds.TimeOnly => "_value_string",
+            RedbTypeIds.TimeSpan => "_value_string",
             RedbTypeIds.Boolean => "_value_bool",
             RedbTypeIds.ByteArray => "_value_bytes",
             RedbTypeIds.Numeric => "_value_numeric",

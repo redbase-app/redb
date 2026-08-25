@@ -88,6 +88,28 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $BODY$
 BEGIN
+    -- 0.6.6 — migrate_structure_type joins the module, and its text conversions
+    --   are guarded:
+    --   * 27_migrate_structure_type.sql moved in from sql/. It used to ship only
+    --     in redb_init.sql, which is applied to fresh databases only, so a fix to
+    --     it never reached an existing one. Living in the module means the
+    --     version check redeploys it like everything else here.
+    --   * String -> Boolean destroyed unrecognised values: the CASE fell through
+    --     to NULL while the same statement cleared _String, and the row counted
+    --     as a success. Now predicated on the accepted token list, so anything
+    --     else stays put and lands in error_count.
+    --   * String -> DateTimeOffset and String -> Guid were bare casts that raised
+    --     on the first bad row and aborted the whole migration. Now guarded, as
+    --     the numeric branches always were and as MSSQL's TRY_CAST already did.
+    -- 0.6.5 — Unicode-aware case folding for the Free query path:
+    --   * new pvt_fold_case(text): wraps an expression in COLLATE when the
+    --     redb.string_collation GUC is set, and returns it untouched otherwise.
+    --     Case folding is driven by the database ctype, so on a database created
+    --     with LC_CTYPE=C the ILIKE/LOWER/UPPER family folds ASCII only and
+    --     'Привет' ILIKE '%привет%' is false. The GUC is set by the C# provider
+    --     per connection, which keeps every existing function signature intact.
+    --   * applied in 13_pvt_condition.sql and 17_pvt_expr.sql at every ILIKE,
+    --     and at $lower/$upper, so the three operations cannot disagree.
     -- 0.6.4 — Scoped WhereLeaves()/WhereRoots() cross-tree leak fix:
     --   * 12_pvt_cte_builder.sql tree_leaves/tree_roots now honour the seed as a
     --     SUBTREE ROOT (descend, then apply the leaf/root predicate) instead of an
@@ -168,9 +190,52 @@ BEGIN
     --   * `_array_index IS NULL` filter for scalars (NOT `_array_parent_id IS NULL`).
     --   * `0$:` base-field prefix stripping in pvt_normalize_base_field_name.
     --   * full collection / nested / dictionary / ListItem.Value/Alias / array-op support.
-    RETURN '0.6.4';
+    RETURN '0.6.6';
 END;
 $BODY$;
+
+-- ---------- 3a. Unicode-aware case folding -----------------------------
+-- Case folding in PostgreSQL is driven by the collation's ctype. A database
+-- created with LC_CTYPE=C folds ASCII and nothing else, so on such a database
+--     'Привет' ILIKE '%привет%'   -> false
+--     lower('Привет')             -> 'Привет'
+-- while the same statements are correct on a database created with a real
+-- locale. The fix is to attach an explicit collation to the operand.
+--
+-- The collation name arrives through a GUC rather than a function parameter.
+-- That is deliberate: every entry point of this module (pvt_build_query_sql and
+-- friends) would otherwise need an extra argument threaded through five layers,
+-- which is a signature change on each. The GUC costs nothing at the call sites
+-- and the C# provider sets it once per connection.
+--
+-- Unset GUC means unchanged behaviour, byte for byte, which is what makes this
+-- safe to deploy to a database whose owner never asked for it.
+--
+-- STABLE, not IMMUTABLE: the result depends on a run-time setting.
+CREATE OR REPLACE FUNCTION pvt_fold_case(p_expr text)
+RETURNS text
+LANGUAGE plpgsql
+STABLE
+AS $BODY$
+DECLARE
+    v_collation text;
+BEGIN
+    -- The second argument makes a missing setting return NULL instead of raising.
+    v_collation := btrim(coalesce(current_setting('redb.string_collation', true), ''));
+
+    IF v_collation = '' THEN
+        RETURN p_expr;
+    END IF;
+
+    -- quote_ident is the escaping, not decoration: the name is an identifier and
+    -- therefore cannot be a bound parameter, so it is concatenated into SQL text.
+    -- It doubles embedded quotes, which neutralises an injected name.
+    RETURN '(' || p_expr || ' COLLATE ' || quote_ident(v_collation) || ')';
+END;
+$BODY$;
+
+COMMENT ON FUNCTION pvt_fold_case(text) IS
+    'Wraps a text expression in COLLATE when redb.string_collation is set, so ILIKE/LOWER/UPPER fold every script and not just ASCII. Returns the expression untouched when the GUC is unset.';
 
 COMMENT ON FUNCTION pvt_module_version() IS
     'Returns the semver of the v2-pvt module. Used by the C# client on InitializeAsync to enforce compatibility (major must match, deployed minor >= required).';

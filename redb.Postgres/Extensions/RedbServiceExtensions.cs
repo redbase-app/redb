@@ -42,7 +42,7 @@ namespace redb.Postgres.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(config.ConnectionString))
             {
-                var dataSource = Npgsql.NpgsqlDataSource.Create(config.ConnectionString);
+                var dataSource = Data.NpgsqlDataSourceFactory.Create(config.ConnectionString, config.StringCollation);
                 services.AddSingleton(dataSource);
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.NpgsqlRedbContext(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));
@@ -93,7 +93,7 @@ namespace redb.Postgres.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(config.ConnectionString))
             {
-                var dataSource = Npgsql.NpgsqlDataSource.Create(config.ConnectionString);
+                var dataSource = Data.NpgsqlDataSourceFactory.Create(config.ConnectionString, config.StringCollation);
                 services.AddSingleton(dataSource);
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.NpgsqlRedbContext(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));
@@ -137,7 +137,7 @@ namespace redb.Postgres.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(configuration.ConnectionString))
             {
-                var dataSource = Npgsql.NpgsqlDataSource.Create(configuration.ConnectionString);
+                var dataSource = Data.NpgsqlDataSourceFactory.Create(configuration.ConnectionString, configuration.StringCollation);
                 services.AddSingleton(dataSource);
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.NpgsqlRedbContext(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));

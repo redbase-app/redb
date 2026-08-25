@@ -141,8 +141,16 @@ public static class JsonValueConverter
         
         var str = elem.GetString();
         if (string.IsNullOrEmpty(str)) return DateTime.MinValue;
-        
-        if (DateTime.TryParse(str, out var dt)) return dt;
+
+        // Parse as DateTimeOffset, then take the UTC instant — identical to the object
+        // materialization path (PostgresInfinityDateTimeConverter). A bare DateTime.TryParse
+        // with DateTimeStyles.None converts a zoned ISO string INTO THE CALLER'S LOCAL ZONE,
+        // so the same field read through analytics (Min/Max/GroupBy/Window/projection) came
+        // back shifted relative to the same field read through the object. REDB's contract is
+        // that DateTime carries no zone: 14:00 written is 14:00 read, on any machine.
+        if (DateTimeOffset.TryParse(str, CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind, out var dto))
+            return Core.Utils.DateTimeConverter.DenormalizeFromStorage(dto);
         return DateTime.MinValue;
     }
 
@@ -159,8 +167,13 @@ public static class JsonValueConverter
         
         var str = elem.GetString();
         if (string.IsNullOrEmpty(str)) return DateTimeOffset.MinValue;
-        
-        if (DateTimeOffset.TryParse(str, out var dto)) return dto;
+
+        // Invariant culture + ToUniversalTime, so the analytics path returns exactly what the
+        // object materialization path returns (PostgresDateTimeOffsetConverter). DateTimeOffset
+        // keeps native .NET semantics — it carries an instant, unlike DateTime.
+        if (DateTimeOffset.TryParse(str, CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind, out var dto))
+            return dto.ToUniversalTime();
         return DateTimeOffset.MinValue;
     }
 }

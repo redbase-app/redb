@@ -2,9 +2,13 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- Single TFM: a dotnet tool built for net8.0 also runs on net9/net10 hosts.
-         Multi-targeting would triple the packaged native SQLite payload for no benefit. -->
+    <!-- Single TFM: multi-targeting would triple the packaged native SQLite payload for no benefit.
+         net8.0 is kept as the floor; RollForward=LatestMajor lets the tool run on a host that only
+         has a newer major runtime (net9/net10) installed — without it the default framework
+         roll-forward (Minor) does NOT cross majors, so a net10-only box would fail with
+         "You must install .NET 8.0". -->
     <TargetFramework>net8.0</TargetFramework>
+    <RollForward>LatestMajor</RollForward>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>redb</AssemblyName>

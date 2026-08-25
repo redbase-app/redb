@@ -352,8 +352,12 @@ BEGIN
         IF lower(v_op_key) = '$abs'    THEN RETURN 'ABS('    || v_a || ')'; END IF;
         IF lower(v_op_key) = '$floor'  THEN RETURN 'FLOOR('  || v_a || ')'; END IF;
         IF lower(v_op_key) = '$ceil'   THEN RETURN 'CEIL('   || v_a || ')'; END IF;
-        IF lower(v_op_key) = '$upper'  THEN RETURN 'UPPER('  || v_a || ')'; END IF;
-        IF lower(v_op_key) = '$lower'  THEN RETURN 'LOWER('  || v_a || ')'; END IF;
+        -- Folded for the same reason ILIKE is: UPPER/LOWER take their case mapping from
+        -- the collation's ctype, so on a C-ctype database lower('Привет') is a no-op.
+        -- These back .ToLower()/.ToUpper() in LINQ, and leaving them unfolded while
+        -- fixing ILIKE would let a search match a row that a comparison then rejects.
+        IF lower(v_op_key) = '$upper'  THEN RETURN 'UPPER('  || pvt_fold_case(v_a) || ')'; END IF;
+        IF lower(v_op_key) = '$lower'  THEN RETURN 'LOWER('  || pvt_fold_case(v_a) || ')'; END IF;
         IF lower(v_op_key) = '$trim'   THEN RETURN 'TRIM('   || v_a || ')'; END IF;
         IF lower(v_op_key) = '$length' THEN
             -- Polymorphic: array → array_length, otherwise → text length.
@@ -837,7 +841,9 @@ BEGIN
     IF v_op = '$gte' THEN RETURN '(' || v_l || ' >= ' || v_r || ')'; END IF;
 
     IF v_op IN ('$like', '$ilike') THEN
-        RETURN '(' || v_l || CASE WHEN v_op = '$like' THEN ' LIKE ' ELSE ' ILIKE ' END || v_r || ')';
+        -- Only the case-insensitive half is folded; $like is case-sensitive by definition.
+        RETURN '(' || CASE WHEN v_op = '$like' THEN v_l ELSE pvt_fold_case(v_l) END
+                   || CASE WHEN v_op = '$like' THEN ' LIKE ' ELSE ' ILIKE ' END || v_r || ')';
     END IF;
 
     -- Sugar over LIKE/ILIKE: RHS must be a string literal so we can
@@ -856,14 +862,16 @@ BEGIN
         DECLARE
             v_lit text;
             v_kw  text;
+            v_ci  boolean;
         BEGIN
-            v_kw  := CASE WHEN right(v_op, length('ignorecase')) = 'ignorecase' THEN ' ILIKE ' ELSE ' LIKE ' END;
+            v_ci  := right(v_op, length('ignorecase')) = 'ignorecase';
+            v_kw  := CASE WHEN v_ci THEN ' ILIKE ' ELSE ' LIKE ' END;
             v_lit := CASE
                 WHEN v_op IN ('$contains', '$containsignorecase')   THEN quote_literal('%' || v_pat || '%')
                 WHEN v_op IN ('$startswith', '$startswithignorecase') THEN quote_literal(v_pat || '%')
                 WHEN v_op IN ('$endswith', '$endswithignorecase')     THEN quote_literal('%' || v_pat)
             END;
-            RETURN '(' || v_l || v_kw || v_lit || ')';
+            RETURN '(' || CASE WHEN v_ci THEN pvt_fold_case(v_l) ELSE v_l END || v_kw || v_lit || ')';
         END;
     END IF;
 

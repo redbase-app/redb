@@ -67,7 +67,17 @@ public class SqliteDialect : ISqlDialect
     
     public string QuoteIdentifier(string name)
         => $"\"{name}\"";
-    
+
+    /// <summary>
+    /// Returns the expression unchanged, because in SQLite there is nothing to attach. Its only
+    /// case-insensitive collation, NOCASE, folds ASCII and nothing else, and LIKE is implemented as
+    /// a function so collations do not reach it at all. The fix therefore lives one level down:
+    /// <c>SqliteRedbConnection</c> overrides the built-in <c>like</c>, <c>lower</c> and
+    /// <c>upper</c> with Unicode-aware implementations when the feature is enabled, which is the
+    /// same technique SQLite's own ICU extension uses.
+    /// </summary>
+    public string FoldCase(string expression) => expression;
+
     public string FormatCaseInsensitiveLike(string column, string parameter)
         // SQLite has no ILIKE; LIKE is ASCII case-insensitive by default.
         // ESCAPE '\\' is REQUIRED because UserProviderBase.EscapeLikeWildcards

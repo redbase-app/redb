@@ -62,7 +62,7 @@ public abstract class UserProviderBase : IUserProvider
             Email = request.Email,
             Phone = request.Phone,
             Enabled = request.Enabled,
-            DateRegister = request.DateRegister ?? DateTimeOffset.Now,
+            DateRegister = request.DateRegister ?? DateTimeOffset.UtcNow,
             DateDismiss = null,
             Key = request.Key,
             CodeInt = request.CodeInt,
@@ -180,11 +180,11 @@ public abstract class UserProviderBase : IUserProvider
         // of normal queries by the _enabled=false predicate; their login slot remains
         // occupied so re-registration with the same login is blocked until an explicit
         // hard DELETE removes the row.
-        var timestamp = DateTimeOffset.Now.ToString("yyyyMMddHHmmssfff");
+        var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmssfff");
         var newName = $"{dbUser.Name}_DEL_{timestamp}";
 
         var result = await Context.ExecuteAsync(Sql.Users_SoftDelete(),
-            newName, false, DateTimeOffset.Now, user.Id);
+            newName, false, DateTimeOffset.UtcNow, user.Id);
 
         if (result > 0)
             await OnUserDeletedAsync(user, currentUser);
@@ -502,8 +502,11 @@ public abstract class UserProviderBase : IUserProvider
         if (dbUser == null) throw new InvalidOperationException($"User with ID {user.Id} not found");
         if (!dbUser.Enabled) throw new InvalidOperationException("Cannot change password for disabled user");
 
+        // Wrong current password is the most common user error on a "change password" form, and the
+        // method is Task<bool> documented as "true if changed" — so it returns false here, it does not
+        // throw. (Programmer/precondition errors above — null args, disabled/system user — still throw.)
         if (!PasswordHasher.VerifyPassword(currentPassword, dbUser.Password))
-            throw new UnauthorizedAccessException("Invalid current password");
+            return false;
 
         if (PasswordHasher.VerifyPassword(newPassword, dbUser.Password))
             throw new ArgumentException("New password must be different from current");

@@ -9,8 +9,38 @@ namespace redb.Postgres.Sql;
 /// </summary>
 public class PostgreSqlDialect : ISqlDialect
 {
+    /// <summary>
+    /// Collation attached to case-folding expressions, or null to leave SQL exactly as it was.
+    /// Validated by <see cref="CollationNameValidator"/> before it reaches here.
+    /// </summary>
+    private readonly string? _stringCollation;
+
+    /// <summary>Default construction: no collation, generated SQL is unchanged.</summary>
+    public PostgreSqlDialect() : this(null) { }
+
+    public PostgreSqlDialect(string? stringCollation)
+    {
+        if (!string.IsNullOrWhiteSpace(stringCollation))
+        {
+            // Re-validated here rather than trusted: this constructor is public and is also
+            // reachable from provider code that did not go through RedbServiceConfiguration.
+            CollationNameValidator.Validate(stringCollation!);
+            _stringCollation = stringCollation;
+        }
+    }
+
     public string ProviderName => "PostgreSQL";
-    
+
+    /// <summary>
+    /// <c>(expr COLLATE "und-x-icu")</c>. The parentheses are not decoration: without them
+    /// <c>COLLATE</c> binds tighter than expected inside a larger expression and the clause can
+    /// attach to the wrong operand.
+    /// </summary>
+    public string FoldCase(string expression)
+        => _stringCollation is null
+            ? expression
+            : $"({expression} COLLATE {CollationNameValidator.Quote(_stringCollation)})";
+
     public string FormatPagination(int? limit, int? offset)
     {
         var parts = new List<string>();
@@ -54,7 +84,7 @@ public class PostgreSqlDialect : ISqlDialect
         => $"\"{name}\"";
     
     public string FormatCaseInsensitiveLike(string column, string parameter)
-        => $"{column} ILIKE {parameter}";
+        => $"{FoldCase(column)} ILIKE {parameter}";
     
     public string FormatDateTimeLiteral(DateTime dt)
         => $"'{DateTimeConverter.NormalizeForStorage(dt):yyyy-MM-ddTHH:mm:ss.ffffffZ}'::timestamptz";
@@ -1078,7 +1108,7 @@ public class PostgreSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
     // Bump together with the literal in redb.Postgres/sql/v2-pvt/00_module_init.sql.
-    public string? Query_PvtRequiredVersion() => "0.6.4";
+    public string? Query_PvtRequiredVersion() => "0.6.6";
 
     // ============================================================
     // Native PVT projection orchestrator (pvt_build_projection_sql).

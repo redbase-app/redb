@@ -63,7 +63,7 @@ public static class PostgresOptionsExtensions
         // DataSource and Context
         if (!string.IsNullOrEmpty(config.ConnectionString))
         {
-            var dataSource = Npgsql.NpgsqlDataSource.Create(config.ConnectionString);
+            var dataSource = Data.NpgsqlDataSourceFactory.Create(config.ConnectionString, config.StringCollation);
             services.AddSingleton(dataSource);
             services.AddScoped<IRedbContext>(sp => 
                 new NpgsqlRedbContext(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));
@@ -73,8 +73,9 @@ public static class PostgresOptionsExtensions
         services.AddScoped<IRedbSecurityContext>(sp => 
             AmbientSecurityContext.GetOrCreateDefault());
         
-        // SQL Dialect
-        services.AddSingleton<ISqlDialect, PostgreSqlDialect>();
+        // SQL Dialect. Constructed from the configuration rather than registered by type, so the
+        // collation travels with the dialect instead of living in a process-wide static.
+        services.AddSingleton<ISqlDialect>(_ => new PostgreSqlDialect(config.StringCollation));
         
         // Core providers
         services.AddScoped<ISchemeSyncProvider, PostgresSchemeSyncProvider>();

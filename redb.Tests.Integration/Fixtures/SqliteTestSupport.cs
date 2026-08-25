@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using redb.Core.Data;
 
 namespace redb.Tests.Integration.Fixtures;
 
@@ -38,5 +39,13 @@ internal static class SqliteTestSupport
         {
             try { if (File.Exists(f)) File.Delete(f); } catch { /* locked from a prior run — ignore */ }
         }
+
+        // The id cache is a process-wide static in RedbKeyGeneratorBase, holding up to 10000 ids already
+        // reserved against the file we have just deleted. The replacement file starts its sqlite_sequence
+        // at zero, so the surviving cache and the fresh sequence hand out overlapping ids and inserts die
+        // with "UNIQUE constraint failed: _values._id". Both SQLite fixtures share one file inside one
+        // process, so the second one to start is the one that trips over it, which is why this never
+        // reproduces when a single test class is run alone.
+        RedbKeyGeneratorBase.ClearAllCaches();
     }
 }

@@ -381,11 +381,24 @@ All saved and loaded with a single `SaveAsync` / `LoadAsync`. Fields can be adde
 
 ### DateTime
 
+**`DateTime` is a reading on a clock, `DateTimeOffset` is a moment in time.** `14:00` written as a
+`DateTime` comes back as `14:00` on any machine, in any zone, through any read path. A
+`DateTimeOffset` carries a real instant and keeps native .NET semantics. Base object fields
+(`DateCreate`, `DateModify`, `DateBegin`, `DateComplete`) are `DateTimeOffset`, therefore instants.
+
+`DateOnly`, `TimeOnly` and `TimeSpan` are stored in a culture-invariant form, so a row written on a
+`ru-RU` host reads identically on an `en-US` one. Nothing to configure.
+
+See **[DATETIME.md](DATETIME.md)** for the full type table, the precision differences between
+providers, and the one trap worth knowing.
+
 | Feature | Example |
 |---------|---------|
 | Comparison | `.Where(e => e.HireDate >= cutoffDate)` |
 | Range | `.Where(e => e.HireDate >= start && e.HireDate < end)` |
 | Extract parts | `.WhereRedb(o => o.DateCreate.Year == 2025)` |
+| Ordering | `.OrderBy(e => e.HireDate)` |
+| `DateOnly` / `TimeOnly` / `TimeSpan` | equality on all three; ordered comparison on `DateTime`, `DateTimeOffset` and `DateOnly` |
 
 ### String Operations
 
@@ -394,8 +407,20 @@ All saved and loaded with a single `SaveAsync` / `LoadAsync`. Fields can be adde
 | Contains | `.Where(e => e.Name.Contains("Smith"))` | `LIKE '%Smith%'` |
 | StartsWith | `.Where(e => e.Name.StartsWith("John"))` | `LIKE 'John%'` |
 | Case-insensitive | `.Contains("smith", StringComparison.OrdinalIgnoreCase)` | `ILIKE` |
+| Case-insensitive, **non-English text** | needs `c.StringCollation = "und-x-icu"` — see below | `(col COLLATE "und-x-icu") ILIKE` |
 | ToLower / ToUpper | `.Where(e => e.Name.ToLower().Contains("s"))` | `LOWER()` |
 | Trim + Length | `.Where(e => e.Name.Trim().Length > 3)` | `TRIM()`, `LENGTH()` |
+
+> **Searching non-English text?** A case-insensitive search folds case the way the database does, and
+> two of the three fold **ASCII only**: `Contains("привет", OrdinalIgnoreCase)` finds `HELLO` but not
+> `ПРИВЕТ`. Always on SQLite; on PostgreSQL only when the database was created with `LC_CTYPE=C`;
+> never on SQL Server. One setting fixes every script at once, Cyrillic, Greek, Hungarian, Polish,
+> Czech and French alike:
+> ```csharp
+> .Configure(c => c.StringCollation = "und-x-icu")
+> ```
+> It changes how PostgreSQL uses indexes and it does not make search accent-insensitive. Read
+> **[COLLATION.md](COLLATION.md)** before switching it on.
 
 ### Nested Properties
 

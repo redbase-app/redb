@@ -106,6 +106,7 @@ redb import -p mssql -c "..." -i backup.redb --dry-run
 |----------|---------|--------------------------|
 | PostgreSQL | `postgres`, `postgresql`, `pgsql` | `Host=localhost;Port=5432;Database=redb;Username=postgres;Password=pass;Timeout=600` |
 | SQL Server | `mssql`, `sqlserver` | `Server=localhost;Database=redb;User Id=sa;Password=pass;TrustServerCertificate=True;Command Timeout=600` |
+| SQLite | `sqlite` | `Data Source=app.db` |
 
 ## Typical Workflows
 

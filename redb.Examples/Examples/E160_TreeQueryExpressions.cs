@@ -33,8 +33,8 @@ public class E160_TreeQueryExpressions : ExampleBase
             .Take(100);
 
         // Uncomment to see generated SQL:
-        // var sql = await query.ToSqlStringAsync();
-        // Console.WriteLine(sql);
+        var sql = await query.ToSqlStringAsync();
+        Console.WriteLine(sql);
 
         var results = await query.ToListAsync();
 
