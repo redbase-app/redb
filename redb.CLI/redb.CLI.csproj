@@ -3,11 +3,14 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <!-- Single TFM: multi-targeting would triple the packaged native SQLite payload for no benefit.
-         net8.0 is kept as the floor; RollForward=LatestMajor lets the tool run on a host that only
-         has a newer major runtime (net9/net10) installed — without it the default framework
-         roll-forward (Minor) does NOT cross majors, so a net10-only box would fail with
-         "You must install .NET 8.0". -->
-    <TargetFramework>net8.0</TargetFramework>
+         The floor is net10.0. It used to be net8.0 to reach the widest set of hosts, but .NET 8 and
+         .NET 9 both reach end of support on 10 November 2026 (Microsoft aligned the STS 9 date with
+         LTS 8), while .NET 10 is supported until 14 November 2028. The floor moves up with the
+         ecosystem rather than trailing it. This DOES require .NET 10 on the machine installing it —
+         roll-forward only goes up, never down, so a net8/net9-only box can no longer install it.
+         RollForward=LatestMajor stays: without it the default (Minor) does not cross majors, and a
+         box carrying only a future net11 runtime would fail with "You must install .NET 10.0". -->
+    <TargetFramework>net10.0</TargetFramework>
     <RollForward>LatestMajor</RollForward>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

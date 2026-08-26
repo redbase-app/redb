@@ -4,6 +4,15 @@ Command-line tool for REDB database management: schema creation, data export and
 
 ## Installation
 
+**Requires the .NET 10 runtime.** From 3.7.1 the tool targets `net10.0`; earlier versions targeted
+`net8.0` and installed on any .NET 8 or newer runtime. Roll-forward only moves up, never down, so a
+machine carrying only .NET 8 or .NET 9 cannot install this version — install .NET 10 there.
+
+Older versions are not a workaround: 3.7.0 and earlier are unlisted and carry a known high-severity
+advisory in a transitive dependency ([GHSA-2m69-gcr7-jv3q](https://github.com/advisories/GHSA-2m69-gcr7-jv3q)),
+fixed in 3.7.1. Both .NET 8 and .NET 9 reach end of support on 10 November 2026 anyway; .NET 10 is
+supported until 14 November 2028.
+
 ```bash
 # Install as a global .NET tool
 dotnet tool install --global redb.CLI

@@ -21,7 +21,14 @@
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="9.0.3" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+    <!-- Same pin as redb.SQLite, and for the same reason: Microsoft.Data.Sqlite drags in
+         SQLitePCLRaw through bundle/provider, and the version it picks is flagged by
+         NU1903 / GHSA-2m69-gcr7-jv3q (high). redb.SQLite pinned the native lib long ago;
+         redb.Export was left on Microsoft.Data.Sqlite 9.0.3 and kept resolving the
+         vulnerable e_sqlite3 2.1.10 into a PUBLISHED package. Do not remove the pin —
+         without it the transitive resolution falls straight back to the flagged version. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
   </ItemGroup>
 
 </Project>

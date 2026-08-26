@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
@@ -27,13 +27,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\redb.Core\redb.Core.csproj" />
-    <PackageReference Include="redb.Core.Pro" Version="3.7.0" />
+    <PackageReference Include="redb.Core.Pro" Version="3.7.1" />
     <ProjectReference Include="..\redb.MSSql\redb.MSSql.csproj" />
-    <PackageReference Include="redb.MSSql.Pro" Version="3.7.0" />
+    <PackageReference Include="redb.MSSql.Pro" Version="3.7.1" />
     <ProjectReference Include="..\redb.Postgres\redb.Postgres.csproj" />
-    <PackageReference Include="redb.Postgres.Pro" Version="3.7.0" />
+    <PackageReference Include="redb.Postgres.Pro" Version="3.7.1" />
     <ProjectReference Include="..\redb.SQLite\redb.SQLite.csproj" />
-    <PackageReference Include="redb.SQLite.Pro" Version="3.7.0" />
+    <PackageReference Include="redb.SQLite.Pro" Version="3.7.1" />
   </ItemGroup>
 
   <ItemGroup>
