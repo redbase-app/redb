@@ -19,6 +19,91 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.2] — 2026-08-27
+
+> **Why this release exists.** 3.7.1 shipped a regression: `array.Contains` over a nullable array
+> property throws instead of translating, so a filter as ordinary as `.Where(x => x.Tags.Contains(y))`
+> stops working the moment `Tags` is `T[]?` — which is what `Nullable enable` gives every optional
+> array. It was introduced by the move to .NET 10 in 3.7.1, not by any change to the query parser,
+> and it is the reason this is a release rather than an entry that waits for company.
+>
+> 3.7.1 stays listed on nuget.org and its images stay in the registry. Nothing there is unsafe; it is
+> superseded, not withdrawn.
+
+Verified on .NET 10.0.8 with the suite targeting `net10.0`: 1942 of 1944 passed, two deliberate skips,
+run twice — once with the PVT prefilter on and once off, since the prefilter is a superset that must
+never change a result. All six provider collections (Postgres, MsSql, Sqlite, each Free and Pro) plus
+the unit tests: 1920 of 1920, no failures in either mode. The regression only reproduced on .NET 10,
+so a green run on 10.0.8 is the proof that matters.
+
+### Fixed
+- **`array.Contains` over a nullable array property stopped parsing on .NET 10 (`RedBase.Core`).**
+  A filter as ordinary as `.Where(x => x.Tags.Contains("urgent"))` threw
+  `NotSupportedException: Unsupported Contains expression structure` whenever `Tags` was declared
+  `T[]?`, which is what `Nullable enable` gives you for every optional array. Introduced by the move
+  to .NET 10 in 3.7.1, not by any change to the parser itself.
+
+  C# resolves `array.Contains(x)` to the `ReadOnlySpan` overload, and the parser already unwrapped
+  that conversion. On .NET 10 with nullable annotations the compiler wraps the collection twice:
+  `op_Implicit` around a `Convert` around the member access. Peeling only the outer layer left a
+  `Convert`, which is not a `MemberExpression`, so both branches of the translation missed and the
+  method fell through to its final `throw`. Conversions are now stripped in a loop from both
+  operands, so the property behind them is found whatever the compiler wrapped it in.
+
+  Covered by `PvtPrefilterEquivalenceTestsBase.ArrayContains_WithOr_SameResults` on all three
+  providers, and verified separately against six shapes of `Contains`, including both `IN` forms
+  over a constant collection.
+
+- **The PVT prefilter refused three shapes it should have accepted (`RedBase.Core.Pro`).**
+
+  *A disjunction nested inside a conjunction* was never taken as a candidate. The guard exists for a
+  real hazard: in `(A OR B) AND C`, where `C` reads a pivot column, the prefilter may already have
+  nulled that column out and the surviving conjunct then drops the object. But a sibling that only
+  constrains the object's own fields is compiled into the `_objects` subquery and cannot read a pivot
+  column at all. `(Name LIKE x OR Name LIKE y) AND ParentId = ANY(...)`, the ordinary shape of a
+  search box scoped to a subtree, now gets its prefilter.
+
+  *Several branches over one structure* were treated as a multi-structure plan by the guard that
+  protects `ORDER BY` and `DISTINCT BY`. Coverage already guarantees that a single covered structure
+  means a single pivot column, and an object either keeps its row or forms no group at all, which is
+  what the authoritative filter would decide anyway. The guard now counts distinct structures.
+
+  *`ListItem.Id`* was rejected together with `.Value` and `.Alias`. The latter two live in
+  `_list_items` and need a join, which a row predicate cannot express. `.Id` is stored in the row's
+  own `_listitem` column, so `Status.Id == 42` is literally `v._listitem = 42`. Its column name also
+  disagreed with the rest of the resolver in casing, which alone would have scored it zero and
+  dropped it silently.
+
+- **Leaves were grouped by structure alone when merging a conjunction (`RedBase.Core.Pro`).**
+  `Status.Id` and `Status.Value` share a structure id and differ only in column, so a merged branch
+  could have spliced a string pattern onto a bigint column. Unreachable before, because every
+  accepted field had a one-to-one structure-to-column mapping; reachable the moment `ListItem.Id` was
+  let in, which is why it is fixed first. Grouping is now by structure and column together.
+
+### Added
+- **The prefilter planner explains itself in `ToSqlStringAsync` (`RedBase.Core.Pro` + all three Pro
+  providers).** An applied plan lists its branches with structure, column, operator and score; a
+  refusal names the guard that stopped it and what it tripped over:
+
+  ```
+  -- PVT prefilter: Row form, 2 branch(es) over 2 structure(s), score 70
+  --   branch: structure 1000032, column _string, Contains, score 70
+  --   branch: structure 1000034, column _string, Contains, score 70
+  ```
+  ```
+  -- PVT prefilter: not applied, reason PivotNotCovered
+  --   detail: pivot column(s) Age (structure 1000030) have no branch
+  ```
+
+  Nine reason codes, including the two decided by the provider rather than the planner: a props null
+  check, and the SQLite rule about an unordered limit. Finding out why a production query got no
+  prefilter used to mean patching the API to log the configuration flag and waiting for a deploy.
+
+  The comments are built by `GetSqlPreviewAsync` and by nothing else. They must never reach the
+  executed statement: a comment that varies per query is a distinct plan-cache key in both PostgreSQL
+  and SQL Server, which would trade a diagnostic for a cache that never hits. Predicate values are
+  not repeated either, since the parameter block above already lists them.
+
 ## [3.7.1] — 2026-08-26
 
 > **Why 3.7.1, and what happened to 3.7.0.** 3.7.0 is withdrawn: it was built on .NET 9 and carries

@@ -121,6 +121,22 @@ largest table in the database, so weigh it against how much case-insensitive sea
 
 SQLite needs no such thing: `LIKE '%x%'` never used an index there in the first place.
 
+### Planned: RedBase should offer to create it
+
+Leaving this to the reader is the weak part of the current design. The setting that causes the
+regression ships in the box, the index that repairs it does not, and the failure mode is silence —
+nothing errors, the query just gets slower, and whoever turns `StringCollation` on months later has
+no reason to connect the two.
+
+What is intended for a later release: an opt-in that creates the matching expression index as part of
+schema initialisation, keyed off the configured collation, so the index and the predicate cannot
+drift apart. Opt-in rather than automatic, because a second GIN index on `_values` is a real cost on
+a large installation and `CREATE INDEX CONCURRENTLY` cannot run inside the transaction that
+initialisation uses — it needs its own connection and its own decision.
+
+Until that exists, the statement above is the supported answer, and this section is the reminder that
+we know it is homework we handed to you.
+
 ---
 
 ## What the value means per provider

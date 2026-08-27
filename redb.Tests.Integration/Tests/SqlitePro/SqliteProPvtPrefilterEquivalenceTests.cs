@@ -31,21 +31,24 @@ public class SqliteProPvtPrefilterEquivalenceTests : PvtPrefilterEquivalenceTest
         var restore = Redb.Configuration.EnablePvtPrefilter;
         try
         {
-            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
-            var unorderedOff = await Unordered().ToSqlStringAsync();
-            var orderedOff = await Ordered().ToSqlStringAsync();
-
             Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
-            var unorderedOn = await Unordered().ToSqlStringAsync();
-            var orderedOn = await Ordered().ToSqlStringAsync();
 
-            unorderedOn.Should().Be(unorderedOff,
+            var unordered = await Unordered().ToSqlStringAsync();
+            var ordered = await Ordered().ToSqlStringAsync();
+
+            // Asserted on the planner trace rather than on the whole SQL text: the trace names the
+            // decision, while a text comparison would also fail on any unrelated formatting change.
+            unordered.Should().Contain("DialectDeclined",
                 "an unordered limit lets SQLite stream the aggregate, and a multi-branch prefilter " +
-                "would take that away for a 59x loss");
+                "would take that away for a 40x loss");
+            unordered.Should().NotContain("AND ((v._id_structure",
+                "and the declined plan must not be rendered into the value scan");
 
-            orderedOn.Should().NotBe(orderedOff,
+            ordered.Should().Contain("-- PVT prefilter: Row form",
                 "with an ORDER BY the aggregate is materialised either way, so the prefilter is pure " +
                 "gain and must still be emitted");
+            ordered.Should().Contain("AND ((v._id_structure",
+                "and it must actually reach the value scan");
         }
         finally
         {

@@ -535,6 +535,14 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     /// </summary>
     protected FilterExpression VisitContainsCore(Expression sourceExpression, Expression valueExpression)
     {
+        // Peel conversions before looking for a property. Under `Nullable enable` on .NET 10 the
+        // span overload of array.Contains wraps the collection twice: op_Implicit around a Convert
+        // around the member access. Unwrapping only the op_Implicit leaves a Convert node, which is
+        // not a MemberExpression, so both branches below missed and every `x.Tags.Contains(...)`
+        // over a `T[]?` property threw "Unsupported Contains expression structure".
+        sourceExpression = StripConversions(sourceExpression);
+        valueExpression = StripConversions(valueExpression);
+
         if (IsPropertyAccess(valueExpression))
         {
             var property = ExtractProperty(valueExpression);
@@ -563,6 +571,22 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         }
 
         throw new NotSupportedException("Unsupported Contains expression structure");
+    }
+
+    /// <summary>
+    /// Removes Convert / ConvertChecked wrappers the compiler puts around an operand. They carry no
+    /// meaning for us: the value is evaluated the same either way, and the property behind them is
+    /// the one we need to name. Written as a loop because the wrappers nest.
+    /// </summary>
+    private static Expression StripConversions(Expression expression)
+    {
+        while (expression is UnaryExpression
+               { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } unary)
+        {
+            expression = unary.Operand;
+        }
+
+        return expression;
     }
 
     /// <summary>

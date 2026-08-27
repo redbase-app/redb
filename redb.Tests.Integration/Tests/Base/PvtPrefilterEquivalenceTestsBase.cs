@@ -96,6 +96,53 @@ public abstract class PvtPrefilterEquivalenceTestsBase
             "identical SQL means EnablePvtPrefilter never reached the query provider");
     }
 
+    /// <summary>
+    /// The planner writes its decision into the SQL preview as comments. Refusals are the interesting
+    /// half: before this existed, finding out why a production query got no prefilter meant patching
+    /// the API to log the configuration flag and waiting for a deploy.
+    ///
+    /// The comments live in <c>GetSqlPreviewAsync</c> only. They must never reach the executed
+    /// statement: a comment that varies per query is a distinct plan-cache key in both PostgreSQL and
+    /// SQL Server, which would trade a diagnostic for a cache that never hits.
+    /// </summary>
+    [Fact]
+    public async Task PlannerTrace_ExplainsTheDecision()
+    {
+        await SeedAsync();
+
+        var restore = Redb.Configuration.EnablePvtPrefilter;
+        try
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
+
+            var applied = await Redb.Query<EmployeeProps>()
+                .Where(e => e.Position.Contains("Developer") || e.Department.Contains("Engineering"))
+                .OrderByRedb(o => o.Id)
+                .Take(100)
+                .ToSqlStringAsync();
+            applied.Should().Contain("-- PVT prefilter:",
+                "the planner decision belongs in the preview, next to the parameter block");
+            applied.Should().Contain("branch:",
+                "an applied plan lists the branches it emitted");
+
+            // Age enters the pivot through the filter but gets no branch of its own, so the row form
+            // would null its column out. The trace has to name that, not just stay silent.
+            var declined = await Redb.Query<EmployeeProps>()
+                .Where(e => e.Position.Contains("Developer") && e.Age > 30)
+                .OrderByRedb(o => o.Id)
+                .Take(100)
+                .ToSqlStringAsync();
+            declined.Should().Contain("PivotNotCovered",
+                "a refusal must say which guard stopped it");
+            declined.Should().Contain("Age",
+                "and which pivot column was left uncovered");
+        }
+        finally
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = restore);
+        }
+    }
+
     // ──────────────────────────────────────────────────────────────────
     //  Shapes the planner accepts
     // ──────────────────────────────────────────────────────────────────
