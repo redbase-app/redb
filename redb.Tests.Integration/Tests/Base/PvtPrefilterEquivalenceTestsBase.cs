@@ -125,11 +125,15 @@ public abstract class PvtPrefilterEquivalenceTestsBase
             applied.Should().Contain("branch:",
                 "an applied plan lists the branches it emitted");
 
-            // Age enters the pivot through the filter but gets no branch of its own, so the row form
-            // would null its column out. The trace has to name that, not just stay silent.
+            // Age enters the pivot through ORDER BY, so no branch can cover it and the row form would
+            // null its column out. The trace has to name that, not just stay silent.
+            //
+            // Deliberately ordered by a Props field rather than filtered by one: since every conjunct
+            // became a branch, a second FILTER field is covered like the first and no longer declines.
             var declined = await Redb.Query<EmployeeProps>()
-                .Where(e => e.Position.Contains("Developer") && e.Age > 30)
-                .OrderByRedb(o => o.Id)
+                .Where(e => e.Position.Contains("Developer"))
+                .OrderBy(e => e.Age)
+                .ThenByRedb(o => o.Id)
                 .Take(100)
                 .ToSqlStringAsync();
             declined.Should().Contain("PivotNotCovered",
@@ -223,6 +227,60 @@ public abstract class PvtPrefilterEquivalenceTestsBase
             .Where(e => e.Salary >= 60000m && e.Salary < 120000m)
             .OrderBy(e => e.Position).ThenBy(e => e.Salary).ThenByRedb(o => o.Id).Take(100),
         "a covered filter plus an uncovered ordering column is where coverage must refuse the prefilter");
+
+    // ──────────────────────────────────────────────────────────────────
+    //  Membership in a constant set
+    // ──────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public Task In_OnStringField_SameResults() => AssertSameAsync(
+        () =>
+        {
+            var wanted = new[] { "Engineering", "Marketing", "Sales" };
+            return Redb.Query<EmployeeProps>()
+                .Where(e => wanted.Contains(e.Department))
+                .OrderBy(e => e.Age).ThenByRedb(o => o.Id).Take(100);
+        },
+        "membership is the most selective shape after equality and must reach the value scan");
+
+    [Fact]
+    public Task In_OnNumericField_SameResults() => AssertSameAsync(
+        () =>
+        {
+            var wanted = new[] { 26, 30, 34, 41 };
+            return Redb.Query<EmployeeProps>()
+                .Where(e => wanted.Contains(e.Age))
+                .OrderBy(e => e.Salary).ThenByRedb(o => o.Id).Take(100);
+        },
+        "the numeric column has its own partial index, so the branch should be index-served");
+
+    /// <summary>
+    /// The shape production tripped over: an empty set. It is legitimately empty, but a branch
+    /// rendered from it would be a contradiction, and inside a disjunction it would quietly take the
+    /// other branches with it. The planner declines instead, and the answer must still be right.
+    /// </summary>
+    [Fact]
+    public Task In_EmptySet_SameResults() => AssertSameAsync(
+        () =>
+        {
+            var wanted = Array.Empty<string>();
+            return Redb.Query<EmployeeProps>()
+                .Where(e => wanted.Contains(e.Department))
+                .OrderByRedb(o => o.Id).Take(100);
+        },
+        "an empty set matches nothing and must do so with the prefilter on as well as off");
+
+    /// <summary>
+    /// Three conditions, because `a &amp;&amp; b &amp;&amp; c` parses as a tree rather than as one node with
+    /// three operands. Before the planner flattened nested conjunctions the middle node was not a
+    /// leaf, the third condition was lost, and coverage then refused the whole plan.
+    /// </summary>
+    [Fact]
+    public Task And_ThreeFields_SameResults() => AssertSameAsync(
+        () => Redb.Query<EmployeeProps>()
+            .Where(e => e.Department == "Engineering" && e.Age > 25 && e.Salary > 60000m)
+            .OrderByRedb(o => o.Id).Take(100),
+        "every conjunct becomes a branch, and a conjunct nested by the parser must not be lost");
 
     // ──────────────────────────────────────────────────────────────────
     //  Shapes the planner must refuse

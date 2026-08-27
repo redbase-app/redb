@@ -19,6 +19,51 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **An empty `IN` set threw instead of matching nothing (`RedBase.Postgres.Pro`).**
+  `.Where(x => wanted.Contains(x.Department))` with an empty `wanted` failed with
+  `42883: operator does not exist: text = bigint`. An empty `object[]` gives Npgsql no element type
+  to infer, so it sent `bigint[]`, and comparing a text column against it is not an operator that
+  exists. Any code that builds its filter list dynamically could reach this with an empty selection.
+  The set now compiles to `FALSE`, which is what membership in an empty set means. MSSql and SQLite
+  survived the same input by accident of their spellings and are unchanged.
+
+- **The PVT prefilter ignored membership and kept only one conjunct (`RedBase.Core.Pro` + all three
+  Pro providers).** Three separate reasons a production filter got no prefilter at all.
+
+  *Membership was not an expressible leaf.* `InExpression` is a node of its own, and the planner only
+  ever looked at comparisons and null checks, so `.Where(x => ids.Contains(x.ShippingPoint.Id))` was
+  reported as `NoAnalyzableLeaf`. It is now a branch, scored as equality minus a penalty that grows
+  with the logarithm of the list: one value behaves like an equality, a few dozen still pay for
+  themselves, a few hundred fall under the threshold. An empty set yields no plan, because a branch
+  rendered from it would be a contradiction that takes the rest of its disjunction with it.
+
+  *A conjunction contributed one branch, not all of them.* The rule is borrowed from a flat table,
+  where pushing the single most selective predicate is enough. In a vertical layout it cannot work:
+  a field named by the filter becomes a pivot column, so with two Props fields a one-branch candidate
+  leaves the other column uncovered and the coverage guard refuses the whole plan. The branch was
+  therefore unreachable for every multi-field conjunction. Every conjunct is now a branch; the
+  candidate is scored by its weakest one, so a single broad predicate still sinks the group.
+
+  *Nested conjunctions lost their operands.* `a && b && c` parses as a tree rather than as one node
+  with three operands, and the middle node is not a leaf, so the third condition was dropped before
+  scoring. Conjunctions are now flattened first.
+
+  The three compound: the query that surfaced this filters a ListItem id against 55 values next to an
+  ordinary field, and needed all three fixes to get a plan.
+
+### Added
+- **Nine differential tests for membership and ListItem fields (`redb.Tests.Integration`).**
+  Membership over a string field, a numeric field and an empty set; a three-condition conjunction;
+  and a separate suite for ListItem accessors, which are the one place where a single structure
+  carries several of them and they do not behave alike: `Status.Id` lives in the row's own
+  `_listitem` column and is a plain row predicate, while `Status.Value` and `Status.Alias` live in
+  `_list_items` and need a join no row predicate can express. The suite pins that the first is taken,
+  the other two are refused, an array of ListItem is refused, and a filter naming `.Id` and `.Value`
+  together still yields one branch on the right column.
+
 ## [3.7.2] — 2026-08-27
 
 > **Why this release exists.** 3.7.1 shipped a regression: `array.Contains` over a nullable array

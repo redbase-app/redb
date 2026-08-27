@@ -154,6 +154,7 @@ public enum ComparisonOperator
     EndsWithIgnoreCase,     // EndsWith with case insensitive
     RegexMatch,             // POSIX regex match (Regex.IsMatch) — PG '~'
     RegexMatchIgnoreCase,   // POSIX regex match, IgnoreCase — PG '~*'
+    In,                     // membership in a constant set; the value carries the whole list
     
     // 🎯 NULL semantics  
     Exists,             // $exists - explicit field existence check
