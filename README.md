@@ -749,3 +749,4 @@ Core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.Export`,
 Versions ≤ 1.3.0 published on nuget.org remain under MIT.
 
 Pro packages (`redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`) are proprietary (closed-source) but **free to use — no license key required** starting from version 3.3.0, for the entire 3.x line including commercial production use. Larger companies that need the Pro **sources** (audit, escrow, in-house builds) can request them — see [Pro](#pro).
+
