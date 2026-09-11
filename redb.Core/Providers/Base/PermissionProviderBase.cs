@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Data;
 using redb.Core.Models.Contracts;
@@ -55,7 +56,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// Get effective permission via SQL (uses DB function or query).
     /// Override in derived class for DB-specific optimizations.
     /// </summary>
-    protected virtual async Task<UserPermissionResult?> GetEffectivePermissionViaSqlAsync(long objectId, long userId)
+    protected virtual async Task<UserPermissionResult?> GetEffectivePermissionViaSqlAsync(long objectId, long userId, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"{userId}_{objectId}";
         Interlocked.Increment(ref _cacheRequests);
@@ -71,6 +72,36 @@ public abstract class PermissionProviderBase : IPermissionProvider
         }
 
         var result = await Context.QueryFirstOrDefaultAsync<UserPermissionResult>(
+            Sql.Permissions_GetEffectiveForObject(), new object[] { objectId, userId }, cancellationToken);
+
+        if (result != null)
+        {
+            PermissionCache[cacheKey] = (result, DateTimeOffset.UtcNow);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Synchronous twin of <see cref="GetEffectivePermissionViaSqlAsync"/> for the
+    /// thread-pool-free lazy path: same cache, same SQL, executed on the calling thread.
+    /// </summary>
+    protected virtual UserPermissionResult? GetEffectivePermissionViaSql(long objectId, long userId)
+    {
+        var cacheKey = $"{userId}_{objectId}";
+        Interlocked.Increment(ref _cacheRequests);
+
+        if (PermissionCache.TryGetValue(cacheKey, out var cached))
+        {
+            var isExpired = DateTimeOffset.UtcNow - cached.cachedAt > CacheLifetime;
+            if (!isExpired)
+            {
+                Interlocked.Increment(ref _cacheHits);
+                return cached.result;
+            }
+        }
+
+        var result = Context.QueryFirstOrDefault<UserPermissionResult>(
             Sql.Permissions_GetEffectiveForObject(), objectId, userId);
 
         if (result != null)
@@ -79,6 +110,17 @@ public abstract class PermissionProviderBase : IPermissionProvider
         }
 
         return result;
+    }
+
+    /// <inheritdoc />
+    public virtual bool CanUserSelectObjectSync(long objectId, long userId)
+    {
+        if (userId == 0) return true;
+
+        var permission = GetEffectivePermissionViaSql(objectId, userId);
+        if (permission == null)
+            throw new InvalidOperationException($"Cannot get permissions for object {objectId} and user {userId}.");
+        return permission.CanSelect;
     }
 
     /// <summary>
@@ -134,28 +176,28 @@ public abstract class PermissionProviderBase : IPermissionProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserEditObject(IRedbObject obj)
+    public virtual async Task<bool> CanUserEditObject(IRedbObject obj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = ((RedbSecurityContext)SecurityContext).GetEffectiveUser();
         return await CanUserEditObject(obj.Id, effectiveUser.Id);
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserSelectObject(IRedbObject obj)
+    public virtual async Task<bool> CanUserSelectObject(IRedbObject obj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = ((RedbSecurityContext)SecurityContext).GetEffectiveUser();
         return await CanUserSelectObject(obj.Id, effectiveUser.Id);
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserInsertScheme(IRedbScheme scheme)
+    public virtual async Task<bool> CanUserInsertScheme(IRedbScheme scheme, CancellationToken cancellationToken = default)
     {
         var effectiveUser = ((RedbSecurityContext)SecurityContext).GetEffectiveUser();
         return await CanUserInsertScheme(scheme.Id, effectiveUser.Id);
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserDeleteObject(IRedbObject obj)
+    public virtual async Task<bool> CanUserDeleteObject(IRedbObject obj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = ((RedbSecurityContext)SecurityContext).GetEffectiveUser();
         return await CanUserDeleteObject(obj.Id, effectiveUser.Id);
@@ -181,13 +223,13 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Async version of GetReadableObjectIds.
     /// </summary>
-    protected virtual async Task<List<long>> GetReadableObjectIdsAsync(long userId)
+    protected virtual async Task<List<long>> GetReadableObjectIdsAsync(long userId, CancellationToken cancellationToken = default)
     {
-        return await Context.QueryAsync<long>(Sql.Permissions_SelectReadableObjectIds(), userId);
+        return await Context.QueryAsync<long>(Sql.Permissions_SelectReadableObjectIds(), new object[] { userId }, cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserEditObject(long objectId, long userId)
+    public virtual async Task<bool> CanUserEditObject(long objectId, long userId, CancellationToken cancellationToken = default)
     {
         if (userId == 0) return true; // System user can do everything
         
@@ -198,7 +240,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserSelectObject(long objectId, long userId)
+    public virtual async Task<bool> CanUserSelectObject(long objectId, long userId, CancellationToken cancellationToken = default)
     {
         if (userId == 0) return true;
         
@@ -209,7 +251,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserInsertScheme(long schemeId, long userId)
+    public virtual async Task<bool> CanUserInsertScheme(long schemeId, long userId, CancellationToken cancellationToken = default)
     {
         if (userId == 0) return true;
         
@@ -220,7 +262,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserDeleteObject(long objectId, long userId)
+    public virtual async Task<bool> CanUserDeleteObject(long objectId, long userId, CancellationToken cancellationToken = default)
     {
         if (userId == 0) return true;
         
@@ -235,64 +277,64 @@ public abstract class PermissionProviderBase : IPermissionProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserEditObject(IRedbObject obj, IRedbUser user)
-        => await CanUserEditObject(obj.Id, user.Id);
+    public virtual async Task<bool> CanUserEditObject(IRedbObject obj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await CanUserEditObject(obj.Id, user.Id, cancellationToken);
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserSelectObject(IRedbObject obj, IRedbUser user)
-        => await CanUserSelectObject(obj.Id, user.Id);
+    public virtual async Task<bool> CanUserSelectObject(IRedbObject obj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await CanUserSelectObject(obj.Id, user.Id, cancellationToken);
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserInsertScheme(IRedbScheme scheme, IRedbUser user)
-        => await CanUserInsertScheme(scheme.Id, user.Id);
+    public virtual async Task<bool> CanUserInsertScheme(IRedbScheme scheme, IRedbUser user, CancellationToken cancellationToken = default)
+        => await CanUserInsertScheme(scheme.Id, user.Id, cancellationToken);
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserDeleteObject(IRedbObject obj, IRedbUser user)
-        => await CanUserDeleteObject(obj.Id, user.Id);
+    public virtual async Task<bool> CanUserDeleteObject(IRedbObject obj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await CanUserDeleteObject(obj.Id, user.Id, cancellationToken);
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserEditObject(RedbObject obj)
+    public virtual async Task<bool> CanUserEditObject(RedbObject obj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = ((RedbSecurityContext)SecurityContext).GetEffectiveUser();
         return await CanUserEditObject(obj.Id, effectiveUser.Id);
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserSelectObject(RedbObject obj)
+    public virtual async Task<bool> CanUserSelectObject(RedbObject obj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = ((RedbSecurityContext)SecurityContext).GetEffectiveUser();
         return await CanUserSelectObject(obj.Id, effectiveUser.Id);
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserDeleteObject(RedbObject obj)
+    public virtual async Task<bool> CanUserDeleteObject(RedbObject obj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = ((RedbSecurityContext)SecurityContext).GetEffectiveUser();
         return await CanUserDeleteObject(obj.Id, effectiveUser.Id);
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserEditObject(RedbObject obj, IRedbUser user)
-        => await CanUserEditObject(obj.Id, user.Id);
+    public virtual async Task<bool> CanUserEditObject(RedbObject obj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await CanUserEditObject(obj.Id, user.Id, cancellationToken);
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserSelectObject(RedbObject obj, IRedbUser user)
-        => await CanUserSelectObject(obj.Id, user.Id);
+    public virtual async Task<bool> CanUserSelectObject(RedbObject obj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await CanUserSelectObject(obj.Id, user.Id, cancellationToken);
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserInsertScheme(RedbObject obj, IRedbUser user)
-        => await CanUserInsertScheme(obj.SchemeId, user.Id);
+    public virtual async Task<bool> CanUserInsertScheme(RedbObject obj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await CanUserInsertScheme(obj.SchemeId, user.Id, cancellationToken);
 
     /// <inheritdoc />
-    public virtual async Task<bool> CanUserDeleteObject(RedbObject obj, IRedbUser user)
-        => await CanUserDeleteObject(obj.Id, user.Id);
+    public virtual async Task<bool> CanUserDeleteObject(RedbObject obj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await CanUserDeleteObject(obj.Id, user.Id, cancellationToken);
 
     // ============================================================
     // === CRUD PERMISSIONS ===
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<IRedbPermission> CreatePermissionAsync(PermissionRequest request, IRedbUser? currentUser = null)
+    public virtual async Task<IRedbPermission> CreatePermissionAsync(PermissionRequest request, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         var newId = await Context.NextObjectIdAsync();
         var newPermission = new RedbPermission
@@ -307,9 +349,8 @@ public abstract class PermissionProviderBase : IPermissionProvider
             Delete = request.CanDelete
         };
 
-        await Context.ExecuteAsync(Sql.Permissions_Insert(),
-            newId, (object?)request.UserId ?? DBNull.Value, (object?)request.RoleId ?? DBNull.Value, request.ObjectId,
-            request.CanSelect, request.CanInsert, request.CanUpdate, request.CanDelete);
+        await Context.ExecuteAsync(Sql.Permissions_Insert(), new object[] { newId, (object?)request.UserId ?? DBNull.Value, (object?)request.RoleId ?? DBNull.Value, request.ObjectId,
+            request.CanSelect, request.CanInsert, request.CanUpdate, request.CanDelete }, cancellationToken);
 
         InvalidatePermissionCache(request.UserId, request.ObjectId);
         if (request.ObjectId != 0)
@@ -321,10 +362,9 @@ public abstract class PermissionProviderBase : IPermissionProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbPermission> UpdatePermissionAsync(IRedbPermission permission, PermissionRequest request, IRedbUser? currentUser = null)
+    public virtual async Task<IRedbPermission> UpdatePermissionAsync(IRedbPermission permission, PermissionRequest request, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
-        var result = await Context.ExecuteAsync(Sql.Permissions_Update(),
-            request.CanSelect, request.CanInsert, request.CanUpdate, request.CanDelete, permission.Id);
+        var result = await Context.ExecuteAsync(Sql.Permissions_Update(), new object[] { request.CanSelect, request.CanInsert, request.CanUpdate, request.CanDelete, permission.Id }, cancellationToken);
 
         if (result == 0)
             throw new ArgumentException($"Permission with ID {permission.Id} not found");
@@ -349,9 +389,9 @@ public abstract class PermissionProviderBase : IPermissionProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> DeletePermissionAsync(IRedbPermission permission, IRedbUser? currentUser = null)
+    public virtual async Task<bool> DeletePermissionAsync(IRedbPermission permission, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
-        var result = await Context.ExecuteAsync(Sql.Permissions_Delete(), permission.Id);
+        var result = await Context.ExecuteAsync(Sql.Permissions_Delete(), new object[] { permission.Id }, cancellationToken);
 
         InvalidatePermissionCache(permission.IdUser, permission.IdRef);
         if (permission.IdRef != 0)
@@ -368,30 +408,30 @@ public abstract class PermissionProviderBase : IPermissionProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<List<IRedbPermission>> GetPermissionsByUserAsync(IRedbUser user)
+    public virtual async Task<List<IRedbPermission>> GetPermissionsByUserAsync(IRedbUser user, CancellationToken cancellationToken = default)
     {
-        var permissions = await Context.QueryAsync<RedbPermission>(Sql.Permissions_SelectByUser(), user.Id);
+        var permissions = await Context.QueryAsync<RedbPermission>(Sql.Permissions_SelectByUser(), new object[] { user.Id }, cancellationToken);
         return permissions.Cast<IRedbPermission>().ToList();
     }
 
     /// <inheritdoc />
-    public virtual async Task<List<IRedbPermission>> GetPermissionsByRoleAsync(IRedbRole role)
+    public virtual async Task<List<IRedbPermission>> GetPermissionsByRoleAsync(IRedbRole role, CancellationToken cancellationToken = default)
     {
-        var permissions = await Context.QueryAsync<RedbPermission>(Sql.Permissions_SelectByRole(), role.Id);
+        var permissions = await Context.QueryAsync<RedbPermission>(Sql.Permissions_SelectByRole(), new object[] { role.Id }, cancellationToken);
         return permissions.Cast<IRedbPermission>().ToList();
     }
 
     /// <inheritdoc />
-    public virtual async Task<List<IRedbPermission>> GetPermissionsByObjectAsync(IRedbObject obj)
+    public virtual async Task<List<IRedbPermission>> GetPermissionsByObjectAsync(IRedbObject obj, CancellationToken cancellationToken = default)
     {
-        var permissions = await Context.QueryAsync<RedbPermission>(Sql.Permissions_SelectByObject(), obj.Id);
+        var permissions = await Context.QueryAsync<RedbPermission>(Sql.Permissions_SelectByObject(), new object[] { obj.Id }, cancellationToken);
         return permissions.Cast<IRedbPermission>().ToList();
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbPermission?> GetPermissionByIdAsync(long permissionId)
+    public virtual async Task<IRedbPermission?> GetPermissionByIdAsync(long permissionId, CancellationToken cancellationToken = default)
     {
-        return await Context.QueryFirstOrDefaultAsync<RedbPermission>(Sql.Permissions_SelectById(), permissionId);
+        return await Context.QueryFirstOrDefaultAsync<RedbPermission>(Sql.Permissions_SelectById(), new object[] { permissionId }, cancellationToken);
     }
 
     // ============================================================
@@ -399,13 +439,13 @@ public abstract class PermissionProviderBase : IPermissionProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<bool> GrantPermissionAsync(IRedbUser user, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null)
+    public virtual async Task<bool> GrantPermissionAsync(IRedbUser user, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         return await GrantPermissionInternalAsync(user.Id, null, obj.Id, actions, currentUser);
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> GrantPermissionAsync(IRedbRole role, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null)
+    public virtual async Task<bool> GrantPermissionAsync(IRedbRole role, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         return await GrantPermissionInternalAsync(null, role.Id, obj.Id, actions, currentUser);
     }
@@ -413,11 +453,10 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Internal method to grant permission.
     /// </summary>
-    protected virtual async Task<bool> GrantPermissionInternalAsync(long? userId, long? roleId, long objectId, PermissionAction actions, IRedbUser? currentUser = null)
+    protected virtual async Task<bool> GrantPermissionInternalAsync(long? userId, long? roleId, long objectId, PermissionAction actions, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         var existingPermission = await Context.QueryFirstOrDefaultAsync<RedbPermission>(
-            Sql.Permissions_SelectByUserRoleObject(),
-            (object?)userId ?? DBNull.Value, (object?)roleId ?? DBNull.Value, objectId);
+            Sql.Permissions_SelectByUserRoleObject(), new object[] { (object?)userId ?? DBNull.Value, (object?)roleId ?? DBNull.Value, objectId }, cancellationToken);
 
         if (existingPermission != null)
         {
@@ -426,18 +465,16 @@ public abstract class PermissionProviderBase : IPermissionProvider
             var newUpdate = existingPermission.Update == true || actions.HasFlag(PermissionAction.Update);
             var newDelete = existingPermission.Delete == true || actions.HasFlag(PermissionAction.Delete);
 
-            await Context.ExecuteAsync(Sql.Permissions_Update(),
-                newSelect, newInsert, newUpdate, newDelete, existingPermission.Id);
+            await Context.ExecuteAsync(Sql.Permissions_Update(), new object[] { newSelect, newInsert, newUpdate, newDelete, existingPermission.Id }, cancellationToken);
         }
         else
         {
             var newId = await Context.NextObjectIdAsync();
-            await Context.ExecuteAsync(Sql.Permissions_Insert(),
-                newId, (object?)userId ?? DBNull.Value, (object?)roleId ?? DBNull.Value, objectId,
+            await Context.ExecuteAsync(Sql.Permissions_Insert(), new object[] { newId, (object?)userId ?? DBNull.Value, (object?)roleId ?? DBNull.Value, objectId,
                 actions.HasFlag(PermissionAction.Select),
                 actions.HasFlag(PermissionAction.Insert),
                 actions.HasFlag(PermissionAction.Update),
-                actions.HasFlag(PermissionAction.Delete));
+                actions.HasFlag(PermissionAction.Delete) }, cancellationToken);
         }
 
         InvalidatePermissionCache(userId, objectId);
@@ -445,13 +482,13 @@ public abstract class PermissionProviderBase : IPermissionProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> RevokePermissionAsync(IRedbUser user, IRedbObject obj, IRedbUser? currentUser = null)
+    public virtual async Task<bool> RevokePermissionAsync(IRedbUser user, IRedbObject obj, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         return await RevokePermissionInternalAsync(user.Id, null, obj.Id, currentUser);
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> RevokePermissionAsync(IRedbRole role, IRedbObject obj, IRedbUser? currentUser = null)
+    public virtual async Task<bool> RevokePermissionAsync(IRedbRole role, IRedbObject obj, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         return await RevokePermissionInternalAsync(null, role.Id, obj.Id, currentUser);
     }
@@ -459,26 +496,25 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Internal method to revoke permission.
     /// </summary>
-    protected virtual async Task<bool> RevokePermissionInternalAsync(long? userId, long? roleId, long objectId, IRedbUser? currentUser = null)
+    protected virtual async Task<bool> RevokePermissionInternalAsync(long? userId, long? roleId, long objectId, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
-        var result = await Context.ExecuteAsync(Sql.Permissions_DeleteByUserRoleObject(),
-            (object?)userId ?? DBNull.Value, (object?)roleId ?? DBNull.Value, objectId);
+        var result = await Context.ExecuteAsync(Sql.Permissions_DeleteByUserRoleObject(), new object[] { (object?)userId ?? DBNull.Value, (object?)roleId ?? DBNull.Value, objectId }, cancellationToken);
         InvalidatePermissionCache(userId, objectId);
         return result > 0;
     }
 
     /// <inheritdoc />
-    public virtual async Task<int> RevokeAllUserPermissionsAsync(IRedbUser user, IRedbUser? currentUser = null)
+    public virtual async Task<int> RevokeAllUserPermissionsAsync(IRedbUser user, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         InvalidatePermissionCache(user.Id, null);
-        return await Context.ExecuteAsync(Sql.Permissions_DeleteByUser(), user.Id);
+        return await Context.ExecuteAsync(Sql.Permissions_DeleteByUser(), new object[] { user.Id }, cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task<int> RevokeAllRolePermissionsAsync(IRedbRole role, IRedbUser? currentUser = null)
+    public virtual async Task<int> RevokeAllRolePermissionsAsync(IRedbRole role, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         InvalidatePermissionCache();
-        return await Context.ExecuteAsync(Sql.Permissions_DeleteByRole(), role.Id);
+        return await Context.ExecuteAsync(Sql.Permissions_DeleteByRole(), new object[] { role.Id }, cancellationToken);
     }
 
     // ============================================================
@@ -486,7 +522,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<EffectivePermissionResult> GetEffectivePermissionsAsync(IRedbUser user, IRedbObject obj)
+    public virtual async Task<EffectivePermissionResult> GetEffectivePermissionsAsync(IRedbUser user, IRedbObject obj, CancellationToken cancellationToken = default)
     {
         return await GetEffectivePermissionsAsync(user.Id, obj.Id);
     }
@@ -494,14 +530,14 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Get effective permissions for user and object.
     /// </summary>
-    protected virtual async Task<EffectivePermissionResult> GetEffectivePermissionsAsync(long userId, long objectId)
+    protected virtual async Task<EffectivePermissionResult> GetEffectivePermissionsAsync(long userId, long objectId, CancellationToken cancellationToken = default)
     {
         // Get user's direct permissions
         var userPermissions = await Context.QueryAsync<RedbPermission>(
-            Sql.Permissions_SelectByUser() + $" AND (_id_ref = {Sql.FormatParameter(2)} OR _id_ref = 0)", userId, objectId);
+            Sql.Permissions_SelectByUser() + $" AND (_id_ref = {Sql.FormatParameter(2)} OR _id_ref = 0)", new object[] { userId, objectId }, cancellationToken);
 
         // Get user's roles
-        var userRoles = await Context.QueryAsync<RedbUserRole>(Sql.Permissions_SelectUserRoleIds(), userId);
+        var userRoles = await Context.QueryAsync<RedbUserRole>(Sql.Permissions_SelectUserRoleIds(), new object[] { userId }, cancellationToken);
         var roleIds = userRoles.Select(ur => ur.IdRole).ToList();
 
         // Get role permissions
@@ -509,14 +545,14 @@ public abstract class PermissionProviderBase : IPermissionProvider
         if (roleIds.Count > 0)
         {
             rolePermissions = await Context.QueryAsync<RedbPermission>(
-                Sql.Permissions_SelectAllColumns() + $" WHERE {Sql.FormatArrayContains("_id_role", Sql.FormatParameter(1))} AND (_id_ref = {Sql.FormatParameter(2)} OR _id_ref = 0)", roleIds.ToArray(), objectId);
+                Sql.Permissions_SelectAllColumns() + $" WHERE {Sql.FormatArrayContains("_id_role", Sql.FormatParameter(1))} AND (_id_ref = {Sql.FormatParameter(2)} OR _id_ref = 0)", new object[] { roleIds.ToArray(), objectId }, cancellationToken);
         }
 
         return BuildEffectivePermissionResult(userId, objectId, userPermissions, rolePermissions);
     }
 
     /// <inheritdoc />
-    public virtual async Task<Dictionary<IRedbObject, EffectivePermissionResult>> GetEffectivePermissionsBatchAsync(IRedbUser user, IRedbObject[] objects)
+    public virtual async Task<Dictionary<IRedbObject, EffectivePermissionResult>> GetEffectivePermissionsBatchAsync(IRedbUser user, IRedbObject[] objects, CancellationToken cancellationToken = default)
     {
         var objectIds = objects.Select(o => o.Id).ToArray();
         var results = await GetEffectivePermissionsBatchAsync(user.Id, objectIds);
@@ -533,22 +569,22 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Batch get effective permissions.
     /// </summary>
-    protected virtual async Task<Dictionary<long, EffectivePermissionResult>> GetEffectivePermissionsBatchAsync(long userId, long[] objectIds)
+    protected virtual async Task<Dictionary<long, EffectivePermissionResult>> GetEffectivePermissionsBatchAsync(long userId, long[] objectIds, CancellationToken cancellationToken = default)
     {
         if (objectIds == null || objectIds.Length == 0)
             return new Dictionary<long, EffectivePermissionResult>();
 
         var userPermissions = await Context.QueryAsync<RedbPermission>(
-            Sql.Permissions_SelectAllColumns() + $" WHERE _id_user = {Sql.FormatParameter(1)} AND {Sql.FormatArrayContains("_id_ref", Sql.FormatParameter(2))}", userId, objectIds);
+            Sql.Permissions_SelectAllColumns() + $" WHERE _id_user = {Sql.FormatParameter(1)} AND {Sql.FormatArrayContains("_id_ref", Sql.FormatParameter(2))}", new object[] { userId, objectIds }, cancellationToken);
 
-        var userRoles = await Context.QueryAsync<RedbUserRole>(Sql.Permissions_SelectUserRoleIds(), userId);
+        var userRoles = await Context.QueryAsync<RedbUserRole>(Sql.Permissions_SelectUserRoleIds(), new object[] { userId }, cancellationToken);
         var roleIds = userRoles.Select(ur => ur.IdRole).ToList();
 
         List<RedbPermission> rolePermissions = [];
         if (roleIds.Count > 0)
         {
             rolePermissions = await Context.QueryAsync<RedbPermission>(
-                Sql.Permissions_SelectAllColumns() + $" WHERE {Sql.FormatArrayContains("_id_role", Sql.FormatParameter(1))} AND {Sql.FormatArrayContains("_id_ref", Sql.FormatParameter(2))}", roleIds.ToArray(), objectIds);
+                Sql.Permissions_SelectAllColumns() + $" WHERE {Sql.FormatArrayContains("_id_role", Sql.FormatParameter(1))} AND {Sql.FormatArrayContains("_id_ref", Sql.FormatParameter(2))}", new object[] { roleIds.ToArray(), objectIds }, cancellationToken);
         }
 
         var userPermissionsByObject = userPermissions.GroupBy(p => p.IdRef).ToDictionary(g => g.Key, g => g.ToList());
@@ -566,7 +602,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<List<EffectivePermissionResult>> GetAllEffectivePermissionsAsync(IRedbUser user)
+    public virtual async Task<List<EffectivePermissionResult>> GetAllEffectivePermissionsAsync(IRedbUser user, CancellationToken cancellationToken = default)
     {
         return await GetAllEffectivePermissionsAsync(user.Id);
     }
@@ -574,17 +610,17 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Get all effective permissions for user.
     /// </summary>
-    protected virtual async Task<List<EffectivePermissionResult>> GetAllEffectivePermissionsAsync(long userId)
+    protected virtual async Task<List<EffectivePermissionResult>> GetAllEffectivePermissionsAsync(long userId, CancellationToken cancellationToken = default)
     {
-        var userPermissions = await Context.QueryAsync<RedbPermission>(Sql.Permissions_SelectByUser(), userId);
-        var userRoles = await Context.QueryAsync<RedbUserRole>(Sql.Permissions_SelectUserRoleIds(), userId);
+        var userPermissions = await Context.QueryAsync<RedbPermission>(Sql.Permissions_SelectByUser(), new object[] { userId }, cancellationToken);
+        var userRoles = await Context.QueryAsync<RedbUserRole>(Sql.Permissions_SelectUserRoleIds(), new object[] { userId }, cancellationToken);
         var roleIds = userRoles.Select(ur => ur.IdRole).ToList();
 
         List<RedbPermission> rolePermissions = [];
         if (roleIds.Count > 0)
         {
             rolePermissions = await Context.QueryAsync<RedbPermission>(
-                Sql.Permissions_SelectAllColumns() + $" WHERE {Sql.FormatArrayContains("_id_role", Sql.FormatParameter(1))}", roleIds.ToArray());
+                Sql.Permissions_SelectAllColumns() + $" WHERE {Sql.FormatArrayContains("_id_role", Sql.FormatParameter(1))}", new object[] { roleIds.ToArray() }, cancellationToken);
         }
 
         var allObjectIds = userPermissions.Select(p => p.IdRef)
@@ -652,13 +688,13 @@ public abstract class PermissionProviderBase : IPermissionProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<int> GetPermissionCountAsync()
+    public virtual async Task<int> GetPermissionCountAsync(CancellationToken cancellationToken = default)
     {
-        return await Context.ExecuteScalarAsync<int>(Sql.Permissions_Count());
+        return await Context.ExecuteScalarAsync<int>(Sql.Permissions_Count(), System.Array.Empty<object>(), cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task<int> GetUserPermissionCountAsync(IRedbUser user)
+    public virtual async Task<int> GetUserPermissionCountAsync(IRedbUser user, CancellationToken cancellationToken = default)
     {
         return await GetUserPermissionCountAsync(user.Id);
     }
@@ -666,27 +702,27 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Get permission count for user.
     /// </summary>
-    protected virtual async Task<int> GetUserPermissionCountAsync(long userId)
+    protected virtual async Task<int> GetUserPermissionCountAsync(long userId, CancellationToken cancellationToken = default)
     {
-        var directPermissions = await Context.ExecuteScalarAsync<int>(Sql.Permissions_CountByUser(), userId);
+        var directPermissions = await Context.ExecuteScalarAsync<int>(Sql.Permissions_CountByUser(), new object[] { userId }, cancellationToken);
 
-        var userRoles = await Context.QueryAsync<RedbUserRole>(Sql.Permissions_SelectUserRoleIds(), userId);
+        var userRoles = await Context.QueryAsync<RedbUserRole>(Sql.Permissions_SelectUserRoleIds(), new object[] { userId }, cancellationToken);
         var roleIds = userRoles.Select(ur => ur.IdRole).ToList();
 
         int rolePermissions = 0;
         if (roleIds.Count > 0)
         {
             rolePermissions = await Context.ExecuteScalarAsync<int>(
-                Sql.Permissions_CountFrom() + $" WHERE {Sql.FormatArrayContains("_id_role", Sql.FormatParameter(1))}", roleIds.ToArray());
+                Sql.Permissions_CountFrom() + $" WHERE {Sql.FormatArrayContains("_id_role", Sql.FormatParameter(1))}", new object[] { roleIds.ToArray() }, cancellationToken);
         }
 
         return directPermissions + rolePermissions;
     }
 
     /// <inheritdoc />
-    public virtual async Task<int> GetRolePermissionCountAsync(IRedbRole role)
+    public virtual async Task<int> GetRolePermissionCountAsync(IRedbRole role, CancellationToken cancellationToken = default)
     {
-        return await Context.ExecuteScalarAsync<int>(Sql.Permissions_CountByRole(), role.Id);
+        return await Context.ExecuteScalarAsync<int>(Sql.Permissions_CountByRole(), new object[] { role.Id }, cancellationToken);
     }
 
     // ============================================================
@@ -696,7 +732,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Called after permission is created. Override in Pro for audit.
     /// </summary>
-    protected virtual Task OnPermissionCreatedAsync(IRedbPermission permission, IRedbUser? currentUser)
+    protected virtual Task OnPermissionCreatedAsync(IRedbPermission permission, IRedbUser? currentUser, CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }
@@ -704,7 +740,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Called after permission is updated. Override in Pro for audit.
     /// </summary>
-    protected virtual Task OnPermissionUpdatedAsync(IRedbPermission permission, IRedbUser? currentUser)
+    protected virtual Task OnPermissionUpdatedAsync(IRedbPermission permission, IRedbUser? currentUser, CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }
@@ -712,7 +748,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Called after permission is deleted. Override in Pro for audit.
     /// </summary>
-    protected virtual Task OnPermissionDeletedAsync(IRedbPermission permission, IRedbUser? currentUser)
+    protected virtual Task OnPermissionDeletedAsync(IRedbPermission permission, IRedbUser? currentUser, CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }

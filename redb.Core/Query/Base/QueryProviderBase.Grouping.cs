@@ -19,7 +19,7 @@ public abstract partial class QueryProviderBase
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrEmpty(havingJson))
         {
@@ -32,39 +32,38 @@ public abstract partial class QueryProviderBase
                 "Use a PVT-capable provider (PostgreSQL) or the Pro builder.");
         }
         // Form JSON for group_fields
-        // 🔥 CRITICAL: Adding the "0$:" prefix for base RedbObject fields!
+        // CRITICAL: Adding the "0$:" prefix for base RedbObject fields!
         var groupFieldsJson = JsonSerializer.Serialize(
-            groupFields.Select(g => new { 
-                field = g.IsBaseField ? $"0$:{g.FieldPath}" : g.FieldPath, 
-                alias = g.Alias 
+            groupFields.Select(g => new {
+                field = g.IsBaseField ? $"0$:{g.FieldPath}" : g.FieldPath,
+                alias = g.Alias
             }));
-        
+
         // Form JSON for aggregations (AVERAGE -> AVG for PostgreSQL)
         var aggregationsJson = JsonSerializer.Serialize(
-            aggregations.Select(a => new { 
-                field = a.FieldPath, 
-                func = a.Function switch 
+            aggregations.Select(a => new {
+                field = a.FieldPath,
+                func = a.Function switch
                 {
                     AggregateFunction.Average => "AVG",
                     _ => a.Function.ToString().ToUpper()
-                }, 
-                alias = a.Alias 
+                },
+                alias = a.Alias
             }));
-        
+
         _logger?.LogDebug("GroupBy: groupFields={GroupFields}, aggregations={Aggregations}", groupFieldsJson, aggregationsJson);
-        
-        var result = await _context.QueryFirstOrDefaultAsync<GroupedResult>(_sql.Query_AggregateGroupedSql(), 
-                schemeId, 
-                groupFieldsJson, 
+
+        var result = await _context.QueryFirstOrDefaultAsync<GroupedResult>(_sql.Query_AggregateGroupedSql(), new object[] { schemeId,
+                groupFieldsJson,
                 aggregationsJson,
-                filterJson ?? "null");
-        
+                filterJson ?? "null" }, cancellationToken);
+
         if (result?.result == null)
             return null;
-        
+
         return JsonDocument.Parse(result.result);
     }
-    
+
     /// <summary>
     /// Performs GroupBy aggregation with FilterExpression (Pro version).
     /// Free version fallback: converts FilterExpression to facet-JSON and calls the string-based method.
@@ -74,18 +73,18 @@ public abstract partial class QueryProviderBase
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         FilterExpression? filter,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         // Free version fallback: convert FilterExpression to facet-JSON
         var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
         return await ExecuteGroupedAggregateAsync(schemeId, groupFields, aggregations, filterJson, havingJson);
     }
-    
+
     private class GroupedResult
     {
         public string? result { get; set; }
     }
-    
+
     /// <summary>
     /// Performs GroupBy aggregation on an array via the aggregate_array_grouped SQL function
     /// </summary>
@@ -95,44 +94,43 @@ public abstract partial class QueryProviderBase
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrEmpty(havingJson))
         {
             throw new NotSupportedException(
                 "HAVING is not supported by aggregate_array_grouped. Tracked under Phase 2.G.3.");
         }
-        // 🔥 CRITICAL: Adding the "0$:" prefix for base RedbObject fields!
+        // CRITICAL: Adding the "0$:" prefix for base RedbObject fields!
         var groupFieldsJson = JsonSerializer.Serialize(
-            groupFields.Select(g => new { 
-                field = g.IsBaseField ? $"0$:{g.FieldPath}" : g.FieldPath, 
-                alias = g.Alias 
+            groupFields.Select(g => new {
+                field = g.IsBaseField ? $"0$:{g.FieldPath}" : g.FieldPath,
+                alias = g.Alias
             }));
-        
+
         var aggregationsJson = JsonSerializer.Serialize(
-            aggregations.Select(a => new { 
-                field = a.FieldPath, 
-                func = a.Function switch 
+            aggregations.Select(a => new {
+                field = a.FieldPath,
+                func = a.Function switch
                 {
                     AggregateFunction.Average => "AVG",
                     _ => a.Function.ToString().ToUpper()
-                }, 
-                alias = a.Alias 
+                },
+                alias = a.Alias
             }));
-        
-        _logger?.LogDebug("GroupByArray: arrayPath={Array}, groupFields={GroupFields}, aggregations={Aggregations}", 
+
+        _logger?.LogDebug("GroupByArray: arrayPath={Array}, groupFields={GroupFields}, aggregations={Aggregations}",
             arrayPath, groupFieldsJson, aggregationsJson);
-        
-        var result = await _context.QueryFirstOrDefaultAsync<GroupedResult>(_sql.Query_AggregateArrayGroupedSql(), 
-                schemeId, 
+
+        var result = await _context.QueryFirstOrDefaultAsync<GroupedResult>(_sql.Query_AggregateArrayGroupedSql(), new object[] { schemeId,
                 arrayPath,
-                groupFieldsJson, 
+                groupFieldsJson,
                 aggregationsJson,
-                filterJson ?? "null");
-        
+                filterJson ?? "null" }, cancellationToken);
+
         if (result?.result == null)
             return null;
-        
+
         return JsonDocument.Parse(result.result);
     }
 
@@ -147,7 +145,7 @@ public abstract partial class QueryProviderBase
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         FilterExpression? filter,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
         if (filterJson == "{}") filterJson = null;

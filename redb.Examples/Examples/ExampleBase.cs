@@ -48,6 +48,13 @@ public sealed class ExampleMetaAttribute(
 public abstract class ExampleBase
 {
     /// <summary>
+    /// The example ids named on the command line, uppercased; null when the whole suite runs.
+    /// Set by Program before any example executes. Lets an example distinguish "I was asked
+    /// for by name" from "the sweep reached me" - E203 seeds only in the former case.
+    /// </summary>
+    public static IReadOnlySet<string>? ExplicitlyRequestedIds { get; set; }
+
+    /// <summary>
     /// Run the example and return result.
     /// </summary>
     public abstract Task<ExampleResult> RunAsync(IRedbService redb);

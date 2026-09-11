@@ -98,9 +98,18 @@ namespace redb.Postgres.Data
             {
                 await _transaction.RollbackAsync();
             }
+            catch (ObjectDisposedException)
+            {
+                // The connector broke mid-command (e.g. a COPY torn down by a cancellation token)
+                // and Npgsql disposed the transaction with it - the server has already rolled the
+                // transaction back on disconnect. Treat the rollback as done: rethrowing here would
+                // mask the original failure (the OCE) with a secondary ObjectDisposedException.
+                IsActive = false;
+                _onDispose();
+            }
             catch (Exception ex)
             {
-                // Console.WriteLine($"[Diag-TX-LIFECYCLE-PG] RollbackAsync FAILED: {ex.GetType().Name}: {ex.Message}. Npgsql's DISCARD ALL on next pool acquire is the only mitigation if the underlying state is dirty.");
+                // Console.WriteLine( RollbackAsync FAILED: {ex.GetType().Name}: {ex.Message}. Npgsql's DISCARD ALL on next pool acquire is the only mitigation if the underlying state is dirty.");
                 IsActive = false;
                 _onDispose();
                 throw;

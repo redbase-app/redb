@@ -10,11 +10,11 @@ public static class BaseFieldMapper
     {
         "Id", "Name", "ParentId", "SchemeId", "DateCreate", "DateModify",
         "Hash", "ValueLong", "ValueString", "ValueGuid", "ValueBool", "OwnerId", "WhoChangeId",
-        "ValueDouble", "ValueNumeric", "ValueDatetime", "ValueBytes",
+        "ValueDouble", "ValueNumeric", "ValueDatetime", "ValueBytes", "ValueUnique",
         "Note", "Key", "DateBegin", "DateComplete",
         "_id", "_name", "_id_parent", "_id_scheme", "_date_create", "_date_modify",
         "_hash", "_value_long", "_value_string", "_value_guid", "_value_bool", "_id_owner", "_id_who_change",
-        "_value_double", "_value_numeric", "_value_datetime", "_value_bytes",
+        "_value_double", "_value_numeric", "_value_datetime", "_value_bytes", "_value_unique",
         "_note", "_key", "_date_begin", "_date_complete"
     };
 
@@ -44,6 +44,7 @@ public static class BaseFieldMapper
         "valuenumeric" or "_value_numeric" or "value_numeric" => "_value_numeric",
         "valuedatetime" or "_value_datetime" or "value_datetime" => "_value_datetime",
         "valuebytes" or "_value_bytes" or "value_bytes" => "_value_bytes",
+        "valueunique" or "_value_unique" or "value_unique" => "_value_unique",
         "ownerid" or "_id_owner" or "owner_id" => "_id_owner",
         "whochangeid" or "_id_who_change" or "who_change_id" => "_id_who_change",
         "note" or "_note" => "_note",

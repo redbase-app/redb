@@ -38,7 +38,6 @@ public sealed class PropsCacheMutationDiagTests : IAsyncLifetime
                 {
                     c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;  // ← Identity Pro uses this, not DeleteInsert
                     c.SkipHashValidationOnCacheCheck = false;
-                    c.EnableLazyLoadingForProps = false;
                     c.EnablePropsCache = true;   // ← the whole point
                 }));
 

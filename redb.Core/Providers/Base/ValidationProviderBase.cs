@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -35,12 +36,12 @@ namespace redb.Core.Providers.Base
             Logger = logger;
         }
 
-        public async Task<List<SupportedType>> GetSupportedTypesAsync()
+        public async Task<List<SupportedType>> GetSupportedTypesAsync(CancellationToken cancellationToken = default)
         {
             if (_supportedTypesCache != null)
                 return _supportedTypesCache;
 
-            var dbTypes = await Context.QueryAsync<RedbType>(Sql.Validation_SelectAllTypes());
+            var dbTypes = await Context.QueryAsync<RedbType>(Sql.Validation_SelectAllTypes(), System.Array.Empty<object>(), cancellationToken);
             
             _supportedTypesCache = dbTypes.Select(t => new SupportedType
             {
@@ -56,7 +57,7 @@ namespace redb.Core.Providers.Base
             return _supportedTypesCache;
         }
 
-        public async Task<ValidationIssue?> ValidateTypeAsync(Type csharpType, string propertyName)
+        public async Task<ValidationIssue?> ValidateTypeAsync(Type csharpType, string propertyName, CancellationToken cancellationToken = default)
         {
             var supportedTypes = await GetSupportedTypesAsync();
             var underlyingType = Nullable.GetUnderlyingType(csharpType) ?? csharpType;
@@ -100,7 +101,7 @@ namespace redb.Core.Providers.Base
             return null;
         }
 
-        public async Task<SchemaValidationResult> ValidateSchemaAsync<TProps>(string schemeName, bool strictDeleteExtra = true) where TProps : class
+        public async Task<SchemaValidationResult> ValidateSchemaAsync<TProps>(string schemeName, bool strictDeleteExtra = true, CancellationToken cancellationToken = default) where TProps : class
         {
             var result = new SchemaValidationResult { IsValid = true };
             var properties = typeof(TProps).GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -134,7 +135,7 @@ namespace redb.Core.Providers.Base
             }
 
             var existingScheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
-                Sql.Validation_SelectSchemeByName(), schemeName);
+                Sql.Validation_SelectSchemeByName(), new object[] { schemeName }, cancellationToken);
             
             if (existingScheme != null)
             {
@@ -154,17 +155,17 @@ namespace redb.Core.Providers.Base
             return result;
         }
 
-        public async Task<SchemaValidationResult> ValidateSchemaAsync<TProps>(IRedbScheme scheme, bool strictDeleteExtra = true) where TProps : class
+        public async Task<SchemaValidationResult> ValidateSchemaAsync<TProps>(IRedbScheme scheme, bool strictDeleteExtra = true, CancellationToken cancellationToken = default) where TProps : class
         {
             return await ValidateSchemaAsync<TProps>(scheme.Name, strictDeleteExtra);
         }
 
-        public async Task<SchemaChangeReport> AnalyzeSchemaChangesAsync<TProps>(IRedbScheme scheme) where TProps : class
+        public async Task<SchemaChangeReport> AnalyzeSchemaChangesAsync<TProps>(IRedbScheme scheme, CancellationToken cancellationToken = default) where TProps : class
         {
             return await AnalyzeSchemaChangesAsync<TProps>(scheme.Id);
         }
 
-        public async Task<SchemaChangeReport> AnalyzeSchemaChangesAsync<TProps>(long schemeId) where TProps : class
+        public async Task<SchemaChangeReport> AnalyzeSchemaChangesAsync<TProps>(long schemeId, CancellationToken cancellationToken = default) where TProps : class
         {
             var report = new SchemaChangeReport();
             var properties = typeof(TProps).GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -173,9 +174,9 @@ namespace redb.Core.Providers.Base
             var nullabilityContext = new NullabilityInfoContext();
 
             var existingStructures = await Context.QueryAsync<RedbStructure>(
-                Sql.Validation_SelectStructuresBySchemeId(), schemeId);
+                Sql.Validation_SelectStructuresBySchemeId(), new object[] { schemeId }, cancellationToken);
             
-            var allTypes = await Context.QueryAsync<RedbType>(Sql.Validation_SelectAllTypes());
+            var allTypes = await Context.QueryAsync<RedbType>(Sql.Validation_SelectAllTypes(), System.Array.Empty<object>(), cancellationToken);
             var typesDict = allTypes.ToDictionary(t => t.Id);
 
             var existingNames = existingStructures.Select(s => s.Name).ToHashSet();
@@ -322,9 +323,9 @@ namespace redb.Core.Providers.Base
             return "String";
         }
 
-        private async Task InitializeCSharpToRedbTypeMappingAsync()
+        private async Task InitializeCSharpToRedbTypeMappingAsync(CancellationToken cancellationToken = default)
         {
-            var allTypes = await Context.QueryAsync<RedbType>(Sql.Validation_SelectAllTypes());
+            var allTypes = await Context.QueryAsync<RedbType>(Sql.Validation_SelectAllTypes(), System.Array.Empty<object>(), cancellationToken);
             _csharpToRedbTypeCache = new Dictionary<Type, string>();
 
             // Sort by ID to ensure base types (String, Long, etc.) are processed first

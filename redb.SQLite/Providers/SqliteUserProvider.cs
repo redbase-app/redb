@@ -27,7 +27,7 @@ public class SqliteUserProvider : UserProviderBase
         IRedbContext context, 
         IRedbSecurityContext securityContext,
         ILogger? logger = null)
-        : base(context, securityContext, new SqliteDialect(), new SimplePasswordHasher(), logger)
+        : base(context, securityContext, new SqliteDialect(), new BcryptPasswordHasher(), logger)
     {
     }
 

@@ -83,7 +83,7 @@ public class RedbOptionsBuilder : IRedbOptionsBuilderInfrastructure
     /// </summary>
     /// <example>
     /// builder.Configure(c => {
-    ///     c.EnableLazyLoadingForProps = true;
+    ///     c.EnablePropsCache = true;
     ///     c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;
     /// });
     /// </example>
@@ -129,6 +129,12 @@ public class RedbOptionsBuilder : IRedbOptionsBuilderInfrastructure
         
         // Register configuration
         _services.AddSingleton(_configuration);
+
+        // Default password hasher: bcrypt, DI-overridable. TryAdd so a user registration made
+        // before AddRedb wins. Never SimplePasswordHasher here - a bare deployment must not
+        // fall back to salted SHA256 (external security report, 2026-09-08).
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions
+            .TryAddSingleton<Security.IPasswordHasher, Security.BcryptPasswordHasher>(_services);
         
         // Schema init hosted service — must be registered BEFORE provider services
         // so it runs before BackgroundDeletionService that queries _objects table

@@ -15,7 +15,7 @@ public static class SchemeHashCalculator
 {
     /// <summary>
     /// Computes MD5 hash of scheme from all its structures.
-    /// Hash aggregates critical fields of all structures: Id, Name, IdType, IdParent, IsArray, AllowNotNull, StoreNull.
+    /// Hash aggregates critical fields of all structures: Id, Name, IdType, IdParent, IsArray, AllowNotNull, StoreNull, Unique.
     /// </summary>
     /// <param name="structures">List of scheme structures.</param>
     /// <returns>MD5 hash as Guid.</returns>
@@ -42,7 +42,12 @@ public static class SchemeHashCalculator
             sb.Append($"{s.CollectionType}|");
             sb.Append($"{s.KeyType}|");
             sb.Append($"{s.AllowNotNull}|");
-            sb.Append($"{s.StoreNull};");
+            sb.Append($"{s.StoreNull}|");
+            // V4 (Л2): virtual appearing/disappearing must change the hash (LAZY plan §6).
+            sb.Append($"{s.Lazy}|");
+            // V4: a key appearing or disappearing must change the hash, or the metadata cache and the
+            // structure tree keep answering from the old flag until restart.
+            sb.Append($"{s.Unique};");
         }
         
         // Compute MD5 and convert to Guid

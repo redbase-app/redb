@@ -182,4 +182,22 @@ public sealed class SqliteProvider : IDataProvider
             await _connection.DisposeAsync();
         }
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// redb's SQLite schema stores uuid-semantic columns as a 16-byte BLOB in RFC 4122 (text)
+    /// order (see SqliteHash in redb.SQLite); the driver's <c>GetGuid</c> would byte-swap the
+    /// first three groups. Legacy pre-V4 databases may still hold the TEXT form.
+    /// </remarks>
+    public Guid GuidFromDb(object raw) => raw switch
+    {
+        byte[] blob => Guid.ParseExact(Convert.ToHexString(blob), "N"),
+        string text => Guid.Parse(text),
+        Guid guid => guid,
+        _ => throw new InvalidOperationException(
+            $"Unexpected uuid column representation: {raw.GetType().Name}")
+    };
+
+    /// <inheritdoc />
+    public object GuidToDb(Guid value) => Convert.FromHexString(value.ToString("N"));
 }

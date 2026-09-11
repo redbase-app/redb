@@ -15,7 +15,7 @@
     "db": {
       "type": "parameter",
       "datatype": "choice",
-      "defaultValue": "postgres",
+      "defaultValue": "sqlite",
       "description": "Database provider to use",
       "choices": [
         { "choice": "postgres", "description": "PostgreSQL (via Npgsql)" },
@@ -26,7 +26,7 @@
     "pro": {
       "type": "parameter",
       "datatype": "bool",
-      "defaultValue": "false",
+      "defaultValue": "true",
       "description": "Include Pro features (LINQ compilation, change tracking, analytics)"
     },
     "UsePostgres": {

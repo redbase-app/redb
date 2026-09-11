@@ -41,7 +41,7 @@ public class TreeWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
     /// Execute window query with tree context and materialize results.
     /// </summary>
     public async Task<List<TResult>> SelectAsync<TResult>(
-        Expression<Func<RedbObject<TProps>, TResult>> selector)
+        Expression<Func<RedbObject<TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var (selectFields, windowFuncs) = ParseSelector(selector);
         var partitionBy = ParsePartitionBy();
@@ -50,7 +50,7 @@ public class TreeWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
         
         // Use tree-aware execution with full context
         var jsonResult = await _treeProvider.ExecuteTreeWindowQueryAsync(
-            _treeContext, selectFields, windowFuncs, partitionBy, orderBy, frameJson);
+            _treeContext, selectFields, windowFuncs, partitionBy, orderBy, frameJson, cancellationToken: cancellationToken);
         
         return MaterializeResults<TResult>(jsonResult, selector);
     }
@@ -59,7 +59,7 @@ public class TreeWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
     /// Returns SQL string for debugging.
     /// </summary>
     public async Task<string> ToSqlStringAsync<TResult>(
-        Expression<Func<RedbObject<TProps>, TResult>> selector)
+        Expression<Func<RedbObject<TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var (selectFields, windowFuncs) = ParseSelector(selector);
         var partitionBy = ParsePartitionBy();
@@ -67,7 +67,7 @@ public class TreeWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
         var frameJson = SerializeFrame();
         
         return await _treeProvider.GetTreeWindowSqlPreviewAsync(
-            _treeContext, selectFields, windowFuncs, partitionBy, orderBy, frameJson);
+            _treeContext, selectFields, windowFuncs, partitionBy, orderBy, frameJson, cancellationToken: cancellationToken);
     }
     
     private string? SerializeFrame()

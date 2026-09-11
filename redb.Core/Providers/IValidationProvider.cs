@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Models.Contracts;
 
@@ -92,27 +93,31 @@ namespace redb.Core.Providers
         /// <summary>
         /// Get all supported types.
         /// </summary>
-        Task<List<SupportedType>> GetSupportedTypesAsync();
+        Task<List<SupportedType>> GetSupportedTypesAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Validate C# type correspondence with REDB supported types.
         /// </summary>
-        Task<ValidationIssue?> ValidateTypeAsync(Type csharpType, string propertyName);
+        Task<ValidationIssue?> ValidateTypeAsync(Type csharpType, string propertyName,
+        CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Validate schema before synchronization.
         /// </summary>
-        Task<SchemaValidationResult> ValidateSchemaAsync<TProps>(string schemeName, bool strictDeleteExtra = true) where TProps : class;
+        Task<SchemaValidationResult> ValidateSchemaAsync<TProps>(string schemeName, bool strictDeleteExtra = true,
+        CancellationToken cancellationToken = default) where TProps : class;
         
         /// <summary>
         /// Validate schema before synchronization (with contract).
         /// </summary>
-        Task<SchemaValidationResult> ValidateSchemaAsync<TProps>(IRedbScheme scheme, bool strictDeleteExtra = true) where TProps : class;
+        Task<SchemaValidationResult> ValidateSchemaAsync<TProps>(IRedbScheme scheme, bool strictDeleteExtra = true,
+        CancellationToken cancellationToken = default) where TProps : class;
 
         /// <summary>
         /// Check schema change compatibility.
         /// </summary>
-        Task<SchemaChangeReport> AnalyzeSchemaChangesAsync<TProps>(IRedbScheme scheme) where TProps : class;
+        Task<SchemaChangeReport> AnalyzeSchemaChangesAsync<TProps>(IRedbScheme scheme,
+        CancellationToken cancellationToken = default) where TProps : class;
 
         /// <summary>
         /// Validate property constraints and arrays.

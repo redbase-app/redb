@@ -452,7 +452,7 @@ public interface ISqlDialect
 
     /// <summary>
     /// INSERT a new scheme, doing nothing when the name is already taken.
-    /// Params: $1=id, $2=name, $3=alias, $4=type. Returns 0 affected rows on conflict.
+    /// Params: $1=id, $2=name, $3=alias, $4=type, $5=nameSpace (nullable). Returns 0 affected rows on conflict.
     /// <para>
     /// Exists because several nodes starting simultaneously all miss the lookup and all try to create
     /// the same scheme. The conflict must be suppressed by the statement itself rather than caught:
@@ -466,6 +466,12 @@ public interface ISqlDialect
     /// UPDATE scheme alias by ID. Params: $1=alias (nullable), $2=schemeId
     /// </summary>
     string Schemes_UpdateAlias();
+
+    /// <summary>
+    /// UPDATE scheme namespace by ID (V4, К7 — the ownership mark that gates short-name adoption).
+    /// Params: $1=nameSpace (nullable), $2=schemeId
+    /// </summary>
+    string Schemes_UpdateNameSpace();
 
     /// <summary>
     /// UPDATE scheme structure hash. Params: $1=hash, $2=schemeId
@@ -558,11 +564,121 @@ public interface ISqlDialect
     /// UPDATE structure allow_not_null. Params: $1=allowNotNull, $2=structureId
     /// </summary>
     string Structures_UpdateAllowNotNull();
+
+    /// <summary>
+    /// UPDATE the lazy-reference marker (V4, LAZY Л2). Params: $1=lazy, $2=structureId
+    /// </summary>
+    string Structures_UpdateLazy();
+
+    /// <summary>
+    /// Set the session lazy-references flag the JSON builders read (V4, LAZY L2).
+    /// Params: $1 = 1|0
+    /// </summary>
+    string Session_SetLazyRefs();
     
     /// <summary>
     /// DELETE structures by IDs. Params: dynamic IN clause
     /// </summary>
     string Structures_DeleteByIds(IEnumerable<long> ids);
+
+    /// <summary>
+    /// UPDATE the unique-key flag, encoder version and element-key scope of a structure.
+    /// Params: $1=unique (bool), $2=unique_version (long, nullable),
+    /// $3=unique_scope (long, nullable; S3), $4=id
+    /// </summary>
+    string Structures_UpdateUnique();
+
+    /// <summary>UPDATE the free-form _tags marker of a structure. Params: $1=tags, $2=id</summary>
+    string Structures_UpdateTags();
+
+    /// <summary>UPDATE the free-form _tags marker of a scheme. Params: $1=tags, $2=id</summary>
+    string Schemes_UpdateTags();
+
+    /// <summary>
+    /// SELECT one structure by id (same columns as Structures_SelectByScheme). Params: $1=id
+    /// </summary>
+    string Structures_SelectById();
+
+    // ============================================================
+    // === UNIQUE KEYS (_values._unique) SQL ===
+    // ============================================================
+
+    /// <summary>
+    /// SELECT the root scalar rows of a structure — no array parent, no array index — with their
+    /// typed columns, for recomputing keys. Params: $1=structureId.
+    /// Returns RedbValue columns: Id, IdStructure, IdObject, String, Long, Guid, Double,
+    /// DateTimeOffset, Boolean, ByteArray, Numeric, Unique.
+    /// </summary>
+    string Values_SelectRootScalarsByStructure();
+
+    /// <summary>
+    /// SELECT the ELEMENT rows of a collection structure — array index present — with their
+    /// typed columns, reference targets and the owning collection id, for recomputing
+    /// element-scoped keys (S3). Params: $1=structureId.
+    /// Returns RedbValue columns: Id, IdStructure, IdObject, String, Long, Guid, Double,
+    /// DateTimeOffset, Boolean, ByteArray, Numeric, ListItem, Object, ArrayParentId, Unique.
+    /// </summary>
+    string Values_SelectElementRowsByStructure();
+
+    /// <summary>UPDATE one row's key. Params: $1=unique (Guid, nullable), $2=id</summary>
+    string Values_UpdateUnique();
+
+    /// <summary>UPDATE every row of a structure to _unique = NULL. Params: $1=structureId</summary>
+    string Values_ClearUniqueByStructure();
+
+    /// <summary>
+    /// SELECT _id_object of the root scalar row holding a key. Params: $1=structureId, $2=unique (Guid).
+    /// At most one row can match: the unique index guarantees it.
+    /// </summary>
+    string Values_SelectObjectIdByUnique();
+
+    /// <summary>
+    /// SELECT 1 if the structure has a root scalar row with a value in <paramref name="typedColumn"/>
+    /// but no key — the trace of a SQL-side writer. Params: $1=structureId. Column name is one of the
+    /// _values typed columns and is interpolated, never user input.
+    /// </summary>
+    string Values_ExistsUnhashedByStructure(string typedColumn);
+
+    /// <summary>
+    /// SELECT every row of a structure (base and array-element rows alike) with RedbValue aliases.
+    /// Params: $1=structureId. Used by the byte[]-storage conversion (V4, work Б1).
+    /// </summary>
+    string Values_SelectByStructure();
+
+    /// <summary>
+    /// UPDATE one row into the scalar byte[] shape: _ByteArray = payload, _Guid and _Long cleared.
+    /// Params: $1=bytes, $2=id.
+    /// </summary>
+    string Values_SetByteArrayScalar();
+
+    /// <summary>
+    /// DELETE the per-byte element rows of a legacy Array-of-Byte structure: rows of the structure
+    /// whose _array_parent_id points at another row OF THE SAME structure (the base row). A base row
+    /// nested in a class points at the class row, another structure, and is left alone. Set-based on
+    /// purpose: a megabyte payload is a million element rows. Params: $1=structureId (used twice).
+    /// </summary>
+    string Values_DeleteByteArrayElements();
+
+    /// <summary>
+    /// SELECT _id of the object holding a unique key in a scheme. Params: $1=schemeId, $2=valueUnique.
+    /// At most one row: the partial unique index over (_id_scheme, _value_unique) guarantees it.
+    /// </summary>
+    string ObjectStorage_SelectIdBySchemeValueUnique();
+
+    /// <summary>
+    /// UPDATE the listed objects to _value_unique = NULL (P7: release before take inside the batch
+    /// transaction, so an in-batch key exchange passes). Ids are inlined like Structures_DeleteByIds.
+    /// </summary>
+    string ObjectStorage_ClearValueUniqueByIds(IEnumerable<long> ids);
+
+    /// <summary>
+    /// P7-аналог для ПОЛЕВЫХ ключей (Э2): освободить _values._unique у обновляемых строк перед
+    /// bulk-UPDATE - иначе обмен [RedbUnique]-значений двух объектов в одном батче бьётся об
+    /// частичный уникальный индекс (проверка немедленная; на SQLite bulk идёт построчно и своп
+    /// падал всегда, на PG/MSSQL исход зависел от порядка строк). Та же транзакция - снаружи
+    /// разрыв не виден. CT-1/CT-выяснение 2026-09-04.
+    /// </summary>
+    string Values_ClearUniqueByValueIds(IEnumerable<long> ids);
     
     // ============================================================
     // === TYPES SQL ===
@@ -753,21 +869,9 @@ public interface ISqlDialect
     
     /// <summary>
     /// SELECT structure metadata by scheme ID. Params: $1=schemeId
-    /// Returns: Id, IdParent, Name, DbType, CollectionType, KeyType, StoreNull, TypeSemantic
+    /// Returns: Id, IdParent, Name, DbType, CollectionType, KeyType, StoreNull, Lazy, TypeSemantic
     /// </summary>
     string ObjectStorage_SelectStructuresWithMetadata();
-    
-    /// <summary>
-    /// SELECT existing values with types. Params: $1=objectId, $2=structureIds (array)
-    /// Returns: Id, IdStructure, IdObject, String, Long, Guid, Double, DateTimeOffset, Boolean, ByteArray, Numeric, ListItem, Object, ArrayParentId, ArrayIndex, DbType
-    /// </summary>
-    string ObjectStorage_SelectValuesWithTypes();
-    
-    /// <summary>
-    /// SELECT structure types by IDs. Params: $1=structureIds (array)
-    /// Returns: StructureId, DbType
-    /// </summary>
-    string ObjectStorage_SelectStructureTypes();
     
     /// <summary>
     /// SELECT type info by ID. Params: $1=typeId
@@ -816,6 +920,13 @@ public interface ISqlDialect
     /// Returns: Id only
     /// </summary>
     string ObjectStorage_SelectExistingIds();
+
+    /// <summary>
+    /// SELECT id + persisted content hash of existing objects. Params: $1=objectIds (array).
+    /// Returns: Id, Hash. F1 (CT hash shortcut): an existing object whose recomputed hash
+    /// equals the persisted one skips the value pipeline under ChangeTracking.
+    /// </summary>
+    string ObjectStorage_SelectIdHashPairs();
     
     /// <summary>
     /// SELECT schemes by IDs. Params: $1=schemeIds (array)
@@ -824,9 +935,12 @@ public interface ISqlDialect
     string ObjectStorage_SelectSchemesByIds();
     
     /// <summary>
-    /// Lock objects for update (row locking). Params: $1=objectIds (array)
-    /// PostgreSQL: SELECT 1 FROM _objects WHERE _id = ANY($1) FOR UPDATE
-    /// MSSQL: SELECT 1 FROM _objects WITH (UPDLOCK) WHERE _id IN (...)
+    /// Lock objects for update (row locking) and RETURN THE LOCKED IDS. Params: $1=objectIds (array)
+    /// Contract (BR-9, 2026-09-02): SELECT _id (not SELECT 1) - the returned rows are the ids that
+    /// exist and are now locked; the caller counts them, a missing id is simply not in the result.
+    /// Rows are taken in ascending _id order so concurrent lockers cannot deadlock on each other.
+    /// PostgreSQL: SELECT _id ... FOR UPDATE. MSSQL: WITH (UPDLOCK, ROWLOCK). SQLite: existence
+    /// check only - writers are serialized database-wide, there is no row lock to take.
     /// </summary>
     string ObjectStorage_LockObjectsForUpdate();
     
@@ -920,9 +1034,33 @@ public interface ISqlDialect
     string ListItems_SelectByObjectId();
     
     // ============================================================
+    // === MAINTENANCE SQL ===
+    // ============================================================
+    // All provider variability of IMaintenanceProvider lives in these three texts; the base
+    // provider holds the only logic and the only mapping. Index-stats SQL must normalize the
+    // engine's catalogs to EXACTLY these column aliases: Table, Name, IsUnique, SizeBytes,
+    // EstimatedRows, Seeks, Scans, Updates, LastUsed - NULL where the engine cannot say.
+
+    /// <summary>
+    /// Refresh planner statistics. <paramref name="analysisLimit"/> bounds SQLite's ANALYZE
+    /// (PRAGMA analysis_limit; 0 = unbounded); PostgreSQL and MSSQL ignore it.
+    /// </summary>
+    string Maintenance_Analyze(int analysisLimit);
+
+    /// <summary>Index statistics of user tables, normalized to the alias contract above.</summary>
+    string Maintenance_SelectIndexStats();
+
+    /// <summary>
+    /// Size-less fallback for engines where the sized form may be unavailable (SQLite without
+    /// the dbstat virtual table). Engines with no such failure mode return the same text as
+    /// <see cref="Maintenance_SelectIndexStats"/> - the base provider then never falls back.
+    /// </summary>
+    string Maintenance_SelectIndexStatsNoSize();
+
+    // ============================================================
     // === VALIDATION SQL ===
     // ============================================================
-    
+
     /// <summary>
     /// SELECT all types for validation.
     /// </summary>
@@ -953,7 +1091,8 @@ public interface ISqlDialect
     string LazyLoader_GetObjectJson();
     
     /// <summary>
-    /// Get multiple objects as JSON via get_object_json batch. Params: $1=objectIds array
+    /// Get multiple objects as JSON via get_object_json batch. Params: $1=objectIds array, $2=depth
+    /// (V4: a stub reload passes 1, query pages their PropsDepth, otherwise 10).
     /// Returns: (Id, JsonData) tuples
     /// </summary>
     string LazyLoader_GetObjectJsonBatch();
@@ -962,6 +1101,21 @@ public interface ISqlDialect
     /// Get object hash for cache validation. Params: $1=objectId
     /// </summary>
     string LazyLoader_SelectObjectHash();
+
+    /// <summary>
+    /// Savepoint trio for a save running inside the CALLER's transaction (bug report п.2,
+    /// 2026-09-02): a unique violation must not leave that transaction aborted (PostgreSQL 25P02),
+    /// so the batch runs under a savepoint and rolls back TO it before the typed exception leaves.
+    /// Release is null where the engine has nothing to release (MSSQL savepoints dissolve on their
+    /// own). MSSQL note: SAVE TRANSACTION does not work in a distributed transaction.
+    /// </summary>
+    string Transaction_SavepointBegin();
+
+    /// <summary>RELEASE of the savepoint above; null when the engine needs none.</summary>
+    string? Transaction_SavepointRelease();
+
+    /// <summary>ROLLBACK TO the savepoint above - the caller's transaction stays alive.</summary>
+    string Transaction_SavepointRollback();
     
     // ============================================================
     // === QUERY PROVIDER SQL ===
@@ -1176,13 +1330,6 @@ public interface ISqlDialect
     /// MSSQL: "dbo.get_search_sql_preview"
     /// </summary>
     string Query_SqlPreviewFunction();
-    
-    /// <summary>
-    /// SQL preview function name for base (lazy loading) search.
-    /// PostgreSQL: "get_search_sql_preview_base"
-    /// MSSQL: "dbo.get_search_sql_preview_base"
-    /// </summary>
-    string Query_SqlPreviewBaseFunction();
     
     /// <summary>
     /// SQL preview function name for tree search.

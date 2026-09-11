@@ -13,7 +13,7 @@ public static class RedbServiceCollectionExtensions
     /// <example>
     /// services.AddRedb(options => options
     ///     .UsePostgres(connectionString)
-    ///     .Configure(c => c.EnableLazyLoadingForProps = true));
+    ///     .Configure(c => c.EnablePropsCache = true));
     /// </example>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Action to configure REDB options including database provider.</param>

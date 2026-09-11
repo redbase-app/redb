@@ -142,7 +142,7 @@ BEGIN
       + N'o.[_name], o.[_date_create], o.[_date_modify], o.[_date_begin], o.[_date_complete], '
       + N'o.[_key], o.[_note], o.[_hash], '
       + N'o.[_value_long], o.[_value_string], o.[_value_guid], o.[_value_bool], '
-      + N'o.[_value_double], o.[_value_numeric], o.[_value_datetime], o.[_value_bytes]';
+      + N'o.[_value_double], o.[_value_numeric], o.[_value_datetime], o.[_value_bytes], o.[_value_unique]';
 
     -- Iterate field metadata: collect pivot sids, exprs, aliases.
     DECLARE @pivot_cols    NVARCHAR(MAX) = N'';

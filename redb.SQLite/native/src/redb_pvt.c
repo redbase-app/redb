@@ -32,7 +32,7 @@ SQLITE_EXTENSION_INIT3
 #include <string.h>
 
 #ifndef PVT_MODULE_VERSION
-#define PVT_MODULE_VERSION "0.6.2"
+#define PVT_MODULE_VERSION "0.6.5"
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -221,6 +221,7 @@ static char *pvtNormalizeBaseFieldName(const char *field_name){
     {"value_numeric","_value_numeric"},{"ValueNumeric","_value_numeric"},{"_value_numeric","_value_numeric"},
     {"value_datetime","_value_datetime"},{"ValueDatetime","_value_datetime"},{"_value_datetime","_value_datetime"},
     {"value_bytes","_value_bytes"},{"ValueBytes","_value_bytes"},{"_value_bytes","_value_bytes"},
+    {"value_unique","_value_unique"},{"ValueUnique","_value_unique"},{"_value_unique","_value_unique"},
     {"hash","_hash"},{"Hash","_hash"},{"_hash","_hash"},
     {"date_create","_date_create"},{"DateCreate","_date_create"},{"_date_create","_date_create"},
     {"date_modify","_date_modify"},{"DateModify","_date_modify"},{"_date_modify","_date_modify"},
@@ -683,7 +684,7 @@ static int pvtColIsText(const char *kind, const char *column,
                   !strcmp(column,"_value_datetime") || !strcmp(column,"_date_create") ||
                   !strcmp(column,"_date_modify") || !strcmp(column,"_date_begin") ||
                   !strcmp(column,"_date_complete") || !strcmp(column,"_hash") ||
-                  !strcmp(column,"_value_bytes"))) return 1;
+                  !strcmp(column,"_value_bytes") || !strcmp(column,"_value_unique"))) return 1;
     return 0;
   }
   if(db_type && (!strcmp(db_type,"String") || !strcmp(db_type,"Guid") ||
@@ -704,7 +705,7 @@ static int pvtColIsDateTime(const char *kind, const char *column, const char *db
 }
 
 /* Append a JSON operand as a SQL literal, typed per the LHS column. */
-static void pvtAppendOperand(sqlite3_str *o, const char *txt, const char *jtype, int is_text, int is_datetime){
+static void pvtAppendOperand(sqlite3_str *o, const char *txt, const char *jtype, int is_text, int is_datetime, int is_hash){
   if(jtype){
     if(!strcmp(jtype, "true"))  { sqlite3_str_append(o, "1", 1); return; }
     if(!strcmp(jtype, "false")) { sqlite3_str_append(o, "0", 1); return; }
@@ -712,6 +713,9 @@ static void pvtAppendOperand(sqlite3_str *o, const char *txt, const char *jtype,
       sqlite3_str_appendf(o, "%s", txt ? txt : "0"); return;
     }
   }
+  /* hash operand: canonical uuid text -> the BLOB(16) the column holds (RFC 4122
+  ** order, see SqliteHash.cs). On the VALUE, so the index on _hash stays usable. */
+  if(is_hash){ sqlite3_str_appendf(o, "unhex(replace(%Q,'-',''))", txt ? txt : ""); return; }
   /* datetime operand: ISO string -> UTC Julian (julianday parses any offset).
   ** Wrapped on the VALUE (constant), not the column, so it stays index-sargable. */
   if(is_datetime){ sqlite3_str_appendf(o, "julianday(%Q)", txt ? txt : ""); return; }
@@ -719,11 +723,31 @@ static void pvtAppendOperand(sqlite3_str *o, const char *txt, const char *jtype,
   else        sqlite3_str_appendf(o, "%s", txt ? txt : "NULL");
 }
 
-/* LIKE pattern literal with prefix/suffix wildcards added in C, then quoted. */
+/* Escape LIKE metacharacters so a sugar operand matches LITERALLY (BR-7, 2026-09-02):
+** '%'/'_' must not act as wildcards, and the escape character itself is doubled. Every
+** consumer pairs the pattern with ESCAPE '\'. The raw $like/$ilike/$arrayMatches operators
+** do NOT pass through here - their pattern belongs to the caller. sqlite3_free() the result. */
+static char *pvtLikeEscape(const char *v){
+  size_t n = v ? strlen(v) : 0;
+  char *out = sqlite3_malloc64(n*2 + 1);
+  if(!out) return 0;
+  char *p = out;
+  for(const char *s = v; s && *s; s++){
+    if(*s=='\\' || *s=='%' || *s=='_') *p++ = '\\';
+    *p++ = *s;
+  }
+  *p = 0;
+  return out;
+}
+
+/* LIKE pattern literal with prefix/suffix wildcards added in C, then quoted; the operand is
+** escaped (pvtLikeEscape) and the ESCAPE clause emitted here so no caller can forget it. */
 static void pvtAppendLikePattern(sqlite3_str *o, const char *val, int lead, int trail){
-  char *pat = sqlite3_mprintf("%s%s%s", lead ? "%" : "", val ? val : "", trail ? "%" : "");
-  sqlite3_str_appendf(o, "%Q", pat);
+  char *esc = pvtLikeEscape(val);
+  char *pat = sqlite3_mprintf("%s%s%s", lead ? "%" : "", esc ? esc : "", trail ? "%" : "");
+  sqlite3_str_appendf(o, "%Q ESCAPE '\\'", pat);
   sqlite3_free(pat);
+  sqlite3_free(esc);
 }
 
 /* Build the AND-joined predicate fragment for a single leaf field.
@@ -744,6 +768,7 @@ static char *pvtBuildFieldCondition(sqlite3 *db, const char *field_name, const c
   int is_text   = pvtColIsText(kind, column, db_type, li_prop);
   int is_datetime = pvtColIsDateTime(kind, column, db_type);
   int is_base   = kind && !strcmp(kind, "base");
+  int is_hash   = is_base && column && !strcmp(column, "_hash");
 
   /* LHS column expression. */
   sqlite3_str *colb = sqlite3_str_new(db);
@@ -769,7 +794,7 @@ static char *pvtBuildFieldCondition(sqlite3 *db, const char *field_name, const c
       sqlite3_str_appendf(out, "%s IS NULL", vcol);
     }else{
       sqlite3_str_appendf(out, "%s = ", vcol);
-      pvtAppendOperand(out, op_json, op_type, is_text, is_datetime);
+      pvtAppendOperand(out, op_json, op_type, is_text, is_datetime, is_hash);
     }
     goto finish;
   }
@@ -801,16 +826,16 @@ static char *pvtBuildFieldCondition(sqlite3 *db, const char *field_name, const c
         /* array LHS: scalar = ANY -> EXISTS over json_each */
         if(eq){
           sqlite3_str_appendf(out, "EXISTS (SELECT 1 FROM json_each(%s) WHERE value = ", vcol);
-          pvtAppendOperand(out, oval, otyp, is_text, is_datetime);
+          pvtAppendOperand(out, oval, otyp, is_text, is_datetime, is_hash);
           sqlite3_str_append(out, ")", 1);
         }else{
           sqlite3_str_appendf(out, "(%s IS NULL OR NOT EXISTS (SELECT 1 FROM json_each(%s) WHERE value = ", vcol, vcol);
-          pvtAppendOperand(out, oval, otyp, is_text, is_datetime);
+          pvtAppendOperand(out, oval, otyp, is_text, is_datetime, is_hash);
           sqlite3_str_append(out, "))", 2);
         }
       }else{
         sqlite3_str_appendf(out, "%s %s ", vcol, sym);
-        pvtAppendOperand(out, oval, otyp, is_text, is_datetime);
+        pvtAppendOperand(out, oval, otyp, is_text, is_datetime, is_hash);
       }
     }
     else if(!strcmp(opk,"$in") || !strcmp(opk,"$nin")){
@@ -855,7 +880,7 @@ static char *pvtBuildFieldCondition(sqlite3 *db, const char *field_name, const c
     }
     else if(!strcmp(opk,"$arraycontains")){
       sqlite3_str_appendf(out, "EXISTS (SELECT 1 FROM json_each(%s) WHERE value = ", vcol);
-      pvtAppendOperand(out, oval, otyp, is_text, is_datetime);
+      pvtAppendOperand(out, oval, otyp, is_text, is_datetime, is_hash);
       sqlite3_str_append(out, ")", 1);
     }
     else if(!strcmp(opk,"$arrayany") || !strcmp(opk,"$arrayempty")){
@@ -871,18 +896,18 @@ static char *pvtBuildFieldCondition(sqlite3 *db, const char *field_name, const c
     }
     else if(!strcmp(opk,"$arrayfirst")){
       sqlite3_str_appendf(out, "json_extract(%s, '$[0]') = ", vcol);
-      pvtAppendOperand(out, oval, otyp, is_text, is_datetime);
+      pvtAppendOperand(out, oval, otyp, is_text, is_datetime, is_hash);
     }
     else if(!strcmp(opk,"$arraylast")){
       sqlite3_str_appendf(out, "json_extract(%s, '$[#-1]') = ", vcol);
-      pvtAppendOperand(out, oval, otyp, is_text, is_datetime);
+      pvtAppendOperand(out, oval, otyp, is_text, is_datetime, is_hash);
     }
     else if(!strcmp(opk,"$arrayat")){
       /* operand {"index":N,"value":V} */
       int f = 0; sqlite3_int64 idx = jsonGetInt(db, oval, "$.index", &f);
       char *vt = jsonTypeAt(db, oval, "$.value"); char *vv = jsonGetText(db, oval, "$.value");
       sqlite3_str_appendf(out, "json_extract(%s, '$[%lld]') = ", vcol, (long long)idx);
-      pvtAppendOperand(out, vv, vt, is_text, is_datetime);
+      pvtAppendOperand(out, vv, vt, is_text, is_datetime, is_hash);
       sqlite3_free(vt); sqlite3_free(vv);
     }
     else if(!strcmp(opk,"$arraystartswith")){
@@ -899,7 +924,7 @@ static char *pvtBuildFieldCondition(sqlite3 *db, const char *field_name, const c
     else if(!strcmp(opk,"$arraysum")||!strcmp(opk,"$arraymin")||!strcmp(opk,"$arraymax")||!strcmp(opk,"$arrayavg")){
       const char *fn = !strcmp(opk,"$arraysum")?"SUM":!strcmp(opk,"$arraymin")?"MIN":!strcmp(opk,"$arraymax")?"MAX":"AVG";
       sqlite3_str_appendf(out, "(SELECT %s(value) FROM json_each(%s)) = ", fn, vcol);
-      pvtAppendOperand(out, oval, otyp, is_text, is_datetime);
+      pvtAppendOperand(out, oval, otyp, is_text, is_datetime, is_hash);
     }
     else{
       /* $regex / $iregex / $fts / $expr-form — not yet ported. */
@@ -1120,7 +1145,7 @@ char *pvtBuildWhereFromJson(sqlite3 *db, const char *filter, const char *fields,
   "o._name, o._date_create, o._date_modify, o._date_begin, o._date_complete, " \
   "o._key, o._note, o._hash, " \
   "o._value_long, o._value_string, o._value_guid, o._value_bool, " \
-  "o._value_double, o._value_numeric, o._value_datetime, o._value_bytes"
+  "o._value_double, o._value_numeric, o._value_datetime, o._value_bytes, o._value_unique"
 
 /* "[1,2,3]" -> "1, 2, 3" (bare int IN-list). */
 static char *pvtInListFromJsonArray(sqlite3 *db, const char *arr){
@@ -2188,8 +2213,9 @@ static char *pvtBuildExprPredicate(sqlite3 *db, const char *op, const char *args
     if(l && pat){
       int lead = !strcmp(opl,"$contains")||!strcmp(opl,"$containsignorecase")||!strcmp(opl,"$endswith")||!strcmp(opl,"$endswithignorecase");
       int trail= !strcmp(opl,"$contains")||!strcmp(opl,"$containsignorecase")||!strcmp(opl,"$startswith")||!strcmp(opl,"$startswithignorecase");
-      char *p=sqlite3_mprintf("%s%s%s", lead?"%":"", pat, trail?"%":"");
-      r=sqlite3_mprintf("(%s LIKE %Q)", l, p); sqlite3_free(p);
+      char *esc=pvtLikeEscape(pat);
+      char *p=sqlite3_mprintf("%s%s%s", lead?"%":"", esc?esc:"", trail?"%":"");
+      r=sqlite3_mprintf("(%s LIKE %Q ESCAPE '\\')", l, p); sqlite3_free(p); sqlite3_free(esc);
     }
     sqlite3_free(l); sqlite3_free(pat); return r;
   }

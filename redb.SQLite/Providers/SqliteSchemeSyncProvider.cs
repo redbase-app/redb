@@ -47,7 +47,7 @@ public class SqliteSchemeSyncProvider : SchemeSyncProviderBase
     /// <c>no such table: migrate_structure_type</c>, so <c>InitializeAsync</c> never came up.
     /// </summary>
     public override async Task<TypeMigrationResult> MigrateStructureTypeAsync(
-        long structureId, string oldTypeName, string newTypeName, bool dryRun = false)
+        long structureId, string oldTypeName, string newTypeName, bool dryRun = false, CancellationToken cancellationToken = default)
     {
         var source = GetValueColumn(oldTypeName);
         var target = GetValueColumn(newTypeName);
@@ -65,7 +65,7 @@ public class SqliteSchemeSyncProvider : SchemeSyncProviderBase
 
         // Rows that actually hold a value under the old column for this structure.
         var affected = (int)(await Context.ExecuteScalarAsync<long?>(
-            $"SELECT COUNT(*) FROM _values WHERE _id_structure = $1 AND {source} IS NOT NULL", structureId) ?? 0);
+            $"SELECT COUNT(*) FROM _values WHERE _id_structure = $1 AND {source} IS NOT NULL", new object[] { structureId }, cancellationToken) ?? 0);
 
         if (affected == 0 || dryRun)
             return new TypeMigrationResult { AffectedRows = affected };
@@ -99,11 +99,11 @@ public class SqliteSchemeSyncProvider : SchemeSyncProviderBase
         // an unparseable string must stay where it is rather than become CAST's silent 0.
         var convertible = (int)(await Context.ExecuteScalarAsync<long?>(
             $"SELECT CAST(COUNT(*) AS BIGINT) FROM _values WHERE _id_structure = $1 " +
-            $"AND {source} IS NOT NULL AND {conversion.Guard}", structureId) ?? 0);
+            $"AND {source} IS NOT NULL AND {conversion.Guard}", new object[] { structureId }, cancellationToken) ?? 0);
 
         await Context.ExecuteAsync(
-            $"UPDATE _values SET {target} = {conversion.Expression}, {source} = NULL " +
-            $"WHERE _id_structure = $1 AND {source} IS NOT NULL AND {conversion.Guard}", structureId);
+            $"UPDATE _values SET {target} = {conversion.Expression}, {source} = NULL, _unique = NULL " +
+            $"WHERE _id_structure = $1 AND {source} IS NOT NULL AND {conversion.Guard}", new object[] { structureId }, cancellationToken);
 
         return new TypeMigrationResult
         {

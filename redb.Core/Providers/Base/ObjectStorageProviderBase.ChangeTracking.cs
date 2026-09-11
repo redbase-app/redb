@@ -4,8 +4,9 @@ using System.Collections.Generic;
 namespace redb.Core.Providers.Base
 {
     /// <summary>
-    /// Pending values fields for ChangeTracking (used in CommitAllChangesBatch).
-    /// In OpenSource these remain empty. Full ChangeTracking implementation is in Pro edition.
+    /// Pending-каналы ChangeTracking: дифф (Pro) складывает сюда DELETE/INSERT/UPDATE, а
+    /// SaveBatchWithChangeTrackingStrategy исполняет их одной точкой flush в живом порядке
+    /// DELETE -> UPDATE -> INSERT. В OpenSource остаются пустыми (CT - Pro-фича).
     /// </summary>
     public abstract partial class ObjectStorageProviderBase
     {

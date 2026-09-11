@@ -31,7 +31,7 @@ public static class PostgresOptionsExtensions
     /// <example>
     /// services.AddRedb(options => options
     ///     .UsePostgres("Host=localhost;Database=mydb;Username=user;Password=pass")
-    ///     .Configure(c => c.EnableLazyLoadingForProps = true));
+    ///     .Configure(c => c.EnablePropsCache = true));
     /// </example>
     public static RedbOptionsBuilder UsePostgres(
         this RedbOptionsBuilder builder,
@@ -63,8 +63,11 @@ public static class PostgresOptionsExtensions
         // DataSource and Context
         if (!string.IsNullOrEmpty(config.ConnectionString))
         {
-            var dataSource = Data.NpgsqlDataSourceFactory.Create(config.ConnectionString, config.StringCollation);
-            services.AddSingleton(dataSource);
+            // Factory registration hands OWNERSHIP to the container: disposing the provider disposes
+            // the NpgsqlDataSource and closes its pool. The old instance-registration form left the
+            // pool open forever - every container restart (module hot-reload, tests) stacked another
+            // orphaned pool of idle sessions until the server-side pruner got them (2026-09-09).
+            services.AddSingleton(_ => Data.NpgsqlDataSourceFactory.Create(config.ConnectionString, config.StringCollation, config.EnableLazyReferences));
             services.AddScoped<IRedbContext>(sp => 
                 new NpgsqlRedbContext(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));
         }

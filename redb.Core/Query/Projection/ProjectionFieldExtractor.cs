@@ -11,7 +11,7 @@ namespace redb.Core.Query.Projection;
 
 /// <summary>
 /// Extracts structure_ids from Select expression to optimize _values loading.
-/// ⭐ SUPPORTS: simple fields, Class fields, arrays, nested arrays (graph of any depth)
+/// SUPPORTS: simple fields, Class fields, arrays, nested arrays (graph of any depth)
 /// </summary>
 public class ProjectionFieldExtractor
 {
@@ -30,21 +30,23 @@ public class ProjectionFieldExtractor
         {
             var result = new HashSet<long>();
             var paths = ExtractFieldPaths(selector.Body);
-            
+
             foreach (var path in paths)
             {
                 AddStructureIdsForPath(scheme, path, result);
             }
-            
+
             return result.Count > 0 ? result : null;
         }
-        catch (Exception ex)
+        catch (NotSupportedException)
         {
-            // Parsing failed — load all fields
+            // Явный сигнал «узел не разобран» из CollectFieldPaths/CollectBindings - откат на
+            // полную загрузку. Ловим ТОЛЬКО его: любая другая ошибка - баг экстрактора и обязана
+            // быть громкой (решение владельца 2026-09-03: никаких глухих catch).
             return null;
         }
     }
-    
+
     /// <summary>
     /// Extracts text field paths for SQL function search_objects_with_projection_by_paths.
     /// Format: ["Name", "AddressBook[home].City", "Items[0].Price"]
@@ -59,24 +61,25 @@ public class ProjectionFieldExtractor
         try
         {
             var paths = ExtractFieldPaths(selector.Body);
-            
+
             if (paths.Count == 0)
                 return null;
-            
+
             var result = paths
                 .Where(p => p.Segments.Count > 0)
                 .Select(p => p.FullPath)
                 .Distinct()
                 .ToList();
-            
+
             return result.Count > 0 ? result : null;
         }
-        catch (Exception)
+        catch (NotSupportedException)
         {
+            // Тот же явный fail-safe, что и в ExtractStructureIds; прочие ошибки - громкие.
             return null;
         }
     }
-    
+
     /// <summary>
     /// Checks if expression contains aggregation calls (Agg.Sum, etc.)
     /// </summary>
@@ -86,7 +89,7 @@ public class ProjectionFieldExtractor
     {
         return ContainsAggCall(selector.Body);
     }
-    
+
     /// <summary>
     /// Extracts information about requested aggregations
     /// </summary>
@@ -100,7 +103,7 @@ public class ProjectionFieldExtractor
     }
 
     #region Private Methods - Path Extraction
-    
+
     /// <summary>
     /// Extracts all field paths from expression
     /// </summary>
@@ -110,9 +113,14 @@ public class ProjectionFieldExtractor
         CollectFieldPaths(expression, paths);
         return paths;
     }
-    
+
     /// <summary>
-    /// Recursively collects field paths from expression
+    /// Recursively collects field paths from expression.
+    /// FAIL-SAFE contract (ревью 2026-09-03, S-5): каждый вид узла либо явно разобран, либо
+    /// метод бросает NotSupportedException - и публичные Extract* через свой try/catch отдают
+    /// null, что означает «грузим объект целиком». Раньше неизвестный узел молча давал ноль
+    /// путей из поддерева: при ЧАСТИЧНОМ разборе лямбды поле молча не загружалось и проекция
+    /// отдавала default вместо значения.
     /// </summary>
     private void CollectFieldPaths(Expression expression, List<FieldPathInfo> paths)
     {
@@ -124,17 +132,12 @@ public class ProjectionFieldExtractor
                     CollectFieldPaths(arg, paths);
                 }
                 break;
-                
+
             case MemberInitExpression initExpr:
-                foreach (var binding in initExpr.Bindings)
-                {
-                    if (binding is MemberAssignment assignment)
-                    {
-                        CollectFieldPaths(assignment.Expression, paths);
-                    }
-                }
+                CollectFieldPaths(initExpr.NewExpression, paths);
+                CollectBindings(initExpr.Bindings, paths);
                 break;
-                
+
             case MemberExpression memberExpr:
                 var path = ExtractMemberPath(memberExpr);
                 if (path != null)
@@ -142,27 +145,101 @@ public class ProjectionFieldExtractor
                     paths.Add(path);
                 }
                 break;
-                
+
             case MethodCallExpression methodExpr:
                 CollectFromMethodCall(methodExpr, paths);
                 break;
-                
+
             case UnaryExpression unaryExpr:
                 CollectFieldPaths(unaryExpr.Operand, paths);
                 break;
-                
+
             case ConditionalExpression condExpr:
+                // S-5b: условие тернарника раньше НЕ сканировалось - поле из условия молча не
+                // загружалось и ветка выбиралась по default-значению.
+                CollectFieldPaths(condExpr.Test, paths);
                 CollectFieldPaths(condExpr.IfTrue, paths);
                 CollectFieldPaths(condExpr.IfFalse, paths);
                 break;
-                
+
             case BinaryExpression binaryExpr:
                 CollectFieldPaths(binaryExpr.Left, paths);
                 CollectFieldPaths(binaryExpr.Right, paths);
                 break;
+
+            case LambdaExpression lambdaExpr:
+                CollectFieldPaths(lambdaExpr.Body, paths);
+                break;
+
+            case NewArrayExpression newArrayExpr:
+                foreach (var el in newArrayExpr.Expressions)
+                    CollectFieldPaths(el, paths);
+                break;
+
+            case ListInitExpression listInitExpr:
+                CollectFieldPaths(listInitExpr.NewExpression, paths);
+                foreach (var init in listInitExpr.Initializers)
+                    foreach (var arg in init.Arguments)
+                        CollectFieldPaths(arg, paths);
+                break;
+
+            case InvocationExpression invocationExpr:
+                CollectFieldPaths(invocationExpr.Expression, paths);
+                foreach (var arg in invocationExpr.Arguments)
+                    CollectFieldPaths(arg, paths);
+                break;
+
+            case TypeBinaryExpression typeBinaryExpr:
+                CollectFieldPaths(typeBinaryExpr.Expression, paths);
+                break;
+
+            case IndexExpression indexExpr:
+                if (indexExpr.Object != null)
+                    CollectFieldPaths(indexExpr.Object, paths);
+                foreach (var arg in indexExpr.Arguments)
+                    CollectFieldPaths(arg, paths);
+                break;
+
+            case ConstantExpression:
+            case ParameterExpression:
+            case DefaultExpression:
+                break; // листья без полей
+
+            default:
+                throw new NotSupportedException(
+                    $"ProjectionFieldExtractor: unrecognized expression node {expression.NodeType} " +
+                    "- falling back to full load (fail-safe).");
         }
     }
-    
+
+    /// <summary>
+    /// Разбор всех видов member-биндингов, включая вложенные объектные инициализаторы
+    /// (MemberMemberBinding: new Dto { Sub = { X = p.Props.N } }) и списковые (MemberListBinding).
+    /// </summary>
+    private void CollectBindings(System.Collections.ObjectModel.ReadOnlyCollection<MemberBinding> bindings, List<FieldPathInfo> paths)
+    {
+        foreach (var binding in bindings)
+        {
+            switch (binding)
+            {
+                case MemberAssignment assignment:
+                    CollectFieldPaths(assignment.Expression, paths);
+                    break;
+                case MemberMemberBinding nested:
+                    CollectBindings(nested.Bindings, paths);
+                    break;
+                case MemberListBinding list:
+                    foreach (var init in list.Initializers)
+                        foreach (var arg in init.Arguments)
+                            CollectFieldPaths(arg, paths);
+                    break;
+                default:
+                    throw new NotSupportedException(
+                        $"ProjectionFieldExtractor: unrecognized member binding {binding.BindingType}.");
+            }
+        }
+    }
+
     /// <summary>
     /// Extracts path from MemberExpression (x.Props.Customer.Name → ["Customer", "Name"])
     /// Supports Dictionary indexer: x.Props.AddressBook["home"].City → ["AddressBook[home]", "City"]
@@ -173,7 +250,7 @@ public class ProjectionFieldExtractor
         string? dictKey = null;
         int dictKeyInsertPosition = -1;
         Expression? current = memberExpr;
-        
+
         while (current != null)
         {
             switch (current)
@@ -182,7 +259,7 @@ public class ProjectionFieldExtractor
                     segments.Insert(0, member.Member.Name);
                     current = member.Expression;
                     break;
-                    
+
                 case MethodCallExpression indexerCall when indexerCall.Method.Name == "get_Item":
                     // Dictionary indexer: AddressBook["home"]
                     if (indexerCall.Arguments.Count > 0 && indexerCall.Arguments[0] is ConstantExpression keyConst)
@@ -193,23 +270,23 @@ public class ProjectionFieldExtractor
                     }
                     current = indexerCall.Object;
                     break;
-                    
+
                 default:
                     current = null;
                     break;
             }
         }
-        
+
         // Check that path starts with Props
         var propsIndex = segments.FindIndex(s => s == "Props");
         if (propsIndex < 0)
             return null;
-        
+
         // Take segments after Props
         var propsSegments = segments.Skip(propsIndex + 1).ToList();
         if (propsSegments.Count == 0)
             return null;
-        
+
         // If there's a dictionary key, add it to the appropriate segment
         // x.Props.AddressBook["home"].City → segments = ["Props", "AddressBook", "City"]
         // dictKeyInsertPosition shows how many segments were AFTER indexer (in this case 1 = "City")
@@ -228,7 +305,7 @@ public class ProjectionFieldExtractor
                 propsSegments[0] = $"{propsSegments[0]}[{dictKey}]";
             }
         }
-        
+
         return new FieldPathInfo
         {
             Segments = propsSegments,
@@ -236,7 +313,7 @@ public class ProjectionFieldExtractor
             DictKey = dictKey
         };
     }
-    
+
     /// <summary>
     /// Processes method calls: Select, Agg.Sum, Dictionary indexer, etc.
     /// </summary>
@@ -244,8 +321,8 @@ public class ProjectionFieldExtractor
     {
         var methodName = methodExpr.Method.Name;
         var declaringType = methodExpr.Method.DeclaringType;
-        
-        // ⭐ Dictionary indexer: x.Props.AddressBook["home"] or x.Props.AddressBook["home"].City
+
+        // Dictionary indexer: x.Props.AddressBook["home"] or x.Props.AddressBook["home"].City
         if (methodName == "get_Item" && declaringType != null && declaringType.IsGenericType)
         {
             var genericDef = declaringType.GetGenericTypeDefinition();
@@ -259,7 +336,7 @@ public class ProjectionFieldExtractor
                 return;
             }
         }
-        
+
         // Agg.Sum, Agg.Average, etc.
         if (declaringType == typeof(Agg))
         {
@@ -269,13 +346,13 @@ public class ProjectionFieldExtractor
             }
             return;
         }
-        
+
         // LINQ Select: x.Props.Items.Select(i => i.Price)
         if (methodName == "Select" && methodExpr.Arguments.Count >= 1)
         {
             // Base collection
             CollectFieldPaths(methodExpr.Arguments[0], paths);
-            
+
             // Lambda inside Select
             if (methodExpr.Arguments.Count >= 2 && methodExpr.Arguments[1] is LambdaExpression lambda)
             {
@@ -283,14 +360,14 @@ public class ProjectionFieldExtractor
             }
             return;
         }
-        
+
         // LINQ ToList
         if (methodName == "ToList" && methodExpr.Arguments.Count >= 1)
         {
             CollectFieldPaths(methodExpr.Arguments[0], paths);
             return;
         }
-        
+
         // Extension methods (FirstOrDefault, etc.)
         if (methodExpr.Object != null)
         {
@@ -301,7 +378,7 @@ public class ProjectionFieldExtractor
             CollectFieldPaths(arg, paths);
         }
     }
-    
+
     /// <summary>
     /// Extracts path from Dictionary indexer expression: x.Props.AddressBook["home"].City
     /// </summary>
@@ -309,16 +386,16 @@ public class ProjectionFieldExtractor
     {
         var segments = new List<string>();
         string? dictKey = null;
-        
+
         // Extract dictionary key
         if (indexerExpr.Arguments.Count > 0 && indexerExpr.Arguments[0] is ConstantExpression keyConst)
         {
             dictKey = keyConst.Value?.ToString();
         }
-        
+
         // Recursively extract path to dictionary (x.Props.AddressBook)
         Expression? current = indexerExpr.Object;
-        
+
         while (current != null)
         {
             switch (current)
@@ -327,34 +404,34 @@ public class ProjectionFieldExtractor
                     segments.Insert(0, member.Member.Name);
                     current = member.Expression;
                     break;
-                    
+
                 case MethodCallExpression nestedIndexer when nestedIndexer.Method.Name == "get_Item":
                     // Nested Dictionary indexer - not supported yet
                     current = nestedIndexer.Object;
                     break;
-                    
+
                 default:
                     current = null;
                     break;
             }
         }
-        
+
         // Check that path starts with Props
         var propsIndex = segments.FindIndex(s => s == "Props");
         if (propsIndex < 0)
             return null;
-        
+
         // Take segments after Props
         var propsSegments = segments.Skip(propsIndex + 1).ToList();
         if (propsSegments.Count == 0)
             return null;
-        
+
         // Add key to dictionary name: AddressBook -> AddressBook[home]
         if (dictKey != null && propsSegments.Count > 0)
         {
             propsSegments[propsSegments.Count - 1] = $"{propsSegments[propsSegments.Count - 1]}[{dictKey}]";
         }
-        
+
         return new FieldPathInfo
         {
             Segments = propsSegments,
@@ -362,46 +439,46 @@ public class ProjectionFieldExtractor
             DictKey = dictKey
         };
     }
-    
+
     #endregion
-    
+
     #region Private Methods - Structure IDs
-    
+
     /// <summary>
     /// Adds structure_ids for path considering NESTED arrays
     /// </summary>
     private void AddStructureIdsForPath(IRedbScheme scheme, FieldPathInfo pathInfo, HashSet<long> result)
     {
         long? parentId = null;
-        
+
         foreach (var segment in pathInfo.Segments)
         {
             var cleanName = CleanSegmentName(segment);
-            
+
             var structure = scheme.Structures
                 .FirstOrDefault(s => s.Name == cleanName && s.IdParent == parentId);
-            
+
             if (structure == null) break;
-            
+
             result.Add(structure.Id);
-            
-            // ⭐ KEY LOGIC: For any Class/Array add ALL children RECURSIVELY
+
+            // KEY LOGIC: For any Class/Array add ALL children RECURSIVELY
             if (structure.CollectionType != null || IsClassField(scheme, structure))
             {
                 AddAllChildStructuresRecursive(scheme, structure.Id, result);
             }
-            
+
             parentId = structure.Id;
         }
     }
-    
+
     /// <summary>
     /// RECURSIVELY adds all child structures at ANY DEPTH
     /// </summary>
     private void AddAllChildStructuresRecursive(IRedbScheme scheme, long parentId, HashSet<long> result)
     {
         var children = scheme.Structures.Where(s => s.IdParent == parentId);
-        
+
         foreach (var child in children)
         {
             result.Add(child.Id);
@@ -409,7 +486,7 @@ public class ProjectionFieldExtractor
             AddAllChildStructuresRecursive(scheme, child.Id, result);
         }
     }
-    
+
     /// <summary>
     /// Cleans segment name from [] and indices
     /// </summary>
@@ -418,7 +495,7 @@ public class ProjectionFieldExtractor
         var bracketIndex = segment.IndexOf('[');
         return bracketIndex >= 0 ? segment.Substring(0, bracketIndex) : segment;
     }
-    
+
     /// <summary>
     /// Checks if structure is a Class field (has child structures)
     /// </summary>
@@ -428,11 +505,11 @@ public class ProjectionFieldExtractor
         if (structure.CollectionType != null) return false;
         return scheme.Structures.Any(s => s.IdParent == structure.Id);
     }
-    
+
     #endregion
-    
+
     #region Private Methods - Aggregation Detection
-    
+
     /// <summary>
     /// Checks if expression contains Agg.* calls
     /// </summary>
@@ -443,30 +520,30 @@ public class ProjectionFieldExtractor
             case MethodCallExpression methodExpr:
                 if (methodExpr.Method.DeclaringType == typeof(Agg))
                     return true;
-                return methodExpr.Arguments.Any(ContainsAggCall) || 
+                return methodExpr.Arguments.Any(ContainsAggCall) ||
                        (methodExpr.Object != null && ContainsAggCall(methodExpr.Object));
-                
+
             case NewExpression newExpr:
                 return newExpr.Arguments.Any(ContainsAggCall);
-                
+
             case MemberInitExpression initExpr:
                 return initExpr.Bindings.OfType<MemberAssignment>()
                     .Any(b => ContainsAggCall(b.Expression));
-                
+
             case UnaryExpression unaryExpr:
                 return ContainsAggCall(unaryExpr.Operand);
-                
+
             case BinaryExpression binaryExpr:
                 return ContainsAggCall(binaryExpr.Left) || ContainsAggCall(binaryExpr.Right);
-                
+
             case LambdaExpression lambdaExpr:
                 return ContainsAggCall(lambdaExpr.Body);
-                
+
             default:
                 return false;
         }
     }
-    
+
     /// <summary>
     /// Collects aggregation information
     /// </summary>
@@ -487,28 +564,28 @@ public class ProjectionFieldExtractor
                 }
                 result.Add(aggInfo);
                 break;
-                
+
             case NewExpression newExpr:
                 foreach (var arg in newExpr.Arguments)
                     CollectAggregations(arg, result);
                 break;
-                
+
             case MemberInitExpression initExpr:
                 foreach (var binding in initExpr.Bindings.OfType<MemberAssignment>())
                     CollectAggregations(binding.Expression, result);
                 break;
-                
+
             case UnaryExpression unaryExpr:
                 CollectAggregations(unaryExpr.Operand, result);
                 break;
-                
+
             case BinaryExpression binaryExpr:
                 CollectAggregations(binaryExpr.Left, result);
                 CollectAggregations(binaryExpr.Right, result);
                 break;
         }
     }
-    
+
     private AggregateFunction ParseAggFunction(string methodName)
     {
         return methodName switch
@@ -521,7 +598,7 @@ public class ProjectionFieldExtractor
             _ => throw new NotSupportedException($"Unknown aggregation: {methodName}")
         };
     }
-    
+
     #endregion
 }
 
@@ -532,16 +609,16 @@ public record FieldPathInfo
 {
     /// <summary>Path segments: ["Contacts", "Email"] or ["AddressBook[home]", "City"]</summary>
     public List<string> Segments { get; init; } = new();
-    
+
     /// <summary>Is array?</summary>
     public bool IsArray { get; init; }
-    
+
     /// <summary>Array element index (for Tags[0])</summary>
     public int? ArrayIndex { get; init; }
-    
+
     /// <summary>Dictionary key (for AddressBook["home"])</summary>
     public string? DictKey { get; init; }
-    
+
     /// <summary>Full path as string</summary>
     public string FullPath => string.Join(".", Segments);
 }

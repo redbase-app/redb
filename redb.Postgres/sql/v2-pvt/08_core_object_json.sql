@@ -103,7 +103,8 @@ BEGIN
             c._collection_type = -9223372036854775667 as _is_dictionary,  -- Dictionary type ID
             c.type_name,
             c.db_type,
-            c.type_semantic
+            c.type_semantic,
+            COALESCE(c._lazy, false) as _lazy  -- V4 (LAZY Л2)
         FROM _scheme_metadata_cache c
         WHERE c._scheme_id = object_scheme_id
           AND ((parent_structure_id IS NULL AND c._parent_structure_id IS NULL) 
@@ -176,15 +177,27 @@ BEGIN
                                     CASE WHEN v._array_index ~ '^[0-9]+$' THEN v._array_index::int ELSE 0 END as array_index_int,
                                     v._id as element_value_id,
                                     v._array_parent_id,
-                                    build_hierarchical_properties_optimized(
-                                        object_id, 
-                                        structure_record.structure_id, 
-                                        object_scheme_id, 
+                                    -- "null must be null" (V-1) + R-1 legacy tolerance: a null
+                                    -- element is a row WITHOUT _Guid AND WITHOUT children (a true
+                                    -- null never has children); a class missing its legacy hash
+                                    -- but having children still reads as an object.
+                                    CASE WHEN v._Guid IS NULL THEN
+                                        CASE WHEN EXISTS (SELECT 1 FROM unnest(all_values) c WHERE c._array_parent_id = v._id)
+                                        THEN build_hierarchical_properties_optimized(
+                                            object_id, structure_record.structure_id, object_scheme_id,
+                                            all_values, max_depth, v._array_index, v._id)
+                                        ELSE 'null'::jsonb END
+                                    ELSE build_hierarchical_properties_optimized(
+                                        object_id,
+                                        structure_record.structure_id,
+                                        object_scheme_id,
                                         all_values,  -- 🚀 Pass array, not jsonb
                                         max_depth,
                                         v._array_index,
                                         v._id
-                                    ) as element_json
+                                    ) END as element_json
+
+
                                 FROM unnest(all_values) AS v  -- 🚀 From memory array
                                 WHERE v._id_structure = structure_record.structure_id
                                   AND v._array_index IS NOT NULL
@@ -206,7 +219,8 @@ BEGIN
                                 CASE 
                                     -- Object references (_RObject) - check by type_semantic
                                     WHEN structure_record.type_semantic = '_RObject' AND v._Object IS NOT NULL THEN
-                                        get_object_json(v._Object, max_depth - 1)
+                                        -- V4 (LAZY Л2): a virtual reference with the session flag on is a stub (depth 0)
+                                        get_object_json(v._Object, CASE WHEN structure_record._lazy AND current_setting('redb.lazy_refs', true) = '1' THEN 0 ELSE max_depth - 1 END)
                                     WHEN structure_record.db_type = 'String' THEN to_jsonb(v._String)
                                     WHEN structure_record.db_type = 'Long' THEN 
                                         -- If _ListItem is filled, process as ListItem (for backward compatibility)
@@ -223,7 +237,7 @@ BEGIN
                                     WHEN structure_record.db_type = 'ListItem' THEN
                                         build_listitem_jsonb(v._ListItem, max_depth)
                                     WHEN structure_record.db_type = 'ByteArray' THEN 
-                                        to_jsonb(encode(decode(v._ByteArray::text, 'base64'), 'base64'))
+                                        to_jsonb(encode(v._ByteArray, 'base64'))
                                     ELSE NULL
                                 -- Safe sorting: numeric for Array, text for Dictionary
                                 END ORDER BY CASE WHEN v._array_index ~ '^[0-9]+$' THEN v._array_index::int ELSE 0 END, v._array_index
@@ -249,7 +263,7 @@ BEGIN
                                 ELSE jsonb_object_agg(
                                     v._array_index,  -- Key as JSON key
                                     CASE 
-                                        WHEN v._Object IS NOT NULL THEN get_object_json(v._Object, max_depth - 1)
+                                        WHEN v._Object IS NOT NULL THEN get_object_json(v._Object, CASE WHEN structure_record._lazy AND current_setting('redb.lazy_refs', true) = '1' THEN 0 ELSE max_depth - 1 END)
                                         ELSE NULL
                                     END
                                 )
@@ -312,8 +326,8 @@ BEGIN
             -- Object reference to another object
             WHEN structure_record.type_name = 'Object' AND structure_record.type_semantic = '_RObject' THEN
                 CASE 
-                    WHEN current_value_record._Object IS NOT NULL THEN 
-                        get_object_json(current_value_record._Object, max_depth - 1)
+                    WHEN current_value_record._Object IS NOT NULL THEN
+                        get_object_json(current_value_record._Object, CASE WHEN structure_record._lazy AND current_setting('redb.lazy_refs', true) = '1' THEN 0 ELSE max_depth - 1 END)
                     ELSE NULL
                 END
             
@@ -368,7 +382,7 @@ BEGIN
             WHEN structure_record.db_type = 'ByteArray' THEN 
                 CASE 
                     WHEN current_value_record._ByteArray IS NOT NULL THEN 
-                        to_jsonb(encode(decode(current_value_record._ByteArray::text, 'base64'), 'base64'))
+                        to_jsonb(encode(current_value_record._ByteArray, 'base64'))
                     ELSE NULL
                 END
             ELSE NULL
@@ -427,13 +441,14 @@ BEGIN
             'key', o._key,
             'value_long', o._value_long,
             'value_string', o._value_string,
+            'value_unique', o._value_unique,
             'value_guid', o._value_guid,
             'note', o._note,
             'value_bool', o._value_bool,
             'value_double', o._value_double,
             'value_numeric', o._value_numeric,
             'value_datetime', o._value_datetime,
-            'value_bytes', o._value_bytes,
+            'value_bytes', replace(encode(o._value_bytes, 'base64'), chr(10), ''),
             'hash', o._hash
         ) INTO result_json
         FROM _objects o
@@ -459,13 +474,14 @@ BEGIN
         'key', o._key,
         'value_long', o._value_long,
         'value_string', o._value_string,
+        'value_unique', o._value_unique,
         'value_guid', o._value_guid,
         'note', o._note,
         'value_bool', o._value_bool,
         'value_double', o._value_double,
         'value_numeric', o._value_numeric,
         'value_datetime', o._value_datetime,
-        'value_bytes', o._value_bytes,
+        'value_bytes', replace(encode(o._value_bytes, 'base64'), chr(10), ''),
         'hash', o._hash
     ), o._id_scheme
     INTO base_info, object_scheme_id
@@ -638,13 +654,14 @@ AS $BODY$
                 'key', o._key,
                 'value_long', o._value_long,
                 'value_string', o._value_string,
+                'value_unique', o._value_unique,
                 'value_guid', o._value_guid,
                 'note', o._note,
                 'value_bool', o._value_bool,
                 'value_double', o._value_double,
                 'value_numeric', o._value_numeric,
                 'value_datetime', o._value_datetime,
-                'value_bytes', o._value_bytes,
+                'value_bytes', replace(encode(o._value_bytes, 'base64'), chr(10), ''),
                 'hash', o._hash
             ) AS base
         FROM _objects o

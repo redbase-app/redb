@@ -86,7 +86,7 @@ CREATE TABLE _users(
     _code_string      TEXT    NULL,
     _code_guid        TEXT    NULL,
     _note             TEXT    NULL,
-    _hash             TEXT    NULL,
+    _hash             BLOB    NULL,    -- 16 bytes, RFC 4122 order (SqliteHash); pre-V4 TEXT is converted on open
     _id_configuration INTEGER NULL REFERENCES _objects(_id) ON DELETE SET NULL
 );
 
@@ -105,7 +105,8 @@ CREATE TABLE _schemes(
     _name           TEXT    NOT NULL,
     _alias          TEXT    NULL,
     _name_space     TEXT    NULL,
-    _structure_hash TEXT    NULL,
+    _structure_hash BLOB    NULL,    -- 16 bytes, RFC 4122 order (SqliteHash); pre-V4 TEXT is converted on open
+    _tags           TEXT    NULL,    -- V4: free-form marker for future / custom extensions (450 chars, enforced in C#; sync never wipes it)
     _type           INTEGER NOT NULL DEFAULT -9223372036854775675, -- Class (default), Array, Dictionary, JsonDocument, XDocument
     CONSTRAINT IX__schemes UNIQUE (_name),
     CONSTRAINT FK__schemes__schemes FOREIGN KEY (_id_parent) REFERENCES _schemes (_id),
@@ -238,6 +239,11 @@ CREATE TABLE _structures(
     _key_type        INTEGER NULL,  -- Key type for Dictionary fields
     _is_compress     INTEGER NULL,
     _store_null      INTEGER NULL,
+    _unique          INTEGER NULL,  -- V4: field is a unique key within its scheme ([RedbUnique])
+    _unique_version  INTEGER NULL,  -- V4: UniqueKeyEncoder.Version the stored keys were computed with
+    _unique_scope    INTEGER NULL,  -- S3: element-key scope of a collection key (NULL = default; 1 = Scheme elements; 2 = Collection elements)
+    _lazy            INTEGER NULL,  -- V4 (LAZY Л2): lazy reference marker (virtual)
+    _tags            TEXT    NULL,  -- V4: free-form marker for future / custom extensions (sync never wipes it)
     _default_value   BLOB    NULL,
     _default_editor  TEXT    NULL,
     CONSTRAINT IX__structures UNIQUE (_id_scheme, _name, _id_parent),
@@ -271,16 +277,17 @@ CREATE TABLE _objects(
     _key            INTEGER NULL,
     _name           TEXT    NULL,
     _note           TEXT    NULL,
-    _hash           TEXT    NULL,
+    _hash           BLOB    NULL,    -- 16 bytes, RFC 4122 order (SqliteHash); pre-V4 TEXT is converted on open
     -- Value columns for RedbPrimitive<T> (Props = primitive value stored directly)
     _value_long     INTEGER NULL,
-    _value_string   TEXT    NULL,
+    _value_string   TEXT    NULL,   -- identifiers/external keys; contract limit 450 (C#-enforced), long text belongs in _note
     _value_guid     TEXT    NULL,
     _value_bool     INTEGER NULL,
     _value_double   REAL    NULL,
     _value_numeric  REAL    NULL,  -- NUMERIC(38,18): REAL default (numeric ops/JSON); TEXT = exact (config)
     _value_datetime REAL    NULL,  -- UTC Julian day (REAL)
     _value_bytes    BLOB    NULL,
+    _value_unique   TEXT    NULL,  -- V4: unique key within the scheme (440 chars, enforced in C#)
     CONSTRAINT FK__objects__objects FOREIGN KEY (_id_parent)     REFERENCES _objects (_id) ON DELETE CASCADE,
     CONSTRAINT FK__objects__schemes FOREIGN KEY (_id_scheme)     REFERENCES _schemes (_id) ON DELETE CASCADE,
     CONSTRAINT FK__objects__users1  FOREIGN KEY (_id_owner)      REFERENCES _users (_id),
@@ -316,6 +323,7 @@ CREATE TABLE _values(
     _Numeric         REAL    NULL,  -- NUMERIC(38,18): REAL default (numeric ops/JSON); TEXT = exact (config)
     _ListItem        INTEGER NULL,
     _Object          INTEGER NULL,
+    _unique          BLOB    NULL,  -- V4: unique-key hash (16 bytes, RFC 4122 order, SqliteHash) for [RedbUnique] root scalars
     -- Relational storage of collections (arrays, dictionaries)
     _array_parent_id INTEGER NULL, -- parent element (nested structures)
     _array_index     TEXT    NULL, -- '0','1',... for arrays; string key for dictionaries
@@ -413,6 +421,11 @@ CREATE TABLE _scheme_metadata_cache (
     _allow_not_null      INTEGER,
     _is_compress         INTEGER,
     _store_null          INTEGER,
+    _lazy                INTEGER,
+    _unique              INTEGER,
+    _unique_version      INTEGER,
+    _unique_scope        INTEGER,   -- S3: element-key scope of a collection key
+    _tags                TEXT,      -- V4: free-form marker mirrored from _structures
     _default_value       BLOB,
     _default_editor      TEXT
 );
@@ -439,10 +452,21 @@ CREATE INDEX IF NOT EXISTS "IX__permissions__users"  ON _permissions (_id_user);
 CREATE INDEX IF NOT EXISTS "IX__permissions__ref"    ON _permissions (_id_ref);
 CREATE INDEX IF NOT EXISTS "IX__values__objects"     ON _values (_id_object);
 CREATE INDEX IF NOT EXISTS "IX__values__structures"  ON _values (_id_structure);
+-- FK-column indexes: _Object/_ListItem carry foreign keys, and without a leading index every
+-- DELETE of a referenced object or list item scans the whole table for the FK check. Partial:
+-- reference fields are a small fraction of rows, so the indexes stay nearly empty.
+CREATE INDEX IF NOT EXISTS "IX__values__ListItem_not_null" ON _values (_ListItem) WHERE _ListItem IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__Object_not_null"   ON _values (_Object)   WHERE _Object IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS "IX__values__array_parent_id"    ON _values (_array_parent_id);
 CREATE INDEX IF NOT EXISTS "IX__values__array_parent_index" ON _values (_array_parent_id, _array_index);
 CREATE INDEX IF NOT EXISTS "IX__values__array_key"          ON _values (_id_structure, _array_index) WHERE _array_index IS NOT NULL;
+-- V4: uniqueness of [RedbUnique] fields. Covers keyed rows at ANY position (root and S2 nested
+-- scalars; element keys join in S3). No INCLUDE in SQLite: the _id_object lookup goes through
+-- the rowid, which is cheap.
+CREATE UNIQUE INDEX IF NOT EXISTS "UIX__values__structure_unique"
+    ON _values (_id_structure, _unique)
+    WHERE _unique IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS "IX__list_items__id_list" ON _list_items (_id_list);
 CREATE INDEX IF NOT EXISTS "IX__list_items__objects" ON _list_items (_id_object);
@@ -459,6 +483,11 @@ CREATE INDEX IF NOT EXISTS "IX__objects__hash"        ON _objects (_hash);
 
 CREATE INDEX IF NOT EXISTS "IX__objects__value_long"     ON _objects (_value_long)     WHERE _value_long     IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_string"   ON _objects (_value_string)   WHERE _value_string   IS NOT NULL;
+-- V4: application-defined object key, unique per scheme (length 440 enforced in C# - SQLite does
+-- not check VARCHAR lengths).
+CREATE UNIQUE INDEX IF NOT EXISTS "UIX__objects__scheme_unique"
+    ON _objects (_id_scheme, _value_unique)
+    WHERE _value_unique IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_guid"     ON _objects (_value_guid)     WHERE _value_guid     IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_datetime" ON _objects (_value_datetime) WHERE _value_datetime IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_numeric"  ON _objects (_value_numeric)  WHERE _value_numeric  IS NOT NULL;

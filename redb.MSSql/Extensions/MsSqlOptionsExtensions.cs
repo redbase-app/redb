@@ -31,7 +31,7 @@ public static class MsSqlOptionsExtensions
     /// <example>
     /// services.AddRedb(options => options
     ///     .UseMsSql("Server=localhost;Database=redb;Trusted_Connection=true")
-    ///     .Configure(c => c.EnableLazyLoadingForProps = true));
+    ///     .Configure(c => c.EnablePropsCache = true));
     /// </example>
     public static RedbOptionsBuilder UseMsSql(
         this RedbOptionsBuilder builder,
@@ -64,7 +64,7 @@ public static class MsSqlOptionsExtensions
         if (!string.IsNullOrEmpty(config.ConnectionString))
         {
             services.AddScoped<IRedbContext>(_ => 
-                new SqlRedbContext(config.ConnectionString));
+                new SqlRedbContext(config.ConnectionString, config.EnableLazyReferences));
         }
         
         // Security

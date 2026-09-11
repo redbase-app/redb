@@ -138,6 +138,10 @@ namespace redb.Core.Models.Entities
         [JsonPropertyName("_value_bytes")]
         public byte[]? ValueBytes { get; set; }
 
+        /// <summary>Unique key within the scheme (V4, UNIQUE stage 1).</summary>
+        [JsonPropertyName("_value_unique")]
+        public string? ValueUnique { get; set; }
+
         public override string ToString()
         {
             return $"ObjectRow {Id} (Scheme:{IdScheme}, Name:{Name ?? "null"})";

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Models.Entities;
 using redb.Core.Query;
@@ -17,7 +18,7 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
 {
     private readonly IRedbQueryable<TProps> _sourceQuery;
     private readonly Expression<Func<TreeRedbObject<TProps>, TResult>> _projection;
-    
+
     // Chain of operations to execute after projection
     private readonly List<Expression<Func<TResult, bool>>> _wherePredicates = new();
     private readonly List<(Expression KeySelector, bool IsDescending)> _orderByExpressions = new();
@@ -29,7 +30,7 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
         _sourceQuery = sourceQuery;
         _projection = projection;
     }
-    
+
     // Private constructor for creating copies with additional operations
     private TreeProjectedQueryable(
         IRedbQueryable<TProps> sourceQuery,
@@ -47,14 +48,14 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
     {
         if (predicate == null)
             throw new ArgumentNullException(nameof(predicate));
-        
+
         // Add filter to operations chain
         var newWherePredicates = new List<Expression<Func<TResult, bool>>>(_wherePredicates) { predicate };
-        
+
         return new TreeProjectedQueryable<TProps, TResult>(
             _sourceQuery,
-            _projection, 
-            newWherePredicates, 
+            _projection,
+            newWherePredicates,
             _orderByExpressions);
     }
 
@@ -62,10 +63,10 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
     {
         if (keySelector == null)
             throw new ArgumentNullException(nameof(keySelector));
-        
+
         // Replace existing sorting
         var newOrderByExpressions = new List<(Expression, bool)> { (keySelector, false) };
-        
+
         return new TreeProjectedQueryable<TProps, TResult>(
             _sourceQuery,
             _projection,
@@ -77,10 +78,10 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
     {
         if (keySelector == null)
             throw new ArgumentNullException(nameof(keySelector));
-        
+
         // Replace existing sorting
         var newOrderByExpressions = new List<(Expression, bool)> { (keySelector, true) };
-        
+
         return new TreeProjectedQueryable<TProps, TResult>(
             _sourceQuery,
             _projection,
@@ -109,81 +110,81 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
         return new TreeProjectedQueryable<TProps, TResult>(distinctSource, _projection, _wherePredicates, _orderByExpressions);
     }
 
-    public async Task<List<TResult>> ToListAsync()
+    public async Task<List<TResult>> ToListAsync(CancellationToken cancellationToken = default)
     {
-        // 🚨 CRITICAL PERFORMANCE ISSUE - EVERYTHING IN MEMORY! 
+        // CRITICAL PERFORMANCE ISSUE - EVERYTHING IN MEMORY!
         // TODO: Rework to SQL-based projections for high performance
-        
-        // ⚡ OPTIMIZATION: Apply limits TO SOURCE QUERY before loading
+
+        // OPTIMIZATION: Apply limits TO SOURCE QUERY before loading
         var optimizedSourceQuery = _sourceQuery;
-        
+
         // If there's only projection without additional filters - can use limits
         if (!_wherePredicates.Any() && !_orderByExpressions.Any())
         {
             // Projection without additional logic - use original limits
-            var fullObjects = await optimizedSourceQuery.ToListAsync();
+            var fullObjects = await optimizedSourceQuery.ToListAsync(cancellationToken: cancellationToken);
             var simpleProjection = _projection.Compile();
             return fullObjects.Select(redbObj => simpleProjection((TreeRedbObject<TProps>)redbObj)).ToList();
         }
-        
-        // 🐌 FALLBACK: Old in-memory logic (for complex cases)
+
+        // FALLBACK: Old in-memory logic (for complex cases)
         // WARNING: Inefficient on large data!
-        var allObjects = await optimizedSourceQuery.ToListAsync();
+        var allObjects = await optimizedSourceQuery.ToListAsync(cancellationToken: cancellationToken);
         var complexProjection = _projection.Compile();
-        
+
         // Apply projection to each object
         var projectedResults = allObjects.Select(redbObj => complexProjection((TreeRedbObject<TProps>)redbObj));
-        
+
         // Apply Where filters after projection
         foreach (var wherePredicate in _wherePredicates)
         {
             var compiledWhere = wherePredicate.Compile();
             projectedResults = projectedResults.Where(compiledWhere);
         }
-        
+
         // Apply sorting after projection
         IOrderedEnumerable<TResult>? orderedResults = null;
         foreach (var (keySelector, isDescending) in _orderByExpressions)
         {
             // Compile expression to delegate
             var compiledKeySelector = ((LambdaExpression)keySelector).Compile();
-            
+
             if (orderedResults == null)
             {
                 // First sort
-                orderedResults = isDescending 
+                orderedResults = isDescending
                     ? projectedResults.OrderByDescending(item => compiledKeySelector.DynamicInvoke(item))
                     : projectedResults.OrderBy(item => compiledKeySelector.DynamicInvoke(item));
             }
             else
             {
                 // Additional sort
-                orderedResults = isDescending 
+                orderedResults = isDescending
                     ? orderedResults.ThenByDescending(item => compiledKeySelector.DynamicInvoke(item))
                     : orderedResults.ThenBy(item => compiledKeySelector.DynamicInvoke(item));
             }
         }
-        
+
         var finalResults = orderedResults?.AsEnumerable() ?? projectedResults;
         return finalResults.ToList();
     }
 
-    public async Task<int> CountAsync()
+    public async Task<int> CountAsync(CancellationToken cancellationToken = default)
     {
-        var results = await ToListAsync();
+        var results = await ToListAsync(cancellationToken: cancellationToken);
         return results.Count;
     }
 
-    public async Task<TResult?> FirstOrDefaultAsync()
+    public async Task<TResult?> FirstOrDefaultAsync(CancellationToken cancellationToken = default)
     {
-        var results = await ToListAsync();
+        var results = await ToListAsync(cancellationToken: cancellationToken);
         return results.FirstOrDefault();
     }
-    
+
     /// <summary>
     /// Get projection info for tree queries (not optimized yet)
     /// </summary>
-    public Task<string> GetProjectionInfoAsync()
+    public Task<string> GetProjectionInfoAsync(CancellationToken cancellationToken = default)
     {
         var info = @"=== TREE PROJECTION INFO ===
 SQL Function: search_objects_with_facets (full load)

@@ -23,7 +23,7 @@ public abstract partial class QueryProviderBase
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        string? filterJson = null)
+        string? filterJson = null, CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException(
             "GroupBy + Window Functions are not implemented in this provider. " +
@@ -41,7 +41,7 @@ public abstract partial class QueryProviderBase
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        FilterExpression? filter)
+        FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
         return ExecuteGroupedWindowQueryAsync(schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
@@ -58,7 +58,7 @@ public abstract partial class QueryProviderBase
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        string? filterJson = null)
+        string? filterJson = null, CancellationToken cancellationToken = default)
     {
         return Task.FromResult(
             $"-- GroupBy + Window SQL Preview not available in Open Source version\n" +
@@ -80,7 +80,7 @@ public abstract partial class QueryProviderBase
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        FilterExpression? filter)
+        FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
         return GetGroupedWindowSqlPreviewAsync(schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);

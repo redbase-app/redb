@@ -31,7 +31,6 @@ public sealed class PostgresFixture : IAsyncLifetime
             {
                 c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert;
                 c.SkipHashValidationOnCacheCheck = false;
-                c.EnableLazyLoadingForProps = false;
                 c.EnablePropsCache = false;
             }));
 
@@ -64,6 +63,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     private async Task Cleanup()
     {
         var ctx = ServiceProvider.GetRequiredService<IRedbContext>();
+        await FixtureWipeGuard.EnsureLooksLikeATestDatabaseAsync(ctx, nameof(PostgresFixture));
         try { await ctx.ExecuteAsync("DELETE FROM _tree"); } catch { }
         await ctx.ExecuteAsync("DELETE FROM _values");
         await ctx.ExecuteAsync("DELETE FROM _objects");

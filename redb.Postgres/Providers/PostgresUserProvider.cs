@@ -36,7 +36,7 @@ public class PostgresUserProvider : UserProviderBase
         IRedbSecurityContext securityContext,
         ILogger? logger = null,
         ISqlDialect? dialect = null)
-        : base(context, securityContext, dialect ?? new PostgreSqlDialect(), new SimplePasswordHasher(), logger)
+        : base(context, securityContext, dialect ?? new PostgreSqlDialect(), new BcryptPasswordHasher(), logger)
     {
     }
 
@@ -59,5 +59,5 @@ public class PostgresUserProvider : UserProviderBase
 
     // All business logic is inherited from UserProviderBase.
     // PostgreSQL-specific SQL is provided by PostgreSqlDialect.
-    // Password hashing is provided by SimplePasswordHasher (or custom implementation).
+    // Password hashing defaults to BcryptPasswordHasher (a custom IPasswordHasher can be injected).
 }

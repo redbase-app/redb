@@ -139,7 +139,7 @@ BEGIN
                 WHEN '_date_modify'     THEN '::timestamptz'
                 WHEN '_date_begin'      THEN '::timestamptz'
                 WHEN '_date_complete'   THEN '::timestamptz'
-                ELSE '' -- _name / _note / _value_string / _hash / _value_bytes -> text/bytea, no cast needed
+                ELSE '' -- _name / _note / _value_string / _value_unique / _hash / _value_bytes -> text/bytea, no cast needed
             END
         -- Scalar ListItem.Value/.Alias pivot column holds the resolved
         -- _list_items._value / _alias string (pvt_build_cte_sql adds a
@@ -229,18 +229,18 @@ BEGIN
                 v_op_val #>> '{}');
 
         ELSIF v_op_norm = '$startswith' THEN
-            v_parts := v_parts || format('%s LIKE %L', v_col, (v_op_val #>> '{}') || '%');
+            v_parts := v_parts || format('%s LIKE %L', v_col, pvt_like_escape(v_op_val #>> '{}') || '%');
         ELSIF v_op_norm = '$endswith' THEN
-            v_parts := v_parts || format('%s LIKE %L', v_col, '%' || (v_op_val #>> '{}'));
+            v_parts := v_parts || format('%s LIKE %L', v_col, '%' || pvt_like_escape(v_op_val #>> '{}'));
         ELSIF v_op_norm = '$contains' THEN
-            v_parts := v_parts || format('%s LIKE %L', v_col, '%' || (v_op_val #>> '{}') || '%');
+            v_parts := v_parts || format('%s LIKE %L', v_col, '%' || pvt_like_escape(v_op_val #>> '{}') || '%');
 
         ELSIF v_op_norm = '$startswithignorecase' THEN
-            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), (v_op_val #>> '{}') || '%');
+            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), pvt_like_escape(v_op_val #>> '{}') || '%');
         ELSIF v_op_norm = '$endswithignorecase' THEN
-            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), '%' || (v_op_val #>> '{}'));
+            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), '%' || pvt_like_escape(v_op_val #>> '{}'));
         ELSIF v_op_norm = '$containsignorecase' THEN
-            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), '%' || (v_op_val #>> '{}') || '%');
+            v_parts := v_parts || format('%s ILIKE %L', pvt_fold_case(v_col), '%' || pvt_like_escape(v_op_val #>> '{}') || '%');
 
         ELSIF v_op_norm IN ('$null', '$isnull') THEN
             v_parts := v_parts || (CASE
@@ -359,10 +359,10 @@ BEGIN
                 v_parts := v_parts || format('%s[array_length(%s, 1)] = %L%s',
                     v_col, v_col, pvt_jsonb_to_sql_literal(v_op_val), v_elem_cast);
             ELSIF v_op_norm = '$arraystartswith' THEN
-                v_parts := v_parts || format('%s[1] LIKE %L', v_col, (v_op_val #>> '{}') || '%');
+                v_parts := v_parts || format('%s[1] LIKE %L', v_col, pvt_like_escape(v_op_val #>> '{}') || '%');
             ELSIF v_op_norm = '$arrayendswith' THEN
                 v_parts := v_parts || format('%s[array_length(%s, 1)] LIKE %L',
-                    v_col, v_col, '%' || (v_op_val #>> '{}'));
+                    v_col, v_col, '%' || pvt_like_escape(v_op_val #>> '{}'));
             ELSIF v_op_norm = '$arraymatches' THEN
                 v_parts := v_parts || format(
                     'EXISTS (SELECT 1 FROM unnest(%s) AS _x WHERE _x LIKE %L)',

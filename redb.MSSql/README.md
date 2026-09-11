@@ -13,6 +13,16 @@ SQL Server provider for **RedBase (REDB)** — Entity Database for .NET.
 - Full LINQ-to-SQL translation
 - Depends on `redb.Core` and `Microsoft.Data.SqlClient`
 
+## Requirements
+
+- **SQL Server 2017 or newer.** The server-side machinery uses `OPENJSON`, `JSON_VALUE`,
+  `JSON_QUERY`, `ISJSON` and `STRING_SPLIT` (2016), plus `STRING_AGG` and `TRIM` (2017).
+- **SQL Server 2022 or newer for the `$min` / `$max` expression operators**, which compile to
+  `LEAST` / `GREATEST`. Nothing else needs 2022, and on an older server only those two operators
+  fail, at query time rather than at startup.
+- Azure SQL Database tracks the latest engine, so it satisfies both. It is not part of our test run.
+- Developed and tested against `mcr.microsoft.com/mssql/server:2025-latest`.
+
 ## Installation
 
 ```bash

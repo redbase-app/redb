@@ -13,34 +13,40 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
   </ItemGroup>
 
+  <!-- Provider packages. Exactly one group below is generated, matching the db option you picked.
+       To switch provider later, replace it with one of:
+         redb.Postgres / redb.Postgres.Pro
+         redb.MSSql    / redb.MSSql.Pro
+         redb.SQLite   / redb.SQLite.Pro
+       and uncomment the matching .Use*() line in Program.cs. -->
   <!--#if (UsePostgres && pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.Postgres.Pro" Version="3.7.2" />
+    <PackageReference Include="redb.Postgres.Pro" Version="4.0.0" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UsePostgres && !pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.Postgres" Version="3.7.2" />
+    <PackageReference Include="redb.Postgres" Version="4.0.0" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UseMsSql && pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.MSSql.Pro" Version="3.7.2" />
+    <PackageReference Include="redb.MSSql.Pro" Version="4.0.0" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UseMsSql && !pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.MSSql" Version="3.7.2" />
+    <PackageReference Include="redb.MSSql" Version="4.0.0" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UseSqlite && pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.SQLite.Pro" Version="3.7.2" />
+    <PackageReference Include="redb.SQLite.Pro" Version="4.0.0" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UseSqlite && !pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.SQLite" Version="3.7.2" />
+    <PackageReference Include="redb.SQLite" Version="4.0.0" />
   </ItemGroup>
   <!--#endif -->
 

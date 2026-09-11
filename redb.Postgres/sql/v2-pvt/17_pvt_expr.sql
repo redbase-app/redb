@@ -867,9 +867,9 @@ BEGIN
             v_ci  := right(v_op, length('ignorecase')) = 'ignorecase';
             v_kw  := CASE WHEN v_ci THEN ' ILIKE ' ELSE ' LIKE ' END;
             v_lit := CASE
-                WHEN v_op IN ('$contains', '$containsignorecase')   THEN quote_literal('%' || v_pat || '%')
-                WHEN v_op IN ('$startswith', '$startswithignorecase') THEN quote_literal(v_pat || '%')
-                WHEN v_op IN ('$endswith', '$endswithignorecase')     THEN quote_literal('%' || v_pat)
+                WHEN v_op IN ('$contains', '$containsignorecase')   THEN quote_literal('%' || pvt_like_escape(v_pat) || '%')
+                WHEN v_op IN ('$startswith', '$startswithignorecase') THEN quote_literal(pvt_like_escape(v_pat) || '%')
+                WHEN v_op IN ('$endswith', '$endswithignorecase')     THEN quote_literal('%' || pvt_like_escape(v_pat))
             END;
             RETURN '(' || CASE WHEN v_ci THEN pvt_fold_case(v_l) ELSE v_l END || v_kw || v_lit || ')';
         END;

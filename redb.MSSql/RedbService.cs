@@ -57,7 +57,7 @@ public class RedbService : RedbServiceBase
     
     protected override IUserProvider CreateUserProvider(
         IRedbContext context, IRedbSecurityContext securityContext, ILogger? logger)
-        => new MssqlUserProvider(context, securityContext, logger);
+        => new MssqlUserProvider(context, securityContext, ResolvePasswordHasher(), logger);
     
     protected override IRoleProvider CreateRoleProvider(
         IRedbContext context, IRedbSecurityContext securityContext, ILogger? logger)
@@ -70,9 +70,10 @@ public class RedbService : RedbServiceBase
     protected override IObjectStorageProvider CreateObjectStorageProvider(
         IRedbContext context, IRedbObjectSerializer serializer, IPermissionProvider permissionProvider,
         IRedbSecurityContext securityContext, ISchemeSyncProvider schemeSync,
-        RedbServiceConfiguration config, IListProvider listProvider, ILogger? logger)
+        RedbServiceConfiguration config, IListProvider listProvider, ILogger? logger,
+        IEnumerable<redb.Core.Interception.IRedbSaveInterceptor>? saveInterceptors)
         => new MssqlObjectStorageProvider(context, serializer, permissionProvider, 
-            securityContext, schemeSync, config, listProvider, logger);
+            securityContext, schemeSync, config, listProvider, logger, saveInterceptors);
     
     protected override ITreeProvider CreateTreeProvider(
         IRedbContext context, IObjectStorageProvider objectStorage, IPermissionProvider permissionProvider,
@@ -96,6 +97,10 @@ public class RedbService : RedbServiceBase
     protected override IValidationProvider CreateValidationProvider(
         IRedbContext context, ILogger? logger)
         => new MssqlValidationProvider(context, logger);
+
+    protected override Core.Providers.IMaintenanceProvider CreateMaintenanceProvider(
+        IRedbContext context, int analysisLimit, ILogger? logger)
+        => new Providers.MssqlMaintenanceProvider(context, analysisLimit, logger);
 
     // === DATABASE SCHEMA MANAGEMENT ===
 

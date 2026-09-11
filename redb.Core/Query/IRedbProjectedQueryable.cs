@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace redb.Core.Query;
@@ -43,22 +44,22 @@ public interface IRedbProjectedQueryable<TResult>
     /// <summary>
     /// Execute query and get list of results.
     /// </summary>
-    Task<List<TResult>> ToListAsync();
+    Task<List<TResult>> ToListAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Count results.
     /// </summary>
-    Task<int> CountAsync();
+    Task<int> CountAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get first result or default value.
     /// </summary>
-    Task<TResult?> FirstOrDefaultAsync();
+    Task<TResult?> FirstOrDefaultAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get projection info including SQL function and structure_ids
     /// </summary>
-    Task<string> GetProjectionInfoAsync();
+    Task<string> GetProjectionInfoAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -114,23 +115,23 @@ public static class RedbProjectedQueryableTaskExtensions
     }
     
     public static async Task<List<TResult>> ToListAsync<TResult>(
-        this Task<IRedbProjectedQueryable<TResult>> queryTask)
+        this Task<IRedbProjectedQueryable<TResult>> queryTask, CancellationToken cancellationToken = default)
     {
         var query = await queryTask;
-        return await query.ToListAsync();
+        return await query.ToListAsync(cancellationToken);
     }
     
     public static async Task<int> CountAsync<TResult>(
-        this Task<IRedbProjectedQueryable<TResult>> queryTask)
+        this Task<IRedbProjectedQueryable<TResult>> queryTask, CancellationToken cancellationToken = default)
     {
         var query = await queryTask;
-        return await query.CountAsync();
+        return await query.CountAsync(cancellationToken);
     }
     
     public static async Task<TResult?> FirstOrDefaultAsync<TResult>(
-        this Task<IRedbProjectedQueryable<TResult>> queryTask)
+        this Task<IRedbProjectedQueryable<TResult>> queryTask, CancellationToken cancellationToken = default)
     {
         var query = await queryTask;
-        return await query.FirstOrDefaultAsync();
+        return await query.FirstOrDefaultAsync(cancellationToken);
     }
 }

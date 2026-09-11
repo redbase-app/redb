@@ -403,13 +403,13 @@ public class MsSqlDialect : ISqlDialect
     // ============================================================
     
     public string Schemes_SelectByName() =>
-        "SELECT _id, _name, _alias, _name_space, _structure_hash, _type FROM _schemes WHERE _name = @p0";
+        "SELECT _id, _name, _alias, _name_space, _structure_hash, _tags, _type FROM _schemes WHERE _name = @p0";
     
     public string Schemes_SelectById() =>
-        "SELECT _id, _name, _alias, _name_space, _structure_hash, _type FROM _schemes WHERE _id = @p0";
+        "SELECT _id, _name, _alias, _name_space, _structure_hash, _tags, _type FROM _schemes WHERE _id = @p0";
     
     public string Schemes_SelectAll() =>
-        "SELECT _id, _name, _alias, _name_space, _structure_hash, _type FROM _schemes";
+        "SELECT _id, _name, _alias, _name_space, _structure_hash, _tags, _type FROM _schemes";
     
     public string Schemes_Insert() =>
         "INSERT INTO _schemes (_id, _name, _alias, _type) VALUES (@p0, @p1, @p2, @p3)";
@@ -417,8 +417,8 @@ public class MsSqlDialect : ISqlDialect
     // T-SQL has no ON CONFLICT. UPDLOCK+HOLDLOCK on the probe is what makes this safe: without them
     // READ COMMITTED lets two sessions both see "not exists" and the loser still gets 2627.
     public string Schemes_InsertIfAbsent() =>
-        "INSERT INTO _schemes (_id, _name, _alias, _type) " +
-        "SELECT @p0, @p1, @p2, @p3 " +
+        "INSERT INTO _schemes (_id, _name, _alias, _type, _name_space) " +
+        "SELECT @p0, @p1, @p2, @p3, @p4 " +
         "WHERE NOT EXISTS (SELECT 1 FROM _schemes WITH (UPDLOCK, HOLDLOCK) WHERE _name = @p1)";
 
     public string Schemes_UpdateHash() =>
@@ -429,6 +429,9 @@ public class MsSqlDialect : ISqlDialect
 
     public string Schemes_UpdateAlias() =>
         "UPDATE _schemes SET _alias = @p0 WHERE _id = @p1";
+
+    public string Schemes_UpdateNameSpace() =>
+        "UPDATE _schemes SET _name_space = @p0 WHERE _id = @p1";
     
     public string Schemes_SelectHashById() =>
         "SELECT _structure_hash FROM _schemes WHERE _id = @p0";
@@ -437,7 +440,7 @@ public class MsSqlDialect : ISqlDialect
         "SELECT TOP 1 _id FROM _schemes WHERE _name = @p0";
     
     public string Schemes_SelectObjectByName() =>
-        "SELECT _id, _name, _alias, _name_space, _structure_hash, _type FROM _schemes WHERE _name = @p0 AND _type = @p1";
+        "SELECT _id, _name, _alias, _name_space, _structure_hash, _tags, _type FROM _schemes WHERE _name = @p0 AND _type = @p1";
     
     public string Schemes_InsertObject() =>
         "INSERT INTO _schemes (_id, _name, _type) VALUES (@p0, @p1, @p2)";
@@ -456,24 +459,26 @@ public class MsSqlDialect : ISqlDialect
         SELECT _id, _id_parent, _id_scheme, _id_override, _id_type, _id_list,
                _name, _alias, _order, _readonly, _allow_not_null, 
                _collection_type, _key_type, _is_compress, _store_null,
+               _unique, _unique_version, _unique_scope, _lazy, _tags,
                _default_value, _default_editor
         FROM _structures WHERE _id_scheme = @p0
         """;
     
     public string Structures_SelectBySchemeShort() =>
-        "SELECT _id, _id_parent, _id_scheme, _id_type, _name, _order FROM _structures WHERE _id_scheme = @p0";
+        "SELECT _id, _id_parent, _id_scheme, _id_type, _name, _order, _collection_type, _key_type, _allow_not_null, _store_null, _unique, _unique_scope, _lazy FROM _structures WHERE _id_scheme = @p0";
     
     public string Structures_SelectBySchemeCacheable() =>
         """
         SELECT _id, _id_parent, _id_scheme, _id_type, _name, _alias, _order,
-               _readonly, _allow_not_null, _collection_type, _key_type
+               _readonly, _allow_not_null, _collection_type, _key_type,
+               _unique, _unique_version, _unique_scope, _lazy
         FROM _structures WHERE _id_scheme = @p0
         """;
     
     public string Structures_Insert() =>
         """
-        INSERT INTO _structures (_id, _id_scheme, _id_parent, _name, _alias, _id_type, _allow_not_null, _collection_type, _key_type, _order)
-        VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9)
+        INSERT INTO _structures (_id, _id_scheme, _id_parent, _name, _alias, _id_type, _allow_not_null, _collection_type, _key_type, _order, _lazy)
+        VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10)
         """;
     
     public string Structures_UpdateType() =>
@@ -490,6 +495,93 @@ public class MsSqlDialect : ISqlDialect
     
     public string Structures_UpdateAllowNotNull() =>
         "UPDATE _structures SET _allow_not_null = @p0 WHERE _id = @p1";
+
+    public string Structures_UpdateLazy() =>
+        "UPDATE _structures SET _lazy = @p0 WHERE _id = @p1";
+
+    public string Session_SetLazyRefs() =>
+        "EXEC sp_set_session_context @key = N'redb.lazy_refs', @value = @p0";
+
+    public string Structures_UpdateUnique() =>
+        "UPDATE _structures SET _unique = @p0, _unique_version = @p1, _unique_scope = @p2 WHERE _id = @p3";
+
+    public string Structures_UpdateTags() =>
+        "UPDATE _structures SET _tags = @p0 WHERE _id = @p1";
+
+    public string Schemes_UpdateTags() =>
+        "UPDATE _schemes SET _tags = @p0 WHERE _id = @p1";
+
+    public string Structures_SelectById() =>
+        """
+        SELECT _id, _id_parent, _id_scheme, _id_override, _id_type, _id_list,
+               _name, _alias, _order, _readonly, _allow_not_null, 
+               _collection_type, _key_type, _is_compress, _store_null,
+               _unique, _unique_version, _unique_scope, _lazy, _tags,
+               _default_value, _default_editor
+        FROM _structures WHERE _id = @p0
+        """;
+
+    // Keyable rows only (root scalars and S2 nested scalars - never collection elements, which
+    // carry _array_index), live objects only: the trash (-10) released its keys and must not get
+    // them back from a recompute.
+    public string Values_SelectRootScalarsByStructure() =>
+        """
+        SELECT v._id as Id, v._id_structure as IdStructure, v._id_object as IdObject,
+               v._String as String, v._Long as Long, v._Guid as Guid, v._Double as [Double],
+               v._DateTimeOffset as DateTimeOffset, v._Boolean as Boolean, v._ByteArray as ByteArray,
+               v._Numeric as [Numeric], v._unique as [Unique]
+        FROM _values v
+        INNER JOIN _objects o ON o._id = v._id_object AND o._id_scheme <> -10
+        WHERE v._id_structure = @p0 AND v._array_index IS NULL
+        ORDER BY v._id
+        """;
+
+    public string Values_SelectElementRowsByStructure() =>
+        """
+        SELECT v._id as Id, v._id_structure as IdStructure, v._id_object as IdObject,
+               v._String as String, v._Long as Long, v._Guid as Guid, v._Double as [Double],
+               v._DateTimeOffset as DateTimeOffset, v._Boolean as Boolean, v._ByteArray as ByteArray,
+               v._Numeric as [Numeric], v._ListItem as ListItem, v._Object as Object,
+               v._array_parent_id as ArrayParentId, v._unique as [Unique]
+        FROM _values v
+        INNER JOIN _objects o ON o._id = v._id_object AND o._id_scheme <> -10
+        WHERE v._id_structure = @p0 AND v._array_index IS NOT NULL
+        ORDER BY v._id
+        """;
+
+    public string Values_UpdateUnique() =>
+        "UPDATE _values SET _unique = @p0 WHERE _id = @p1";
+
+    public string Values_ClearUniqueByStructure() =>
+        "UPDATE _values SET _unique = NULL WHERE _id_structure = @p0 AND _unique IS NOT NULL";
+
+    // No positional filter: UIX__values__structure_unique guarantees at most one row per
+    // (structure, key) across root, nested and element rows alike.
+    public string Values_SelectObjectIdByUnique() =>
+        "SELECT _id_object FROM _values WHERE _id_structure = @p0 AND _unique = @p1";
+
+    public string Values_ExistsUnhashedByStructure(string typedColumn) =>
+        $"""
+        SELECT TOP 1 1 FROM _values v
+        INNER JOIN _objects o ON o._id = v._id_object AND o._id_scheme <> -10
+        WHERE v._id_structure = @p0 AND v._unique IS NULL AND v.{typedColumn} IS NOT NULL
+          AND v._array_index IS NULL
+        """;
+
+    public string Values_SelectByStructure() =>
+        """
+        SELECT v._id as Id, v._id_structure as IdStructure, v._id_object as IdObject,
+               v._String as String, v._Long as Long, v._Guid as Guid, v._Double as [Double],
+               v._DateTimeOffset as DateTimeOffset, v._Boolean as Boolean, v._ByteArray as ByteArray,
+               v._Numeric as [Numeric], v._array_parent_id as ArrayParentId, v._array_index as ArrayIndex
+        FROM _values v WHERE v._id_structure = @p0
+        """;
+
+    public string Values_SetByteArrayScalar() =>
+        "UPDATE _values SET _ByteArray = CAST(@p0 AS VARBINARY(MAX)), _Guid = NULL, _Long = NULL WHERE _id = @p1";
+
+    public string Values_DeleteByteArrayElements() =>
+        "DELETE FROM _values WHERE _id_structure = @p0 AND _array_parent_id IN (SELECT _id FROM _values WHERE _id_structure = @p0)";
     
     public string Structures_DeleteByIds(IEnumerable<long> ids) =>
         $"DELETE FROM _structures WHERE _id IN ({string.Join(",", ids)})";
@@ -560,7 +652,7 @@ public class MsSqlDialect : ISqlDialect
                _key as [Key], _value_long as ValueLong, _value_string as ValueString, 
                _value_guid as ValueGuid, _value_bool as ValueBool, _value_double as ValueDouble, 
                _value_numeric as ValueNumeric, _value_datetime as ValueDatetime, 
-               _value_bytes as ValueBytes, _note as Note, _hash as Hash
+               _value_bytes as ValueBytes, _note as Note, _hash as Hash, _value_unique as ValueUnique
         FROM _objects 
         WHERE _id_parent = @p0 AND _id_scheme = @p1
         ORDER BY _name, _id
@@ -575,7 +667,7 @@ public class MsSqlDialect : ISqlDialect
                _key as [Key], _value_long as ValueLong, _value_string as ValueString, 
                _value_guid as ValueGuid, _value_bool as ValueBool, _value_double as ValueDouble, 
                _value_numeric as ValueNumeric, _value_datetime as ValueDatetime, 
-               _value_bytes as ValueBytes, _note as Note, _hash as Hash
+               _value_bytes as ValueBytes, _note as Note, _hash as Hash, _value_unique as ValueUnique
         FROM _objects 
         WHERE _id_parent = @p0
         ORDER BY _name, _id
@@ -588,7 +680,9 @@ public class MsSqlDialect : ISqlDialect
         "SELECT _id_parent FROM _objects WHERE _id = @p0";
     
     public string Tree_UpdateParent() =>
-        "UPDATE _objects SET _id_parent = @p0, _date_modify = @p1, _id_who_change = @p2 WHERE _id = @p3";
+        // _hash = NULL: the parent is part of the object hash and this update bypasses the save
+        // path - a cached copy must not keep answering with the old parent.
+        "UPDATE _objects SET _id_parent = @p0, _date_modify = @p1, _id_who_change = @p2, _hash = NULL WHERE _id = @p3";
     
     public string Tree_DeleteValuesByObjectIds() =>
         "DELETE FROM _values WHERE _id_object IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
@@ -609,12 +703,22 @@ public class MsSqlDialect : ISqlDialect
                _key as [Key], _value_long as ValueLong, _value_string as ValueString, 
                _value_guid as ValueGuid, _value_bool as ValueBool, _value_double as ValueDouble, 
                _value_numeric as ValueNumeric, _value_datetime as ValueDatetime, 
-               _value_bytes as ValueBytes, _note as Note
+               _value_bytes as ValueBytes, _note as Note, _value_unique as ValueUnique
         FROM _objects WHERE _id = @p0
         """;
     
     public string ObjectStorage_SelectIdHash() =>
         "SELECT _id as Id, _hash as Hash FROM _objects WHERE _id = @p0";
+
+    public string ObjectStorage_SelectIdBySchemeValueUnique() =>
+        "SELECT _id FROM _objects WHERE _id_scheme = @p0 AND _value_unique = @p1";
+
+    // P7: an in-batch key exchange releases before it takes - inside the batch transaction.
+    public string ObjectStorage_ClearValueUniqueByIds(IEnumerable<long> ids) =>
+        $"UPDATE _objects SET _value_unique = NULL WHERE _value_unique IS NOT NULL AND _id IN ({string.Join(",", ids)})";
+
+    public string Values_ClearUniqueByValueIds(IEnumerable<long> ids) =>
+        $"UPDATE _values SET _unique = NULL WHERE _unique IS NOT NULL AND _id IN ({string.Join(",", ids)})";
     
     public string ObjectStorage_SelectIdHashScheme() =>
         "SELECT _id as Id, _hash as Hash, _id_scheme as IdScheme FROM _objects WHERE _id = @p0";
@@ -627,7 +731,7 @@ public class MsSqlDialect : ISqlDialect
                _date_complete as DateComplete, _key as [Key], _note as Note,
                _value_long as ValueLong, _value_string as ValueString, _value_guid as ValueGuid,
                _value_bool as ValueBool, _value_double as ValueDouble, _value_numeric as ValueNumeric,
-               _value_datetime as ValueDatetime, _value_bytes as ValueBytes
+               _value_datetime as ValueDatetime, _value_bytes as ValueBytes, _value_unique as ValueUnique
         FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))
         """;
     
@@ -643,8 +747,8 @@ public class MsSqlDialect : ISqlDialect
             _id_owner, _id_who_change, _id_parent, _hash,
             _value_string, _value_long, _value_guid, _value_bool,
             _value_double, _value_numeric, _value_datetime, _value_bytes,
-            _key, _date_begin, _date_complete
-        ) VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, CAST(@p17 AS VARBINARY(MAX)), @p18, @p19, @p20)
+            _key, _date_begin, _date_complete, _value_unique
+        ) VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, CAST(@p17 AS VARBINARY(MAX)), @p18, @p19, @p20, @p21)
         """;
     
     public string ObjectStorage_UpdateObject() => """
@@ -652,8 +756,8 @@ public class MsSqlDialect : ISqlDialect
             _name = @p0, _note = @p1, _date_modify = @p2, _id_who_change = @p3, _hash = @p4,
             _value_string = @p5, _value_long = @p6, _value_guid = @p7, _value_bool = @p8,
             _value_double = @p9, _value_numeric = @p10, _value_datetime = @p11, _value_bytes = CAST(@p12 AS VARBINARY(MAX)),
-            _key = @p13, _date_begin = @p14, _date_complete = @p15
-        WHERE _id = @p16
+            _key = @p13, _date_begin = @p14, _date_complete = @p15, _value_unique = @p16
+        WHERE _id = @p17
         """;
     
     public string ObjectStorage_DeleteValuesByObjectId() =>
@@ -677,32 +781,12 @@ public class MsSqlDialect : ISqlDialect
                COALESCE(t._db_type, 'String') as DbType,
                s._collection_type as CollectionType, s._key_type as KeyType, 
                COALESCE(s._store_null, 0) as StoreNull,
+               COALESCE(s._unique, 0) as [Unique],
+               s._unique_scope as UniqueScope,
                COALESCE(t._type, 'string') as TypeSemantic
         FROM _structures s
         LEFT JOIN _types t ON s._id_type = t._id
         WHERE s._id_scheme = @p0
-        """;
-    
-    public string ObjectStorage_SelectValuesWithTypes() =>
-        """
-        SELECT v._id as Id, v._id_structure as IdStructure, v._id_object as IdObject,
-               v._string as String, v._long as Long, v._guid as Guid, v.[_Double] as [Double],
-               v._datetimeoffset as DateTimeOffset, v._boolean as Boolean, v._bytearray as ByteArray,
-               v._numeric as Numeric, v._listitem as ListItem, v._object as Object,
-               v._array_parent_id as ArrayParentId, v._array_index as ArrayIndex,
-               COALESCE(t._db_type, 'String') as DbType
-        FROM _values v
-        JOIN _structures s ON v._id_structure = s._id
-        JOIN _types t ON s._id_type = t._id
-        WHERE v._id_object = @p0 AND v._id_structure IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p1, ','))
-        """;
-    
-    public string ObjectStorage_SelectStructureTypes() =>
-        """
-        SELECT s._id as StructureId, COALESCE(t._db_type, 'String') as DbType
-        FROM _structures s
-        JOIN _types t ON s._id_type = t._id
-        WHERE s._id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))
         """;
     
     public string ObjectStorage_SelectTypeById() =>
@@ -743,6 +827,9 @@ public class MsSqlDialect : ISqlDialect
     
     public string ObjectStorage_SelectExistingIds() =>
         "SELECT _id as Id FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
+
+    public string ObjectStorage_SelectIdHashPairs() =>
+        "SELECT _id as Id, _hash as Hash FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
     
     public string ObjectStorage_SelectSchemesByIds() =>
         """
@@ -752,7 +839,7 @@ public class MsSqlDialect : ISqlDialect
         """;
     
     public string ObjectStorage_LockObjectsForUpdate() =>
-        "SELECT 1 FROM _objects WITH (UPDLOCK, ROWLOCK) WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ',')) ORDER BY _id";
+        "SELECT _id FROM _objects WITH (UPDLOCK, ROWLOCK) WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ',')) ORDER BY _id";
     
     public string ObjectStorage_SelectSchemeIdByObjectId() =>
         "SELECT _id_scheme FROM _objects WHERE _id = @p0";
@@ -811,9 +898,43 @@ public class MsSqlDialect : ISqlDialect
         "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id_object = @p0";
     
     // ============================================================
+    // === MAINTENANCE SQL ===
+    // ============================================================
+
+    public string Maintenance_Analyze(int analysisLimit) => "EXEC sp_updatestats";
+
+    // sys.dm_db_index_usage_stats resets on server restart and holds rows only for indexes
+    // touched since - hence the LEFT JOIN and nullable counters. Heap rows (index_id 0) are
+    // not indexes and are excluded.
+    public string Maintenance_SelectIndexStats() =>
+        """
+        SELECT t.name                                     AS [Table],
+               i.name                                     AS [Name],
+               i.is_unique                                AS [IsUnique],
+               CAST(SUM(a.used_pages) * 8 * 1024 AS bigint) AS [SizeBytes],
+               CAST(MAX(p.rows) AS bigint)                AS [EstimatedRows],
+               CAST(MAX(u.user_seeks) AS bigint)          AS [Seeks],
+               CAST(MAX(u.user_scans) + MAX(u.user_lookups) AS bigint) AS [Scans],
+               CAST(MAX(u.user_updates) AS bigint)        AS [Updates],
+               CASE WHEN MAX(u.last_user_seek) >= ISNULL(MAX(u.last_user_scan), '19000101')
+                    THEN MAX(u.last_user_seek) ELSE MAX(u.last_user_scan) END AS [LastUsed]
+        FROM sys.indexes i
+        JOIN sys.tables t     ON t.object_id = i.object_id
+        JOIN sys.partitions p ON p.object_id = i.object_id AND p.index_id = i.index_id
+        JOIN sys.allocation_units a ON a.container_id = p.partition_id
+        LEFT JOIN sys.dm_db_index_usage_stats u
+               ON u.object_id = i.object_id AND u.index_id = i.index_id AND u.database_id = DB_ID()
+        WHERE i.index_id > 0 AND t.is_ms_shipped = 0
+        GROUP BY t.name, i.name, i.is_unique
+        ORDER BY t.name, i.name
+        """;
+
+    public string Maintenance_SelectIndexStatsNoSize() => Maintenance_SelectIndexStats();
+
+    // ============================================================
     // === VALIDATION SQL ===
     // ============================================================
-    
+
     public string Validation_SelectAllTypes() =>
         "SELECT _id, _name, _db_type, _type FROM _types";
     
@@ -825,6 +946,7 @@ public class MsSqlDialect : ISqlDialect
         SELECT s._id, s._id_parent, s._id_scheme, s._id_override, s._id_type, s._id_list, 
                s._name, s._alias, s._order, s._readonly, s._allow_not_null, 
                s._collection_type, s._key_type, s._is_compress, s._store_null, 
+               s._unique, s._unique_version, 
                s._default_value, s._default_editor
         FROM _structures s WHERE s._id_scheme = @p0
         """;
@@ -851,12 +973,16 @@ public class MsSqlDialect : ISqlDialect
     /// </summary>
     public string LazyLoader_GetObjectJsonBatch() =>
         """
-        SELECT CAST(value AS BIGINT) as Id, dbo.get_object_json(CAST(value AS BIGINT), 1) as JsonData 
+        SELECT CAST(value AS BIGINT) as Id, dbo.get_object_json(CAST(value AS BIGINT), @p1) as JsonData 
         FROM STRING_SPLIT(@p0, ',')
         """;
     
     public string LazyLoader_SelectObjectHash() =>
         "SELECT _hash FROM _objects WHERE _id = @p0";
+
+    public string Transaction_SavepointBegin() => "SAVE TRANSACTION redb_batch_save";
+    public string? Transaction_SavepointRelease() => null; // MSSQL savepoints dissolve on their own
+    public string Transaction_SavepointRollback() => "ROLLBACK TRANSACTION redb_batch_save";
     
     // ============================================================
     // === QUERY PROVIDER SQL ===
@@ -904,7 +1030,7 @@ public class MsSqlDialect : ISqlDialect
         "EXEC {0} @p0, @p1, @p2, @p3, @p4, @p5, @p6";
     
     /// <summary>
-    /// MSSQL always uses _base version, but C# passes 8 params when useLazyLoading=false.
+    /// MSSQL always uses the _base version; the C# side passes 8 params (the include_facets slot stays).
     /// The _base procedure has dummy @include_facets param that is ignored.
     /// </summary>
     public string Query_SearchFullTemplate() =>
@@ -1063,8 +1189,6 @@ public class MsSqlDialect : ISqlDialect
     // MSSQL: Eager loading not implemented, always use _base (lazy) versions
     public string Query_SqlPreviewFunction() => "dbo.get_search_sql_preview_base";
     
-    public string Query_SqlPreviewBaseFunction() => "dbo.get_search_sql_preview_base";
-    
     public string Query_TreeSqlPreviewFunction() => "dbo.get_search_tree_sql_preview_base";
     
     public string Query_TreeSqlPreviewBaseFunction() => "dbo.get_search_tree_sql_preview_base";
@@ -1126,7 +1250,7 @@ public class MsSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
 
     // Bump together with the literal in redb.MSSql/sql/v2-pvt/00_module_init.sql.
-    public string? Query_PvtRequiredVersion() => "0.1.7";
+    public string? Query_PvtRequiredVersion() => "0.2.14";
 
     // Native PVT projection orchestrator — not supported on MSSql (yet).
     // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these

@@ -99,6 +99,40 @@ namespace redb.Core.Models.Entities
         /// </summary>
         [JsonPropertyName("store_null")]
         public bool? StoreNull { get; set; }
+
+        /// <summary>
+        /// V4 (LAZY Л2): the reference is lazy - read from the `virtual` marker on the property at
+        /// synchronisation. Builders emit a stub for such a reference when the option is on.
+        /// </summary>
+        [JsonPropertyName("lazy")]
+        public bool? Lazy { get; set; }
+
+        /// <summary>
+        /// Unique key within the scheme ([RedbUnique]).
+        /// </summary>
+        [JsonPropertyName("unique")]
+        public bool? Unique { get; set; }
+
+        /// <summary>
+        /// Encoder version the stored keys were computed with.
+        /// </summary>
+        [JsonPropertyName("unique_version")]
+        public long? UniqueVersion { get; set; }
+
+        /// <summary>
+        /// S3: element-key scope of a collection key (NULL = default reading; 1 = element values
+        /// unique per scheme; 2 = no duplicate elements per collection). Values mirror
+        /// <see cref="Attributes.UniqueScope"/>.
+        /// </summary>
+        [JsonPropertyName("unique_scope")]
+        public long? UniqueScope { get; set; }
+
+        /// <summary>
+        /// Free-form marker for future / custom extensions (450 chars). Written by
+        /// [RedbTags] at synchronisation when present; direct writes survive sync.
+        /// </summary>
+        [JsonPropertyName("tags")]
+        public string? Tags { get; set; }
         
         /// <summary>
         /// Default value (binary).

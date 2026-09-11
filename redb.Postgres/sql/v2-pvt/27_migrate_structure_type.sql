@@ -276,6 +276,12 @@ BEGIN
     -- Execute migration
     EXECUTE v_conversion_sql USING p_structure_id;
     GET DIAGNOSTICS v_success_count = ROW_COUNT;
+
+    -- V4 (P3): a SQL-side writer does not know the canonical form - the keys of the touched rows
+    -- are released; scheme synchronisation recomputes them (rows with a value and no key are its
+    -- trigger). NULL takes rows OUT of uniqueness instead of faking it.
+    -- AFTER the ROW_COUNT capture: the migration's own success count must not measure this UPDATE.
+    UPDATE _values SET _unique = NULL WHERE _id_structure = p_structure_id AND _unique IS NOT NULL;
     
     RETURN QUERY SELECT v_affected_rows, v_success_count, v_affected_rows - v_success_count, NULL::TEXT;
 END;

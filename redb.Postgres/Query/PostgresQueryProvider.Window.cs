@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Query.QueryExpressions;
@@ -32,7 +33,7 @@ public partial class PostgresQueryProvider
         string? filterJson = null,
         string? frameJson = null,
         int? take = null,
-        int? skip = null)
+        int? skip = null, CancellationToken cancellationToken = default)
     {
         return ExecuteWindowQueryInternalAsync(schemeId, selectFields, windowFuncs, partitionBy, orderBy,
             filterJson, frameJson, take, skip);
@@ -48,7 +49,7 @@ public partial class PostgresQueryProvider
         FilterExpression? filter,
         string? frameJson = null,
         int? take = null,
-        int? skip = null)
+        int? skip = null, CancellationToken cancellationToken = default)
     {
         var filterJson = filter is null ? null : _facetBuilder.BuildFacetFilters(filter);
         return ExecuteWindowQueryInternalAsync(schemeId, selectFields, windowFuncs, partitionBy, orderBy,
@@ -64,13 +65,13 @@ public partial class PostgresQueryProvider
         string? filterJson,
         string? frameJson,
         int? take,
-        int? skip)
+        int? skip, CancellationToken cancellationToken = default)
     {
         var innerSql = await BuildWindowInnerSqlAsync(schemeId, selectFields, windowFuncs, partitionBy, orderBy,
             filterJson, frameJson, take, skip);
 
         var wrapped = "SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json)::text AS \"Value\" FROM (" + innerSql + ") t";
-        var jsonArray = await _context.ExecuteScalarAsync<string>(wrapped);
+        var jsonArray = await _context.ExecuteScalarAsync<string>(wrapped, System.Array.Empty<object>(), cancellationToken);
         if (string.IsNullOrEmpty(jsonArray))
             return null;
         return JsonDocument.Parse(jsonArray);
@@ -86,7 +87,7 @@ public partial class PostgresQueryProvider
         string? filterJson = null,
         string? frameJson = null,
         int? take = null,
-        int? skip = null)
+        int? skip = null, CancellationToken cancellationToken = default)
     {
         return BuildWindowInnerSqlAsync(schemeId, selectFields, windowFuncs, partitionBy, orderBy,
             filterJson, frameJson, take, skip);
@@ -101,7 +102,7 @@ public partial class PostgresQueryProvider
         string? filterJson,
         string? frameJson,
         int? take,
-        int? skip)
+        int? skip, CancellationToken cancellationToken = default)
     {
         var selectList = selectFields?.ToList() ?? new List<WindowFieldRequest>();
         var funcList = windowFuncs?.ToList() ?? new List<WindowFuncRequest>();
@@ -133,7 +134,7 @@ public partial class PostgresQueryProvider
         _logger?.LogDebug("PVT Window Build: SchemeId={SchemeId}, Select={Select}, Filter={Filter}, Take={Take}, Skip={Skip}",
             schemeId, selectJson, filterJson ?? "null", take, skip);
 
-        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, filterParam, selectJson, limitParam, offsetParam);
+        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, selectJson, limitParam, offsetParam }, cancellationToken);
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
                 "pvt_build_window_sql returned an empty SQL string for scheme " + schemeId + ".");

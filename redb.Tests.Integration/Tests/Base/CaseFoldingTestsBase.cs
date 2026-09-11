@@ -215,6 +215,36 @@ public abstract class CaseFoldingTestsBase
     /// <summary>Does this provider fold the Turkish dotted capital İ to a plain i?</summary>
     protected abstract bool FoldsTurkishDottedI { get; }
 
+    /// <summary>
+    /// BR-6 (owner decision 2026-09-02): the PLAIN string predicates (StartsWith/Contains/EndsWith
+    /// without a comparison) translate to LIKE and keep each database's own case rules - redb does
+    /// not decide for the programmer. PostgreSQL: case-sensitive; SQLite: ASCII case-insensitive;
+    /// MSSQL: whatever the collation says (CI on the default). Explicit control is the *IgnoreCase
+    /// forms plus StringCollation. This flag states the provider's documented default.
+    /// </summary>
+    protected abstract bool PlainStartsWithIsCaseSensitive { get; }
+
+    [Fact]
+    public async Task PlainStartsWith_IsTheDatabasesOwnSemantics_ByContract()
+    {
+        await EnsureSeededAsync();
+
+        // Exact case matches everywhere - the sanity half of the contract.
+        var exact = await Redb.Query<CollationProps>()
+            .Where(c => c.Text.StartsWith("HELLO")).Take(50).ToListAsync();
+        exact.Select(r => r.Props.Label).Should().Contain("ascii");
+
+        // A lower-case needle against the upper-cased row: the database's own rule decides.
+        var folded = await Redb.Query<CollationProps>()
+            .Where(c => c.Text.StartsWith("hello")).Take(50).ToListAsync();
+        if (PlainStartsWithIsCaseSensitive)
+            folded.Select(r => r.Props.Label).Should().NotContain("ascii",
+                "this database's LIKE is case-sensitive and redb passes its rule through");
+        else
+            folded.Select(r => r.Props.Label).Should().Contain("ascii",
+                "this database's LIKE folds ASCII case and redb passes its rule through");
+    }
+
     [Fact]
     public async Task Boundary_GermanSharpS_AgainstDoubleS()
     {

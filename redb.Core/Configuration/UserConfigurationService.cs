@@ -157,7 +157,6 @@ public class UserConfigurationService : IUserConfigurationService
         effective.ListCacheTtl = _baseConfiguration.ListCacheTtl;
         effective.MaxLoadDepth = _baseConfiguration.DefaultLoadDepth;
         effective.MaxTreeDepth = _baseConfiguration.DefaultMaxTreeDepth;
-        effective.EnableLazyLoadingForProps = _baseConfiguration.EnableLazyLoadingForProps;
         effective.AlwaysCheckPermissionsOnLoad = _baseConfiguration.DefaultCheckPermissionsOnLoad;
         effective.AlwaysCheckPermissionsOnSave = _baseConfiguration.DefaultCheckPermissionsOnSave;
         effective.MaxRequestsPerMinute = null;
@@ -252,18 +251,6 @@ public class UserConfigurationService : IUserConfigurationService
                 Source = sourceName,
                 Priority = priority,
                 Value = source.MaxTreeDepth.Value.ToString()
-            });
-        }
-        
-        if (source.EnableLazyLoadingForProps.HasValue)
-        {
-            target.EnableLazyLoadingForProps = source.EnableLazyLoadingForProps.Value;
-            target.Sources.Add(new ConfigurationSource
-            {
-                ParameterName = nameof(source.EnableLazyLoadingForProps),
-                Source = sourceName,
-                Priority = priority,
-                Value = source.EnableLazyLoadingForProps.Value.ToString()
             });
         }
         

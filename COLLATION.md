@@ -177,3 +177,22 @@ List what your server offers:
 ```sql
 SELECT collname FROM pg_collation WHERE collprovider = 'i' ORDER BY 1;
 ```
+
+## Plain matching follows the database (BR-6, contract)
+
+`StartsWith` / `Contains` / `EndsWith` **without** a comparison argument translate to `LIKE` and
+keep each database's own case rules - redb does not decide for the programmer:
+
+| Provider | Plain `LIKE` semantics |
+|---|---|
+| **PostgreSQL** | case-sensitive |
+| **SQLite** | ASCII case-insensitive (non-ASCII is case-sensitive) |
+| **MSSQL** | whatever the column collation says - case-insensitive on the default |
+
+The same prefix query can therefore return different sets on different providers - by contract.
+When you need one behaviour everywhere, say so explicitly: the `*IgnoreCase` forms
+(`StartsWith(x, StringComparison.OrdinalIgnoreCase)`, `ContainsIgnoreCase`, ...) fold case on every
+provider, and `StringCollation` extends the folding beyond ASCII (the subject of this document).
+For a case-sensitive contract on top of a case-insensitive database, filter the candidates again
+in memory with an ordinal comparison - the server-side match stays an index-friendly prefilter.
+

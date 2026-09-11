@@ -17,7 +17,38 @@ public abstract class WindowTestsBase
         return await TestDataFactory.SeedEmployees(Redb, 15);
     }
 
+    public class WindowRowDto
+    {
+        public string? FirstName { get; set; }
+        public long RowNum { get; set; }
+    }
+
     [Fact]
+    public async Task Window_SelectAsync_IntoDtoMemberInit()
+    {
+        // G-1 доехал до оконных (решение владельца 2026-09-04): раньше DTO давал громкий отказ,
+        // а до ревью - молча пустой результат.
+        await SeedAsync();
+
+        var results = await Redb.Query<EmployeeProps>()
+            .WithWindow(w => w
+                .PartitionBy(e => e.Department)
+                .OrderByDesc(e => e.Salary))
+            .SelectAsync(e => new WindowRowDto
+            {
+                FirstName = e.Props.FirstName,
+                RowNum = Win.RowNumber(),
+            });
+
+        results.Should().NotBeEmpty();
+        results.Should().AllSatisfy(r =>
+        {
+            r.FirstName.Should().NotBeNullOrEmpty();
+            r.RowNum.Should().BeGreaterThan(0);
+        });
+    }
+
+        [Fact]
     public async Task Window_RowNumber_PartitionByDept()
     {
         var ids = await SeedAsync();

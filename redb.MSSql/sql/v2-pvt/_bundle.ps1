@@ -31,7 +31,7 @@ Set-Location $here
 $files = Get-ChildItem -Path $here -Filter '*.sql' -File `
     | Where-Object { $_.Name -ne $OutFile } `
     | Where-Object { $IncludeSmoke -or ($_.Name -ne '99_smoke_tests.sql' -and $_.Name -ne '99_smoke_auto.sql') } `
-    | Sort-Object Name
+    | Sort-Object { $_.Name.ToUpperInvariant() } -Culture ""
 
 if (-not $files) {
     throw "No *.sql files to bundle in $here"

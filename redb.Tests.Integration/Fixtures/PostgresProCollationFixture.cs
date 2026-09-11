@@ -56,7 +56,6 @@ public sealed class PostgresProCollationFixture : IAsyncLifetime
                 {
                     c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;
                     c.SkipHashValidationOnCacheCheck = false;
-                    c.EnableLazyLoadingForProps = false;
                     c.EnablePropsCache = false;
                     c.EnablePvtPrefilter = true;   // see the class remark
                     c.StringCollation = PostgresCollationFixture.Collation;

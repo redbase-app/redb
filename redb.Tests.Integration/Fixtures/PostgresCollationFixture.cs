@@ -58,7 +58,6 @@ public sealed class PostgresCollationFixture : IAsyncLifetime
             {
                 c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert;
                 c.SkipHashValidationOnCacheCheck = false;
-                c.EnableLazyLoadingForProps = false;
                 c.EnablePropsCache = false;
                 c.StringCollation = Collation;
                 // A distinct cache domain: this process also holds services pointed at the ordinary
@@ -77,6 +76,7 @@ public sealed class PostgresCollationFixture : IAsyncLifetime
         await Redb.InitializeTypeRegistryAsync();
 
         var ctx = ServiceProvider.GetRequiredService<IRedbContext>();
+        await FixtureWipeGuard.EnsureLooksLikeATestDatabaseAsync(ctx, nameof(PostgresCollationFixture));
         await ctx.ExecuteAsync("DELETE FROM _values");
         await ctx.ExecuteAsync("DELETE FROM _objects");
     }
@@ -150,7 +150,6 @@ public sealed class PostgresNoCollationFixture : IAsyncLifetime
             {
                 c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert;
                 c.SkipHashValidationOnCacheCheck = false;
-                c.EnableLazyLoadingForProps = false;
                 c.EnablePropsCache = false;
                 // StringCollation deliberately left unset — that is the point of this fixture.
                 c.CacheDomain = "collation-c";

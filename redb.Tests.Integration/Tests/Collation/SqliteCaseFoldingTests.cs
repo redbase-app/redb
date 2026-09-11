@@ -15,4 +15,6 @@ public class SqliteCaseFoldingTests : CaseFoldingTestsBase
     // .NET ToLowerInvariant folds character by character, like ICU root.
     protected override bool FoldsSharpSToDoubleS => false;
     protected override bool FoldsTurkishDottedI  => false;
+
+    protected override bool PlainStartsWithIsCaseSensitive => false;
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Models.Entities;
 using redb.Core.Models.Contracts;
@@ -34,7 +35,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         _treeContext = context;
         _facetBuilder = facetBuilder ?? new FacetFilterBuilder();
     }
-    
+
     /// <summary>
     /// Creates a new instance with the specified context. Override in derived classes.
     /// </summary>
@@ -50,7 +51,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var newContext = _treeContext.Clone();
         var filterExpression = _filterParser.ParseFilter(predicate);
 
-        // ✅ FIX: Check for empty filter (Where(x => false))
+        // FIX: Check for empty filter (Where(x => false))
         if (IsEmptyFilter(filterExpression))
         {
             newContext.IsEmpty = true;
@@ -69,7 +70,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
             newContext.Filter = filterExpression;
         }
 
-        // ✅ FIX: Return PostgresTreeQueryable, not base RedbQueryable
+        // FIX: Return PostgresTreeQueryable, not base RedbQueryable
         return CreateInstance(newContext);
     }
 
@@ -81,7 +82,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var newContext = _treeContext.Clone();
         var filterExpression = _filterParser.ParseRedbFilter(predicate);
 
-        // ✅ Check for empty filter
+        // Check for empty filter
         if (IsEmptyFilter(filterExpression))
         {
             newContext.IsEmpty = true;
@@ -106,7 +107,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     // ===== OVERRIDE SORTING METHODS TO PRESERVE TREE CONTEXT =====
 
     /// <summary>
-    /// ✅ FIX ISSUE #4: Override OrderBy to preserve Tree context
+    /// FIX ISSUE #4: Override OrderBy to preserve Tree context
     /// Base OrderBy returns RedbQueryable and loses Tree context!
     /// RETURNS: IOrderedTreeQueryable (inherits from IOrderedRedbQueryable + preserves Tree methods)
     /// </summary>
@@ -118,13 +119,13 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var ordering = _orderingParser.ParseOrdering(keySelector, SortDirection.Ascending);
         newContext.Orderings.Add(ordering);
 
-        // ✅ CORRECT: PostgresTreeQueryable implements IOrderedTreeQueryable : IOrderedRedbQueryable
+        // CORRECT: PostgresTreeQueryable implements IOrderedTreeQueryable : IOrderedRedbQueryable
         // Return as IOrderedRedbQueryable, but actually it's PostgresTreeQueryable!
         return CreateInstance(newContext);
     }
 
     /// <summary>
-    /// ✅ FIX ISSUE #4: Override OrderByDescending for Tree context
+    /// FIX ISSUE #4: Override OrderByDescending for Tree context
     /// </summary>
     public override IOrderedRedbQueryable<TProps> OrderByDescending<TKey>(Expression<Func<TProps, TKey>> keySelector)
     {
@@ -134,12 +135,12 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var ordering = _orderingParser.ParseOrdering(keySelector, SortDirection.Descending);
         newContext.Orderings.Add(ordering);
 
-        // ✅ FIX: Return PostgresTreeQueryable, preserving Tree context!
+        // FIX: Return PostgresTreeQueryable, preserving Tree context!
         return CreateInstance(newContext);
     }
 
     /// <summary>
-    /// ✅ FIX ISSUE #4: Override ThenBy for Tree context
+    /// FIX ISSUE #4: Override ThenBy for Tree context
     /// </summary>
     public override IOrderedRedbQueryable<TProps> ThenBy<TKey>(Expression<Func<TProps, TKey>> keySelector)
     {
@@ -148,12 +149,12 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var ordering = _orderingParser.ParseOrdering(keySelector, SortDirection.Ascending);
         newContext.Orderings.Add(ordering); // ThenBy adds to existing sorting
 
-        // ✅ FIX: Return PostgresTreeQueryable, preserving Tree context!
+        // FIX: Return PostgresTreeQueryable, preserving Tree context!
         return CreateInstance(newContext);
     }
 
     /// <summary>
-    /// ✅ FIX ISSUE #4: Override ThenByDescending for Tree context
+    /// FIX ISSUE #4: Override ThenByDescending for Tree context
     /// </summary>
     public override IOrderedRedbQueryable<TProps> ThenByDescending<TKey>(Expression<Func<TProps, TKey>> keySelector)
     {
@@ -162,12 +163,12 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var ordering = _orderingParser.ParseOrdering(keySelector, SortDirection.Descending);
         newContext.Orderings.Add(ordering); // ThenByDescending adds to existing sorting
 
-        // ✅ FIX: Return PostgresTreeQueryable, preserving Tree context!
+        // FIX: Return PostgresTreeQueryable, preserving Tree context!
         return CreateInstance(newContext);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 🆕 SORTING BY BASE RedbObject FIELDS FOR TREE CONTEXT
+    // SORTING BY BASE RedbObject FIELDS FOR TREE CONTEXT
     // ═══════════════════════════════════════════════════════════════════════════
 
     public override IOrderedRedbQueryable<TProps> OrderByRedb<TKey>(Expression<Func<IRedbObject, TKey>> keySelector)
@@ -212,17 +213,12 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         return CreateInstance(newContext);
     }
 
-    // ===== OVERRIDE LAZY LOADING METHODS TO PRESERVE TREE CONTEXT =====
-
-    /// <summary>
-    /// ✅ FIX: Override WithLazyLoading to preserve Tree context
-    /// Base WithLazyLoading returns RedbQueryable and loses Tree context!
-    /// </summary>
-    public override IRedbQueryable<TProps> WithLazyLoading(bool enabled = true)
+    /// <summary>V4 (LAZY Л2): preserve the tree context (the base method would drop it).</summary>
+    public override IRedbQueryable<TProps> WithLazyReferences(bool enabled = true)
     {
         var newContext = _treeContext.Clone();
-        newContext.UseLazyLoading = enabled;
-        
+        newContext.LazyReferences = enabled;
+
         return CreateInstance(newContext);
     }
 
@@ -232,7 +228,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     /// Filter by ancestors with polymorphic query support
     /// </summary>
     public override IRedbQueryable<TProps> WhereHasAncestor<TTarget>(
-        Expression<Func<TTarget, bool>> ancestorCondition, 
+        Expression<Func<TTarget, bool>> ancestorCondition,
         int? maxDepth = null)
     {
         if (ancestorCondition == null)
@@ -265,7 +261,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     /// Filter by descendants with polymorphic query support
     /// </summary>
     public override IRedbQueryable<TProps> WhereHasDescendant<TTarget>(
-        Expression<Func<TTarget, bool>> descendantCondition, 
+        Expression<Func<TTarget, bool>> descendantCondition,
         int? maxDepth = null)
     {
         if (descendantCondition == null)
@@ -374,15 +370,15 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     }
 
     // ===== MATERIALIZATION METHODS =====
-    
+
     /// <summary>
     /// Execute query and get list of objects (base RedbObject)
     /// TreeRedbObject inherits from RedbObject, so direct casting works
     /// </summary>
-    public override async Task<List<RedbObject<TProps>>> ToListAsync()
+    public override async Task<List<RedbObject<TProps>>> ToListAsync(CancellationToken cancellationToken = default)
     {
         // Get TreeRedbObject and cast to RedbObject (they are compatible)
-        var treeObjects = await ToFlatListAsync();
+        var treeObjects = await ToFlatListAsync(cancellationToken: cancellationToken);
         return treeObjects.Cast<RedbObject<TProps>>().ToList();
     }
 
@@ -391,8 +387,9 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     /// Tree provider returns List&lt;TreeRedbObject&gt;, need Cast to List&lt;RedbObject&gt;.
     /// </summary>
     protected internal override async Task<List<RedbObject<TProps>>> ToListWithProjectionAsync(
-        HashSet<long>? projectedStructureIds, 
-        bool skipPropsLoading = false)
+        HashSet<long>? projectedStructureIds,
+        bool skipPropsLoading = false,
+        CancellationToken cancellationToken = default)
     {
         // Set structure_ids in context for provider
         if (projectedStructureIds != null && projectedStructureIds.Count > 0)
@@ -402,23 +399,22 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
 
         if (skipPropsLoading)
         {
-            // ⭐ FIX: Same logic as RedbQueryable.ToListWithProjectionAsync.
+            // FIX: Same logic as RedbQueryable.ToListWithProjectionAsync.
             // Skip Props re-loading and disable lazy loader — projection SQL already
             // returned partial Props in the JSON, deserialized via Props setter.
             _treeContext.SkipPropsLoading = true;
-            _treeContext.UseLazyLoading = false;
         }
 
         // Get TreeRedbObject and cast to RedbObject via Cast
-        var treeObjects = await ToFlatListAsync();
+        var treeObjects = await ToFlatListAsync(cancellationToken: cancellationToken);
         return treeObjects.Cast<RedbObject<TProps>>().ToList();
     }
 
-    public override async Task<RedbObject<TProps>?> FirstOrDefaultAsync()
+    public override async Task<RedbObject<TProps>?> FirstOrDefaultAsync(CancellationToken cancellationToken = default)
     {
         // Limit to 1 record
         var limitedQuery = Take(1);
-        var results = await limitedQuery.ToListAsync();
+        var results = await limitedQuery.ToListAsync(cancellationToken: cancellationToken);
         return results.FirstOrDefault();
     }
 
@@ -430,7 +426,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var newContext = _treeContext.Clone();
         newContext.Limit = count;
 
-        // ✅ FIX: Return PostgresTreeQueryable, preserving Tree context!
+        // FIX: Return PostgresTreeQueryable, preserving Tree context!
         return CreateInstance(newContext);
     }
 
@@ -442,7 +438,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var newContext = _treeContext.Clone();
         newContext.Offset = count;
 
-        // ✅ FIX: Return PostgresTreeQueryable, preserving Tree context!
+        // FIX: Return PostgresTreeQueryable, preserving Tree context!
         return CreateInstance(newContext);
     }
 
@@ -513,7 +509,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var newContext = _treeContext.Clone();
         newContext.IsDistinct = true;
 
-        // ✅ FIX: Return PostgresTreeQueryable, preserving Tree context!
+        // FIX: Return PostgresTreeQueryable, preserving Tree context!
         return CreateInstance(newContext);
     }
 
@@ -565,40 +561,40 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var newContext = _treeContext.Clone();
         newContext.MaxRecursionDepth = depth;
 
-        // ✅ FIX: Return PostgresTreeQueryable, preserving Tree context!
+        // FIX: Return PostgresTreeQueryable, preserving Tree context!
         return CreateInstance(newContext);
     }
 
-    public override async Task<int> CountAsync()
+    public override async Task<int> CountAsync(CancellationToken cancellationToken = default)
     {
-        var result = await _treeProvider.ExecuteAsync(BuildCountExpression(), typeof(int));
+        var result = await _treeProvider.ExecuteAsync(BuildCountExpression(), typeof(int), cancellationToken: cancellationToken);
         return (int)result;
     }
 
-    public override async Task<bool> AnyAsync()
+    public override async Task<bool> AnyAsync(CancellationToken cancellationToken = default)
     {
-        var count = await CountAsync();
+        var count = await CountAsync(cancellationToken: cancellationToken);
         return count > 0;
     }
 
-    public override async Task<bool> AnyAsync(Expression<Func<TProps, bool>> predicate)
+    public override async Task<bool> AnyAsync(Expression<Func<TProps, bool>> predicate, CancellationToken cancellationToken = default)
     {
         // Create new query with additional filter
         var filteredQuery = Where(predicate);
-        return await filteredQuery.AnyAsync();
+        return await filteredQuery.AnyAsync(cancellationToken: cancellationToken);
     }
 
-    public override async Task<bool> AllAsync(Expression<Func<TProps, bool>> predicate)
+    public override async Task<bool> AllAsync(Expression<Func<TProps, bool>> predicate, CancellationToken cancellationToken = default)
     {
         if (predicate == null)
             throw new ArgumentNullException(nameof(predicate));
 
         // All() == true if all records satisfy condition
-        var totalCount = await CountAsync();
+        var totalCount = await CountAsync(cancellationToken: cancellationToken);
         if (totalCount == 0)
             return true; // All elements of empty set satisfy any condition
 
-        var matchingCount = await Where(predicate).CountAsync();
+        var matchingCount = await Where(predicate).CountAsync(cancellationToken: cancellationToken);
         return totalCount == matchingCount;
     }
 
@@ -609,10 +605,10 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     /// Loads objects + all parents to root and establishes links
     /// Children contain only objects from the loaded chain
     /// </summary>
-    public override async Task<List<TreeRedbObject<TProps>>> ToTreeListAsync()
+    public override async Task<List<TreeRedbObject<TProps>>> ToTreeListAsync(CancellationToken cancellationToken = default)
     {
         // 1. Get filtered objects (with Props via lazy loading)
-        var filteredObjects = await ToFlatListAsync();
+        var filteredObjects = await ToFlatListAsync(cancellationToken: cancellationToken);
         if (!filteredObjects.Any())
             return new List<TreeRedbObject<TProps>>();
 
@@ -623,13 +619,13 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
 
         // 3. FIX: Calculate IDs of ONLY parents (that aren't already loaded)
         var parentIds = allIds.Except(filteredIds).ToList();
-        
+
         List<ITreeRedbObject> allObjectsUntyped;
-        
+
         if (parentIds.Any())
         {
             // 4. Load ONLY parents (don't reload children!)
-            var parents = await _treeProvider.LoadObjectsByIdsAsync(parentIds, _treeContext.PropsDepth);
+            var parents = await _treeProvider.LoadObjectsByIdsAsync(parentIds, _treeContext.PropsDepth, cancellationToken: cancellationToken);
 
             // 5. Combine parents with already loaded children
             allObjectsUntyped = parents
@@ -650,7 +646,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
             .Where(o => filteredIds.Contains(o.Id) && o is TreeRedbObject<TProps>)
             .Cast<TreeRedbObject<TProps>>()
             .ToList();
-        
+
         return matchingByIdAndType;
     }
 
@@ -659,10 +655,10 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     /// Loads objects + all parents to root, establishes links and returns roots
     /// Children contain only objects from the loaded chain
     /// </summary>
-    public override async Task<List<ITreeRedbObject>> ToRootListAsync()
+    public override async Task<List<ITreeRedbObject>> ToRootListAsync(CancellationToken cancellationToken = default)
     {
         // 1. Get filtered objects (with Props via lazy loading)
-        var filteredObjects = await ToFlatListAsync();
+        var filteredObjects = await ToFlatListAsync(cancellationToken: cancellationToken);
         if (!filteredObjects.Any())
             return new List<ITreeRedbObject>();
 
@@ -673,13 +669,13 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
 
         // 3. FIX: Calculate IDs of ONLY parents (that aren't already loaded)
         var parentIds = allIds.Except(filteredIds).ToList();
-        
+
         List<ITreeRedbObject> allObjects;
-        
+
         if (parentIds.Any())
         {
             // 4. Load ONLY parents
-            var parents = await _treeProvider.LoadObjectsByIdsAsync(parentIds, _treeContext.PropsDepth);
+            var parents = await _treeProvider.LoadObjectsByIdsAsync(parentIds, _treeContext.PropsDepth, cancellationToken: cancellationToken);
 
             // 5. Combine parents with already loaded children
             allObjects = parents
@@ -702,17 +698,17 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     /// <summary>
     /// Execute query and get flat list of tree objects
     /// </summary>
-    public override async Task<List<TreeRedbObject<TProps>>> ToFlatListAsync()
+    public override async Task<List<TreeRedbObject<TProps>>> ToFlatListAsync(CancellationToken cancellationToken = default)
     {
         // Execute query through provider
         var expression = BuildTreeExpression();
-        var result = await _treeProvider.ExecuteAsync(expression, typeof(List<TreeRedbObject<TProps>>));
+        var result = await _treeProvider.ExecuteAsync(expression, typeof(List<TreeRedbObject<TProps>>), cancellationToken: cancellationToken);
         var list = (List<TreeRedbObject<TProps>>)result;
         return list;
     }
 
     /// <summary>
-    /// ✅ NEW METHOD: Determines if filter is empty (Where(x => false))
+    /// NEW METHOD: Determines if filter is empty (Where(x => false))
     /// </summary>
     private bool IsEmptyFilter(FilterExpression filter)
     {
@@ -731,8 +727,8 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     }
 
     // ===== LINQ METHODS ARE INHERITED FROM BASE CLASS =====
-    // 💀 REMOVED all duplicated Where/OrderBy/Take/Skip/Distinct methods!
-    // ✅ Using logic from RedbQueryable - WITHOUT DUPLICATION!
+    // REMOVED all duplicated Where/OrderBy/Take/Skip/Distinct methods!
+    // Using logic from RedbQueryable - WITHOUT DUPLICATION!
 
     /// <summary>
     /// Configure maximum search depth in tree
@@ -901,10 +897,10 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     /// Delete objects without loading data
     /// Executes DELETE with filters from query
     /// </summary>
-    public override async Task<int> DeleteAsync()
+    public override async Task<int> DeleteAsync(CancellationToken cancellationToken = default)
     {
         // 1. Get list of objects by filter
-        var objects = await ToListAsync();
+        var objects = await ToListAsync(cancellationToken: cancellationToken);
 
         if (objects.Count == 0)
             return 0;
@@ -913,9 +909,9 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var objectIds = objects.Select(o => o.Id).ToArray();
 
         // 3. Delete through provider
-        return await _treeProvider.ExecuteTreeDeleteAsync(objectIds);
+        return await _treeProvider.ExecuteTreeDeleteAsync(objectIds, cancellationToken: cancellationToken);
     }
-    
+
     /// <summary>
     /// Override GroupBy to respect tree context (rootObjectId, maxDepth, ParentIds).
     /// Returns TreeGroupedQueryable that uses tree-aware execution.
@@ -927,7 +923,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         return new Grouping.TreeGroupedQueryable<TKey, TProps>(
             _treeProvider, _treeContext, keySelector, BuildFilterJson());
     }
-    
+
     /// <summary>
     /// Override GroupByRedb to respect tree context.
     /// </summary>
@@ -937,7 +933,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         return new Grouping.TreeGroupedQueryable<TKey, TProps>(
             _treeProvider, _treeContext, keySelector, BuildFilterJson(), isBaseFieldGrouping: true);
     }
-    
+
     /// <summary>
     /// Override WithWindow to use tree-aware execution.
     /// Returns TreeWindowedQueryable that uses tree-aware execution with CTE.

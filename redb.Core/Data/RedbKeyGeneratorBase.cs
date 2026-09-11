@@ -53,37 +53,58 @@ namespace redb.Core.Data
         /// </summary>
         protected abstract Task<List<long>> GenerateKeysAsync(int count);
 
+        /// <summary>
+        /// Provider hook for the single-writer trap (SQLite): when the calling scope already
+        /// holds a write transaction (BEGIN IMMEDIATE), a refill on a SEPARATE connection
+        /// deadlocks against it - the refill waits for the file's only write lock, the lock
+        /// holder waits for the refill, and only busy_timeout unwinds the pair. A provider that
+        /// can allocate keys on the scope's own connection INSIDE that transaction returns them
+        /// here, bypassing the shared cache: on rollback the sequence bump is taken back with
+        /// the transaction, and these ids were never visible outside it - no duplicates either
+        /// way. Default: null (PostgreSQL/MSSQL sequences live outside transactions, the trap
+        /// does not exist there).
+        /// </summary>
+        protected virtual Task<List<long>?> TryGenerateKeysInAmbientTransactionAsync(int count)
+            => Task.FromResult<List<long>?>(null);
+
         // === PUBLIC API ===
         
         /// <summary>
         /// Get next object ID (uses shared static cache).
         /// </summary>
-        public async Task<long> NextObjectIdAsync()
+        // ct is honoured at the entry only: the refill below feeds a SHARED static cache, and a
+        // caller's token must not abort a refill other callers are waiting on. The refill query
+        // itself is a single short statement.
+        public async Task<long> NextObjectIdAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return await GetNextKeyAsync();
         }
         
         /// <summary>
         /// Get next value ID (uses shared static cache).
         /// </summary>
-        public async Task<long> NextValueIdAsync()
+        public async Task<long> NextValueIdAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return await GetNextKeyAsync();
         }
         
         /// <summary>
         /// Get batch of object IDs.
         /// </summary>
-        public async Task<long[]> NextObjectIdBatchAsync(int count)
+        public async Task<long[]> NextObjectIdBatchAsync(int count, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return await GetNextKeyBatchAsync(count);
         }
         
         /// <summary>
         /// Get batch of value IDs.
         /// </summary>
-        public async Task<long[]> NextValueIdBatchAsync(int count)
+        public async Task<long[]> NextValueIdBatchAsync(int count, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return await GetNextKeyBatchAsync(count);
         }
         
@@ -109,6 +130,13 @@ namespace redb.Core.Data
                 return key;
             }
             
+            // Cache empty. If this scope sits inside its own write transaction, a refill on a
+            // separate connection would self-deadlock (SQLite single writer) - take the key
+            // through the ambient transaction instead, bypassing the shared cache.
+            var ambient = await TryGenerateKeysInAmbientTransactionAsync(1);
+            if (ambient is { Count: > 0 })
+                return ambient[0];
+
             // Cache empty - WAIT until fully refilled
             await RefillCacheBlockingAsync();
             
@@ -143,6 +171,16 @@ namespace redb.Core.Data
                 }
                 else
                 {
+                    // Same single-writer trap as in GetNextKeyAsync: inside the scope's own
+                    // transaction the remainder comes through it, bypassing the shared cache.
+                    var ambient = await TryGenerateKeysInAmbientTransactionAsync(count - collected);
+                    if (ambient is { Count: > 0 })
+                    {
+                        foreach (var ambientKey in ambient)
+                            result[collected++] = ambientKey;
+                        continue;
+                    }
+
                     // Cache empty - wait for refill
                     await RefillCacheBlockingAsync();
                 }

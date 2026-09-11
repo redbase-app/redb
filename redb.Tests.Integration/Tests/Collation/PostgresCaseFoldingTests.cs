@@ -15,4 +15,6 @@ public class PostgresCaseFoldingTests : CaseFoldingTestsBase
     // ICU root collation: neither fold applies.
     protected override bool FoldsSharpSToDoubleS => false;
     protected override bool FoldsTurkishDottedI  => false;
+
+    protected override bool PlainStartsWithIsCaseSensitive => true;
 }

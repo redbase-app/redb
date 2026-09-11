@@ -449,12 +449,13 @@ public sealed class ImportService
         dt.Columns.Add("_name", typeof(string));
         dt.Columns.Add("_alias", typeof(string));
         dt.Columns.Add("_name_space", typeof(string));
-        dt.Columns.Add("_structure_hash", typeof(Guid));
+        // uuid-semantic: object, not Guid - SQLite stores it as an RFC-ordered BLOB (GuidToDb).
+        dt.Columns.Add("_structure_hash", typeof(object));
         dt.Columns.Add("_type", typeof(long));
         return dt;
     }
 
-    private static void AddSchemeRow(DataTable dt, SchemeRecord r)
+    private void AddSchemeRow(DataTable dt, SchemeRecord r)
     {
         dt.Rows.Add(
             r.Id,
@@ -462,7 +463,7 @@ public sealed class ImportService
             r.Name,
             r.Alias ?? (object)DBNull.Value,
             r.NameSpace ?? (object)DBNull.Value,
-            r.StructureHash ?? (object)DBNull.Value,
+            GuidDb(r.StructureHash),
             r.SchemeType
         );
     }
@@ -487,6 +488,9 @@ public sealed class ImportService
         dt.Columns.Add("_store_null", typeof(bool));
         dt.Columns.Add("_default_value", typeof(byte[]));
         dt.Columns.Add("_default_editor", typeof(string));
+        dt.Columns.Add("_unique", typeof(bool));
+        dt.Columns.Add("_unique_version", typeof(long));
+        dt.Columns.Add("_lazy", typeof(bool));
         return dt;
     }
 
@@ -509,7 +513,10 @@ public sealed class ImportService
             r.IsCompress ?? (object)DBNull.Value,
             r.StoreNull ?? (object)DBNull.Value,
             r.DefaultValue ?? (object)DBNull.Value,
-            r.DefaultEditor ?? (object)DBNull.Value
+            r.DefaultEditor ?? (object)DBNull.Value,
+            r.Unique ?? (object)DBNull.Value,
+            r.UniqueVersion ?? (object)DBNull.Value,
+            r.Lazy ?? (object)DBNull.Value
         );
     }
 
@@ -544,12 +551,13 @@ public sealed class ImportService
         dt.Columns.Add("_code_string", typeof(string));
         dt.Columns.Add("_code_guid", typeof(Guid));
         dt.Columns.Add("_note", typeof(string));
-        dt.Columns.Add("_hash", typeof(Guid));
+        // uuid-semantic: object, not Guid - SQLite stores it as an RFC-ordered BLOB (GuidToDb).
+        dt.Columns.Add("_hash", typeof(object));
         dt.Columns.Add("_id_configuration", typeof(long));
         return dt;
     }
 
-    private static void AddUserRow(DataTable dt, UserRecord r)
+    private void AddUserRow(DataTable dt, UserRecord r)
     {
         dt.Rows.Add(
             r.Id,
@@ -566,7 +574,7 @@ public sealed class ImportService
             r.CodeString ?? (object)DBNull.Value,
             r.CodeGuid ?? (object)DBNull.Value,
             r.Note ?? (object)DBNull.Value,
-            r.Hash ?? (object)DBNull.Value,
+            GuidDb(r.Hash),
             r.IdConfiguration ?? (object)DBNull.Value
         );
     }
@@ -600,7 +608,8 @@ public sealed class ImportService
         dt.Columns.Add("_key", typeof(long));
         dt.Columns.Add("_name", typeof(string));
         dt.Columns.Add("_note", typeof(string));
-        dt.Columns.Add("_hash", typeof(Guid));
+        // uuid-semantic: object, not Guid - SQLite stores it as an RFC-ordered BLOB (GuidToDb).
+        dt.Columns.Add("_hash", typeof(object));
         dt.Columns.Add("_value_long", typeof(long));
         dt.Columns.Add("_value_string", typeof(string));
         dt.Columns.Add("_value_guid", typeof(Guid));
@@ -609,10 +618,11 @@ public sealed class ImportService
         dt.Columns.Add("_value_numeric", typeof(decimal));
         dt.Columns.Add("_value_datetime", typeof(DateTimeOffset));
         dt.Columns.Add("_value_bytes", typeof(byte[]));
+        dt.Columns.Add("_value_unique", typeof(string));
         return dt;
     }
 
-    private static void AddObjectRow(DataTable dt, ObjectRecord r)
+    private void AddObjectRow(DataTable dt, ObjectRecord r)
     {
         dt.Rows.Add(
             r.Id,
@@ -627,7 +637,7 @@ public sealed class ImportService
             r.Key ?? (object)DBNull.Value,
             r.Name ?? (object)DBNull.Value,
             r.Note ?? (object)DBNull.Value,
-            r.Hash ?? (object)DBNull.Value,
+            GuidDb(r.Hash),
             r.ValueLong ?? (object)DBNull.Value,
             r.ValueString ?? (object)DBNull.Value,
             r.ValueGuid ?? (object)DBNull.Value,
@@ -635,7 +645,8 @@ public sealed class ImportService
             r.ValueDouble ?? (object)DBNull.Value,
             r.ValueNumeric ?? (object)DBNull.Value,
             r.ValueDatetime.HasValue ? (object)r.ValueDatetime.Value : DBNull.Value,
-            r.ValueBytes ?? (object)DBNull.Value
+            r.ValueBytes ?? (object)DBNull.Value,
+            r.ValueUnique ?? (object)DBNull.Value
         );
     }
 
@@ -707,10 +718,12 @@ public sealed class ImportService
         dt.Columns.Add("_Object", typeof(long));
         dt.Columns.Add("_array_parent_id", typeof(long));
         dt.Columns.Add("_array_index", typeof(string));
+        // uuid-semantic: object, not Guid - SQLite stores it as an RFC-ordered BLOB (GuidToDb).
+        dt.Columns.Add("_unique", typeof(object));
         return dt;
     }
 
-    private static void AddValueRow(DataTable dt, ValueRecord r)
+    private void AddValueRow(DataTable dt, ValueRecord r)
     {
         dt.Rows.Add(
             r.Id,
@@ -727,9 +740,17 @@ public sealed class ImportService
             r.ListItem ?? (object)DBNull.Value,
             r.Object ?? (object)DBNull.Value,
             r.ArrayParentId ?? (object)DBNull.Value,
-            r.ArrayIndex ?? (object)DBNull.Value
+            r.ArrayIndex ?? (object)DBNull.Value,
+            GuidDb(r.Unique)
         );
     }
+
+    /// <summary>
+    /// Provider form of a uuid-semantic column value (<c>_hash</c>, <c>_structure_hash</c>,
+    /// <c>_values._unique</c>): the Guid itself for PostgreSQL/MSSQL, an RFC 4122-ordered
+    /// BLOB for SQLite. Genuine binary columns never go through this.
+    /// </summary>
+    private object GuidDb(Guid? value) => value is { } v ? _provider.GuidToDb(v) : DBNull.Value;
 
     #endregion
 

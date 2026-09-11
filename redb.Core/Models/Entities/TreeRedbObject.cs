@@ -202,11 +202,9 @@ namespace redb.Core.Models.Entities
     {
         // FIX: Props inherited from RedbObject<TProps> - duplication eliminated!
 
-        /// <summary>
-        /// TREE-SPECIFIC PROPERTIES - untyped navigation
-        /// Supports polymorphic trees - parents and children can be different types
-        /// </summary>
-        
+        // === TREE-SPECIFIC PROPERTIES - untyped navigation ===
+        // Supports polymorphic trees - parents and children can be different types
+
         /// <summary>
         /// Reference to parent object (untyped to support polymorphic trees)
         /// </summary>
@@ -217,10 +215,8 @@ namespace redb.Core.Models.Entities
         /// </summary>
         public ICollection<ITreeRedbObject> Children { get; set; } = new List<ITreeRedbObject>();
 
-        /// <summary>
-        /// TREE NAVIGATION PROPERTIES (moved from base TreeRedbObject)
-        /// </summary>
-        
+        // === TREE NAVIGATION PROPERTIES (moved from base TreeRedbObject) ===
+
         /// <summary>
         /// Checks if node is leaf (has no children)
         /// </summary>
@@ -290,10 +286,8 @@ namespace redb.Core.Models.Entities
             }
         }
 
-        /// <summary>
-        /// NAVIGATION METHODS (moved from base TreeRedbObject)
-        /// </summary>
-        
+        // === NAVIGATION METHODS (moved from base TreeRedbObject) ===
+
         /// <summary>
         /// Gets path from root to current node as IDs
         /// </summary>

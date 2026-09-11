@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Models.Contracts;
 
@@ -21,14 +22,17 @@ public interface IGroupedWindowedQueryable<TKey, TProps>
     /// <typeparam name="TResult">Result type</typeparam>
     /// <param name="selector">Projection expression with group aggregations and window functions</param>
     /// <returns>List of results with window calculations</returns>
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
     Task<List<TResult>> SelectAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector);
+        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get SQL preview for debugging.
     /// </summary>
     Task<string> ToSqlStringAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector);
+        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

@@ -48,11 +48,6 @@ namespace redb.Core.Models.Configuration
         
         // === PERFORMANCE ===
         
-        /// <summary>
-        /// Enable lazy loading for Props
-        /// </summary>
-        public bool EnableLazyLoadingForProps { get; set; }
-        
         // === SECURITY ===
         
         /// <summary>

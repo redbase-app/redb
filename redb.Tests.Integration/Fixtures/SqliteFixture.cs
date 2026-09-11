@@ -38,7 +38,6 @@ public sealed class SqliteFixture : IAsyncLifetime
             {
                 c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert;
                 c.SkipHashValidationOnCacheCheck = false;
-                c.EnableLazyLoadingForProps = false;
                 c.EnablePropsCache = false;
             }));
 

@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -26,7 +27,68 @@ namespace redb.Core.Providers.Base
         protected readonly ISqlDialect Sql;
         protected readonly ILogger? Logger;
         protected readonly GlobalListCache ListCache;
-        
+
+        /// <inheritdoc />
+        public Func<long, Task<IRedbObject?>>? LinkedObjectLoader { get; set; }
+
+        /// <inheritdoc />
+        public Func<long, IRedbObject?>? LinkedObjectSyncLoader { get; set; }
+
+        /// <inheritdoc />
+        public Func<IReadOnlyCollection<long>, CancellationToken, Task<IReadOnlyDictionary<long, IRedbObject>>>? LinkedObjectsBatchLoader { get; set; }
+
+        /// <summary>
+        /// Hand-out preload (PreloadListItemLinkedObjects, default on): resolve the linked
+        /// objects of the items in ONE batch and publish them, so a later touch of
+        /// <see cref="RedbListItem.Object"/> is a field read - no database call, no blocked
+        /// thread (a hot loop over fresh lazy items froze a production process, 2026-09-09).
+        /// Items already carrying their object are skipped; a missing id stays lazy.
+        /// </summary>
+        private async Task PreloadLinkedObjectsAsync(IReadOnlyList<RedbListItem> items, CancellationToken cancellationToken)
+        {
+            var batchLoader = LinkedObjectsBatchLoader;
+            if (batchLoader == null || !Configuration.PreloadListItemLinkedObjects) return;
+
+            var ids = new List<long>();
+            foreach (var item in items)
+                if (item is { IsObjectLoaded: false, IdObject: long id })
+                    ids.Add(id);
+            if (ids.Count == 0) return;
+
+            var byId = await batchLoader(ids, cancellationToken);
+            foreach (var item in items)
+                if (!item.IsObjectLoaded && item.IdObject is long id && byId.TryGetValue(id, out var obj))
+                    item.Object = obj;
+        }
+
+        /// <summary>
+        /// Binds the items to this provider's loader before they leave it. Items are shared through
+        /// the list cache across scopes, so this runs on every hand-out, cache hit included: the
+        /// scope that most recently asked for the item is the one it resolves its object through.
+        /// </summary>
+        protected List<RedbListItem> Attach(List<RedbListItem> items)
+        {
+            var loader = LinkedObjectLoader;
+            var syncLoader = LinkedObjectSyncLoader;
+            foreach (var item in items)
+            {
+                if (loader != null) item.AttachObjectLoader(loader);
+                if (syncLoader != null) item.AttachSyncObjectLoader(syncLoader);
+            }
+            return items;
+        }
+
+        /// <inheritdoc cref="Attach(List{RedbListItem})"/>
+        protected RedbListItem? Attach(RedbListItem? item)
+        {
+            if (item != null)
+            {
+                if (LinkedObjectLoader is { } loader) item.AttachObjectLoader(loader);
+                if (LinkedObjectSyncLoader is { } syncLoader) item.AttachSyncObjectLoader(syncLoader);
+            }
+            return item;
+        }
+
         protected ListProviderBase(
             IRedbContext context, 
             RedbServiceConfiguration configuration,
@@ -43,33 +105,33 @@ namespace redb.Core.Providers.Base
         
         // === CRUD for lists ===
         
-        public async Task<RedbList?> GetListAsync(long listId)
+        public async Task<RedbList?> GetListAsync(long listId, CancellationToken cancellationToken = default)
         {
             var cached = ListCache.GetList(listId);
             if (cached != null) return cached;
             
-            var list = await Context.QueryFirstOrDefaultAsync<RedbList>(Sql.Lists_SelectById(), listId);
+            var list = await Context.QueryFirstOrDefaultAsync<RedbList>(Sql.Lists_SelectById(), new object[] { listId }, cancellationToken);
             if (list == null) return null;
             
             ListCache.CacheList(list);
             return list;
         }
         
-        public async Task<RedbList?> GetListByNameAsync(string name)
+        public async Task<RedbList?> GetListByNameAsync(string name, CancellationToken cancellationToken = default)
         {
             var cached = ListCache.GetListByName(name);
             if (cached != null) return cached;
             
-            var list = await Context.QueryFirstOrDefaultAsync<RedbList>(Sql.Lists_SelectByName(), name);
+            var list = await Context.QueryFirstOrDefaultAsync<RedbList>(Sql.Lists_SelectByName(), new object[] { name }, cancellationToken);
             if (list == null) return null;
             
             ListCache.CacheList(list);
             return list;
         }
         
-        public async Task<List<RedbList>> GetAllListsAsync()
+        public async Task<List<RedbList>> GetAllListsAsync(CancellationToken cancellationToken = default)
         {
-            var lists = await Context.QueryAsync<RedbList>(Sql.Lists_SelectAll());
+            var lists = await Context.QueryAsync<RedbList>(Sql.Lists_SelectAll(), System.Array.Empty<object>(), cancellationToken);
             
             foreach (var list in lists)
             {
@@ -82,7 +144,7 @@ namespace redb.Core.Providers.Base
         /// <summary>
         /// Get list with all its items loaded.
         /// </summary>
-        public async Task<RedbList?> GetListWithItemsAsync(long listId)
+        public async Task<RedbList?> GetListWithItemsAsync(long listId, CancellationToken cancellationToken = default)
         {
             var list = await GetListAsync(listId);
             if (list == null) return null;
@@ -96,7 +158,7 @@ namespace redb.Core.Providers.Base
         /// <summary>
         /// Get list by name with all its items loaded.
         /// </summary>
-        public async Task<RedbList?> GetListByNameWithItemsAsync(string name)
+        public async Task<RedbList?> GetListByNameWithItemsAsync(string name, CancellationToken cancellationToken = default)
         {
             var list = await GetListByNameAsync(name);
             if (list == null) return null;
@@ -107,7 +169,7 @@ namespace redb.Core.Providers.Base
             return list;
         }
         
-        public async Task<RedbList> SaveListAsync(IRedbList list)
+        public async Task<RedbList> SaveListAsync(IRedbList list, CancellationToken cancellationToken = default)
         {
             RedbList entity;
             
@@ -120,30 +182,30 @@ namespace redb.Core.Providers.Base
                     Name = list.Name,
                     Alias = list.Alias
                 };
-                await Context.ExecuteAsync(Sql.Lists_Insert(), entity.Id, entity.Name, entity.Alias);
+                await Context.ExecuteAsync(Sql.Lists_Insert(), new object[] { entity.Id, entity.Name, entity.Alias }, cancellationToken);
             }
             else
             {
-                var existing = await Context.QueryFirstOrDefaultAsync<RedbList>(Sql.Lists_SelectById(), list.Id);
+                var existing = await Context.QueryFirstOrDefaultAsync<RedbList>(Sql.Lists_SelectById(), new object[] { list.Id }, cancellationToken);
                 if (existing == null)
                     throw new InvalidOperationException($"List with ID {list.Id} not found");
                     
                 entity = new RedbList { Id = list.Id, Name = list.Name, Alias = list.Alias };
-                await Context.ExecuteAsync(Sql.Lists_Update(), entity.Name, entity.Alias, entity.Id);
+                await Context.ExecuteAsync(Sql.Lists_Update(), new object[] { entity.Name, entity.Alias, entity.Id }, cancellationToken);
             }
             
             ListCache.InvalidateList(entity.Id);
             return entity;
         }
         
-        public async Task<bool> DeleteListAsync(long listId)
+        public async Task<bool> DeleteListAsync(long listId, CancellationToken cancellationToken = default)
         {
             if (await IsListUsedInStructuresAsync(listId))
             {
                 return false;
             }
             
-            var result = await Context.ExecuteAsync(Sql.Lists_Delete(), listId);
+            var result = await Context.ExecuteAsync(Sql.Lists_Delete(), new object[] { listId }, cancellationToken);
             
             if (result == 0) return false;
             
@@ -153,47 +215,50 @@ namespace redb.Core.Providers.Base
         
         // === CRUD for list items ===
         
-        public async Task<RedbListItem?> GetListItemAsync(long itemId)
+        public async Task<RedbListItem?> GetListItemAsync(long itemId, CancellationToken cancellationToken = default)
         {
-            var cached = ListCache.GetListItem(itemId);
-            if (cached != null) return cached;
-            
-            return await Context.QueryFirstOrDefaultAsync<RedbListItem>(Sql.ListItems_SelectById(), itemId);
+            var item = ListCache.GetListItem(itemId)
+                ?? await Context.QueryFirstOrDefaultAsync<RedbListItem>(Sql.ListItems_SelectById(), new object[] { itemId }, cancellationToken);
+            if (item == null) return null;
+            Attach(item);
+            await PreloadLinkedObjectsAsync(new[] { item }, cancellationToken);
+            return item;
         }
-        
-        public async Task<List<RedbListItem>> GetListItemsAsync(long listId)
+
+        public async Task<List<RedbListItem>> GetListItemsAsync(long listId, CancellationToken cancellationToken = default)
         {
-            var cached = ListCache.GetListItems(listId);
-            if (cached != null) return cached;
-            
-            var items = await Context.QueryAsync<RedbListItem>(Sql.ListItems_SelectByListId(), listId);
-            
-            ListCache.CacheListItems(listId, items);
+            var items = ListCache.GetListItems(listId);
+            if (items == null)
+            {
+                items = await Context.QueryAsync<RedbListItem>(Sql.ListItems_SelectByListId(), new object[] { listId }, cancellationToken);
+                ListCache.CacheListItems(listId, items);
+            }
+            Attach(items);
+            await PreloadLinkedObjectsAsync(items, cancellationToken);
             return items;
         }
         
-        public async Task<RedbListItem?> GetListItemByValueAsync(long listId, string value)
+        public async Task<RedbListItem?> GetListItemByValueAsync(long listId, string value, CancellationToken cancellationToken = default)
         {
             var items = await GetListItemsAsync(listId);
             return items.FirstOrDefault(i => i.Value == value);
         }
         
-        public async Task<RedbListItem> SaveListItemAsync(IRedbListItem item)
+        public async Task<RedbListItem> SaveListItemAsync(IRedbListItem item, CancellationToken cancellationToken = default)
         {
             RedbListItem entity;
             
             if (item.Id == 0)
             {
                 var existing = await Context.QueryFirstOrDefaultAsync<RedbListItem>(
-                    Sql.ListItems_SelectByListIdAndValue(), item.IdList, item.Value);
+                    Sql.ListItems_SelectByListIdAndValue(), new object[] { item.IdList, item.Value }, cancellationToken);
                 
                 if (existing != null)
                 {
                     entity = existing;
                     entity.Alias = item.Alias;
                     entity.IdObject = item.IdObject;
-                    await Context.ExecuteAsync(Sql.ListItems_UpdateAliasAndObject(), 
-                        entity.Alias, entity.IdObject, entity.Id);
+                    await Context.ExecuteAsync(Sql.ListItems_UpdateAliasAndObject(), new object[] { entity.Alias, entity.IdObject, entity.Id }, cancellationToken);
                 }
                 else
                 {
@@ -205,14 +270,13 @@ namespace redb.Core.Providers.Base
                         Alias = item.Alias,
                         IdObject = item.IdObject
                     };
-                    await Context.ExecuteAsync(Sql.ListItems_Insert(),
-                        entity.Id, entity.IdList, entity.Value, entity.Alias, entity.IdObject);
+                    await Context.ExecuteAsync(Sql.ListItems_Insert(), new object[] { entity.Id, entity.IdList, entity.Value, entity.Alias, entity.IdObject }, cancellationToken);
                 }
             }
             else
             {
                 var existing = await Context.QueryFirstOrDefaultAsync<RedbListItem>(
-                    Sql.ListItems_SelectById(), item.Id);
+                    Sql.ListItems_SelectById(), new object[] { item.Id }, cancellationToken);
                 if (existing == null)
                     throw new InvalidOperationException($"ListItem with ID {item.Id} not found");
                     
@@ -220,29 +284,28 @@ namespace redb.Core.Providers.Base
                 entity.Value = item.Value;
                 entity.Alias = item.Alias;
                 entity.IdObject = item.IdObject;
-                await Context.ExecuteAsync(Sql.ListItems_Update(),
-                    entity.Value, entity.Alias, entity.IdObject, entity.Id);
+                await Context.ExecuteAsync(Sql.ListItems_Update(), new object[] { entity.Value, entity.Alias, entity.IdObject, entity.Id }, cancellationToken);
             }
             
             ListCache.InvalidateListItems(entity.IdList);
-            return entity;
+            return Attach(entity)!;
         }
         
-        public async Task<bool> DeleteListItemAsync(long itemId)
+        public async Task<bool> DeleteListItemAsync(long itemId, CancellationToken cancellationToken = default)
         {
             var entity = await Context.QueryFirstOrDefaultAsync<RedbListItem>(
-                Sql.ListItems_SelectById(), itemId);
+                Sql.ListItems_SelectById(), new object[] { itemId }, cancellationToken);
                 
             if (entity == null) return false;
             
             var listId = entity.IdList;
-            await Context.ExecuteAsync(Sql.ListItems_Delete(), itemId);
+            await Context.ExecuteAsync(Sql.ListItems_Delete(), new object[] { itemId }, cancellationToken);
             
             ListCache.InvalidateListItems(listId);
             return true;
         }
         
-        public async Task<List<RedbListItem>> AddItemsAsync(IRedbList list, IEnumerable<IRedbListItem> items)
+        public async Task<List<RedbListItem>> AddItemsAsync(IRedbList list, IEnumerable<IRedbListItem> items, CancellationToken cancellationToken = default)
         {
             var entities = new List<RedbListItem>();
             
@@ -258,15 +321,14 @@ namespace redb.Core.Providers.Base
                 };
                 entities.Add(entity);
                 
-                await Context.ExecuteAsync(Sql.ListItems_Insert(),
-                    entity.Id, entity.IdList, entity.Value, entity.Alias, entity.IdObject);
+                await Context.ExecuteAsync(Sql.ListItems_Insert(), new object[] { entity.Id, entity.IdList, entity.Value, entity.Alias, entity.IdObject }, cancellationToken);
             }
             
             ListCache.InvalidateListItems(list.Id);
-            return entities;
+            return Attach(entities);
         }
         
-        public async Task<List<RedbListItem>> AddItemsAsync(IRedbList list, IEnumerable<string> values, IEnumerable<string>? aliases = null)
+        public async Task<List<RedbListItem>> AddItemsAsync(IRedbList list, IEnumerable<string> values, IEnumerable<string>? aliases = null, CancellationToken cancellationToken = default)
         {
             var valuesList = values.ToList();
             var aliasesList = aliases?.ToList();
@@ -281,12 +343,12 @@ namespace redb.Core.Providers.Base
             return await AddItemsAsync(list, itemsToAdd);
         }
         
-        public async Task<RedbList> SaveListWithItemsAsync(IRedbList list)
+        public async Task<RedbList> SaveListWithItemsAsync(IRedbList list, CancellationToken cancellationToken = default)
         {
             var savedList = await SaveListAsync(list);
             
             // 1. Get current items from DB
-            var dbItems = await Context.QueryAsync<RedbListItem>(Sql.ListItems_SelectByListId(), savedList.Id);
+            var dbItems = await Context.QueryAsync<RedbListItem>(Sql.ListItems_SelectByListId(), new object[] { savedList.Id }, cancellationToken);
             var dbItemIds = dbItems.Select(i => i.Id).ToHashSet();
             
             // 2. Get IDs from memory (existing items only, Id > 0)
@@ -301,7 +363,7 @@ namespace redb.Core.Providers.Base
             // 4. Delete removed items from DB
             foreach (var itemId in toDeleteIds)
             {
-                await Context.ExecuteAsync(Sql.ListItems_Delete(), itemId);
+                await Context.ExecuteAsync(Sql.ListItems_Delete(), new object[] { itemId }, cancellationToken);
             }
             
             // 5. Add new items (Id == 0)
@@ -337,18 +399,18 @@ namespace redb.Core.Providers.Base
         
         // === Specific methods ===
         
-        public async Task<List<RedbListItem>> GetItemsByObjectReferenceAsync(long objectId)
+        public async Task<List<RedbListItem>> GetItemsByObjectReferenceAsync(long objectId, CancellationToken cancellationToken = default)
         {
-            return await Context.QueryAsync<RedbListItem>(Sql.ListItems_SelectByObjectId(), objectId);
+            return Attach(await Context.QueryAsync<RedbListItem>(Sql.ListItems_SelectByObjectId(), new object[] { objectId }, cancellationToken));
         }
         
-        public async Task<bool> IsListUsedInStructuresAsync(long listId)
+        public async Task<bool> IsListUsedInStructuresAsync(long listId, CancellationToken cancellationToken = default)
         {
-            var result = await Context.ExecuteScalarAsync<long?>(Sql.Lists_IsUsedInStructures(), listId);
+            var result = await Context.ExecuteScalarAsync<long?>(Sql.Lists_IsUsedInStructures(), new object[] { listId }, cancellationToken);
             return result.HasValue;
         }
         
-        public async Task<RedbList> SyncListFromEnumAsync<TEnum>(string? listName = null) where TEnum : struct, Enum
+        public async Task<RedbList> SyncListFromEnumAsync<TEnum>(string? listName = null, CancellationToken cancellationToken = default) where TEnum : struct, Enum
         {
             var enumType = typeof(TEnum);
             var name = listName ?? enumType.Name;

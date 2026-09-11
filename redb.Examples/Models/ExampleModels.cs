@@ -214,3 +214,20 @@ public class PersonProps
     /// <summary>Array of ListItems (e.g. roles from dictionary).</summary>
     public List<RedbListItem>? Roles { get; set; }
 }
+
+/// <summary>
+/// Product with a unique business key (V4 [RedbUnique]): the SKU is unique per scheme,
+/// enforced by the database over the hash of the canonical value. Used by E003.
+/// </summary>
+public class ProductProps
+{
+    /// <summary>Unique business key. NULL never participates in uniqueness.</summary>
+    [RedbUnique]
+    public string? Sku { get; set; }
+
+    /// <summary>Display name (not unique).</summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Price in USD.</summary>
+    public decimal Price { get; set; }
+}

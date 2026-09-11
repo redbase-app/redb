@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Data;
 using redb.Core.Models.Contracts;
@@ -43,7 +44,7 @@ public abstract class UserProviderBase : IUserProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<IRedbUser> CreateUserAsync(CreateUserRequest request, IRedbUser? currentUser = null)
+    public virtual async Task<IRedbUser> CreateUserAsync(CreateUserRequest request, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         ValidateCreateRequest(request);
 
@@ -72,13 +73,12 @@ public abstract class UserProviderBase : IUserProvider
             Hash = Guid.NewGuid()
         };
 
-        await Context.ExecuteAsync(Sql.Users_Insert(),
-            newUser.Id, newUser.Login, newUser.Password, newUser.Name, 
+        await Context.ExecuteAsync(Sql.Users_Insert(), new object[] { newUser.Id, newUser.Login, newUser.Password, newUser.Name, 
             (object?)newUser.Phone ?? DBNull.Value, (object?)newUser.Email ?? DBNull.Value,
             newUser.Enabled, newUser.DateRegister, (object?)newUser.DateDismiss ?? DBNull.Value,
             (object?)newUser.Key ?? DBNull.Value, (object?)newUser.CodeInt ?? DBNull.Value,
             (object?)newUser.CodeString ?? DBNull.Value, (object?)newUser.CodeGuid ?? DBNull.Value,
-            (object?)newUser.Note ?? DBNull.Value, newUser.Hash);
+            (object?)newUser.Note ?? DBNull.Value, newUser.Hash }, cancellationToken);
 
         // Assign roles
         if (request.RoleNames?.Length > 0)
@@ -96,12 +96,12 @@ public abstract class UserProviderBase : IUserProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbUser> UpdateUserAsync(IRedbUser user, UpdateUserRequest request, IRedbUser? currentUser = null)
+    public virtual async Task<IRedbUser> UpdateUserAsync(IRedbUser user, UpdateUserRequest request, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         if (user.Id == 0 || user.Id == -1)
             throw new InvalidOperationException($"System user with ID {user.Id} cannot be modified");
 
-        var dbUser = await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectById(), user.Id);
+        var dbUser = await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectById(), new object[] { user.Id }, cancellationToken);
         if (dbUser == null)
             throw new ArgumentException($"User with ID {user.Id} not found");
 
@@ -109,7 +109,7 @@ public abstract class UserProviderBase : IUserProvider
 
         if (request.Login != null)
         {
-            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsByLoginExcluding(), request.Login, user.Id);
+            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsByLoginExcluding(), new object[] { request.Login, user.Id }, cancellationToken);
             if (exists.HasValue)
                 throw new InvalidOperationException($"User with login '{request.Login}' already exists");
             dbUser.Login = request.Login;
@@ -130,13 +130,13 @@ public abstract class UserProviderBase : IUserProvider
         // Update roles
         if (request.RoleNames != null)
         {
-            await Context.ExecuteAsync(Sql.UsersRoles_DeleteByUser(), user.Id);
+            await Context.ExecuteAsync(Sql.UsersRoles_DeleteByUser(), new object[] { user.Id }, cancellationToken);
             await AssignRolesByNamesAsync(user.Id, request.RoleNames);
             dataChanged = true;
         }
         else if (request.Roles != null)
         {
-            await Context.ExecuteAsync(Sql.UsersRoles_DeleteByUser(), user.Id);
+            await Context.ExecuteAsync(Sql.UsersRoles_DeleteByUser(), new object[] { user.Id }, cancellationToken);
             await AssignRolesByObjectsAsync(user.Id, request.Roles);
             dataChanged = true;
         }
@@ -144,13 +144,12 @@ public abstract class UserProviderBase : IUserProvider
         if (dataChanged)
         {
             dbUser.Hash = Guid.NewGuid();
-            await Context.ExecuteAsync(Sql.Users_Update(),
-                dbUser.Login, dbUser.Name, (object?)dbUser.Phone ?? DBNull.Value, 
+            await Context.ExecuteAsync(Sql.Users_Update(), new object[] { dbUser.Login, dbUser.Name, (object?)dbUser.Phone ?? DBNull.Value, 
                 (object?)dbUser.Email ?? DBNull.Value, dbUser.Enabled,
                 (object?)dbUser.DateDismiss ?? DBNull.Value, (object?)dbUser.Key ?? DBNull.Value,
                 (object?)dbUser.CodeInt ?? DBNull.Value, (object?)dbUser.CodeString ?? DBNull.Value,
                 (object?)dbUser.CodeGuid ?? DBNull.Value, (object?)dbUser.Note ?? DBNull.Value,
-                dbUser.Hash, dbUser.Id);
+                dbUser.Hash, dbUser.Id }, cancellationToken);
         }
 
         await OnUserUpdatedAsync(dbUser, currentUser);
@@ -159,12 +158,12 @@ public abstract class UserProviderBase : IUserProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> DeleteUserAsync(IRedbUser user, IRedbUser? currentUser = null)
+    public virtual async Task<bool> DeleteUserAsync(IRedbUser user, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         if (user.Id == 0 || user.Id == 1 || user.Id == -1)
             throw new InvalidOperationException($"System user with ID {user.Id} cannot be deleted");
 
-        var dbUser = await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectById(), user.Id);
+        var dbUser = await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectById(), new object[] { user.Id }, cancellationToken);
         if (dbUser == null)
             return false;
 
@@ -172,8 +171,8 @@ public abstract class UserProviderBase : IUserProvider
             return true; // Already soft-deleted
 
         // Delete associations
-        await Context.ExecuteAsync(Sql.UsersRoles_DeleteByUser(), user.Id);
-        await Context.ExecuteAsync(Sql.Permissions_DeleteByUser(), user.Id);
+        await Context.ExecuteAsync(Sql.UsersRoles_DeleteByUser(), new object[] { user.Id }, cancellationToken);
+        await Context.ExecuteAsync(Sql.Permissions_DeleteByUser(), new object[] { user.Id }, cancellationToken);
 
         // Soft delete — login STAYS as-is (immutable per protect_system_users trigger).
         // Name is suffixed for tombstoning visibility. Soft-deleted rows are filtered out
@@ -183,8 +182,7 @@ public abstract class UserProviderBase : IUserProvider
         var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmssfff");
         var newName = $"{dbUser.Name}_DEL_{timestamp}";
 
-        var result = await Context.ExecuteAsync(Sql.Users_SoftDelete(),
-            newName, false, DateTimeOffset.UtcNow, user.Id);
+        var result = await Context.ExecuteAsync(Sql.Users_SoftDelete(), new object[] { newName, false, DateTimeOffset.UtcNow, user.Id }, cancellationToken);
 
         if (result > 0)
             await OnUserDeletedAsync(user, currentUser);
@@ -197,36 +195,36 @@ public abstract class UserProviderBase : IUserProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<IRedbUser?> GetUserByIdAsync(long userId)
+    public virtual async Task<IRedbUser?> GetUserByIdAsync(long userId, CancellationToken cancellationToken = default)
     {
-        return await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectById(), userId);
+        return await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectById(), new object[] { userId }, cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task<List<IRedbUser>> GetUsersByIdsAsync(IEnumerable<long> userIds)
+    public virtual async Task<List<IRedbUser>> GetUsersByIdsAsync(IEnumerable<long> userIds, CancellationToken cancellationToken = default)
     {
         var ids = userIds.ToArray();
         if (ids.Length == 0)
             return new List<IRedbUser>();
-        var users = await Context.QueryAsync<RedbUser>(Sql.Users_SelectByIds(), (object)ids);
+        var users = await Context.QueryAsync<RedbUser>(Sql.Users_SelectByIds(), new object[] { (object)ids }, cancellationToken);
         return users.Cast<IRedbUser>().ToList();
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbUser?> GetUserByLoginAsync(string login)
+    public virtual async Task<IRedbUser?> GetUserByLoginAsync(string login, CancellationToken cancellationToken = default)
     {
-        return await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectByLogin(), login);
+        return await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectByLogin(), new object[] { login }, cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbUser?> GetUserByEmailAsync(string email)
+    public virtual async Task<IRedbUser?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(email)) return null;
-        return await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectByEmail(), email);
+        return await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectByEmail(), new object[] { email }, cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbUser> LoadUserAsync(string login)
+    public virtual async Task<IRedbUser> LoadUserAsync(string login, CancellationToken cancellationToken = default)
     {
         var user = await GetUserByLoginAsync(login);
         if (user == null)
@@ -235,7 +233,7 @@ public abstract class UserProviderBase : IUserProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbUser> LoadUserAsync(long userId)
+    public virtual async Task<IRedbUser> LoadUserAsync(long userId, CancellationToken cancellationToken = default)
     {
         var user = await GetUserByIdAsync(userId);
         if (user == null)
@@ -244,19 +242,19 @@ public abstract class UserProviderBase : IUserProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<List<IRedbUser>> GetUsersAsync(UserSearchCriteria? criteria = null)
+    public virtual async Task<List<IRedbUser>> GetUsersAsync(UserSearchCriteria? criteria = null, CancellationToken cancellationToken = default)
     {
         // Build dynamic SQL - this is DB-specific, override in derived class if needed
         var sql = BuildUserSearchSql(criteria, out var parameters);
-        var users = await Context.QueryAsync<RedbUser>(sql, parameters);
+        var users = await Context.QueryAsync<RedbUser>(sql, parameters, cancellationToken);
         return users.Cast<IRedbUser>().ToList();
     }
 
     /// <inheritdoc />
-    public virtual async Task<int> CountUsersAsync(UserSearchCriteria? criteria = null)
+    public virtual async Task<int> CountUsersAsync(UserSearchCriteria? criteria = null, CancellationToken cancellationToken = default)
     {
         var sql = BuildUserCountSql(criteria, out var parameters);
-        return await Context.ExecuteScalarAsync<int>(sql, parameters);
+        return await Context.ExecuteScalarAsync<int>(sql, parameters, cancellationToken);
     }
 
     /// <summary>
@@ -468,14 +466,14 @@ public abstract class UserProviderBase : IUserProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<IRedbUser?> ValidateUserAsync(string login, string password)
+    public virtual async Task<IRedbUser?> ValidateUserAsync(string login, string password, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
             return null;
 
         try
         {
-            var user = await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectByLogin(), login);
+            var user = await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectByLogin(), new object[] { login }, cancellationToken);
             if (user == null || !user.Enabled)
                 return null;
 
@@ -491,14 +489,14 @@ public abstract class UserProviderBase : IUserProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> ChangePasswordAsync(IRedbUser user, string currentPassword, string newPassword, IRedbUser? currentUser = null)
+    public virtual async Task<bool> ChangePasswordAsync(IRedbUser user, string currentPassword, string newPassword, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         if (user == null) throw new ArgumentNullException(nameof(user));
         if (string.IsNullOrWhiteSpace(currentPassword)) throw new ArgumentException("Current password cannot be empty");
         if (string.IsNullOrWhiteSpace(newPassword)) throw new ArgumentException("New password cannot be empty");
         if (user.Id == 0) throw new InvalidOperationException("Cannot change password for system user (ID 0)");
 
-        var dbUser = await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectById(), user.Id);
+        var dbUser = await Context.QueryFirstOrDefaultAsync<RedbUser>(Sql.Users_SelectById(), new object[] { user.Id }, cancellationToken);
         if (dbUser == null) throw new InvalidOperationException($"User with ID {user.Id} not found");
         if (!dbUser.Enabled) throw new InvalidOperationException("Cannot change password for disabled user");
 
@@ -512,13 +510,13 @@ public abstract class UserProviderBase : IUserProvider
             throw new ArgumentException("New password must be different from current");
 
         var hashedPassword = PasswordHasher.HashPassword(newPassword);
-        await Context.ExecuteAsync(Sql.Users_UpdatePassword(), hashedPassword, user.Id);
+        await Context.ExecuteAsync(Sql.Users_UpdatePassword(), new object[] { hashedPassword, user.Id }, cancellationToken);
 
         return true;
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> SetPasswordAsync(IRedbUser user, string newPassword, IRedbUser? currentUser = null)
+    public virtual async Task<bool> SetPasswordAsync(IRedbUser user, string newPassword, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         if (user.Id == 0)
             throw new InvalidOperationException("System user password (ID 0) cannot be changed");
@@ -529,12 +527,12 @@ public abstract class UserProviderBase : IUserProvider
         if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
             throw new ArgumentException("Password must be at least 4 characters");
 
-        var exists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsById(), user.Id);
+        var exists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsById(), new object[] { user.Id }, cancellationToken);
         if (!exists.HasValue)
             throw new ArgumentException($"User with ID {user.Id} not found");
 
         var hashedPassword = PasswordHasher.HashPassword(newPassword);
-        var result = await Context.ExecuteAsync(Sql.Users_UpdatePassword(), hashedPassword, user.Id);
+        var result = await Context.ExecuteAsync(Sql.Users_UpdatePassword(), new object[] { hashedPassword, user.Id }, cancellationToken);
         return result > 0;
     }
 
@@ -543,17 +541,17 @@ public abstract class UserProviderBase : IUserProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<bool> EnableUserAsync(IRedbUser user, IRedbUser? currentUser = null)
+    public virtual async Task<bool> EnableUserAsync(IRedbUser user, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         if (user.Id == 0 || user.Id == -1)
             return true;
 
-        var result = await Context.ExecuteAsync(Sql.Users_UpdateStatus(), true, DBNull.Value, user.Id);
+        var result = await Context.ExecuteAsync(Sql.Users_UpdateStatus(), new object[] { true, DBNull.Value, user.Id }, cancellationToken);
         return result >= 0;
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> DisableUserAsync(IRedbUser user, IRedbUser? currentUser = null)
+    public virtual async Task<bool> DisableUserAsync(IRedbUser user, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         if (user.Id == 0 || user.Id == -1)
             throw new InvalidOperationException($"System user with ID {user.Id} cannot be disabled");
@@ -561,7 +559,7 @@ public abstract class UserProviderBase : IUserProvider
         if (currentUser != null && currentUser.Id == user.Id)
             throw new InvalidOperationException("User cannot disable themselves");
 
-        var result = await Context.ExecuteAsync(Sql.Users_UpdateStatus(), false, DateTimeOffset.UtcNow, user.Id);
+        var result = await Context.ExecuteAsync(Sql.Users_UpdateStatus(), new object[] { false, DateTimeOffset.UtcNow, user.Id }, cancellationToken);
         return result >= 0;
     }
 
@@ -570,7 +568,7 @@ public abstract class UserProviderBase : IUserProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<UserValidationResult> ValidateUserDataAsync(CreateUserRequest request)
+    public virtual async Task<UserValidationResult> ValidateUserDataAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
     {
         var result = new UserValidationResult();
 
@@ -599,7 +597,7 @@ public abstract class UserProviderBase : IUserProvider
             if (!request.Email.Contains('@') || !request.Email.Contains('.'))
                 result.AddError("Email", "Invalid email format");
 
-            var emailExists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsByEmail(), request.Email);
+            var emailExists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsByEmail(), new object[] { request.Email }, cancellationToken);
             if (emailExists.HasValue)
                 result.AddError("Email", $"Email '{request.Email}' is already taken");
         }
@@ -630,16 +628,16 @@ public abstract class UserProviderBase : IUserProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> IsLoginAvailableAsync(string login, long? excludeUserId = null)
+    public virtual async Task<bool> IsLoginAvailableAsync(string login, long? excludeUserId = null, CancellationToken cancellationToken = default)
     {
         if (excludeUserId.HasValue)
         {
-            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsByLoginExcluding(), login, excludeUserId.Value);
+            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsByLoginExcluding(), new object[] { login, excludeUserId.Value }, cancellationToken);
             return !exists.HasValue;
         }
         else
         {
-            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsByLogin(), login);
+            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsByLogin(), new object[] { login }, cancellationToken);
             return !exists.HasValue;
         }
     }
@@ -649,13 +647,13 @@ public abstract class UserProviderBase : IUserProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<int> GetUserCountAsync(bool includeDisabled = false)
+    public virtual async Task<int> GetUserCountAsync(bool includeDisabled = false, CancellationToken cancellationToken = default)
     {
-        return await Context.ExecuteScalarAsync<int>(includeDisabled ? Sql.Users_Count() : Sql.Users_CountEnabled());
+        return await Context.ExecuteScalarAsync<int>(includeDisabled ? Sql.Users_Count() : Sql.Users_CountEnabled(), System.Array.Empty<object>(), cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual Task<int> GetActiveUserCountAsync(DateTimeOffset fromDate, DateTimeOffset toDate)
+    public virtual Task<int> GetActiveUserCountAsync(DateTimeOffset fromDate, DateTimeOffset toDate, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException("GetActiveUserCountAsync requires activity logging");
     }
@@ -665,23 +663,23 @@ public abstract class UserProviderBase : IUserProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<long?> GetUserConfigurationIdAsync(long userId)
+    public virtual async Task<long?> GetUserConfigurationIdAsync(long userId, CancellationToken cancellationToken = default)
     {
-        return await Context.ExecuteScalarAsync<long?>(Sql.Users_SelectConfigurationId(), userId);
+        return await Context.ExecuteScalarAsync<long?>(Sql.Users_SelectConfigurationId(), new object[] { userId }, cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task SetUserConfigurationAsync(long userId, long? configId)
+    public virtual async Task SetUserConfigurationAsync(long userId, long? configId, CancellationToken cancellationToken = default)
     {
-        var result = await Context.ExecuteAsync(Sql.Users_UpdateConfiguration(), (object?)configId ?? DBNull.Value, userId);
+        var result = await Context.ExecuteAsync(Sql.Users_UpdateConfiguration(), new object[] { (object?)configId ?? DBNull.Value, userId }, cancellationToken);
         if (result == 0)
             throw new ArgumentException($"User with ID {userId} not found");
     }
 
     /// <inheritdoc />
-    public virtual async Task<List<IRedbRole>> GetUserRolesAsync(long userId)
+    public virtual async Task<List<IRedbRole>> GetUserRolesAsync(long userId, CancellationToken cancellationToken = default)
     {
-        var roles = await Context.QueryAsync<RedbRole>(Sql.UsersRoles_SelectRolesByUser(), userId);
+        var roles = await Context.QueryAsync<RedbRole>(Sql.UsersRoles_SelectRolesByUser(), new object[] { userId }, cancellationToken);
         return roles.Cast<IRedbRole>().ToList();
     }
 
@@ -697,29 +695,29 @@ public abstract class UserProviderBase : IUserProvider
         if (string.IsNullOrWhiteSpace(request.Name)) throw new ArgumentException("Name cannot be empty");
     }
 
-    private async Task AssignRolesByNamesAsync(long userId, string[] roleNames)
+    private async Task AssignRolesByNamesAsync(long userId, string[] roleNames, CancellationToken cancellationToken = default)
     {
         foreach (var roleName in roleNames)
         {
-            var role = await Context.QueryFirstOrDefaultAsync<RedbRole>(Sql.Roles_SelectIdByName(), roleName);
+            var role = await Context.QueryFirstOrDefaultAsync<RedbRole>(Sql.Roles_SelectIdByName(), new object[] { roleName }, cancellationToken);
             if (role == null)
                 throw new ArgumentException($"Role '{roleName}' not found");
 
             var userRoleId = await Context.NextObjectIdAsync();
-            await Context.ExecuteAsync(Sql.UsersRoles_Insert(), userRoleId, userId, role.Id);
+            await Context.ExecuteAsync(Sql.UsersRoles_Insert(), new object[] { userRoleId, userId, role.Id }, cancellationToken);
         }
     }
 
-    private async Task AssignRolesByObjectsAsync(long userId, IRedbRole[] roles)
+    private async Task AssignRolesByObjectsAsync(long userId, IRedbRole[] roles, CancellationToken cancellationToken = default)
     {
         foreach (var role in roles)
         {
-            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Roles_ExistsById(), role.Id);
+            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Roles_ExistsById(), new object[] { role.Id }, cancellationToken);
             if (!exists.HasValue)
                 throw new ArgumentException($"Role with ID {role.Id} ('{role.Name}') not found");
 
             var userRoleId = await Context.NextObjectIdAsync();
-            await Context.ExecuteAsync(Sql.UsersRoles_Insert(), userRoleId, userId, role.Id);
+            await Context.ExecuteAsync(Sql.UsersRoles_Insert(), new object[] { userRoleId, userId, role.Id }, cancellationToken);
         }
     }
 

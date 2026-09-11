@@ -23,4 +23,6 @@ public class MsSqlCaseFoldingTests : CaseFoldingTestsBase
     // This asymmetry is the reason the boundaries are per-provider rather than shared.
     protected override bool FoldsSharpSToDoubleS => true;
     protected override bool FoldsTurkishDottedI  => true;
+
+    protected override bool PlainStartsWithIsCaseSensitive => false;
 }

@@ -167,7 +167,7 @@ namespace redb.Core.Extensions
                 if (method != null)
                 {
                     // Call method via reflection
-                    var task = method.Invoke(redb, null);
+                    var task = method.Invoke(redb, new object[] { System.Threading.CancellationToken.None }); // SyncSchemeAsync<T>(ct) takes a token now
                     if (task is Task asyncTask)
                     {
                         await asyncTask;

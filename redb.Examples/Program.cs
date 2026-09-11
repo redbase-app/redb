@@ -66,10 +66,15 @@ class Program
         // Discover examples
         var examples = DiscoverExamples();
 
-        // Parse args
+        // Parse args (stray "-" tokens tolerated: `dotnet run --no-build - E203` forwards the
+        // lone dash to the app)
         var exampleIds = args.Length > 0
-            ? args.Select(a => a.ToUpperInvariant()).ToHashSet()
+            ? args.Select(a => a.ToUpperInvariant()).Where(a => a.StartsWith('E')).ToHashSet()
             : null;
+        if (exampleIds is { Count: 0 }) exampleIds = null;
+
+        // Examples that behave differently when asked for by name (E203 seeds only then).
+        ExampleBase.ExplicitlyRequestedIds = exampleIds;
 
         // Filter examples
         var toRun = exampleIds == null
@@ -165,7 +170,6 @@ class Program
             {
                 c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert; // FREE tier: DeleteInsert (ChangeTracking is a Pro feature). Flip to ChangeTracking for the Pro run.
                 //c.SkipHashValidationOnCacheCheck = false;
-                //c.EnableLazyLoadingForProps = false;
                 //c.EnablePropsCache = false;
                 //c.PropsCacheMaxSize = 10000;
                 //c.PropsCacheTtl = TimeSpan.FromMinutes(60);
@@ -173,9 +177,13 @@ class Program
                 // diff the SQL with and without the cutting step. See docs/PVT_PREFILTER_PLAN.md.
                 c.EnablePvtPrefilter = true;// Environment.GetEnvironmentVariable("REDB_PVT_PREFILTER") == "1";
             })
-            .UsePostgres("Host=localhost;Port=5432;Username=postgres;Password=1;Database=redb;Pooling=true;Timeout=600;Command Timeout=600;Include Error Detail=true;Options=-c jit=off")
-            //.UseMsSql("Server=127.0.0.1,1433;Database=redb;User Id=sa;Password=1;TrustServerCertificate=true;Command Timeout=600;")  // 127.0.0.1 (not localhost): localhost->::1 hits docker [::]:1433 and hangs ~63s
-            //.UseSqlite(@"Data Source=C:\Work\redb_code\csharp\redb\redb.Examples\redb_examples.db")
+            // Examples live in their OWN databases (redb_examples), never in the test/Identity
+            // `redb`: the integration-test fixtures wipe their database CLEAN on start, and a
+            // seeded 8M-row _values under the cascade trigger turns that wipe into hours
+            // (2026-09-10: a seeded database was lost to exactly this).
+            //.UsePostgres("Host=localhost;Port=5432;Username=postgres;Password=1;Database=redb_examples;Pooling=true;Timeout=600;Command Timeout=600;Include Error Detail=true;Options=-c jit=off")
+            //.UseMsSql("Server=127.0.0.1,1433;Database=redb_examples;User Id=sa;Password=1;TrustServerCertificate=true;Command Timeout=600;")  // 127.0.0.1 (not localhost): localhost->::1 hits docker [::]:1433 and hangs ~63s
+            .UseSqlite(@"Data Source=redb_examples.db")
             );
     }
 

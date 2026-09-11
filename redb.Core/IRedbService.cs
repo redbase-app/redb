@@ -45,6 +45,12 @@ namespace redb.Core
         /// Provider for list management.
         /// </summary>
         IListProvider ListProvider { get; }
+
+        /// <summary>
+        /// Storage maintenance: planner statistics (<c>AnalyzeAsync</c> after bulk writes) and
+        /// index health (<c>GetIndexStatsAsync</c>). Explicit calls only - never a side effect.
+        /// </summary>
+        IMaintenanceProvider Maintenance { get; }
         
         // === CONFIGURATION ===
         
@@ -127,9 +133,21 @@ namespace redb.Core
         string GetSchemaScript();
 
         /// <summary>
+        /// Returns the SQL script that brings an existing database up to the module version this
+        /// build requires — the same text start-up applies automatically when the connected role is
+        /// allowed to. Hand it to the schema owner when it is not (see
+        /// <see cref="Exceptions.RedbSchemaOutdatedException"/>). Idempotent: safe to re-run.
+        /// Returns <c>null</c> for providers that have no versioned module (SQLite upgrades itself,
+        /// the database file belongs to the process).
+        /// </summary>
+        string? GetUpgradeScript();
+
+        /// <summary>
         /// Initialize REDB system at application startup, optionally creating the database schema first.
         /// </summary>
-        /// <param name="ensureCreated">If true, calls <see cref="EnsureDatabaseAsync"/> before initialization.</param>
+        /// <param name="ensureCreated">If true, calls <see cref="EnsureDatabaseAsync"/> before initialization.
+        /// If false and the database has no redb schema yet, initialization stops with
+        /// <see cref="Exceptions.RedbSchemaMissingException"/> - creation is opt-in, never a side effect.</param>
         /// <param name="assemblies">Assemblies to scan. If not specified — all loaded assemblies are scanned.</param>
         Task InitializeAsync(bool ensureCreated, params Assembly[] assemblies);
 

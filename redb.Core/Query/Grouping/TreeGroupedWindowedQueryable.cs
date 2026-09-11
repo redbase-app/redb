@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Models.Contracts;
 using redb.Core.Query.Aggregation;
@@ -36,7 +37,7 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
     }
 
     public async Task<List<TResult>> SelectAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector)
+        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var groupFields = ParseGroupFields();
         var aggregations = ParseAggregations(selector);
@@ -45,13 +46,13 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
         var orderBy = ParseOrderBy();
 
         var jsonResult = await _treeProvider.ExecuteTreeGroupedWindowQueryAsync(
-            _treeContext, groupFields, aggregations, windowFuncs, partitionBy, orderBy);
+            _treeContext, groupFields, aggregations, windowFuncs, partitionBy, orderBy, cancellationToken: cancellationToken);
 
         return MaterializeResults<TResult>(jsonResult, selector, groupFields);
     }
 
     public async Task<string> ToSqlStringAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector)
+        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var groupFields = ParseGroupFields();
         var aggregations = ParseAggregations(selector);
@@ -60,7 +61,7 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
         var orderBy = ParseOrderBy();
 
         return await _treeProvider.GetTreeGroupedWindowSqlPreviewAsync(
-            _treeContext, groupFields, aggregations, windowFuncs, partitionBy, orderBy);
+            _treeContext, groupFields, aggregations, windowFuncs, partitionBy, orderBy, cancellationToken: cancellationToken);
     }
 
     private List<GroupFieldRequest> ParseGroupFields()
@@ -91,87 +92,94 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
     private List<AggregateRequest> ParseAggregations(LambdaExpression selector)
     {
         var result = new List<AggregateRequest>();
-        
-        if (selector.Body is not NewExpression newExpr || newExpr.Members == null)
-            return result;
+        var param = selector.Parameters[0];
 
-        for (int i = 0; i < newExpr.Arguments.Count; i++)
+        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, "Оконный SelectAsync"))
         {
-            var arg = newExpr.Arguments[i];
-            var alias = newExpr.Members[i].Name;
-            
-            if (arg is MethodCallExpression methodCall)
+            var expr = GroupSelectorMembers.StripConvert(rawExpr);
+
+            if (GroupSelectorMembers.IsKeyAccess(expr, param))
+                continue;
+
+            if (expr is MethodCallExpression methodCall)
             {
                 var funcName = methodCall.Method.Name;
                 var declaringType = methodCall.Method.DeclaringType;
-                
-                // Check for Agg.Sum(g, x => x.Field) pattern - static Agg class methods
-                if (declaringType?.Name == "Agg" && 
+
+                if (declaringType == typeof(Win))
+                    continue; // оконная функция - её разбирает ParseWindowFunctions
+
+                if (declaringType?.Name == "Agg" &&
                     funcName is "Sum" or "Average" or "Min" or "Max" or "Count")
                 {
-                    // Agg.Sum has 2 arguments: (group, selector)
-                    // Field path is in the second argument (lambda)
-                    var fieldPath = methodCall.Arguments.Count > 1 
+                    var fieldPath = methodCall.Arguments.Count > 1
                         ? ExtractFieldPathFromLambda(methodCall.Arguments[1])
                         : null;
-                    
-                    var aggFunc = Enum.Parse<AggregateFunction>(funcName);
-                    result.Add(new AggregateRequest 
-                    { 
-                        Function = aggFunc, 
-                        FieldPath = fieldPath ?? "", 
-                        Alias = alias 
+                    result.Add(new AggregateRequest
+                    {
+                        Function = Enum.Parse<AggregateFunction>(funcName),
+                        FieldPath = fieldPath ?? "",
+                        Alias = name
                     });
+                    continue;
                 }
-                // Check for g.Sum(x => x.Field) pattern - IRedbGrouping methods
-                else if (IsGroupingMethod(methodCall) && 
+
+                if (declaringType == typeof(IRedbGrouping<TKey, TProps>) &&
                     funcName is "Sum" or "Avg" or "Min" or "Max" or "Count")
                 {
-                    var fieldPath = methodCall.Arguments.Count > 0 
+                    var fieldPath = methodCall.Arguments.Count > 0
                         ? ExtractFieldPathFromLambda(methodCall.Arguments[0])
                         : null;
-                    result.Add(new AggregateRequest 
-                    { 
-                        Function = Enum.Parse<AggregateFunction>(funcName), 
-                        FieldPath = fieldPath ?? "", 
-                        Alias = alias 
+                    result.Add(new AggregateRequest
+                    {
+                        Function = Enum.Parse<AggregateFunction>(funcName),
+                        FieldPath = fieldPath ?? "",
+                        Alias = name
                     });
+                    continue;
                 }
             }
+
+            if (expr is MemberExpression && GroupSelectorMembers.ReferencesParameter(expr, param))
+                continue; // путь поля (e.Props.X) - материализуется по имени/алиасу
+
+            if (!GroupSelectorMembers.ReferencesParameter(expr, param))
+                continue; // клиентское значение - вычислится при материализации
+
+            throw new NotSupportedException(
+                $"Оконный SelectAsync: член '{name}' использует строку/группу, но не является полем, " +
+                $"g.Key, Agg.*, методом группы или Win.* ('{expr}').");
         }
-        
+
         return result;
     }
+
 
     private List<WindowFuncRequest> ParseWindowFunctions(LambdaExpression selector)
     {
         var result = new List<WindowFuncRequest>();
-        
-        if (selector.Body is not NewExpression newExpr || newExpr.Members == null)
-            return result;
 
-        for (int i = 0; i < newExpr.Arguments.Count; i++)
+        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, "Оконный SelectAsync"))
         {
-            var arg = newExpr.Arguments[i];
-            var alias = newExpr.Members[i].Name;
-            
-            if (arg is MethodCallExpression methodCall && 
+            if (GroupSelectorMembers.StripConvert(rawExpr) is MethodCallExpression methodCall &&
                 methodCall.Method.DeclaringType == typeof(Win))
             {
-                var funcName = methodCall.Method.Name;
                 string? fieldPath = null;
-                
                 if (methodCall.Arguments.Count > 0)
-                {
                     fieldPath = ExtractFieldPathFromLambda(methodCall.Arguments[0]);
-                }
-                
-                result.Add(new WindowFuncRequest { Func = funcName, FieldPath = fieldPath ?? "", Alias = alias });
+
+                result.Add(new WindowFuncRequest
+                {
+                    Func = methodCall.Method.Name,
+                    FieldPath = fieldPath ?? "",
+                    Alias = name
+                });
             }
         }
-        
+
         return result;
     }
+
 
     private List<WindowFieldRequest> ParsePartitionBy()
     {
@@ -266,48 +274,50 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
         var results = new List<TResult>();
         if (jsonDoc == null) return results;
 
-        var resultType = typeof(TResult);
-        var constructor = resultType.GetConstructors().FirstOrDefault();
-        if (constructor == null) return results;
+        var members = GroupSelectorMembers.Extract(selector, "Оконный SelectAsync");
+        var param = selector.Parameters[0];
+
+        // Клиентские значения - раз на запрос. Win/Agg-вызовы клиентскими не считаются, даже
+        // когда не ссылаются на параметр (Win.RowNumber()): их значение приходит из JSON.
+        var clientValues = new object?[members.Count];
+        var isClient = new bool[members.Count];
+        for (int i = 0; i < members.Count; i++)
+        {
+            var e = GroupSelectorMembers.StripConvert(members[i].Expr);
+            var serverCall = e is MethodCallExpression mcx &&
+                (mcx.Method.DeclaringType == typeof(Win) || mcx.Method.DeclaringType?.Name == "Agg");
+            if (!serverCall && !GroupSelectorMembers.ReferencesParameter(e, param))
+            {
+                isClient[i] = true;
+                clientValues[i] = Expression.Lambda(members[i].Expr).Compile().DynamicInvoke();
+            }
+        }
 
         foreach (var element in jsonDoc.RootElement.EnumerateArray())
         {
-            var args = new List<object?>();
-            
-            if (selector.Body is NewExpression newExpr && newExpr.Members != null)
+            var values = new object?[members.Count];
+            for (int i = 0; i < members.Count; i++)
             {
-                for (int i = 0; i < newExpr.Members.Count; i++)
+                if (isClient[i]) { values[i] = clientValues[i]; continue; }
+
+                var (name, type, rawExpr) = members[i];
+                if (element.TryGetProperty(name, out var prop))
+                    values[i] = ConvertJsonValue(prop, type);
+                else
                 {
-                    var memberName = newExpr.Members[i].Name;
-                    var memberType = constructor.GetParameters()[i].ParameterType;
-                    
-                    // Try direct property lookup first
-                    if (element.TryGetProperty(memberName, out var prop))
-                    {
-                        args.Add(ConvertJsonValue(prop, memberType));
-                    }
+                    var jsonAlias = ExtractJsonAliasFromArgument(GroupSelectorMembers.StripConvert(rawExpr), groupFields);
+                    if (!string.IsNullOrEmpty(jsonAlias) && element.TryGetProperty(jsonAlias, out prop))
+                        values[i] = ConvertJsonValue(prop, type);
                     else
-                    {
-                        // Handle g.Key / g.Key.Field.Id patterns
-                        var jsonAlias = ExtractJsonAliasFromArgument(newExpr.Arguments[i], groupFields);
-                        if (!string.IsNullOrEmpty(jsonAlias) && element.TryGetProperty(jsonAlias, out prop))
-                        {
-                            args.Add(ConvertJsonValue(prop, memberType));
-                        }
-                        else
-                        {
-                            args.Add(GetDefaultValue(memberType));
-                        }
-                    }
+                        values[i] = GetDefaultValue(type);
                 }
             }
-            
-            var instance = constructor.Invoke(args.ToArray());
-            results.Add((TResult)instance);
+            results.Add(GroupSelectorMembers.Construct<TResult>(selector, values));
         }
 
         return results;
     }
+
 
     /// <summary>
     /// Extracts JSON field alias from selector argument.

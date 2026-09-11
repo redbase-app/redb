@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Models.Contracts;
 using redb.Core.Query.Aggregation;
@@ -22,12 +23,14 @@ public interface IRedbQueryProvider
     /// <summary>
     /// Execute query asynchronously.
     /// </summary>
-    Task<object> ExecuteAsync(Expression expression, Type elementType);
+    Task<object> ExecuteAsync(Expression expression, Type elementType,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get scheme by ID (for projections).
     /// </summary>
-    Task<IRedbScheme?> GetSchemeAsync(long schemeId);
+    Task<IRedbScheme?> GetSchemeAsync(long schemeId,
+        CancellationToken cancellationToken = default);
     
     // ===== AGGREGATIONS (EAV) =====
     
@@ -39,11 +42,13 @@ public interface IRedbQueryProvider
     /// <param name="function">Aggregation function</param>
     /// <param name="filterJson">JSON filter (as for search_objects)</param>
     /// <returns>Aggregation result</returns>
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
     Task<decimal?> ExecuteAggregateAsync(
         long schemeId, 
         string fieldPath, 
         AggregateFunction function,
-        string? filterJson = null);
+        string? filterJson = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute batch aggregation (multiple fields in one query).
@@ -51,7 +56,8 @@ public interface IRedbQueryProvider
     Task<AggregateResult> ExecuteAggregateBatchAsync(
         long schemeId,
         IEnumerable<AggregateRequest> requests,
-        string? filterJson = null);
+        string? filterJson = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute single-field aggregation with FilterExpression (Pro version).
@@ -60,7 +66,8 @@ public interface IRedbQueryProvider
         long schemeId,
         string fieldPath,
         AggregateFunction function,
-        FilterExpression? filter);
+        FilterExpression? filter,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute batch aggregation with FilterExpression (Pro version).
@@ -68,7 +75,8 @@ public interface IRedbQueryProvider
     Task<AggregateResult> ExecuteAggregateBatchAsync(
         long schemeId,
         IEnumerable<AggregateRequest> requests,
-        FilterExpression? filter);
+        FilterExpression? filter,
+        CancellationToken cancellationToken = default);
     
     // ===== GROUPBY AGGREGATIONS =====
     
@@ -81,7 +89,8 @@ public interface IRedbQueryProvider
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null);
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute GroupBy aggregation with FilterExpression (Pro version).
@@ -93,7 +102,8 @@ public interface IRedbQueryProvider
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         FilterExpression? filter,
-        string? havingJson = null);
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute GroupBy aggregation on array (SQL function aggregate_array_grouped).
@@ -104,7 +114,8 @@ public interface IRedbQueryProvider
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null);
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Execute GroupBy aggregation on array with FilterExpression (Pro version).
@@ -117,7 +128,8 @@ public interface IRedbQueryProvider
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         FilterExpression? filter,
-        string? havingJson = null);
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
     
     // ===== WINDOW FUNCTIONS =====
     
@@ -133,7 +145,8 @@ public interface IRedbQueryProvider
         string? filterJson = null,
         string? frameJson = null,
         int? take = null,
-        int? skip = null);
+        int? skip = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute query with window functions with FilterExpression (Pro version).
@@ -147,7 +160,8 @@ public interface IRedbQueryProvider
         FilterExpression? filter,
         string? frameJson = null,
         int? take = null,
-        int? skip = null);
+        int? skip = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get SQL preview for window query (for debugging).
@@ -161,7 +175,8 @@ public interface IRedbQueryProvider
         string? filterJson = null,
         string? frameJson = null,
         int? take = null,
-        int? skip = null);
+        int? skip = null,
+        CancellationToken cancellationToken = default);
     
     // ===== GROUPED WINDOW (GroupBy + Window Functions) =====
     
@@ -175,7 +190,8 @@ public interface IRedbQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? filterJson = null);
+        string? filterJson = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute GroupBy with Window Functions with FilterExpression (Pro version).
@@ -187,7 +203,8 @@ public interface IRedbQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        FilterExpression? filter);
+        FilterExpression? filter,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get SQL preview for GroupBy + Window query.
@@ -199,7 +216,8 @@ public interface IRedbQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? filterJson = null);
+        string? filterJson = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get SQL preview for GroupBy + Window query with FilterExpression (Pro version).
@@ -211,7 +229,8 @@ public interface IRedbQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        FilterExpression? filter);
+        FilterExpression? filter,
+        CancellationToken cancellationToken = default);
     
     // ===== DELETE =====
     
@@ -221,7 +240,9 @@ public interface IRedbQueryProvider
     /// <param name="schemeId">Scheme ID</param>
     /// <param name="filterJson">JSON filter</param>
     /// <returns>Number of deleted objects</returns>
-    Task<int> ExecuteDeleteAsync(long schemeId, string? filterJson = null);
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+    Task<int> ExecuteDeleteAsync(long schemeId, string? filterJson = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Delete objects by filter (Pro version with FilterExpression for PVT-based deletion).
@@ -229,7 +250,9 @@ public interface IRedbQueryProvider
     /// <param name="schemeId">Scheme ID</param>
     /// <param name="filter">Filter expression from LINQ</param>
     /// <returns>Number of deleted objects</returns>
-    Task<int> ExecuteDeleteAsync(long schemeId, FilterExpression? filter);
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+    Task<int> ExecuteDeleteAsync(long schemeId, FilterExpression? filter,
+        CancellationToken cancellationToken = default);
     
     // ===== SQL PREVIEW =====
     
@@ -237,10 +260,12 @@ public interface IRedbQueryProvider
     /// Get SQL query for debugging (analogous to ToQueryString in EF Core).
     /// Pro version returns PVT SQL, Open Source - redb_json_objects.
     /// </summary>
-    Task<string> GetSqlPreviewAsync<TProps>(QueryContext<TProps> context) where TProps : class, new();
+    Task<string> GetSqlPreviewAsync<TProps>(QueryContext<TProps> context,
+        CancellationToken cancellationToken = default) where TProps : class, new();
     
     /// <summary>
     /// Returns the JSON filter that will be sent to SQL function (for diagnostics)
     /// </summary>
-    Task<string> GetFilterJsonAsync<TProps>(QueryContext<TProps> context) where TProps : class, new();
+    Task<string> GetFilterJsonAsync<TProps>(QueryContext<TProps> context,
+        CancellationToken cancellationToken = default) where TProps : class, new();
 }

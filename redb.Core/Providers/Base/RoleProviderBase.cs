@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Data;
 using redb.Core.Models.Contracts;
@@ -46,7 +47,7 @@ public abstract class RoleProviderBase : IRoleProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<IRedbRole> CreateRoleAsync(CreateRoleRequest request, IRedbUser? currentUser = null)
+    public virtual async Task<IRedbRole> CreateRoleAsync(CreateRoleRequest request, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         ValidateRoleName(request.Name);
 
@@ -82,7 +83,7 @@ public abstract class RoleProviderBase : IRoleProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbRole> UpdateRoleAsync(IRedbRole role, string newName, IRedbUser? currentUser = null)
+    public virtual async Task<IRedbRole> UpdateRoleAsync(IRedbRole role, string newName, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         ValidateRoleName(newName);
 
@@ -94,11 +95,11 @@ public abstract class RoleProviderBase : IRoleProvider
         if (dbRole.Name != newName)
         {
             var existingRole = await Context.ExecuteScalarAsync<long?>(
-                Sql.Roles_ExistsByNameExcluding(), newName, role.Id);
+                Sql.Roles_ExistsByNameExcluding(), new object[] { newName, role.Id }, cancellationToken);
             if (existingRole.HasValue)
                 throw new InvalidOperationException($"Role with name '{newName}' already exists");
 
-            await Context.ExecuteAsync(Sql.Roles_UpdateName(), newName, role.Id);
+            await Context.ExecuteAsync(Sql.Roles_UpdateName(), new object[] { newName, role.Id }, cancellationToken);
             dbRole.Name = newName;
         }
 
@@ -108,20 +109,20 @@ public abstract class RoleProviderBase : IRoleProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> DeleteRoleAsync(IRedbRole role, IRedbUser? currentUser = null)
+    public virtual async Task<bool> DeleteRoleAsync(IRedbRole role, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         var dbRole = await GetRoleByIdInternalAsync(role.Id);
         if (dbRole == null)
             return false;
 
         // Cascade delete user-role associations
-        await Context.ExecuteAsync(Sql.UsersRoles_DeleteByRole(), role.Id);
+        await Context.ExecuteAsync(Sql.UsersRoles_DeleteByRole(), new object[] { role.Id }, cancellationToken);
 
         // Cascade delete role permissions
-        await Context.ExecuteAsync(Sql.Permissions_DeleteByRole(), role.Id);
+        await Context.ExecuteAsync(Sql.Permissions_DeleteByRole(), new object[] { role.Id }, cancellationToken);
 
         // Delete role itself
-        var result = await Context.ExecuteAsync(Sql.Roles_Delete(), role.Id);
+        var result = await Context.ExecuteAsync(Sql.Roles_Delete(), new object[] { role.Id }, cancellationToken);
 
         if (result > 0)
             await OnRoleDeletedAsync(role, currentUser);
@@ -134,19 +135,19 @@ public abstract class RoleProviderBase : IRoleProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<IRedbRole?> GetRoleByIdAsync(long roleId)
+    public virtual async Task<IRedbRole?> GetRoleByIdAsync(long roleId, CancellationToken cancellationToken = default)
     {
         return await GetRoleByIdInternalAsync(roleId);
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbRole?> GetRoleByNameAsync(string roleName)
+    public virtual async Task<IRedbRole?> GetRoleByNameAsync(string roleName, CancellationToken cancellationToken = default)
     {
         return await GetRoleByNameInternalAsync(roleName);
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbRole> LoadRoleAsync(long roleId)
+    public virtual async Task<IRedbRole> LoadRoleAsync(long roleId, CancellationToken cancellationToken = default)
     {
         var role = await GetRoleByIdAsync(roleId);
         if (role == null)
@@ -155,7 +156,7 @@ public abstract class RoleProviderBase : IRoleProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<IRedbRole> LoadRoleAsync(string roleName)
+    public virtual async Task<IRedbRole> LoadRoleAsync(string roleName, CancellationToken cancellationToken = default)
     {
         var role = await GetRoleByNameAsync(roleName);
         if (role == null)
@@ -164,9 +165,9 @@ public abstract class RoleProviderBase : IRoleProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<List<IRedbRole>> GetRolesAsync()
+    public virtual async Task<List<IRedbRole>> GetRolesAsync(CancellationToken cancellationToken = default)
     {
-        var roles = await Context.QueryAsync<RedbRole>(Sql.Roles_SelectAll());
+        var roles = await Context.QueryAsync<RedbRole>(Sql.Roles_SelectAll(), System.Array.Empty<object>(), cancellationToken);
         return roles.Cast<IRedbRole>().ToList();
     }
 
@@ -175,46 +176,46 @@ public abstract class RoleProviderBase : IRoleProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<bool> AssignUserToRoleAsync(IRedbUser user, IRedbRole role, IRedbUser? currentUser = null)
+    public virtual async Task<bool> AssignUserToRoleAsync(IRedbUser user, IRedbRole role, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         // Check user exists
-        var userExists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsById(), user.Id);
+        var userExists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsById(), new object[] { user.Id }, cancellationToken);
         if (!userExists.HasValue)
             throw new ArgumentException($"User with ID {user.Id} not found");
 
         // Check role exists
-        var roleExists = await Context.ExecuteScalarAsync<long?>(Sql.Roles_ExistsById(), role.Id);
+        var roleExists = await Context.ExecuteScalarAsync<long?>(Sql.Roles_ExistsById(), new object[] { role.Id }, cancellationToken);
         if (!roleExists.HasValue)
             throw new ArgumentException($"Role with ID {role.Id} not found");
 
         // Check if already assigned
-        var existingAssignment = await Context.ExecuteScalarAsync<long?>(Sql.UsersRoles_Exists(), user.Id, role.Id);
+        var existingAssignment = await Context.ExecuteScalarAsync<long?>(Sql.UsersRoles_Exists(), new object[] { user.Id, role.Id }, cancellationToken);
         if (existingAssignment.HasValue)
             return true; // Already assigned
 
         // Create assignment
         var userRoleId = await Context.NextObjectIdAsync();
-        var result = await Context.ExecuteAsync(Sql.UsersRoles_Insert(), userRoleId, user.Id, role.Id);
+        var result = await Context.ExecuteAsync(Sql.UsersRoles_Insert(), new object[] { userRoleId, user.Id, role.Id }, cancellationToken);
         return result > 0;
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> RemoveUserFromRoleAsync(IRedbUser user, IRedbRole role, IRedbUser? currentUser = null)
+    public virtual async Task<bool> RemoveUserFromRoleAsync(IRedbUser user, IRedbRole role, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
-        var result = await Context.ExecuteAsync(Sql.UsersRoles_Delete(), user.Id, role.Id);
+        var result = await Context.ExecuteAsync(Sql.UsersRoles_Delete(), new object[] { user.Id, role.Id }, cancellationToken);
         return result > 0;
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> SetUserRolesAsync(IRedbUser user, IRedbRole[] roles, IRedbUser? currentUser = null)
+    public virtual async Task<bool> SetUserRolesAsync(IRedbUser user, IRedbRole[] roles, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
     {
         // Check user exists
-        var userExists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsById(), user.Id);
+        var userExists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsById(), new object[] { user.Id }, cancellationToken);
         if (!userExists.HasValue)
             throw new ArgumentException($"User with ID {user.Id} not found");
 
         // Delete all existing user roles
-        await Context.ExecuteAsync(Sql.UsersRoles_DeleteByUser(), user.Id);
+        await Context.ExecuteAsync(Sql.UsersRoles_DeleteByUser(), new object[] { user.Id }, cancellationToken);
 
         // Add new roles
         if (roles is { Length: > 0 })
@@ -222,11 +223,11 @@ public abstract class RoleProviderBase : IRoleProvider
             foreach (var role in roles)
             {
                 var roleExists = await Context.ExecuteScalarAsync<long?>(
-                    "SELECT _id FROM _roles WHERE _id = " + Sql.FormatParameter(1), role.Id);
+                    "SELECT _id FROM _roles WHERE _id = " + Sql.FormatParameter(1), new object[] { role.Id }, cancellationToken);
                 if (roleExists.HasValue)
                 {
                     var userRoleId = await Context.NextObjectIdAsync();
-                    await Context.ExecuteAsync(Sql.UsersRoles_Insert(), userRoleId, user.Id, role.Id);
+                    await Context.ExecuteAsync(Sql.UsersRoles_Insert(), new object[] { userRoleId, user.Id, role.Id }, cancellationToken);
                 }
             }
         }
@@ -235,23 +236,23 @@ public abstract class RoleProviderBase : IRoleProvider
     }
 
     /// <inheritdoc />
-    public virtual async Task<List<IRedbRole>> GetUserRolesAsync(IRedbUser user)
+    public virtual async Task<List<IRedbRole>> GetUserRolesAsync(IRedbUser user, CancellationToken cancellationToken = default)
     {
-        var roles = await Context.QueryAsync<RedbRole>(Sql.UsersRoles_SelectRolesByUser(), user.Id);
+        var roles = await Context.QueryAsync<RedbRole>(Sql.UsersRoles_SelectRolesByUser(), new object[] { user.Id }, cancellationToken);
         return roles.Cast<IRedbRole>().ToList();
     }
 
     /// <inheritdoc />
-    public virtual async Task<List<IRedbUser>> GetRoleUsersAsync(IRedbRole role)
+    public virtual async Task<List<IRedbUser>> GetRoleUsersAsync(IRedbRole role, CancellationToken cancellationToken = default)
     {
-        var users = await Context.QueryAsync<RedbUser>(Sql.UsersRoles_SelectUsersByRole(), role.Id);
+        var users = await Context.QueryAsync<RedbUser>(Sql.UsersRoles_SelectUsersByRole(), new object[] { role.Id }, cancellationToken);
         return users.Cast<IRedbUser>().ToList();
     }
 
     /// <inheritdoc />
-    public virtual async Task<bool> UserHasRoleAsync(IRedbUser user, IRedbRole role)
+    public virtual async Task<bool> UserHasRoleAsync(IRedbUser user, IRedbRole role, CancellationToken cancellationToken = default)
     {
-        var exists = await Context.ExecuteScalarAsync<long?>(Sql.UsersRoles_Exists(), user.Id, role.Id);
+        var exists = await Context.ExecuteScalarAsync<long?>(Sql.UsersRoles_Exists(), new object[] { user.Id, role.Id }, cancellationToken);
         return exists.HasValue;
     }
 
@@ -260,17 +261,17 @@ public abstract class RoleProviderBase : IRoleProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<bool> IsRoleNameAvailableAsync(string roleName, IRedbRole? excludeRole = null)
+    public virtual async Task<bool> IsRoleNameAvailableAsync(string roleName, IRedbRole? excludeRole = null, CancellationToken cancellationToken = default)
     {
         if (excludeRole != null)
         {
             var exists = await Context.ExecuteScalarAsync<long?>(
-                Sql.Roles_ExistsByNameExcluding(), roleName, excludeRole.Id);
+                Sql.Roles_ExistsByNameExcluding(), new object[] { roleName, excludeRole.Id }, cancellationToken);
             return !exists.HasValue;
         }
         else
         {
-            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Roles_ExistsByName(), roleName);
+            var exists = await Context.ExecuteScalarAsync<long?>(Sql.Roles_ExistsByName(), new object[] { roleName }, cancellationToken);
             return !exists.HasValue;
         }
     }
@@ -280,26 +281,26 @@ public abstract class RoleProviderBase : IRoleProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<int> GetRoleCountAsync()
+    public virtual async Task<int> GetRoleCountAsync(CancellationToken cancellationToken = default)
     {
-        return await Context.ExecuteScalarAsync<int>(Sql.Roles_Count());
+        return await Context.ExecuteScalarAsync<int>(Sql.Roles_Count(), System.Array.Empty<object>(), cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task<int> GetRoleUserCountAsync(IRedbRole role)
+    public virtual async Task<int> GetRoleUserCountAsync(IRedbRole role, CancellationToken cancellationToken = default)
     {
-        return await Context.ExecuteScalarAsync<int>(Sql.UsersRoles_CountByRole(), role.Id);
+        return await Context.ExecuteScalarAsync<int>(Sql.UsersRoles_CountByRole(), new object[] { role.Id }, cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task<Dictionary<IRedbRole, int>> GetRoleStatisticsAsync()
+    public virtual async Task<Dictionary<IRedbRole, int>> GetRoleStatisticsAsync(CancellationToken cancellationToken = default)
     {
-        var roles = await Context.QueryAsync<RedbRole>(Sql.Roles_SelectAll());
+        var roles = await Context.QueryAsync<RedbRole>(Sql.Roles_SelectAll(), System.Array.Empty<object>(), cancellationToken);
 
         var result = new Dictionary<IRedbRole, int>();
         foreach (var role in roles)
         {
-            var count = await Context.ExecuteScalarAsync<int>(Sql.UsersRoles_CountByRole(), role.Id);
+            var count = await Context.ExecuteScalarAsync<int>(Sql.UsersRoles_CountByRole(), new object[] { role.Id }, cancellationToken);
             result[role] = count;
         }
         return result;
@@ -310,15 +311,15 @@ public abstract class RoleProviderBase : IRoleProvider
     // ============================================================
 
     /// <inheritdoc />
-    public virtual async Task<long?> GetRoleConfigurationIdAsync(long roleId)
+    public virtual async Task<long?> GetRoleConfigurationIdAsync(long roleId, CancellationToken cancellationToken = default)
     {
-        return await Context.ExecuteScalarAsync<long?>(Sql.Roles_SelectConfigurationId(), roleId);
+        return await Context.ExecuteScalarAsync<long?>(Sql.Roles_SelectConfigurationId(), new object[] { roleId }, cancellationToken);
     }
 
     /// <inheritdoc />
-    public virtual async Task SetRoleConfigurationAsync(long roleId, long? configId)
+    public virtual async Task SetRoleConfigurationAsync(long roleId, long? configId, CancellationToken cancellationToken = default)
     {
-        var result = await Context.ExecuteAsync(Sql.Roles_UpdateConfiguration(), (object?)configId ?? DBNull.Value, roleId);
+        var result = await Context.ExecuteAsync(Sql.Roles_UpdateConfiguration(), new object[] { (object?)configId ?? DBNull.Value, roleId }, cancellationToken);
         if (result == 0)
             throw new ArgumentException($"Role with ID {roleId} not found");
     }
@@ -330,25 +331,25 @@ public abstract class RoleProviderBase : IRoleProvider
     /// <summary>
     /// Insert role into database. Override for DB-specific optimizations (e.g., RETURNING).
     /// </summary>
-    protected virtual async Task InsertRoleInternalAsync(long roleId, string name)
+    protected virtual async Task InsertRoleInternalAsync(long roleId, string name, CancellationToken cancellationToken = default)
     {
-        await Context.ExecuteAsync(Sql.Roles_Insert(), roleId, name);
+        await Context.ExecuteAsync(Sql.Roles_Insert(), new object[] { roleId, name }, cancellationToken);
     }
 
     /// <summary>
     /// Get role by ID from database.
     /// </summary>
-    protected virtual async Task<RedbRole?> GetRoleByIdInternalAsync(long roleId)
+    protected virtual async Task<RedbRole?> GetRoleByIdInternalAsync(long roleId, CancellationToken cancellationToken = default)
     {
-        return await Context.QueryFirstOrDefaultAsync<RedbRole>(Sql.Roles_SelectById(), roleId);
+        return await Context.QueryFirstOrDefaultAsync<RedbRole>(Sql.Roles_SelectById(), new object[] { roleId }, cancellationToken);
     }
 
     /// <summary>
     /// Get role by name from database.
     /// </summary>
-    protected virtual async Task<RedbRole?> GetRoleByNameInternalAsync(string name)
+    protected virtual async Task<RedbRole?> GetRoleByNameInternalAsync(string name, CancellationToken cancellationToken = default)
     {
-        return await Context.QueryFirstOrDefaultAsync<RedbRole>(Sql.Roles_SelectByName(), name);
+        return await Context.QueryFirstOrDefaultAsync<RedbRole>(Sql.Roles_SelectByName(), new object[] { name }, cancellationToken);
     }
 
     // ============================================================
@@ -358,7 +359,7 @@ public abstract class RoleProviderBase : IRoleProvider
     /// <summary>
     /// Called after role is created. Override in Pro to add audit logging.
     /// </summary>
-    protected virtual Task OnRoleCreatedAsync(IRedbRole role, IRedbUser? currentUser)
+    protected virtual Task OnRoleCreatedAsync(IRedbRole role, IRedbUser? currentUser, CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }
@@ -366,7 +367,7 @@ public abstract class RoleProviderBase : IRoleProvider
     /// <summary>
     /// Called after role is updated. Override in Pro to add audit logging.
     /// </summary>
-    protected virtual Task OnRoleUpdatedAsync(IRedbRole role, IRedbUser? currentUser)
+    protected virtual Task OnRoleUpdatedAsync(IRedbRole role, IRedbUser? currentUser, CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }
@@ -374,7 +375,7 @@ public abstract class RoleProviderBase : IRoleProvider
     /// <summary>
     /// Called after role is deleted. Override in Pro to add audit logging.
     /// </summary>
-    protected virtual Task OnRoleDeletedAsync(IRedbRole role, IRedbUser? currentUser)
+    protected virtual Task OnRoleDeletedAsync(IRedbRole role, IRedbUser? currentUser, CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }
@@ -392,29 +393,29 @@ public abstract class RoleProviderBase : IRoleProvider
             throw new ArgumentException("Role name must be at least 2 characters");
     }
 
-    private async Task AssignUsersByLoginsAsync(IRedbRole role, string[] userLogins)
+    private async Task AssignUsersByLoginsAsync(IRedbRole role, string[] userLogins, CancellationToken cancellationToken = default)
     {
         foreach (var userLogin in userLogins)
         {
-            var userId = await Context.ExecuteScalarAsync<long?>(Sql.Users_SelectIdByLogin(), userLogin);
+            var userId = await Context.ExecuteScalarAsync<long?>(Sql.Users_SelectIdByLogin(), new object[] { userLogin }, cancellationToken);
             if (!userId.HasValue)
                 throw new ArgumentException($"User with login '{userLogin}' not found");
 
             var userRoleId = await Context.NextObjectIdAsync();
-            await Context.ExecuteAsync(Sql.UsersRoles_Insert(), userRoleId, userId.Value, role.Id);
+            await Context.ExecuteAsync(Sql.UsersRoles_Insert(), new object[] { userRoleId, userId.Value, role.Id }, cancellationToken);
         }
     }
 
-    private async Task AssignUsersByObjectsAsync(IRedbRole role, IRedbUser[] users)
+    private async Task AssignUsersByObjectsAsync(IRedbRole role, IRedbUser[] users, CancellationToken cancellationToken = default)
     {
         foreach (var user in users)
         {
-            var userExists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsById(), user.Id);
+            var userExists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsById(), new object[] { user.Id }, cancellationToken);
             if (!userExists.HasValue)
                 throw new ArgumentException($"User with ID {user.Id} ('{user.Login}') not found");
 
             var userRoleId = await Context.NextObjectIdAsync();
-            await Context.ExecuteAsync(Sql.UsersRoles_Insert(), userRoleId, user.Id, role.Id);
+            await Context.ExecuteAsync(Sql.UsersRoles_Insert(), new object[] { userRoleId, user.Id, role.Id }, cancellationToken);
         }
     }
 }

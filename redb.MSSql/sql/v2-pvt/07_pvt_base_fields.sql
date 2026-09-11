@@ -37,6 +37,7 @@ BEGIN
             o.[_key]              AS [key],
             o.[_value_long]       AS [value_long],
             o.[_value_string]     AS [value_string],
+            o.[_value_unique]     AS [value_unique],
             o.[_value_guid]       AS [value_guid],
             o.[_note]             AS [note],
             o.[_value_bool]       AS [value_bool],

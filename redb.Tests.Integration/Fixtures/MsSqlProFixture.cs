@@ -33,7 +33,6 @@ public sealed class MsSqlProFixture : IAsyncLifetime
                 {
                     c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;
                     c.SkipHashValidationOnCacheCheck = false;
-                    c.EnableLazyLoadingForProps = false;
                     c.EnablePropsCache = false;
                     c.EnablePvtPrefilter = ProTestOptions.PvtPrefilter;
                 });
@@ -65,6 +64,7 @@ public sealed class MsSqlProFixture : IAsyncLifetime
     private async Task Cleanup()
     {
         var ctx = ServiceProvider.GetRequiredService<IRedbContext>();
+        await FixtureWipeGuard.EnsureLooksLikeATestDatabaseAsync(ctx, nameof(MsSqlProFixture));
         try { await ctx.ExecuteAsync("DELETE FROM _tree"); } catch { }
         try { await ctx.ExecuteAsync("DELETE FROM _values"); } catch { }
         await ctx.ExecuteAsync("DELETE FROM _objects");
@@ -78,5 +78,7 @@ public sealed class MsSqlProFixture : IAsyncLifetime
             await ad.DisposeAsync();
         else
             ServiceProvider?.Dispose();
+        // Same as the Postgres fixtures: return the pooled sessions to the server immediately.
+        Microsoft.Data.SqlClient.SqlConnection.ClearAllPools();
     }
 }

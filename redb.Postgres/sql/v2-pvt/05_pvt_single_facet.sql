@@ -217,12 +217,12 @@ BEGIN
                                          ELSE format('%I.%I != %L', table_alias, sql_field_name, operator_value)
                                     END
                                 WHEN '$in' THEN format('%I.%I IN (%s)', table_alias, sql_field_name, _format_json_array_for_in(condition_value->'$in'))
-                                WHEN '$contains' THEN format('%I.%I LIKE %L', table_alias, sql_field_name, '%' || operator_value || '%')
-                                WHEN '$containsIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case(format('%I.%I', table_alias, sql_field_name)), '%' || operator_value || '%')
-                                WHEN '$startsWith' THEN format('%I.%I LIKE %L', table_alias, sql_field_name, operator_value || '%')
-                                WHEN '$startsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case(format('%I.%I', table_alias, sql_field_name)), operator_value || '%')
-                                WHEN '$endsWith' THEN format('%I.%I LIKE %L', table_alias, sql_field_name, '%' || operator_value)
-                                WHEN '$endsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case(format('%I.%I', table_alias, sql_field_name)), '%' || operator_value)
+                                WHEN '$contains' THEN format('%I.%I LIKE %L', table_alias, sql_field_name, '%' || pvt_like_escape(operator_value) || '%')
+                                WHEN '$containsIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case(format('%I.%I', table_alias, sql_field_name)), '%' || pvt_like_escape(operator_value) || '%')
+                                WHEN '$startsWith' THEN format('%I.%I LIKE %L', table_alias, sql_field_name, pvt_like_escape(operator_value) || '%')
+                                WHEN '$startsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case(format('%I.%I', table_alias, sql_field_name)), pvt_like_escape(operator_value) || '%')
+                                WHEN '$endsWith' THEN format('%I.%I LIKE %L', table_alias, sql_field_name, '%' || pvt_like_escape(operator_value))
+                                WHEN '$endsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case(format('%I.%I', table_alias, sql_field_name)), '%' || pvt_like_escape(operator_value))
                                 WHEN '$exists' THEN 
                                     CASE WHEN operator_value = 'true' THEN format('%I.%I IS NOT NULL', table_alias, sql_field_name)
                                          ELSE format('%I.%I IS NULL', table_alias, sql_field_name)
@@ -582,12 +582,12 @@ BEGIN
                                         ELSE format('dv._String <> %L', dict_op_value)
                                     END
                                     -- String operations
-                                    WHEN '$contains' THEN format('dv._String LIKE %L', '%' || dict_op_value || '%')
-                                    WHEN '$startsWith' THEN format('dv._String LIKE %L', dict_op_value || '%')
-                                    WHEN '$endsWith' THEN format('dv._String LIKE %L', '%' || dict_op_value)
-                                    WHEN '$containsIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case('dv._String'), '%' || dict_op_value || '%')
-                                    WHEN '$startsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case('dv._String'), dict_op_value || '%')
-                                    WHEN '$endsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case('dv._String'), '%' || dict_op_value)
+                                    WHEN '$contains' THEN format('dv._String LIKE %L', '%' || pvt_like_escape(dict_op_value) || '%')
+                                    WHEN '$startsWith' THEN format('dv._String LIKE %L', pvt_like_escape(dict_op_value) || '%')
+                                    WHEN '$endsWith' THEN format('dv._String LIKE %L', '%' || pvt_like_escape(dict_op_value))
+                                    WHEN '$containsIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case('dv._String'), '%' || pvt_like_escape(dict_op_value) || '%')
+                                    WHEN '$startsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case('dv._String'), pvt_like_escape(dict_op_value) || '%')
+                                    WHEN '$endsWithIgnoreCase' THEN format('%s ILIKE %L', pvt_fold_case('dv._String'), '%' || pvt_like_escape(dict_op_value))
                                     -- Regex
                                     WHEN '$regex' THEN format('dv._String ~ %L', dict_op_value)
                                     WHEN '$iregex' THEN format('dv._String ~* %L', dict_op_value)

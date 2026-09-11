@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Query.Aggregation;
@@ -29,7 +30,7 @@ public partial class SqliteQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         return ExecuteGroupedAggregateInternalAsync(schemeId, groupFields, aggregations, filterJson, havingJson);
     }
@@ -40,7 +41,7 @@ public partial class SqliteQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         FilterExpression? filter,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var filterJson = filter is null ? null : _facetBuilder.BuildFacetFilters(filter);
         return ExecuteGroupedAggregateInternalAsync(schemeId, groupFields, aggregations, filterJson, havingJson);
@@ -92,7 +93,7 @@ public partial class SqliteQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var groupList = groupFields?.ToList() ?? new List<GroupFieldRequest>();
         var aggList = aggregations?.ToList() ?? new List<AggregateRequest>();
@@ -109,7 +110,7 @@ public partial class SqliteQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         FilterExpression? filter,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var filterJson = filter is null ? null : _facetBuilder.BuildFacetFilters(filter);
         return GetGroupBySqlPreviewAsync(schemeId, groupFields, aggregations, filterJson, havingJson);
@@ -120,7 +121,7 @@ public partial class SqliteQueryProvider
         IList<GroupFieldRequest> groupList,
         IList<AggregateRequest> aggList,
         string? filterJson,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var groupByJson = BuildPvtGroupByJson(groupList);
         var aggregationsJson = aggList.Count == 0 ? null : BuildPvtAggregationsJson(aggList);
@@ -140,7 +141,7 @@ public partial class SqliteQueryProvider
         _logger?.LogDebug("PVT GroupBy Build: SchemeId={SchemeId}, GroupBy={GroupBy}, Aggs={Aggs}, Filter={Filter}, Having={Having}",
             schemeId, groupByJson, aggregationsJson ?? "null", filterJson ?? "null", havingJson ?? "null");
 
-        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, filterParam, groupByJson, aggParam, havingParam);
+        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, groupByJson, aggParam, havingParam }, cancellationToken);
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
                 "pvt_build_groupby_sql returned an empty SQL string for scheme " + schemeId + ".");
@@ -199,7 +200,7 @@ public partial class SqliteQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var groupList = groupFields?.ToList() ?? new List<GroupFieldRequest>();
         if (groupList.Count == 0 && !string.IsNullOrEmpty(havingJson))
@@ -250,7 +251,7 @@ public partial class SqliteQueryProvider
             schemeId, arrayPath, groupByJson, aggregationsJson ?? "null", filterJson ?? "null", havingJson);
 
         var innerSql = await _context.ExecuteScalarAsync<string>(
-            invocation, arrayPath, filterParam, groupByJson, aggParam, havingParam);
+            invocation, new object[] { arrayPath, filterParam, groupByJson, aggParam, havingParam }, cancellationToken);
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
                 "pvt_build_array_groupby_sql returned an empty SQL string for scheme " + schemeId + ".");

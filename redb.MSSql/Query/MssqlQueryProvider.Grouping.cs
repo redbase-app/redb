@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Query.Aggregation;
@@ -29,7 +30,7 @@ public partial class MssqlQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         return ExecuteGroupedAggregateInternalAsync(schemeId, groupFields, aggregations, filterJson, havingJson);
     }
@@ -40,7 +41,7 @@ public partial class MssqlQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         FilterExpression? filter,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var filterJson = filter is null ? null : _facetBuilder.BuildFacetFilters(filter);
         return ExecuteGroupedAggregateInternalAsync(schemeId, groupFields, aggregations, filterJson, havingJson);
@@ -51,7 +52,7 @@ public partial class MssqlQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var groupList = groupFields?.ToList() ?? new List<GroupFieldRequest>();
         var aggList = aggregations?.ToList() ?? new List<AggregateRequest>();
@@ -76,7 +77,7 @@ public partial class MssqlQueryProvider
         var wrapped =
             "SELECT (SELECT * FROM (" + innerSql + ") _grp_rows FOR JSON PATH, INCLUDE_NULL_VALUES)";
 
-        var jsonArray = await _context.ExecuteScalarAsync<string>(wrapped);
+        var jsonArray = await _context.ExecuteScalarAsync<string>(wrapped, System.Array.Empty<object>(), cancellationToken);
         if (string.IsNullOrEmpty(jsonArray))
             return JsonDocument.Parse("[]");
         return JsonDocument.Parse(jsonArray);
@@ -93,7 +94,7 @@ public partial class MssqlQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var groupList = groupFields?.ToList() ?? new List<GroupFieldRequest>();
         var aggList = aggregations?.ToList() ?? new List<AggregateRequest>();
@@ -111,7 +112,7 @@ public partial class MssqlQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         FilterExpression? filter,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var filterJson = filter is null ? null : _facetBuilder.BuildFacetFilters(filter);
         return GetGroupBySqlPreviewAsync(schemeId, groupFields, aggregations, filterJson, havingJson);
@@ -122,7 +123,7 @@ public partial class MssqlQueryProvider
         IList<GroupFieldRequest> groupList,
         IList<AggregateRequest> aggList,
         string? filterJson,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var groupByJson = BuildPvtGroupByJson(groupList);
         var aggregationsJson = aggList.Count == 0 ? null : BuildPvtAggregationsJson(aggList);
@@ -143,7 +144,7 @@ public partial class MssqlQueryProvider
             "PVT GroupBy Build (MSSql): SchemeId={SchemeId}, GroupBy={GroupBy}, Aggs={Aggs}, Filter={Filter}",
             schemeId, groupByJson, aggregationsJson ?? "null", filterJson ?? "null");
 
-        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, filterParam, groupByJson, aggParam);
+        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, groupByJson, aggParam }, cancellationToken);
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
                 "dbo.pvt_build_groupby_sql returned an empty SQL string for scheme " + schemeId + ".");
@@ -200,7 +201,7 @@ public partial class MssqlQueryProvider
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var groupList = groupFields?.ToList() ?? new List<GroupFieldRequest>();
         if (groupList.Count == 0 && !string.IsNullOrEmpty(havingJson))
@@ -253,7 +254,7 @@ public partial class MssqlQueryProvider
             schemeId, arrayPath, groupByJson, aggregationsJson ?? "null", filterJson ?? "null", havingJson ?? "null");
 
         var innerSql = await _context.ExecuteScalarAsync<string>(
-            invocation, arrayPath, filterParam, groupByJson, aggParam, havingParam);
+            invocation, new object[] { arrayPath, filterParam, groupByJson, aggParam, havingParam }, cancellationToken);
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
                 "dbo.pvt_build_array_groupby_sql returned an empty SQL string for scheme "
@@ -261,7 +262,7 @@ public partial class MssqlQueryProvider
 
         var wrapped =
             "SELECT (SELECT * FROM (" + innerSql + ") _grp_rows FOR JSON PATH, INCLUDE_NULL_VALUES)";
-        var jsonArray = await _context.ExecuteScalarAsync<string>(wrapped);
+        var jsonArray = await _context.ExecuteScalarAsync<string>(wrapped, System.Array.Empty<object>(), cancellationToken);
         if (string.IsNullOrEmpty(jsonArray))
             return JsonDocument.Parse("[]");
         return JsonDocument.Parse(jsonArray);

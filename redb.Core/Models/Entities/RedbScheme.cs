@@ -49,6 +49,12 @@ namespace redb.Core.Models.Entities
         /// </summary>
         [JsonPropertyName("structure_hash")]
         public Guid? StructureHash { get; set; }
+
+        /// <summary>
+        /// Free-form marker for future / custom extensions (450 chars). Written by
+        /// [RedbTags] at synchronisation when present; direct writes survive sync.
+        /// </summary>
+        public string? Tags { get; set; }
         
         /// <summary>
         /// Scheme type ID (Class, Array, Dictionary, JsonDocument, XDocument).

@@ -238,6 +238,15 @@ public sealed class StructureRecord : ExportRecord
     /// <summary>Whether explicit NULLs are persisted.</summary>
     public bool? StoreNull { get; init; }
 
+    /// <summary>Whether the field is a unique key within its scheme ([RedbUnique]).</summary>
+    public bool? Unique { get; init; }
+
+    /// <summary>Encoder version the stored keys were computed with.</summary>
+    public long? UniqueVersion { get; init; }
+
+    /// <summary>Whether the reference is lazy (`virtual` in the CLR model, V4).</summary>
+    public bool? Lazy { get; init; }
+
     /// <summary>Serialized default value.</summary>
     public byte[]? DefaultValue { get; init; }
 
@@ -314,6 +323,9 @@ public sealed class ObjectRecord : ExportRecord
 
     /// <summary>Inline binary value (for primitive schemes).</summary>
     public byte[]? ValueBytes { get; init; }
+
+    /// <summary>Unique key within the scheme (V4, UNIQUE stage 1).</summary>
+    public string? ValueUnique { get; init; }
 }
 
 /// <summary>
@@ -396,4 +408,12 @@ public sealed class ValueRecord : ExportRecord
 
     /// <summary>Index or key within an array/dictionary.</summary>
     public string? ArrayIndex { get; init; }
+
+    /// <summary>
+    /// Unique-key hash of a <c>[RedbUnique]</c> field (V4). Absent in pre-V4 exports: the
+    /// import then leaves <c>_values._unique</c> NULL, and the next scheme synchronisation
+    /// recomputes the keys from the stored values (rows with a value but no key are a
+    /// standing recompute trigger).
+    /// </summary>
+    public Guid? Unique { get; init; }
 }

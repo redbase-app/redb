@@ -14,23 +14,23 @@ using System;
 namespace redb.Core.Providers.Base
 {
     /// <summary>
-    /// 🚀 BULK INSERT - high-performance creation of multiple objects
+    /// BULK INSERT - high-performance creation of multiple objects
     /// </summary>
     public abstract partial class ObjectStorageProviderBase
     {
         /// <summary>
-        /// 🚀 BULK INSERT: Create multiple new objects in one operation (WITHOUT permission checks)
-        /// Reuses logic from SaveAsyncNew + BulkInsert for maximum performance
+        /// BULK INSERT: Create multiple new objects in one operation (WITHOUT permission checks)
+        /// The batch save's preparation steps + BulkInsert for maximum performance
         /// </summary>
-        public async Task<List<long>> AddNewObjectsAsync<TProps>(IEnumerable<IRedbObject<TProps>> objects) where TProps : class, new()
+        public async Task<List<long>> AddNewObjectsAsync<TProps>(IEnumerable<IRedbObject<TProps>> objects, CancellationToken cancellationToken = default) where TProps : class, new()
         {
-            return await AddNewObjectsAsync(objects, _securityContext.CurrentUser);
+            return await AddNewObjectsAsync(objects, _securityContext.CurrentUser, cancellationToken);
         }
 
         /// <summary>
-        /// 🚀 BULK INSERT with explicit user: Create multiple new objects (WITHOUT permission checks)
+        /// BULK INSERT with explicit user: Create multiple new objects (WITHOUT permission checks)
         /// </summary>
-        public async Task<List<long>> AddNewObjectsAsync<TProps>(IEnumerable<IRedbObject<TProps>> objects, IRedbUser user) where TProps : class, new()
+        public async Task<List<long>> AddNewObjectsAsync<TProps>(IEnumerable<IRedbObject<TProps>> objects, IRedbUser user, CancellationToken cancellationToken = default) where TProps : class, new()
         {
             // Materialize IEnumerable to list for multiple iterations
             var objectsList = objects?.ToList() ?? new List<IRedbObject<TProps>>();
@@ -55,14 +55,14 @@ namespace redb.Core.Providers.Base
 
             foreach (var obj in objectsList)
             {
-                // Recalculate hash (from SaveAsyncNew)
+                // Recalculate hash
                 var currentHash = RedbHash.ComputeFor(obj);
                 if (currentHash.HasValue)
                 {
                     obj.Hash = currentHash.Value;
                 }
 
-                // Auto-determination of scheme (from SaveAsyncNew, but WITHOUT checks for existing objects)
+                // Auto-determination of scheme (WITHOUT checks for existing objects)
                 if (obj.SchemeId == 0 && _configuration.AutoSyncSchemesOnSave)
                 {
 
@@ -90,7 +90,7 @@ namespace redb.Core.Providers.Base
                 }
             }
 
-            // === REUSE LOGIC FROM SaveAsyncNew ===
+            // === THE BATCH SAVE'S PREPARATION STEPS ===
 
             var objectsToSave = new List<IRedbObject>();
             var valuesToSave = new List<RedbValue>();
@@ -106,9 +106,9 @@ namespace redb.Core.Providers.Base
 
             // STEP 3: Assign IDs to all objects without ID (via GetNextKey)
 
-            await AssignMissingIds(objectsToSave, user);
-            
-            // ✅ Set ParentId for nested objects after ID assignment
+            await AssignMissingIds(objectsToSave, user, cancellationToken);
+
+            // Set ParentId for nested objects after ID assignment
             var mainObjectIds = objectsList.Select(o => o.Id).ToHashSet();
             foreach (var obj in objectsToSave)
             {
@@ -122,33 +122,40 @@ namespace redb.Core.Providers.Base
 
             // STEP 4: Create/verify schemes for all object types
 
-            await EnsureSchemesForAllTypes(objectsToSave);
+            await EnsureSchemesForAllTypes(objectsToSave, cancellationToken);
 
 
             // STEP 5: Recursive processing of Props of all objects into values lists
 
-            await ProcessAllObjectsPropertiesRecursively(objectsToSave, valuesToSave);
+            await ProcessAllObjectsPropertiesRecursively(objectsToSave, valuesToSave, cancellationToken: cancellationToken);
 
-            
+
             // STEP 6: WITHOUT Delete strategy - these are NEW objects
 
 
             // STEP 7: BULK INSERT instead of regular saving
 
-            await CommitAllChangesBulk(objectsToSave, valuesToSave);
+            try
+            {
+                await CommitAllChangesBulk(objectsToSave, valuesToSave, cancellationToken);
+            }
+            catch (Exception ex) when (Data.DbErrorClassifier.IsUniqueViolation(ex))
+            {
+                throw await TranslateUniqueViolationAsync(ex, objectsList.FirstOrDefault()?.SchemeId);
+            }
 
 
             // Return IDs of all created main objects
             var resultIds = objectsList.Select(o => o.Id).ToList();
 
-            
+
             return resultIds;
         }
 
         /// <summary>
         /// Step 7 (BULK): Bulk save with BulkInsert instead of Add().
         /// </summary>
-        private async Task CommitAllChangesBulk(List<IRedbObject> objects, List<RedbValue> valuesList)
+        private async Task CommitAllChangesBulk(List<IRedbObject> objects, List<RedbValue> valuesList, CancellationToken cancellationToken)
         {
             // 1. BULK INSERT objects
             if (objects.Count > 0)
@@ -195,14 +202,14 @@ namespace redb.Core.Providers.Base
                     return record;
                 }).ToList();
 
-                await _context.Bulk.BulkInsertObjectsAsync(objectRecords);
+                await _context.Bulk.BulkInsertObjectsAsync(objectRecords, cancellationToken);
             }
 
             // 2. BULK INSERT values (with topological sort for FK constraint)
             if (valuesList.Count > 0)
             {
                 var sortedValues = ValuesTopologicalSort.SortByFkDependency(valuesList);
-                await _context.Bulk.BulkInsertValuesAsync(sortedValues);
+                await _context.Bulk.BulkInsertValuesAsync(sortedValues, cancellationToken);
             }
         }
     }

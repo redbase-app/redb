@@ -250,7 +250,7 @@ public class BackgroundDeletionService : BackgroundService, IBackgroundDeletionS
                 break;
             }
 
-            await redb.PurgeTrashAsync(trashId, totalCount, DefaultBatchSize).ConfigureAwait(false);
+            await redb.PurgeTrashAsync(trashId, totalCount, DefaultBatchSize, cancellationToken: ct).ConfigureAwait(false);
 
             try { await Task.Delay(50, ct).ConfigureAwait(false); }
             catch (OperationCanceledException) { break; }

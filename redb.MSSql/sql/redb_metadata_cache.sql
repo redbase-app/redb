@@ -29,14 +29,6 @@ IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'TR__types__invalidate_metada
     DROP TRIGGER [dbo].[TR__types__invalidate_metadata_cache]
 GO
 
-IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'sync_metadata_cache_for_scheme')
-    DROP PROCEDURE [dbo].[sync_metadata_cache_for_scheme]
-GO
-
-IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'warmup_all_metadata_caches')
-    DROP PROCEDURE [dbo].[warmup_all_metadata_caches]
-GO
-
 IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'check_metadata_cache_consistency')
     DROP PROCEDURE [dbo].[check_metadata_cache_consistency]
 GO
@@ -81,6 +73,11 @@ CREATE TABLE [dbo].[_scheme_metadata_cache] (
     [_allow_not_null] BIT NULL,
     [_is_compress] BIT NULL,
     [_store_null] BIT NULL,
+    [_unique] BIT NULL,             -- V4: unique key flag ([RedbUnique])
+    [_unique_scope] BIGINT NULL,    -- S3: element-key scope of a collection key
+    [_tags] NVARCHAR(450) NULL,     -- V4: free-form marker mirrored from _structures
+    [_unique_version] BIGINT NULL,  -- V4: encoder version of the stored keys
+    [_lazy] BIT NULL,  -- V4 (LAZY Л2): lazy reference marker
     
     -- Default values
     [_default_value] VARBINARY(MAX) NULL,
@@ -123,63 +120,13 @@ CREATE INDEX [idx_metadata_cache_key_type]
 GO
 
 -- =====================================================
--- 3. SYNC PROCEDURE FOR SINGLE SCHEME
+-- 3. SYNC PROCEDURE — MODULE-OWNED since V4
 -- =====================================================
-
-CREATE PROCEDURE [dbo].[sync_metadata_cache_for_scheme]
-    @target_scheme_id BIGINT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- Delete old cache data for scheme
-    DELETE FROM [dbo].[_scheme_metadata_cache] 
-    WHERE [_scheme_id] = @target_scheme_id;
-    
-    -- Insert current data (with collection types and scheme type support)
-    INSERT INTO [dbo].[_scheme_metadata_cache] (
-        [_scheme_id], [_structure_id], [_parent_structure_id], [_id_override],
-        [_name], [_alias],
-        [_type_id], [_list_id], [type_name], [db_type], [type_semantic],
-        [_scheme_type], [scheme_type_name],
-        [_order], [_collection_type], [collection_type_name], [_key_type], [key_type_name],
-        [_readonly], [_allow_not_null], [_is_compress], [_store_null],
-        [_default_value], [_default_editor]
-    )
-    SELECT 
-        s.[_id_scheme],
-        s.[_id],
-        s.[_id_parent],
-        s.[_id_override],
-        s.[_name],
-        s.[_alias],
-        t.[_id],
-        s.[_id_list],
-        t.[_name],
-        t.[_db_type],
-        t.[_type],
-        sch.[_type],                    -- Scheme type
-        scht.[_name],                   -- Scheme type name
-        s.[_order],
-        s.[_collection_type],           -- Collection type (Array/Dictionary/NULL)
-        ct.[_name],                     -- Collection type name
-        s.[_key_type],                  -- Key type for Dictionary
-        kt.[_name],                     -- Key type name
-        s.[_readonly],
-        s.[_allow_not_null],
-        s.[_is_compress],
-        s.[_store_null],
-        s.[_default_value],
-        s.[_default_editor]
-    FROM [dbo].[_structures] s
-    INNER JOIN [dbo].[_types] t ON t.[_id] = s.[_id_type]
-    INNER JOIN [dbo].[_schemes] sch ON sch.[_id] = s.[_id_scheme]
-    LEFT JOIN [dbo].[_types] scht ON scht.[_id] = sch.[_type]         -- Scheme type
-    LEFT JOIN [dbo].[_types] ct ON ct.[_id] = s.[_collection_type]    -- Collection type
-    LEFT JOIN [dbo].[_types] kt ON kt.[_id] = s.[_key_type]           -- Key type
-    WHERE s.[_id_scheme] = @target_scheme_id;
-END
-GO
+-- sync_metadata_cache_for_scheme carries the cache column list, which must
+-- reach EXISTING databases when _structures gains a column. It lives in
+-- v2-pvt/29_metadata_cache_sync.sql and rides the versioned bundle
+-- (redb_init.sql includes it for fresh databases). The triggers below EXEC
+-- it by name at run time.
 
 -- =====================================================
 -- 4. TRIGGER: Sync cache on _structure_hash change
@@ -275,46 +222,9 @@ END
 GO
 
 -- =====================================================
--- 7. WARMUP PROCEDURE (for app start or after crash)
+-- 7. WARMUP PROCEDURE — MODULE-OWNED since V4
 -- =====================================================
-
-CREATE PROCEDURE [dbo].[warmup_all_metadata_caches]
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    TRUNCATE TABLE [dbo].[_scheme_metadata_cache];
-    
-    -- Rebuild cache for ALL schemes
-    DECLARE @scheme_id BIGINT;
-    
-    DECLARE cur CURSOR LOCAL FAST_FORWARD FOR
-        SELECT [_id] FROM [dbo].[_schemes];
-    
-    OPEN cur;
-    FETCH NEXT FROM cur INTO @scheme_id;
-    
-    WHILE @@FETCH_STATUS = 0
-    BEGIN
-        EXEC [dbo].[sync_metadata_cache_for_scheme] @scheme_id;
-        FETCH NEXT FROM cur INTO @scheme_id;
-    END
-    
-    CLOSE cur;
-    DEALLOCATE cur;
-    
-    -- Return statistics
-    SELECT 
-        s.[_id] AS scheme_id,
-        COUNT(c.[_structure_id]) AS structures_count,
-        s.[_name] AS scheme_name,
-        s.[_structure_hash] AS structure_hash
-    FROM [dbo].[_schemes] s
-    LEFT JOIN [dbo].[_scheme_metadata_cache] c ON c.[_scheme_id] = s.[_id]
-    GROUP BY s.[_id], s.[_name], s.[_structure_hash]
-    ORDER BY s.[_id];
-END
-GO
+-- See v2-pvt/29_metadata_cache_sync.sql (same reason as the sync procedure).
 
 -- =====================================================
 -- 8. CONSISTENCY CHECK PROCEDURE

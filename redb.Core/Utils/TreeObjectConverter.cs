@@ -83,6 +83,7 @@ public static class TreeObjectConverter
             value_numeric = source.ValueNumeric,
             value_datetime = source.ValueDatetime,
             value_bytes = source.ValueBytes,
+            value_unique = source.ValueUnique,
             name = source.Name,
             note = source.Note,
             hash = source.Hash,
@@ -238,6 +239,7 @@ public static class TreeObjectConverter
             value_numeric = source.ValueNumeric;
             value_datetime = source.ValueDatetime;
             value_bytes = source.ValueBytes;
+            value_unique = source.ValueUnique;
             name = source.Name;
             note = source.Note;
             hash = source.Hash;

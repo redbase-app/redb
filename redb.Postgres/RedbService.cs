@@ -56,7 +56,7 @@ public class RedbService : RedbServiceBase
     
     protected override IUserProvider CreateUserProvider(
         IRedbContext context, IRedbSecurityContext securityContext, ILogger? logger)
-        => new PostgresUserProvider(context, securityContext, logger);
+        => new PostgresUserProvider(context, securityContext, ResolvePasswordHasher(), logger);
     
     protected override IRoleProvider CreateRoleProvider(
         IRedbContext context, IRedbSecurityContext securityContext, ILogger? logger)
@@ -69,9 +69,10 @@ public class RedbService : RedbServiceBase
     protected override IObjectStorageProvider CreateObjectStorageProvider(
         IRedbContext context, IRedbObjectSerializer serializer, IPermissionProvider permissionProvider,
         IRedbSecurityContext securityContext, ISchemeSyncProvider schemeSync,
-        RedbServiceConfiguration config, IListProvider listProvider, ILogger? logger)
+        RedbServiceConfiguration config, IListProvider listProvider, ILogger? logger,
+        IEnumerable<redb.Core.Interception.IRedbSaveInterceptor>? saveInterceptors)
         => new PostgresObjectStorageProvider(context, serializer, permissionProvider, 
-            securityContext, schemeSync, config, listProvider, logger);
+            securityContext, schemeSync, config, listProvider, logger, saveInterceptors);
     
     protected override ITreeProvider CreateTreeProvider(
         IRedbContext context, IObjectStorageProvider objectStorage, IPermissionProvider permissionProvider,
@@ -95,6 +96,10 @@ public class RedbService : RedbServiceBase
     protected override IValidationProvider CreateValidationProvider(
         IRedbContext context, ILogger? logger)
         => new PostgresValidationProvider(context, logger);
+
+    protected override Core.Providers.IMaintenanceProvider CreateMaintenanceProvider(
+        IRedbContext context, int analysisLimit, ILogger? logger)
+        => new Providers.PostgresMaintenanceProvider(context, analysisLimit, logger);
 
     // === DATABASE SCHEMA MANAGEMENT ===
 

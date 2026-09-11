@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Models.Entities;
 using redb.Core.Models.Contracts;
@@ -41,13 +42,13 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         var newContext = _context.Clone();
         var filterExpression = _filterParser.ParseFilter(predicate);
-        
-        // ✅ FIX: Check for empty filter (Where(x => false))
+
+        // FIX: Check for empty filter (Where(x => false))
         if (IsEmptyFilter(filterExpression))
         {
             newContext.IsEmpty = true;
         }
-        
+
         // If filter already exists, combine via AND
         if (newContext.Filter != null)
         {
@@ -70,16 +71,16 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
             throw new ArgumentNullException(nameof(predicate));
 
         var newContext = _context.Clone();
-        
+
         // Parse expression for base IRedbObject fields
         var filterExpression = _filterParser.ParseRedbFilter(predicate);
-        
-        // ✅ Check for empty filter
+
+        // Check for empty filter
         if (IsEmptyFilter(filterExpression))
         {
             newContext.IsEmpty = true;
         }
-        
+
         // If filter already exists, combine via AND
         if (newContext.Filter != null)
         {
@@ -100,11 +101,11 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         var newContext = _context.Clone();
         newContext.Orderings.Clear(); // OrderBy replaces previous sorting
-        
+
         var ordering = _orderingParser.ParseOrdering(keySelector, SortDirection.Ascending);
         newContext.Orderings.Add(ordering);
-        
-        // ✅ FIX: Preserve IsEmpty flag after OrderBy
+
+        // FIX: Preserve IsEmpty flag after OrderBy
         // Even if ordering is added, query can remain empty (Where(x => false))
 
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
@@ -114,11 +115,11 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         var newContext = _context.Clone();
         newContext.Orderings.Clear(); // OrderByDescending replaces previous sorting
-        
+
         var ordering = _orderingParser.ParseOrdering(keySelector, SortDirection.Descending);
         newContext.Orderings.Add(ordering);
-        
-        // ✅ FIX: Preserve IsEmpty flag after OrderByDescending
+
+        // FIX: Preserve IsEmpty flag after OrderByDescending
         // IsEmpty is already copied in Clone(), no additional actions required
 
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
@@ -127,11 +128,11 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     public virtual IOrderedRedbQueryable<TProps> ThenBy<TKey>(Expression<Func<TProps, TKey>> keySelector)
     {
         var newContext = _context.Clone();
-        
+
         var ordering = _orderingParser.ParseOrdering(keySelector, SortDirection.Ascending);
         newContext.Orderings.Add(ordering);
-        
-        // ✅ FIX: Preserve IsEmpty flag after ThenBy  
+
+        // FIX: Preserve IsEmpty flag after ThenBy
         // IsEmpty is already copied in Clone(), no additional actions required
 
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
@@ -140,11 +141,11 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     public virtual IOrderedRedbQueryable<TProps> ThenByDescending<TKey>(Expression<Func<TProps, TKey>> keySelector)
     {
         var newContext = _context.Clone();
-        
+
         var ordering = _orderingParser.ParseOrdering(keySelector, SortDirection.Descending);
         newContext.Orderings.Add(ordering);
-        
-        // ✅ FIX: Preserve IsEmpty flag after ThenByDescending
+
+        // FIX: Preserve IsEmpty flag after ThenByDescending
         // IsEmpty is already copied in Clone(), no additional actions required
 
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
@@ -158,7 +159,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         var newContext = _context.Clone();
         newContext.Orderings.Clear(); // OrderByRedb replaces previous sorting
-        
+
         var ordering = _orderingParser.ParseRedbOrdering(keySelector, SortDirection.Ascending);
         newContext.Orderings.Add(ordering);
 
@@ -169,7 +170,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         var newContext = _context.Clone();
         newContext.Orderings.Clear(); // OrderByDescendingRedb replaces previous sorting
-        
+
         var ordering = _orderingParser.ParseRedbOrdering(keySelector, SortDirection.Descending);
         newContext.Orderings.Add(ordering);
 
@@ -179,7 +180,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     public virtual IOrderedRedbQueryable<TProps> ThenByRedb<TKey>(Expression<Func<IRedbObject, TKey>> keySelector)
     {
         var newContext = _context.Clone();
-        
+
         var ordering = _orderingParser.ParseRedbOrdering(keySelector, SortDirection.Ascending);
         newContext.Orderings.Add(ordering); // ThenByRedb adds to existing sorting
 
@@ -189,7 +190,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     public virtual IOrderedRedbQueryable<TProps> ThenByDescendingRedb<TKey>(Expression<Func<IRedbObject, TKey>> keySelector)
     {
         var newContext = _context.Clone();
-        
+
         var ordering = _orderingParser.ParseRedbOrdering(keySelector, SortDirection.Descending);
         newContext.Orderings.Add(ordering); // ThenByDescendingRedb adds to existing sorting
 
@@ -200,7 +201,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         if (count < 0)
             throw new ArgumentException("Take count must be non-negative", nameof(count));
-            
+
         var newContext = _context.Clone();
         newContext.Limit = count;
 
@@ -211,53 +212,53 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         if (count < 0)
             throw new ArgumentException("Skip count must be non-negative", nameof(count));
-            
+
         var newContext = _context.Clone();
         newContext.Offset = count;
 
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
     }
 
-    public virtual async Task<List<RedbObject<TProps>>> ToListAsync()
+    public virtual async Task<List<RedbObject<TProps>>> ToListAsync(CancellationToken cancellationToken = default)
     {
-        var result = await _provider.ExecuteAsync(BuildExpression(), typeof(List<RedbObject<TProps>>));
+        var result = await _provider.ExecuteAsync(BuildExpression(), typeof(List<RedbObject<TProps>>), cancellationToken: cancellationToken);
         return (List<RedbObject<TProps>>)result;
     }
 
-    public virtual async Task<int> CountAsync()
+    public virtual async Task<int> CountAsync(CancellationToken cancellationToken = default)
     {
-        var result = await _provider.ExecuteAsync(BuildCountExpression(), typeof(int));
+        var result = await _provider.ExecuteAsync(BuildCountExpression(), typeof(int), cancellationToken: cancellationToken);
         return (int)result;
     }
 
-    public virtual async Task<RedbObject<TProps>?> FirstOrDefaultAsync()
+    public virtual async Task<RedbObject<TProps>?> FirstOrDefaultAsync(CancellationToken cancellationToken = default)
     {
         // For FirstOrDefault limit to 1 record
         var limitedContext = _context.Clone();
         limitedContext.Limit = 1;
-        
+
         var tempQueryable = new RedbQueryable<TProps>(_provider, limitedContext, _filterParser, _orderingParser);
-        var result = await tempQueryable.ToListAsync();
-        
+        var result = await tempQueryable.ToListAsync(cancellationToken: cancellationToken);
+
         return result.FirstOrDefault();
     }
 
-    public virtual async Task<RedbObject<TProps>?> FirstOrDefaultAsync(Expression<Func<TProps, bool>> predicate)
+    public virtual async Task<RedbObject<TProps>?> FirstOrDefaultAsync(Expression<Func<TProps, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return await Where(predicate).FirstOrDefaultAsync();
+        return await Where(predicate).FirstOrDefaultAsync(cancellationToken: cancellationToken);
     }
 
-    public virtual async Task<bool> AnyAsync()
+    public virtual async Task<bool> AnyAsync(CancellationToken cancellationToken = default)
     {
-        var count = await CountAsync();
+        var count = await CountAsync(cancellationToken: cancellationToken);
         return count > 0;
     }
 
-    public virtual async Task<bool> AnyAsync(Expression<Func<TProps, bool>> predicate)
+    public virtual async Task<bool> AnyAsync(Expression<Func<TProps, bool>> predicate, CancellationToken cancellationToken = default)
     {
         // Create new query with additional filter
         var filteredQuery = Where(predicate);
-        return await filteredQuery.AnyAsync();
+        return await filteredQuery.AnyAsync(cancellationToken: cancellationToken);
     }
 
     public virtual IRedbQueryable<TProps> WhereIn<TValue>(Expression<Func<TProps, TValue>> selector, IEnumerable<TValue> values)
@@ -277,17 +278,17 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         // Create expression: x => values.Contains(selector(x))
         var parameter = selector.Parameters[0];
         var selectorBody = selector.Body;
-        
+
         // Create constant with list of values
         var valuesConstant = Expression.Constant(valuesList);
-        
+
         // Create Contains call
         var containsMethod = typeof(List<TValue>).GetMethod("Contains", new[] { typeof(TValue) });
         var containsCall = Expression.Call(valuesConstant, containsMethod!, selectorBody);
-        
+
         // Create lambda expression
         var lambda = Expression.Lambda<Func<TProps, bool>>(containsCall, parameter);
-        
+
         return Where(lambda);
     }
 
@@ -308,31 +309,31 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         // Create expression: x => values.Contains(selector(x))
         var parameter = selector.Parameters[0];
         var selectorBody = selector.Body;
-        
+
         // Create constant with list of values
         var valuesConstant = Expression.Constant(valuesList);
-        
+
         // Create Contains call
         var containsMethod = typeof(List<TValue>).GetMethod("Contains", new[] { typeof(TValue) });
         var containsCall = Expression.Call(valuesConstant, containsMethod!, selectorBody);
-        
+
         // Create lambda expression for IRedbObject
         var lambda = Expression.Lambda<Func<IRedbObject, bool>>(containsCall, parameter);
-        
+
         return WhereRedb(lambda);
     }
 
-    public virtual async Task<bool> AllAsync(Expression<Func<TProps, bool>> predicate)
+    public virtual async Task<bool> AllAsync(Expression<Func<TProps, bool>> predicate, CancellationToken cancellationToken = default)
     {
         if (predicate == null)
             throw new ArgumentNullException(nameof(predicate));
 
         // All() == true if all records satisfy the condition
-        var totalCount = await CountAsync();
+        var totalCount = await CountAsync(cancellationToken: cancellationToken);
         if (totalCount == 0)
             return true; // All elements of empty set satisfy any condition
 
-        var matchingCount = await Where(predicate).CountAsync();
+        var matchingCount = await Where(predicate).CountAsync(cancellationToken: cancellationToken);
         return totalCount == matchingCount;
     }
 
@@ -343,7 +344,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
 
         return new RedbProjectedQueryable<TProps, TResult>(this, selector, _provider, _context.SchemeId);
     }
-    
+
     /// <summary>
     /// Internal method for optimized loading with structure_ids filter.
     /// Virtual for overriding in PostgresTreeQueryable (List TreeRedbObject → List RedbObject).
@@ -360,46 +361,42 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     /// (search_objects_with_projection_by_paths) embedded in the JSON "properties" field.
     /// Re-loading would overwrite partial Props with full object data, wasting the projection.
     /// </param>
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
     protected internal virtual async Task<List<RedbObject<TProps>>> ToListWithProjectionAsync(
-        HashSet<long>? projectedStructureIds, 
-        bool skipPropsLoading = false)
+        HashSet<long>? projectedStructureIds,
+        bool skipPropsLoading = false,
+        CancellationToken cancellationToken = default)
     {
         // Set structure_ids in context for passing to provider
         if (projectedStructureIds != null && projectedStructureIds.Count > 0)
         {
             _context.ProjectedStructureIds = projectedStructureIds;
         }
-        
+
         if (skipPropsLoading)
         {
-            // ⭐ FIX: Skip BOTH Props loading AND lazy loader setup.
+            // FIX: Skip BOTH Props loading AND lazy loader setup.
             // Projection SQL already returns "properties" with only the needed fields.
             // Deserializer maps them to Props via setter (_propsLoaded = true).
             // Any post-processing (eager or lazy) would overwrite partial Props with full data.
             _context.SkipPropsLoading = true;
-            
-            // Explicitly disable lazy loading so MaterializeResultsFromJson does NOT set
-            // _lazyLoader on the objects. Without this, if global config has lazy=true,
-            // the materializer would set _lazyLoader + _propsLoaded=false, and on first
-            // .Props access the lazy loader would load the FULL object, defeating projection.
-            _context.UseLazyLoading = false;
         }
-        
+
         // Delegate to provider using the same BuildExpression() as ToListAsync()
-        var result = await _provider.ExecuteAsync(BuildExpression(), typeof(List<RedbObject<TProps>>));
+        var result = await _provider.ExecuteAsync(BuildExpression(), typeof(List<RedbObject<TProps>>), cancellationToken: cancellationToken);
         return (List<RedbObject<TProps>>)result;
     }
-    
+
     /// <summary>
     /// Scheme ID for access from projections
     /// </summary>
     internal long SchemeId => _context.SchemeId;
-    
+
     /// <summary>
     /// Provider for access from projections
     /// </summary>
     internal IRedbQueryProvider Provider => _provider;
-    
+
     /// <summary>
     /// Sets text paths for SQL function search_objects_with_projection_by_paths.
     /// Called from RedbProjectedQueryable before ToListWithProjectionAsync.
@@ -416,7 +413,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         var newContext = _context.Clone();
         newContext.IsDistinct = true;
-        
+
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
     }
 
@@ -424,7 +421,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         var newContext = _context.Clone();
         newContext.IsDistinctRedb = true;
-        
+
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
     }
 
@@ -432,15 +429,15 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         if (keySelector == null)
             throw new ArgumentNullException(nameof(keySelector));
-            
+
         var newContext = _context.Clone();
         var ordering = _orderingParser.ParseOrdering(keySelector, SortDirection.Ascending);
         newContext.DistinctByField = ordering;
         newContext.DistinctByIsBaseField = false;
-        
+
         // CRITICAL: PostgreSQL requires ORDER BY starting with DISTINCT ON fields
         newContext.Orderings.Insert(0, ordering);
-        
+
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
     }
 
@@ -448,15 +445,15 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         if (keySelector == null)
             throw new ArgumentNullException(nameof(keySelector));
-            
+
         var newContext = _context.Clone();
         var ordering = _orderingParser.ParseRedbOrdering(keySelector, SortDirection.Ascending);
         newContext.DistinctByField = ordering;
         newContext.DistinctByIsBaseField = true;
-        
+
         // CRITICAL: PostgreSQL requires ORDER BY starting with DISTINCT ON fields
         newContext.Orderings.Insert(0, ordering);
-        
+
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
     }
 
@@ -464,18 +461,18 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     {
         if (depth < 1)
             throw new ArgumentException("Max recursion depth must be positive", nameof(depth));
-            
+
         var newContext = _context.Clone();
         newContext.MaxRecursionDepth = depth;
-        
+
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
     }
 
-    public virtual IRedbQueryable<TProps> WithLazyLoading(bool enabled = true)
+    public virtual IRedbQueryable<TProps> WithLazyReferences(bool enabled = true)
     {
         var newContext = _context.Clone();
-        newContext.UseLazyLoading = enabled;
-        
+        newContext.LazyReferences = enabled;
+
         return new RedbQueryable<TProps>(_provider, newContext, _filterParser, _orderingParser, _facetBuilder);
     }
 
@@ -497,23 +494,23 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         // Similarly for Count
         return Expression.Constant(_context);
     }
-    
+
     /// <summary>
     /// NEW METHOD: Determines if filter is empty (Where(x =&gt; false))
     /// </summary>
     private bool IsEmptyFilter(FilterExpression filter)
     {
         // Check for constant false filter (created for Where(x => false))
-        if (filter is ComparisonExpression comparison && 
+        if (filter is ComparisonExpression comparison &&
             comparison.Property.Name == "__constant" &&
             comparison.Property.Type == typeof(bool) &&
             comparison.Operator == ComparisonOperator.Equal &&
-            comparison.Value is bool boolValue && 
+            comparison.Value is bool boolValue &&
             boolValue == false)
         {
             return true;
         }
-        
+
         return false;
     }
 
@@ -522,8 +519,8 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     // PostgresTreeQueryable overrides them with real implementation
 
     public virtual IRedbQueryable<TProps> WhereHasAncestor<TTarget>(
-        Expression<Func<TTarget, bool>> ancestorCondition, 
-        int? maxDepth = null) 
+        Expression<Func<TTarget, bool>> ancestorCondition,
+        int? maxDepth = null)
         where TTarget : class
     {
         throw new NotSupportedException(
@@ -532,8 +529,8 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     }
 
     public virtual IRedbQueryable<TProps> WhereHasDescendant<TTarget>(
-        Expression<Func<TTarget, bool>> descendantCondition, 
-        int? maxDepth = null) 
+        Expression<Func<TTarget, bool>> descendantCondition,
+        int? maxDepth = null)
         where TTarget : class
     {
         throw new NotSupportedException(
@@ -613,104 +610,104 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
 
     // ===== MATERIALIZATION METHODS =====
 
-    public virtual async Task<List<TreeRedbObject<TProps>>> ToTreeListAsync()
+    public virtual async Task<List<TreeRedbObject<TProps>>> ToTreeListAsync(CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException(
             "ToTreeListAsync is not supported in non-tree queries. " +
             "Use ITreeQueryProvider.CreateTreeQuery() to create queries with tree support.");
     }
 
-    public virtual async Task<List<TreeRedbObject<TProps>>> ToFlatListAsync()
+    public virtual async Task<List<TreeRedbObject<TProps>>> ToFlatListAsync(CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException(
             "ToFlatListAsync is not supported in non-tree queries. " +
             "Use ITreeQueryProvider.CreateTreeQuery() to create queries with tree support.");
     }
 
-    public virtual async Task<List<ITreeRedbObject>> ToRootListAsync()
+    public virtual async Task<List<ITreeRedbObject>> ToRootListAsync(CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException(
             "ToRootListAsync is not supported in non-tree queries. " +
             "Use ITreeQueryProvider.CreateTreeQuery() to create queries with tree support.");
     }
 
-    public virtual async Task<int> DeleteAsync()
+    public virtual async Task<int> DeleteAsync(CancellationToken cancellationToken = default)
     {
         // Pass FilterExpression directly (Pro uses it for PVT-based deletion, OpenSource falls back to facet-JSON)
-        return await _provider.ExecuteDeleteAsync(_context.SchemeId, _context.Filter);
+        return await _provider.ExecuteDeleteAsync(_context.SchemeId, _context.Filter, cancellationToken: cancellationToken);
     }
-    
+
     // ===== AGGREGATIONS (EAV) =====
-    
-    public virtual async Task<decimal> SumAsync<TField>(Expression<Func<TProps, TField>> selector) 
+
+    public virtual async Task<decimal> SumAsync<TField>(Expression<Func<TProps, TField>> selector, CancellationToken cancellationToken = default)
         where TField : struct
     {
         var fieldPath = ExtractFieldPath(selector);
-        
+
         // Pass FilterExpression directly (Pro uses it, Free falls back to facet-JSON)
         var result = await _provider.ExecuteAggregateAsync(
-            _context.SchemeId, 
-            fieldPath, 
+            _context.SchemeId,
+            fieldPath,
             Aggregation.AggregateFunction.Sum,
-            _context.Filter);
-        
+            _context.Filter, cancellationToken: cancellationToken);
+
         return result ?? 0m;
     }
-    
-    public virtual async Task<decimal> AverageAsync<TField>(Expression<Func<TProps, TField>> selector) 
+
+    public virtual async Task<decimal> AverageAsync<TField>(Expression<Func<TProps, TField>> selector, CancellationToken cancellationToken = default)
         where TField : struct
     {
         var fieldPath = ExtractFieldPath(selector);
-        
+
         // Pass FilterExpression directly (Pro uses it, Free falls back to facet-JSON)
         var result = await _provider.ExecuteAggregateAsync(
-            _context.SchemeId, 
-            fieldPath, 
+            _context.SchemeId,
+            fieldPath,
             Aggregation.AggregateFunction.Average,
-            _context.Filter);
-        
+            _context.Filter, cancellationToken: cancellationToken);
+
         return result ?? 0m;
     }
-    
-    public virtual async Task<TField?> MinAsync<TField>(Expression<Func<TProps, TField>> selector) 
+
+    public virtual async Task<TField?> MinAsync<TField>(Expression<Func<TProps, TField>> selector, CancellationToken cancellationToken = default)
 where TField : struct
     {
         var fieldPath = ExtractFieldPath(selector);
-        
+
         // Pass FilterExpression directly (Pro uses it, Free falls back to facet-JSON)
         var result = await _provider.ExecuteAggregateAsync(
-            _context.SchemeId, 
-            fieldPath, 
+            _context.SchemeId,
+            fieldPath,
             Aggregation.AggregateFunction.Min,
-            _context.Filter);
-        
+            _context.Filter, cancellationToken: cancellationToken);
+
         if (result == null) return null;
         return (TField)Utils.TemporalDecoder.ChangeType(result.Value, typeof(TField));
     }
-    
-    public virtual async Task<TField?> MaxAsync<TField>(Expression<Func<TProps, TField>> selector) 
+
+    public virtual async Task<TField?> MaxAsync<TField>(Expression<Func<TProps, TField>> selector, CancellationToken cancellationToken = default)
         where TField : struct
     {
         var fieldPath = ExtractFieldPath(selector);
-        
+
         // Pass FilterExpression directly (Pro uses it, Free falls back to facet-JSON)
         var result = await _provider.ExecuteAggregateAsync(
-            _context.SchemeId, 
-            fieldPath, 
+            _context.SchemeId,
+            fieldPath,
             Aggregation.AggregateFunction.Max,
-            _context.Filter);
-        
+            _context.Filter, cancellationToken: cancellationToken);
+
         if (result == null) return null;
         return (TField)Utils.TemporalDecoder.ChangeType(result.Value, typeof(TField));
     }
-    
+
     // ===== AGGREGATIONS FOR BASE FIELDS =====
-    
+
     /// <summary>
     /// Sum of base IRedbObject field values (ValueLong, Key, etc.)
     /// SQL: uses aggregate_grouped with empty grouping for base fields
     /// </summary>
-    public virtual async Task<decimal> SumRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector)
+    public virtual async Task<decimal> SumRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector, CancellationToken cancellationToken = default)
         where TField : struct
     {
         var fieldPath = ExtractFieldPathRedb(selector);
@@ -727,8 +724,8 @@ where TField : struct
         // Pass FilterExpression directly: Pro's filterJson grouped-overload drops the filter and
         // aggregates the whole scheme (same defect fixed in AggregateAsync). Free converts it to facet-JSON.
         var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, _context.Filter);
-        
+            _context.SchemeId, groupFields, aggregations, _context.Filter, cancellationToken: cancellationToken);
+
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
             var firstRow = jsonResult.RootElement[0];
@@ -749,7 +746,7 @@ where TField : struct
     /// Average value of base IRedbObject field
     /// SQL: uses aggregate_grouped with empty grouping
     /// </summary>
-    public virtual async Task<decimal> AverageRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector)
+    public virtual async Task<decimal> AverageRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector, CancellationToken cancellationToken = default)
         where TField : struct
     {
         var fieldPath = ExtractFieldPathRedb(selector);
@@ -764,8 +761,8 @@ where TField : struct
 
         // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
         var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, _context.Filter);
-        
+            _context.SchemeId, groupFields, aggregations, _context.Filter, cancellationToken: cancellationToken);
+
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
             var firstRow = jsonResult.RootElement[0];
@@ -776,12 +773,12 @@ where TField : struct
 
         return 0m;
     }
-    
+
     /// <summary>
     /// Minimum value of base IRedbObject field (ValueLong, Key, DateCreate, etc.)
     /// SQL: uses aggregate_grouped with empty grouping
     /// </summary>
-    public virtual async Task<TField?> MinRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector)
+    public virtual async Task<TField?> MinRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector, CancellationToken cancellationToken = default)
         where TField : struct
     {
         var fieldPath = ExtractFieldPathRedb(selector);
@@ -796,23 +793,23 @@ where TField : struct
 
         // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
         var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, _context.Filter);
-        
+            _context.SchemeId, groupFields, aggregations, _context.Filter, cancellationToken: cancellationToken);
+
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
             var firstRow = jsonResult.RootElement[0];
             if (firstRow.TryGetProperty("result", out var value) && value.ValueKind != JsonValueKind.Null)
                 return (TField?)Utils.JsonValueConverter.Convert(value, typeof(TField));
         }
-        
+
         return null;
     }
-    
+
     /// <summary>
     /// Maximum value of base IRedbObject field (ValueLong, Key, DateCreate, etc.)
     /// SQL: uses aggregate_grouped with empty grouping
     /// </summary>
-    public virtual async Task<TField?> MaxRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector)
+    public virtual async Task<TField?> MaxRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector, CancellationToken cancellationToken = default)
         where TField : struct
     {
         var fieldPath = ExtractFieldPathRedb(selector);
@@ -827,24 +824,24 @@ where TField : struct
 
         // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
         var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, _context.Filter);
-        
+            _context.SchemeId, groupFields, aggregations, _context.Filter, cancellationToken: cancellationToken);
+
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
             var firstRow = jsonResult.RootElement[0];
             if (firstRow.TryGetProperty("result", out var value) && value.ValueKind != JsonValueKind.Null)
                 return (TField?)Utils.JsonValueConverter.Convert(value, typeof(TField));
         }
-        
+
         return null;
     }
-    
+
     /// <summary>
     /// Get field statistics (Sum, Avg, Min, Max, Count) in one call
     /// Executed as ONE SQL query!
     /// </summary>
     public virtual async Task<Aggregation.FieldStatistics<TField>> GetStatisticsAsync<TField>(
-        Expression<Func<TProps, TField>> selector) where TField : struct
+        Expression<Func<TProps, TField>> selector, CancellationToken cancellationToken = default) where TField : struct
     {
         var fieldPath = ExtractFieldPath(selector);
         var schemeId = _context.SchemeId;
@@ -861,8 +858,8 @@ where TField : struct
 
         // Pass FilterExpression directly: Pro's filterJson batch-overload drops the filter (whole-scheme
         // stats). Same fix as AggregateAsync; Free converts to facet-JSON.
-        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, _context.Filter);
-        
+        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, _context.Filter, cancellationToken: cancellationToken);
+
         return new Aggregation.FieldStatistics<TField>
         {
             Sum = batchResult.Get<decimal>("Sum") ?? 0m,
@@ -872,18 +869,18 @@ where TField : struct
             Count = batchResult.Get<int>("Count") ?? 0
         };
     }
-    
+
     /// <summary>
     /// Flexible aggregation - choose what to aggregate via Agg.Sum/Avg/Min/Max/Count
     /// Executed as ONE SQL query (aggregate_batch)!
     /// </summary>
-    public virtual async Task<TResult> AggregateAsync<TResult>(Expression<Func<RedbObject<TProps>, TResult>> selector)
+    public virtual async Task<TResult> AggregateAsync<TResult>(Expression<Func<RedbObject<TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var schemeId = _context.SchemeId;
-        
+
         // Parse expression and find all Agg.* calls
         var aggregations = ParseAggregateExpression(selector);
-        
+
         // ONE SQL query for all aggregations!
         var requests = aggregations.Select(agg => new Aggregation.AggregateRequest
         {
@@ -891,15 +888,15 @@ where TField : struct
             Function = agg.Function,
             Alias = agg.PropertyName
         });
-        
+
         // BUG FIX: pass the FilterExpression directly so providers that only
         // honour the typed overload (e.g. Pro) don't silently drop the outer Where.
-        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, _context.Filter);
-        
+        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, _context.Filter, cancellationToken: cancellationToken);
+
         // Build result
         return BuildAggregateResult<TResult>(selector, batchResult.Values);
     }
-    
+
     /// <summary>
     /// Parses AggregateAsync expression and extracts aggregations
     /// </summary>
@@ -907,14 +904,14 @@ where TField : struct
         Expression<Func<RedbObject<TProps>, TResult>> selector)
     {
         var result = new List<(string PropertyName, string FieldPath, Aggregation.AggregateFunction Function)>();
-        
+
         if (selector.Body is NewExpression newExpr)
         {
             for (int i = 0; i < newExpr.Arguments.Count; i++)
             {
                 var propName = newExpr.Members?[i].Name ?? $"Item{i}";
                 var arg = newExpr.Arguments[i];
-                
+
                 if (arg is MethodCallExpression methodCall && methodCall.Method.DeclaringType == typeof(Aggregation.Agg))
                 {
                     var funcName = methodCall.Method.Name;
@@ -927,27 +924,27 @@ where TField : struct
                         "Count" => Aggregation.AggregateFunction.Count,
                         _ => throw new NotSupportedException($"Unknown aggregation: {funcName}")
                     };
-                    
+
                     // Extract field path
                     string fieldPath = "*"; // for Count()
                     if (methodCall.Arguments.Count > 0)
                     {
                         fieldPath = ExtractFieldPathFromExpression(methodCall.Arguments[0]);
                     }
-                    
+
                     result.Add((propName, fieldPath, function));
                 }
             }
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// Flexible aggregation ONLY for base IRedbObject fields
     /// Executed as ONE SQL query (aggregate_grouped without grouping)
     /// </summary>
-    public virtual async Task<TResult> AggregateRedbAsync<TResult>(Expression<Func<IRedbObject, TResult>> selector)
+    public virtual async Task<TResult> AggregateRedbAsync<TResult>(Expression<Func<IRedbObject, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var schemeId = _context.SchemeId;
 
@@ -969,8 +966,8 @@ where TField : struct
         });
 
         // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
-        var jsonResult = await _provider.ExecuteGroupedAggregateAsync(schemeId, groupFields, requests, _context.Filter);
-        
+        var jsonResult = await _provider.ExecuteGroupedAggregateAsync(schemeId, groupFields, requests, _context.Filter, cancellationToken: cancellationToken);
+
         // Parse result (first row, since no grouping)
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
@@ -980,7 +977,7 @@ where TField : struct
 
         throw new InvalidOperationException("AggregateRedbAsync returned no results");
     }
-    
+
     /// <summary>
     /// Parses AggregateRedbAsync expression for base IRedbObject fields
     /// </summary>
@@ -988,14 +985,14 @@ where TField : struct
         Expression<Func<IRedbObject, TResult>> selector)
     {
         var result = new List<(string PropertyName, string FieldPath, Aggregation.AggregateFunction Function)>();
-        
+
         if (selector.Body is NewExpression newExpr)
         {
             for (int i = 0; i < newExpr.Arguments.Count; i++)
             {
                 var propName = newExpr.Members?[i].Name ?? $"Item{i}";
                 var arg = newExpr.Arguments[i];
-                
+
                 if (arg is MethodCallExpression methodCall && methodCall.Method.DeclaringType == typeof(Aggregation.Agg))
                 {
                     var funcName = methodCall.Method.Name;
@@ -1008,7 +1005,7 @@ where TField : struct
                         "Count" => Aggregation.AggregateFunction.Count,
                         _ => throw new NotSupportedException($"Unknown aggregation: {funcName}")
                     };
-                    
+
                     // Extract base field path (without Props!)
                     string fieldPath = "*"; // for Count()
                     if (methodCall.Arguments.Count > 0)
@@ -1019,15 +1016,15 @@ where TField : struct
                             fieldPath = member.Member.Name;  // Id, ValueLong, DateCreate, etc.
                         }
                     }
-                    
+
                     result.Add((propName, fieldPath, function));
                 }
             }
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// Builds AggregateRedbAsync result from JSON element
     /// </summary>
@@ -1038,32 +1035,32 @@ where TField : struct
         if (selector.Body is NewExpression newExpr && newExpr.Constructor != null)
         {
             var args = new object?[newExpr.Arguments.Count];
-            
+
             for (int i = 0; i < newExpr.Arguments.Count; i++)
             {
                 var propName = newExpr.Members?[i].Name ?? $"Item{i}";
                 var targetType = newExpr.Constructor.GetParameters()[i].ParameterType;
-                
+
                 object? value = null;
                 if (jsonRow.TryGetProperty(propName, out var jsonValue))
                 {
                     value = Query.Utils.JsonValueConverter.Convert(jsonValue, targetType);
                 }
-                
+
                 args[i] = ConvertAggregateValue(value, targetType);
             }
-            
+
             return (TResult)newExpr.Constructor.Invoke(args);
         }
-        
+
         throw new ArgumentException("AggregateRedbAsync requires anonymous type creation (new { ... })", nameof(selector));
     }
-    
+
     /// <summary>
     /// Extracts field path from expression
     /// Supports:
     ///   x.Props.Price              → "Price"
-    ///   x.Props.Customer.Name      → "Customer.Name"  
+    ///   x.Props.Customer.Name      → "Customer.Name"
     ///   x.Props.Items[2].Price     → "Items[2].Price"   (specific index)
     ///   x.Props.Items[].Price      → "Items[].Price"    (all elements, via Select)
     ///   x.Props.PhoneBook["home"]  → "PhoneBook[home]"  (Dictionary key)
@@ -1075,11 +1072,11 @@ where TField : struct
         ExtractFieldPathRecursive(expr, parts);
         return string.Join(".", parts);
     }
-    
+
     private void ExtractFieldPathRecursive(Expression? expr, List<string> parts)
     {
         if (expr == null) return;
-        
+
         switch (expr)
         {
             // x.Props.Price or x.Props.Items.Price
@@ -1104,7 +1101,7 @@ where TField : struct
                     ExtractFieldPathRecursive(member.Expression, parts);
                 }
                 break;
-                
+
             // x.Props.Items[2] - array indexer (int[], string[], etc.)
             case BinaryExpression { NodeType: ExpressionType.ArrayIndex } arrayIndex:
                 // IMPORTANT: recursion first, then modification!
@@ -1116,17 +1113,17 @@ where TField : struct
                     parts[^1] = $"{parts[^1]}[{index}]";
                 }
                 break;
-                
+
             // x.Props.Items.get_Item(2) - indexer for List&lt;T&gt; or Dictionary&lt;K,V&gt;
             case MethodCallExpression { Method.Name: "get_Item" } indexerCall:
-                if (indexerCall.Arguments.Count > 0 && 
+                if (indexerCall.Arguments.Count > 0 &&
                     indexerCall.Arguments[0] is ConstantExpression idxConst)
                 {
                     // FIX: For nested paths like AddressBook["home"].City
                     // Recursion uses Insert(0, ...), so new element will be at the beginning
                     var countBefore = parts.Count;
                     ExtractFieldPathRecursive(indexerCall.Object, parts);
-                    
+
                     // If element was added, it's at the beginning (Insert(0, ...))
                     if (parts.Count > countBefore)
                     {
@@ -1145,10 +1142,10 @@ where TField : struct
                     }
                 }
                 break;
-                
+
             // x.Props.Items.ElementAt(2)
             case MethodCallExpression { Method.Name: "ElementAt" } elementAtCall:
-                if (elementAtCall.Arguments.Count > 1 && 
+                if (elementAtCall.Arguments.Count > 1 &&
                     elementAtCall.Arguments[1] is ConstantExpression elemConst)
                 {
                     var index = Convert.ToInt32(elemConst.Value);
@@ -1158,7 +1155,7 @@ where TField : struct
                         parts[^1] = $"{parts[^1]}[{index}]";
                     }
                 }
-                else if (elementAtCall.Arguments.Count == 1 && 
+                else if (elementAtCall.Arguments.Count == 1 &&
                          elementAtCall.Arguments[0] is ConstantExpression singleConst)
                 {
                     // For instance method
@@ -1170,7 +1167,7 @@ where TField : struct
                     }
                 }
                 break;
-                
+
             // x.Props.Items.Select(i => i.Price) → Items[].Price (all elements)
             case MethodCallExpression { Method.Name: "Select" } selectCall:
                 // Add [] to array
@@ -1180,7 +1177,7 @@ where TField : struct
                     parts[^1] = $"{parts[^1]}[]";
                 }
                 // Parse lambda inside Select
-                if (selectCall.Arguments.Count > 1 && 
+                if (selectCall.Arguments.Count > 1 &&
                     selectCall.Arguments[1] is LambdaExpression lambda)
                 {
                     var innerParts = new List<string>();
@@ -1188,7 +1185,7 @@ where TField : struct
                     parts.AddRange(innerParts);
                 }
                 break;
-                
+
             // x.Props.Items.Sum(i => i.Price) → Items[].Price
             case MethodCallExpression { Method.Name: "Sum" or "Average" or "Min" or "Max" } linqAggCall:
                 ExtractFieldPathRecursive(linqAggCall.Arguments[0], parts);
@@ -1196,7 +1193,7 @@ where TField : struct
                 {
                     parts[^1] = $"{parts[^1]}[]";
                 }
-                if (linqAggCall.Arguments.Count > 1 && 
+                if (linqAggCall.Arguments.Count > 1 &&
                     linqAggCall.Arguments[1] is LambdaExpression aggLambda)
                 {
                     var innerParts = new List<string>();
@@ -1206,7 +1203,7 @@ where TField : struct
                 break;
         }
     }
-    
+
     /// <summary>
     /// Checks if a type is Dictionary&lt;K,V&gt; or IDictionary&lt;K,V&gt;
     /// </summary>
@@ -1219,10 +1216,10 @@ where TField : struct
             if (genericDef == typeof(Dictionary<,>) || genericDef == typeof(IDictionary<,>))
                 return true;
         }
-        return type.GetInterfaces().Any(i => 
+        return type.GetInterfaces().Any(i =>
             i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDictionary<,>));
     }
-    
+
     /// <summary>
     /// Creates aggregation result from dictionary of values
     /// </summary>
@@ -1233,31 +1230,31 @@ where TField : struct
         if (selector.Body is NewExpression newExpr && newExpr.Constructor != null)
         {
             var args = new object?[newExpr.Arguments.Count];
-            
+
             for (int i = 0; i < newExpr.Arguments.Count; i++)
             {
                 var propName = newExpr.Members?[i].Name ?? $"Item{i}";
                 var targetType = newExpr.Constructor.GetParameters()[i].ParameterType;
                 results.TryGetValue(propName, out var value);
-                
+
                 args[i] = ConvertAggregateValue(value, targetType);
             }
-            
+
             return (TResult)newExpr.Constructor.Invoke(args);
         }
-        
+
         throw new NotSupportedException("AggregateAsync supports only anonymous types");
     }
-    
+
     private object? ConvertAggregateValue(object? value, Type targetType)
     {
         if (value == null)
         {
             return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
         }
-        
+
         var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
-        
+
         return underlying switch
         {
             Type t when t == typeof(int) => Convert.ToInt32(value),
@@ -1268,35 +1265,35 @@ where TField : struct
             _ => Utils.TemporalDecoder.ChangeType(value, underlying)
         };
     }
-    
+
     /// <summary>
     /// Extracts field path from lambda expression
     /// </summary>
     protected string ExtractFieldPath<TField>(Expression<Func<TProps, TField>> selector)
     {
         var body = selector.Body;
-        
+
         // Handle Convert (for nullable types)
         if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
         {
             body = unary.Operand;
         }
-        
+
         var segments = new List<string>();
         var current = body;
-        
+
         while (current is MemberExpression member)
         {
             segments.Insert(0, member.Member.Name);
             current = member.Expression;
         }
-        
+
         if (segments.Count == 0)
             throw new ArgumentException("Cannot extract field path from selector", nameof(selector));
-        
+
         return string.Join(".", segments);
     }
-    
+
     /// <summary>
     /// Extracts base field path from IRedbObject expression
     /// Used for *RedbAsync methods (SumRedbAsync, GroupByRedb, etc.)
@@ -1304,22 +1301,22 @@ where TField : struct
     protected string ExtractFieldPathRedb<TField>(Expression<Func<IRedbObject, TField>> selector)
     {
         var body = selector.Body;
-        
+
         // Handle Convert (for nullable types)
         if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
         {
             body = unary.Operand;
         }
-        
+
         if (body is MemberExpression member)
         {
             // For IRedbObject: just property name (Id, Name, ValueLong, etc.)
             return member.Member.Name;
         }
-        
+
         throw new ArgumentException("Cannot extract field path from IRedbObject selector", nameof(selector));
     }
-    
+
     /// <summary>
     /// Builds JSON filter from current query context
     /// </summary>
@@ -1327,13 +1324,13 @@ where TField : struct
     {
         if (_context.Filter == null || _facetBuilder == null)
             return null;
-        
+
         var json = _facetBuilder.BuildFacetFilters(_context.Filter);
         return string.IsNullOrEmpty(json) || json == "{}" ? null : json;
     }
-    
+
     // ===== GROUPBY =====
-    
+
     /// <summary>
     /// Grouping with aggregations.
     /// Pro version receives FilterExpression directly for proper SQL compilation.
@@ -1345,7 +1342,7 @@ where TField : struct
         return new Grouping.RedbGroupedQueryable<TKey, TProps>(
             _provider, _context.SchemeId, _context.Filter, keySelector);
     }
-    
+
     /// <summary>
     /// Grouping by base IRedbObject fields (id, scheme_id, parent_id, etc.)
     /// Uses IRedbObject for compile-time safety - Props not visible!
@@ -1358,7 +1355,7 @@ where TField : struct
         return new Grouping.RedbGroupedQueryable<TKey, TProps>(
             _provider, _context.SchemeId, _context.Filter, keySelector, isBaseFieldGrouping: true);
     }
-    
+
     /// <summary>
     /// Grouping by array elements
     /// </summary>
@@ -1370,9 +1367,9 @@ where TField : struct
         return new Grouping.RedbArrayGroupedQueryable<TKey, TItem, TProps>(
             _provider, _context.SchemeId, filterJson, _context.Filter, arraySelector, keySelector);
     }
-    
+
     // ===== WINDOW FUNCTIONS =====
-    
+
     /// <summary>
     /// Query with window functions.
     /// Pro version receives FilterExpression directly for proper SQL compilation.
@@ -1386,9 +1383,9 @@ where TField : struct
         return new Window.RedbWindowedQueryable<TProps>(
             _provider, _context.SchemeId, _context.Filter, windowSpec, _context.Limit, _context.Offset);
     }
-    
+
     // ===== SQL PREVIEW (like EF Core) =====
-    
+
     /// <summary>
     /// Get SQL representation of query (for debugging).
     /// Analog of EF Core ToQueryString().
@@ -1400,31 +1397,31 @@ where TField : struct
         // Use Task.Run to avoid Blazor SynchronizationContext deadlock
         return Task.Run(() => _provider.GetSqlPreviewAsync(_context)).GetAwaiter().GetResult();
     }
-    
+
     /// <summary>
     /// Async version of getting SQL (recommended)
     /// </summary>
-    public virtual Task<string> ToSqlStringAsync()
+    public virtual Task<string> ToSqlStringAsync(CancellationToken cancellationToken = default)
     {
-        return _provider.GetSqlPreviewAsync(_context);
+        return _provider.GetSqlPreviewAsync(_context, cancellationToken: cancellationToken);
     }
-    
+
     /// <summary>
     /// Get JSON filter that will be sent to SQL function (for diagnostics)
     /// </summary>
-    public virtual Task<string> ToFilterJsonAsync()
+    public virtual Task<string> ToFilterJsonAsync(CancellationToken cancellationToken = default)
     {
-        return _provider.GetFilterJsonAsync(_context);
+        return _provider.GetFilterJsonAsync(_context, cancellationToken: cancellationToken);
     }
-    
+
     private string BuildOrderByJson()
     {
         if (!_context.Orderings.Any())
             return "[]";
-        
-        var orders = _context.Orderings.Select(o => new { 
-            field = o.Property.Name, 
-            dir = o.Direction.ToString().ToUpper() 
+
+        var orders = _context.Orderings.Select(o => new {
+            field = o.Property.Name,
+            dir = o.Direction.ToString().ToUpper()
         });
         return System.Text.Json.JsonSerializer.Serialize(orders);
     }

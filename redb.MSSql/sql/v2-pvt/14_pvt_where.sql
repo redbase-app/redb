@@ -584,7 +584,7 @@ BEGIN
             IF @ct_s IS NOT NULL AND ISJSON(@ct_s) = 1
                 SET @ct_s = COALESCE(JSON_VALUE(@ct_s, N'$."$const"'), @ct_s);
             SET @piece = dbo.pvt_b2_expr_sql(@ct_e, @fields, @obj_alias)
-                       + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + @ct_s + N'%');
+                       + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@ct_s) + N'%') + N' ESCAPE ''\''';
         END
 
         ELSE IF @lk = N'$startswith' AND @t = 4
@@ -596,7 +596,7 @@ BEGIN
             IF @sw_s IS NOT NULL AND ISJSON(@sw_s) = 1
                 SET @sw_s = COALESCE(JSON_VALUE(@sw_s, N'$."$const"'), @sw_s);
             SET @piece = dbo.pvt_b2_expr_sql(@sw_e, @fields, @obj_alias)
-                       + N' LIKE ' + dbo.pvt_sql_string_literal(@sw_s + N'%');
+                       + N' LIKE ' + dbo.pvt_sql_string_literal(dbo.pvt_like_escape(@sw_s) + N'%') + N' ESCAPE ''\''';
         END
 
         ELSE IF @lk = N'$endswith' AND @t = 4
@@ -608,7 +608,7 @@ BEGIN
             IF @es_s IS NOT NULL AND ISJSON(@es_s) = 1
                 SET @es_s = COALESCE(JSON_VALUE(@es_s, N'$."$const"'), @es_s);
             SET @piece = dbo.pvt_b2_expr_sql(@es_e, @fields, @obj_alias)
-                       + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + @es_s);
+                       + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@es_s)) + N' ESCAPE ''\''';
         END
 
         -- $like: raw LIKE with full pattern from second arg expression

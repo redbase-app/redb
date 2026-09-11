@@ -55,9 +55,9 @@ BEGIN
     -- 🚀 OPTIMIZATION: removed fs.db_type check - type already known for string operators
     ELSIF operator_name IN ('$startsWith', '$endsWith', '$contains') THEN
         CASE operator_name
-            WHEN '$startsWith' THEN pattern := operator_value || '%';
-            WHEN '$endsWith' THEN pattern := '%' || operator_value;
-            WHEN '$contains' THEN pattern := '%' || operator_value || '%';
+            WHEN '$startsWith' THEN pattern := pvt_like_escape(operator_value) || '%';
+            WHEN '$endsWith' THEN pattern := '%' || pvt_like_escape(operator_value);
+            WHEN '$contains' THEN pattern := '%' || pvt_like_escape(operator_value) || '%';
         END CASE;
         
         RETURN format('fv._String LIKE %L', pattern);
@@ -66,9 +66,9 @@ BEGIN
     -- 🚀 OPTIMIZATION: removed fs.db_type check
     ELSIF operator_name IN ('$startsWithIgnoreCase', '$endsWithIgnoreCase', '$containsIgnoreCase') THEN
         CASE operator_name
-            WHEN '$startsWithIgnoreCase' THEN pattern := operator_value || '%';
-            WHEN '$endsWithIgnoreCase' THEN pattern := '%' || operator_value;
-            WHEN '$containsIgnoreCase' THEN pattern := '%' || operator_value || '%';
+            WHEN '$startsWithIgnoreCase' THEN pattern := pvt_like_escape(operator_value) || '%';
+            WHEN '$endsWithIgnoreCase' THEN pattern := '%' || pvt_like_escape(operator_value);
+            WHEN '$containsIgnoreCase' THEN pattern := '%' || pvt_like_escape(operator_value) || '%';
         END CASE;
         
         RETURN format('%s ILIKE %L', pvt_fold_case('fv._String'), pattern);
@@ -306,7 +306,7 @@ BEGIN
               AND av._id_structure = fv._id_structure
               AND av._array_index IS NOT NULL
               AND av._String LIKE %L
-        )', operator_value || '%');
+        )', pvt_like_escape(operator_value) || '%');
     
     ELSIF operator_name = '$arrayEndsWith' THEN
         RETURN format('EXISTS(
@@ -315,7 +315,7 @@ BEGIN
               AND av._id_structure = fv._id_structure
               AND av._array_index IS NOT NULL
               AND av._String LIKE %L
-        )', '%' || operator_value);
+        )', '%' || pvt_like_escape(operator_value));
     
     ELSIF operator_name = '$arrayMatches' THEN
         RETURN format('EXISTS(

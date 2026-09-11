@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using redb.Core.Models.Entities;
 
 namespace redb.Core.Caching
@@ -12,6 +13,12 @@ namespace redb.Core.Caching
     internal class PropsCacheDomain
     {
         public IRedbObjectCache? Cache { get; set; }
+
+        /// <summary>
+        /// V4 (review): the loader every reference inside a cached object carries - one that opens
+        /// its own scope per load, because a cached instance is shared by every scope. Null without DI.
+        /// </summary>
+        public Providers.DetachedLazyPropsLoader? DetachedLoader { get; set; }
     }
     
     /// <summary>
@@ -50,11 +57,13 @@ namespace redb.Core.Caching
         /// <summary>
         /// Initialize cache for this domain (called once at application startup per domain).
         /// </summary>
-        public void Initialize(IRedbObjectCache cache)
+        public void Initialize(IRedbObjectCache cache, IServiceScopeFactory? scopeFactory = null)
         {
             lock (_lock)
             {
-                GetCache().Cache = cache;
+                var domain = GetCache();
+                domain.Cache = cache;
+                domain.DetachedLoader = scopeFactory != null ? new Providers.DetachedLazyPropsLoader(scopeFactory) : null;
             }
         }
         
@@ -63,7 +72,7 @@ namespace redb.Core.Caching
         /// </summary>
         public RedbObject<TProps>? Get<TProps>(long objectId, Guid hash) where TProps : class, new()
         {
-            return Instance?.Get<TProps>(objectId, hash);
+            return DetachOnHandOut(Instance?.Get<TProps>(objectId, hash));
         }
         
         /// <summary>
@@ -71,7 +80,7 @@ namespace redb.Core.Caching
         /// </summary>
         public RedbObject<TProps>? GetWithoutHashValidation<TProps>(long objectId) where TProps : class, new()
         {
-            return Instance?.GetWithoutHashValidation<TProps>(objectId);
+            return DetachOnHandOut(Instance?.GetWithoutHashValidation<TProps>(objectId));
         }
         
         /// <summary>
@@ -79,7 +88,19 @@ namespace redb.Core.Caching
         /// </summary>
         public void Set<TProps>(RedbObject<TProps> obj) where TProps : class, new()
         {
-            Instance?.Set(obj);
+            var domain = GetCache();
+            if (domain.Cache == null) return;
+            domain.Cache.Set(obj);
+            // The writer keeps its scoped loaders, wrapped with a dead-scope fallback: while its
+            // scope lives every reference touch rides the writer's own connection (detaching here
+            // made each touch rent a fresh scope and drained the pool - tsum, 2026-09-09); once
+            // the scope dies the wrapper falls through to the detached loader. A graph handed OUT
+            // of the cache still gets the pure detached loader - see DetachOnHandOut.
+            if (domain.DetachedLoader != null)
+                Utils.LazyReferenceInstaller.InstallForCacheSet(obj, domain.DetachedLoader);
+            // A (re-)Set may bring fresh stubs carrying the writer's loader: drop the served-once
+            // mark so the next hand-out detaches the graph again.
+            _detached.Remove(obj);
         }
         
         /// <summary>
@@ -92,7 +113,10 @@ namespace redb.Core.Caching
         {
             if (Instance != null)
             {
-                return Instance.FilterNeedToLoad(objects, out fromCache);
+                var missing = Instance.FilterNeedToLoad(objects, out fromCache);
+                foreach (var served in fromCache.Values)
+                    DetachOnHandOut(served);
+                return missing;
             }
             
             // Cache is disabled - load everything from DB
@@ -100,6 +124,30 @@ namespace redb.Core.Caching
             return objects.Select(o => o.objectId).ToHashSet();
         }
         
+        // Served-once marker: the reflection walk over a graph is not free, and a hot cache
+        // serves the same instance thousands of times. The table entry lives exactly as long
+        // as the cached instance does.
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, object> _detached = new();
+
+        /// <summary>
+        /// A graph leaving the cache is shared between scopes from that moment on: swap its lazy
+        /// loaders to the domain's <see cref="Providers.DetachedLazyPropsLoader"/> (each lazy access
+        /// then borrows a fresh scope). The WRITER's copy is deliberately not touched on Set - only
+        /// what the cache hands out gets detached, once per instance.
+        /// </summary>
+        private T? DetachOnHandOut<T>(T? obj) where T : class, Models.Contracts.IRedbObject
+        {
+            if (obj == null) return null;
+            var detachedLoader = GetCache().DetachedLoader;
+            if (detachedLoader == null) return obj;
+            if (!_detached.TryGetValue(obj, out _))
+            {
+                Utils.LazyReferenceInstaller.Install(obj, detachedLoader);
+                _detached.AddOrUpdate(obj, string.Empty);
+            }
+            return obj;
+        }
+
         /// <summary>
         /// Remove from cache.
         /// </summary>

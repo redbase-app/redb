@@ -12,19 +12,21 @@ public interface IRedbGroupedQueryable<TKey, TProps> where TProps : class, new()
     /// Executes projection with aggregations for each group.
     /// </summary>
     Task<List<TResult>> SelectAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector);
+        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Returns group count.
     /// </summary>
-    Task<int> CountAsync();
+    Task<int> CountAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Returns SQL string that will be executed for this GroupBy query.
     /// Useful for debugging and diagnostics.
     /// </summary>
     Task<string> ToSqlStringAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector);
+        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Filter groups by a predicate over aggregates (SQL HAVING).

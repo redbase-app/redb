@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace redb.Core.Data
@@ -17,6 +18,9 @@ namespace redb.Core.Data
         /// Database connection.
         /// </summary>
         public abstract IRedbConnection Db { get; }
+
+        /// <inheritdoc />
+        public bool IsDisposed => Db.IsDisposed;
         
         /// <summary>
         /// Key generator.
@@ -35,42 +39,70 @@ namespace redb.Core.Data
         /// </summary>
         public Task<List<T>> QueryAsync<T>(string sql, params object[] parameters) where T : new()
             => Db.QueryAsync<T>(sql, parameters);
+
+        /// <inheritdoc />
+        public Task<List<T>> QueryAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
+            => Db.QueryAsync<T>(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL query and return first result or null.
         /// </summary>
         public Task<T?> QueryFirstOrDefaultAsync<T>(string sql, params object[] parameters) where T : class, new()
             => Db.QueryFirstOrDefaultAsync<T>(sql, parameters);
+
+        /// <inheritdoc />
+        public Task<T?> QueryFirstOrDefaultAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : class, new()
+            => Db.QueryFirstOrDefaultAsync<T>(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL query and return scalar value.
         /// </summary>
         public Task<T?> ExecuteScalarAsync<T>(string sql, params object[] parameters)
             => Db.ExecuteScalarAsync<T>(sql, parameters);
+
+        /// <inheritdoc />
+        public Task<T?> ExecuteScalarAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken)
+            => Db.ExecuteScalarAsync<T>(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL query and return list of scalar values (first column only).
         /// </summary>
         public Task<List<T>> QueryScalarListAsync<T>(string sql, params object[] parameters)
             => Db.QueryScalarListAsync<T>(sql, parameters);
+
+        /// <inheritdoc />
+        public Task<List<T>> QueryScalarListAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken)
+            => Db.QueryScalarListAsync<T>(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL command (INSERT, UPDATE, DELETE).
         /// </summary>
         public Task<int> ExecuteAsync(string sql, params object[] parameters)
             => Db.ExecuteAsync(sql, parameters);
+
+        /// <inheritdoc />
+        public Task<int> ExecuteAsync(string sql, object[] parameters, CancellationToken cancellationToken)
+            => Db.ExecuteAsync(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL returning JSON.
         /// </summary>
         public Task<string?> ExecuteJsonAsync(string sql, params object[] parameters)
             => Db.ExecuteJsonAsync(sql, parameters);
+
+        /// <inheritdoc />
+        public Task<string?> ExecuteJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken)
+            => Db.ExecuteJsonAsync(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL returning multiple JSON rows.
         /// </summary>
         public Task<List<string>> ExecuteJsonListAsync(string sql, params object[] parameters)
             => Db.ExecuteJsonListAsync(sql, parameters);
+
+        /// <inheritdoc />
+        public Task<List<string>> ExecuteJsonListAsync(string sql, object[] parameters, CancellationToken cancellationToken)
+            => Db.ExecuteJsonListAsync(sql, parameters, cancellationToken);
 
         // === TRANSACTION SHORTCUTS ===
         
@@ -87,46 +119,54 @@ namespace redb.Core.Data
         /// <summary>
         /// Begin new transaction.
         /// </summary>
-        public Task<IRedbTransaction> BeginTransactionAsync()
-            => Db.BeginTransactionAsync();
+        public Task<IRedbTransaction> BeginTransactionAsync(System.Data.IsolationLevel? isolationLevel = null, CancellationToken cancellationToken = default)
+            => Db.BeginTransactionAsync(isolationLevel, cancellationToken);
         
         /// <summary>
         /// Execute operations atomically.
         /// </summary>
-        public Task ExecuteAtomicAsync(Func<Task> operations)
-            => Db.ExecuteAtomicAsync(operations);
+        public Task ExecuteAtomicAsync(Func<Task> operations, CancellationToken cancellationToken = default)
+            => Db.ExecuteAtomicAsync(operations, cancellationToken);
         
         /// <summary>
         /// Execute operations atomically and return result.
         /// </summary>
-        public Task<T> ExecuteAtomicAsync<T>(Func<Task<T>> operations)
-            => Db.ExecuteAtomicAsync(operations);
+        public Task<T> ExecuteAtomicAsync<T>(Func<Task<T>> operations, CancellationToken cancellationToken = default)
+            => Db.ExecuteAtomicAsync(operations, cancellationToken);
+
+        /// <inheritdoc />
+        public Task ExecuteAtomicAsync(System.Data.IsolationLevel isolationLevel, Func<Task> operations, CancellationToken cancellationToken = default)
+            => Db.ExecuteAtomicAsync(isolationLevel, operations, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<T> ExecuteAtomicAsync<T>(System.Data.IsolationLevel isolationLevel, Func<Task<T>> operations, CancellationToken cancellationToken = default)
+            => Db.ExecuteAtomicAsync(isolationLevel, operations, cancellationToken);
 
         // === KEY GENERATION SHORTCUTS ===
         
         /// <summary>
         /// Get next object ID.
         /// </summary>
-        public Task<long> NextObjectIdAsync()
-            => Keys.NextObjectIdAsync();
+        public Task<long> NextObjectIdAsync(CancellationToken cancellationToken = default)
+            => Keys.NextObjectIdAsync(cancellationToken);
         
         /// <summary>
         /// Get next value ID.
         /// </summary>
-        public Task<long> NextValueIdAsync()
-            => Keys.NextValueIdAsync();
+        public Task<long> NextValueIdAsync(CancellationToken cancellationToken = default)
+            => Keys.NextValueIdAsync(cancellationToken);
         
         /// <summary>
         /// Get batch of object IDs.
         /// </summary>
-        public Task<long[]> NextObjectIdBatchAsync(int count)
-            => Keys.NextObjectIdBatchAsync(count);
+        public Task<long[]> NextObjectIdBatchAsync(int count, CancellationToken cancellationToken = default)
+            => Keys.NextObjectIdBatchAsync(count, cancellationToken);
         
         /// <summary>
         /// Get batch of value IDs.
         /// </summary>
-        public Task<long[]> NextValueIdBatchAsync(int count)
-            => Keys.NextValueIdBatchAsync(count);
+        public Task<long[]> NextValueIdBatchAsync(int count, CancellationToken cancellationToken = default)
+            => Keys.NextValueIdBatchAsync(count, cancellationToken);
 
         // === DISPOSE ===
         

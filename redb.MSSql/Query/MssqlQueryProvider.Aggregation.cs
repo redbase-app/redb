@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Query.Aggregation;
@@ -38,7 +39,7 @@ public partial class MssqlQueryProvider
         long schemeId,
         string fieldPath,
         AggregateFunction function,
-        FilterExpression? filter)
+        FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var request = new AggregateRequest
         {
@@ -70,7 +71,7 @@ public partial class MssqlQueryProvider
         long schemeId,
         string fieldPath,
         AggregateFunction function,
-        string? filterJson = null)
+        string? filterJson = null, CancellationToken cancellationToken = default)
     {
         var request = new AggregateRequest
         {
@@ -101,7 +102,7 @@ public partial class MssqlQueryProvider
     public override Task<AggregateResult> ExecuteAggregateBatchAsync(
         long schemeId,
         IEnumerable<AggregateRequest> requests,
-        FilterExpression? filter)
+        FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var facetFilters = filter is null ? null : _facetBuilder.BuildFacetFilters(filter);
         return ExecuteAggregateBatchInternalAsync(schemeId, requests, facetFilters);
@@ -118,7 +119,7 @@ public partial class MssqlQueryProvider
     public override Task<AggregateResult> ExecuteAggregateBatchAsync(
         long schemeId,
         IEnumerable<AggregateRequest> requests,
-        string? filterJson = null)
+        string? filterJson = null, CancellationToken cancellationToken = default)
     {
         return ExecuteAggregateBatchInternalAsync(schemeId, requests, filterJson);
     }
@@ -126,7 +127,7 @@ public partial class MssqlQueryProvider
     internal async Task<AggregateResult> ExecuteAggregateBatchInternalAsync(
         long schemeId,
         IEnumerable<AggregateRequest> requests,
-        string? filterJson)
+        string? filterJson, CancellationToken cancellationToken = default)
     {
         var list = requests?.ToList()
             ?? throw new ArgumentNullException(nameof(requests));
@@ -152,7 +153,7 @@ public partial class MssqlQueryProvider
         _logger?.LogDebug("PVT Aggregate Build (MSSql): SchemeId={SchemeId}, Aggs={Aggs}, Filter={Filter}",
             schemeId, aggregationsJson, filterJson ?? "null");
 
-        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, filterParam, aggregationsJson);
+        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, aggregationsJson }, cancellationToken);
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
                 "dbo.pvt_build_aggregate_sql returned an empty SQL string for scheme " + schemeId + ".");
@@ -163,7 +164,7 @@ public partial class MssqlQueryProvider
         var wrapped =
             "SELECT (SELECT * FROM (" + innerSql + ") _agg_row FOR JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES)";
 
-        var jsonRow = await _context.ExecuteScalarAsync<string>(wrapped);
+        var jsonRow = await _context.ExecuteScalarAsync<string>(wrapped, System.Array.Empty<object>(), cancellationToken);
 
         var result = new AggregateResult();
         if (!string.IsNullOrEmpty(jsonRow))

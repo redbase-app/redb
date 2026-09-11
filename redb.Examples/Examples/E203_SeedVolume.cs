@@ -17,17 +17,17 @@ namespace redb.Examples.Examples;
 ///   REDB_SEED_COUNT=100000 REDB_SEED_BATCH=1000 dotnet run --project redb.Examples -- E203
 /// </code>
 ///
-/// <b>Seeding is off unless REDB_SEED_COUNT says otherwise.</b> Naming the example on the command
-/// line used to be the request, and `-- E203` alone seeded 100000. That made a twenty-minute,
-/// six-million-row write one typo away from anyone browsing the examples, so the size now has to be
-/// stated: no REDB_SEED_COUNT, no seeding, whether the example is named or reached by a whole-suite
-/// run. Batches default to 1000.
+/// <b>The whole-suite sweep never seeds.</b> Seeding runs only when the example is NAMED on the
+/// command line (<c>dotnet run -- E203</c>, default 100000) - being reached by the sweep is not a
+/// request for a twenty-minute, six-million-row write. REDB_SEED_COUNT overrides the size in
+/// either mode (and 0 disables even an explicit run); batches default to 1000.
 /// Objects reuse the exact shape E000 builds
 /// (~60 _values rows each, arrays, nested classes, dictionaries), with an index offset so
 /// batches do not collide. 100000 employees therefore land around 6M rows in _values.
 ///
 /// This example WRITES a lot. It appends, it never clears, so running it twice doubles the
-/// data. Run ANALYZE afterwards or every estimate you read will be fiction.
+/// data. The tail refreshes planner statistics via <c>redb.Maintenance.AnalyzeAsync()</c> -
+/// after a bulk load, without that refresh every estimate you read is fiction.
 /// </summary>
 [ExampleMeta("E203", "Seed volume for prefilter measurement", "Setup",
     ExampleTier.Pro, 200, "Setup", "BulkInsert", "Prefilter", "Benchmark",
@@ -36,21 +36,21 @@ public class E203_SeedVolume : ExampleBase
 {
     public override async Task<ExampleResult> RunAsync(IRedbService redb)
     {
-        // Seeding volume is a decision, not a side effect, so it has to be asked for — and the size
-        // is the request. Naming the example used to be enough, which put a twenty-minute,
-        // six-million-row write behind a single command-line token; examples are discovered by
-        // reflection and browsed by people who have not read this file. Nothing is written unless
-        // REDB_SEED_COUNT is set, so the default is zero in every path.
-        var total = ReadInt("REDB_SEED_COUNT", 0);
+        // Seeding volume is a decision, not a side effect. Being NAMED on the command line is
+        // that decision (dotnet run -- E203, default 100000); being reached by the whole-suite
+        // sweep is not - the sweep always skips. REDB_SEED_COUNT overrides the size in either
+        // mode, and 0 disables even an explicit run.
+        var isExplicitRun = ExplicitlyRequestedIds?.Contains("E203") == true;
+        var total = ReadInt("REDB_SEED_COUNT", isExplicitRun ? 100_000 : 0);
         var batchSize = ReadInt("REDB_SEED_BATCH", 1_000);
 
         if (total == 0)
         {
             return Ok("E203", "Seed volume for prefilter measurement", ExampleTier.Pro, 0,
             [
-                "Skipped: seeding is off unless REDB_SEED_COUNT asks for a size.",
-                "To seed: REDB_SEED_COUNT=100000 dotnet run --project redb.Examples -- E203",
-                "REDB_SEED_BATCH sets the batch (default 1000).",
+                "Skipped: the whole-suite sweep never seeds.",
+                "To seed: dotnet run --project redb.Examples -- E203   (default 100000)",
+                "REDB_SEED_COUNT overrides the size, REDB_SEED_BATCH the batch (default 1000).",
                 "100000 employees land around 6M rows in _values and take ~20 minutes.",
                 "It appends and never clears, so running it twice doubles the data."
             ]);
@@ -113,9 +113,15 @@ public class E203_SeedVolume : ExampleBase
         var finalCount = await redb.Query<EmployeeProps>().CountAsync();
         var rate = seeded * 1000.0 / Math.Max(sw.ElapsedMilliseconds, 1);
 
+        // A bulk load leaves the planner's statistics behind reality - every estimate (and
+        // every EXPLAIN you would trust) is fiction until they are refreshed. The Maintenance
+        // facade runs the provider's own incantation (ANALYZE / sp_updatestats / PRAGMA
+        // analysis_limit + ANALYZE), so the seed hands back a database ready to be measured.
         Console.WriteLine();
-        Console.WriteLine("Done. Run this before measuring anything:");
-        Console.WriteLine("  ANALYZE _values; ANALYZE _objects;");
+        Console.WriteLine("Refreshing planner statistics (redb.Maintenance.AnalyzeAsync)...");
+        var analyzeSw = Stopwatch.StartNew();
+        await redb.Maintenance.AnalyzeAsync();
+        analyzeSw.Stop();
         Console.WriteLine();
 
         return Ok("E203", "Seed volume for prefilter measurement", ExampleTier.Pro,
@@ -123,7 +129,7 @@ public class E203_SeedVolume : ExampleBase
             [
                 $"Seeded {seeded:N0} in {batches:N0} batches of {batchSize:N0}",
                 $"Rate: {rate:F0} obj/sec | scheme now holds {finalCount:N0} employees",
-                "Run ANALYZE _values; ANALYZE _objects; before any EXPLAIN"
+                $"Planner statistics refreshed: Maintenance.AnalyzeAsync in {analyzeSw.ElapsedMilliseconds:N0} ms"
             ]);
     }
 

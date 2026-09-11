@@ -71,4 +71,22 @@ public interface IDataProvider : IAsyncDisposable
     /// <param name="data">Data to insert.</param>
     /// <param name="ct">Cancellation token.</param>
     Task BulkInsertAsync(string tableName, System.Data.DataTable data, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads a uuid-semantic column value into its portable <see cref="Guid"/> form.
+    /// PostgreSQL/MSSQL store these columns natively; SQLite stores them as a 16-byte BLOB in
+    /// RFC 4122 (text) order - <c>_users._hash</c>, <c>_schemes._structure_hash</c>,
+    /// <c>_objects._hash</c>, <c>_values._unique</c>. Reading such a BLOB through the driver's
+    /// <c>GetGuid</c> would byte-swap the first three groups; this seam keeps the JSONL canonical.
+    /// Genuine binary columns (<c>_value_bytes</c>, <c>_values._ByteArray</c>) are NOT uuids and
+    /// never go through this conversion.
+    /// </summary>
+    Guid GuidFromDb(object raw);
+
+    /// <summary>
+    /// Converts a portable <see cref="Guid"/> into the value this provider stores in a
+    /// uuid-semantic column (see <see cref="GuidFromDb"/>): the <see cref="Guid"/> itself for
+    /// PostgreSQL/MSSQL, the RFC 4122-ordered 16-byte BLOB for SQLite.
+    /// </summary>
+    object GuidToDb(Guid value);
 }

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Models.Entities;
@@ -47,7 +48,7 @@ public partial class PostgresTreeQueryProvider
     }
 
     /// <inheritdoc />
-    protected override async Task<object> ExecuteTreeToListAsync<TProps>(TreeQueryContext<TProps> context)
+    protected override async Task<object> ExecuteTreeToListAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken = default)
     {
         // Free PG: HasAncestor / HasDescendant are routed through PVT here
         // because the legacy search_*_base SQL functions are gone.
@@ -60,7 +61,7 @@ public partial class PostgresTreeQueryProvider
             return await ExecutePvtHasDescendantToListAsync(context, hasDescendantFilter);
 
         if (!ShouldRoutePvtTree(context, out var route))
-            return await base.ExecuteTreeToListAsync<TProps>(context);
+            return await base.ExecuteTreeToListAsync<TProps>(context, cancellationToken);
 
         try
         {
@@ -69,26 +70,11 @@ public partial class PostgresTreeQueryProvider
 
             if (result.Count > 0 && _lazyPropsLoader != null)
             {
-                var useLazyOnDemand = context.UseLazyLoading ?? _configuration.EnableLazyLoadingForProps;
-                if (useLazyOnDemand)
-                {
-                    foreach (var treeObj in result)
-                    {
-                        if (treeObj.id > 0)
-                        {
-                            treeObj._lazyLoader = _lazyPropsLoader;
-                            treeObj._propsLoaded = false;
-                        }
-                    }
-                }
-                else
-                {
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    var baseObjects = result.Cast<redb.Core.Models.Entities.RedbObject<TProps>>().ToList();
-                    await _lazyPropsLoader.LoadPropsForManyAsync(baseObjects, context.PropsDepth);
-                    sw.Stop();
-                    _logger?.LogInformation("Props loaded via batch (PVT tree) in {ElapsedMs} ms", sw.ElapsedMilliseconds);
-                }
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var baseObjects = result.Cast<redb.Core.Models.Entities.RedbObject<TProps>>().ToList();
+                await _lazyPropsLoader.LoadPropsForManyAsync(baseObjects, context.PropsDepth);
+                sw.Stop();
+                _logger?.LogInformation("Props loaded via batch (PVT tree) in {ElapsedMs} ms", sw.ElapsedMilliseconds);
             }
 
             return (object)result;
@@ -101,7 +87,7 @@ public partial class PostgresTreeQueryProvider
     }
 
     /// <inheritdoc />
-    protected override async Task<int> ExecuteTreeCountAsync<TProps>(TreeQueryContext<TProps> context)
+    protected override async Task<int> ExecuteTreeCountAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken = default)
     {
         // Free PG: HasAncestor / HasDescendant — execute list path and count.
         // The two operators rewrite the context via recursive ExecuteTreeToListAsync,
@@ -120,7 +106,7 @@ public partial class PostgresTreeQueryProvider
         }
 
         if (!ShouldRoutePvtTree(context, out var route))
-            return await base.ExecuteTreeCountAsync<TProps>(context);
+            return await base.ExecuteTreeCountAsync<TProps>(context, cancellationToken);
 
         var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: true);
         var sql = "SELECT COUNT(*)::bigint AS \"Value\" FROM (" + inner + ") t";
@@ -131,9 +117,9 @@ public partial class PostgresTreeQueryProvider
         var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
         long? count;
         if (hasOrder)
-            count = await _context.ExecuteScalarAsync<long?>(sql, filterParam, orderByJson!);
+            count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam, orderByJson! }, cancellationToken);
         else
-            count = await _context.ExecuteScalarAsync<long?>(sql, filterParam);
+            count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam }, cancellationToken);
         return checked((int)(count ?? 0));
     }
 
@@ -269,7 +255,7 @@ public partial class PostgresTreeQueryProvider
     private async Task<string> BuildPvtTreeInnerSqlAsync<TProps>(
         TreeQueryContext<TProps> context,
         PvtTreeRoute route,
-        bool ignoreLimitOffset) where TProps : class, new()
+        bool ignoreLimitOffset, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var orderByJson = context.Orderings.Count > 0
             ? _facetBuilder.BuildOrderBy(context.Orderings)
@@ -312,9 +298,9 @@ public partial class PostgresTreeQueryProvider
 
         string? inner;
         if (hasOrder)
-            inner = await _context.ExecuteScalarAsync<string>(invocation, filterParam, orderByJson!);
+            inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, orderByJson! }, cancellationToken);
         else
-            inner = await _context.ExecuteScalarAsync<string>(invocation, filterParam);
+            inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam }, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(inner))
             throw new InvalidOperationException(
@@ -330,7 +316,7 @@ public partial class PostgresTreeQueryProvider
     private async Task<string?> ExecutePvtTreeAsync<TProps>(
         TreeQueryContext<TProps> context,
         PvtTreeRoute route,
-        bool applyPaging) where TProps : class, new()
+        bool applyPaging, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: !applyPaging);
 
@@ -367,7 +353,7 @@ public partial class PostgresTreeQueryProvider
         var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
 
         if (hasOrder)
-            return await _context.ExecuteScalarAsync<string>(sql, filterParam, orderByJson!);
-        return await _context.ExecuteScalarAsync<string>(sql, filterParam);
+            return await _context.ExecuteScalarAsync<string>(sql, new object[] { filterParam, orderByJson! }, cancellationToken);
+        return await _context.ExecuteScalarAsync<string>(sql, new object[] { filterParam }, cancellationToken);
     }
 }

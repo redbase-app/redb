@@ -33,7 +33,6 @@ public sealed class PostgresProFixture : IAsyncLifetime
                 {
                     c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;
                     c.SkipHashValidationOnCacheCheck = false;
-                    c.EnableLazyLoadingForProps = false;
                     c.EnablePropsCache = false;
                     c.EnablePvtPrefilter = ProTestOptions.PvtPrefilter;
                 });
@@ -68,6 +67,7 @@ public sealed class PostgresProFixture : IAsyncLifetime
     private async Task Cleanup()
     {
         var ctx = ServiceProvider.GetRequiredService<IRedbContext>();
+        await FixtureWipeGuard.EnsureLooksLikeATestDatabaseAsync(ctx, nameof(PostgresProFixture));
         try { await ctx.ExecuteAsync("DELETE FROM _tree"); } catch { }
         await ctx.ExecuteAsync("DELETE FROM _values");
         await ctx.ExecuteAsync("DELETE FROM _objects");

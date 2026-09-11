@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Caching;
 using redb.Core.Models.Contracts;
@@ -44,7 +45,9 @@ public interface ITreeQueryProvider : IRedbQueryProvider
     /// </summary>
     /// <param name="filteredIds">IDs of filtered objects</param>
     /// <returns>List of all IDs including parents to root</returns>
-    Task<List<long>> GetIdsWithAncestorsAsync<TProps>(List<long> filteredIds) where TProps : class, new();
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+    Task<List<long>> GetIdsWithAncestorsAsync<TProps>(List<long> filteredIds,
+        CancellationToken cancellationToken = default) where TProps : class, new();
     
     /// <summary>
     /// Load full typed objects by ID list via v_objects_json.
@@ -53,7 +56,9 @@ public interface ITreeQueryProvider : IRedbQueryProvider
     /// <param name="objectIds">Object IDs to load</param>
     /// <param name="propsDepth">Maximum depth for nested RedbObject loading (null = use config default)</param>
     /// <returns>List of TreeRedbObject with full data</returns>
-    Task<List<TreeRedbObject<TProps>>> LoadObjectsByIdsAsync<TProps>(List<long> objectIds, int? propsDepth = null) where TProps : class, new();
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+    Task<List<TreeRedbObject<TProps>>> LoadObjectsByIdsAsync<TProps>(List<long> objectIds, int? propsDepth = null,
+        CancellationToken cancellationToken = default) where TProps : class, new();
     
     /// <summary>
     /// Load full untyped objects by ID list via v_objects_json.
@@ -63,7 +68,9 @@ public interface ITreeQueryProvider : IRedbQueryProvider
     /// <param name="objectIds">Object IDs to load</param>
     /// <param name="propsDepth">Maximum depth for nested RedbObject loading (null = use config default)</param>
     /// <returns>List of polymorphic ITreeRedbObject (each of its own TProps type)</returns>
-    Task<List<ITreeRedbObject>> LoadObjectsByIdsAsync(List<long> objectIds, int? propsDepth = null);
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+    Task<List<ITreeRedbObject>> LoadObjectsByIdsAsync(List<long> objectIds, int? propsDepth = null,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Delete objects by ID array.
@@ -71,7 +78,9 @@ public interface ITreeQueryProvider : IRedbQueryProvider
     /// </summary>
     /// <param name="objectIds">Object IDs to delete</param>
     /// <returns>Number of deleted objects</returns>
-    Task<int> ExecuteTreeDeleteAsync(long[] objectIds);
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+    Task<int> ExecuteTreeDeleteAsync(long[] objectIds,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute GROUP BY aggregation with tree context (CTE for tree traversal).
@@ -82,11 +91,13 @@ public interface ITreeQueryProvider : IRedbQueryProvider
     /// <param name="groupFields">Fields to group by</param>
     /// <param name="aggregations">Aggregation functions to apply</param>
     /// <returns>JSON document with grouped results</returns>
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
     Task<System.Text.Json.JsonDocument?> ExecuteTreeGroupedAggregateAsync<TProps>(
         Base.TreeQueryContext<TProps> context,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<Aggregation.AggregateRequest> aggregations,
-        string? havingJson = null) where TProps : class, new();
+        string? havingJson = null,
+        CancellationToken cancellationToken = default) where TProps : class, new();
     
     /// <summary>
     /// Execute Window Functions query with tree context (CTE for tree traversal).
@@ -100,13 +111,15 @@ public interface ITreeQueryProvider : IRedbQueryProvider
     /// <param name="orderBy">Order by fields</param>
     /// <param name="frameJson">Optional window frame specification</param>
     /// <returns>JSON document with windowed results</returns>
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
     Task<System.Text.Json.JsonDocument?> ExecuteTreeWindowQueryAsync<TProps>(
         Base.TreeQueryContext<TProps> context,
         IEnumerable<Window.WindowFieldRequest> selectFields,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? frameJson = null) where TProps : class, new();
+        string? frameJson = null,
+        CancellationToken cancellationToken = default) where TProps : class, new();
     
     /// <summary>
     /// Get SQL preview for tree window query (for debugging).
@@ -117,7 +130,8 @@ public interface ITreeQueryProvider : IRedbQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? frameJson = null) where TProps : class, new();
+        string? frameJson = null,
+        CancellationToken cancellationToken = default) where TProps : class, new();
     
     /// <summary>
     /// Get SQL preview for tree GROUP BY query (for debugging).
@@ -126,7 +140,8 @@ public interface ITreeQueryProvider : IRedbQueryProvider
         Base.TreeQueryContext<TProps> context,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<Aggregation.AggregateRequest> aggregations,
-        string? havingJson = null) where TProps : class, new();
+        string? havingJson = null,
+        CancellationToken cancellationToken = default) where TProps : class, new();
     
     // ===== TREE GROUPED WINDOW (GroupBy + Window for Trees) =====
     
@@ -140,7 +155,8 @@ public interface ITreeQueryProvider : IRedbQueryProvider
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
-        IEnumerable<Window.WindowOrderRequest> orderBy) where TProps : class, new();
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        CancellationToken cancellationToken = default) where TProps : class, new();
     
     /// <summary>
     /// Get SQL preview for tree GroupBy + Window query.
@@ -151,5 +167,6 @@ public interface ITreeQueryProvider : IRedbQueryProvider
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
-        IEnumerable<Window.WindowOrderRequest> orderBy) where TProps : class, new();
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        CancellationToken cancellationToken = default) where TProps : class, new();
 }

@@ -50,9 +50,6 @@ namespace redb.Core.Configuration
                     MaxLoadDepth = 10,
                     MaxTreeDepth = 50,
                     
-                    // Performance
-                    EnableLazyLoadingForProps = true,
-                    
                     // Security (more checks for regular users)
                     AlwaysCheckPermissionsOnLoad = false,
                     AlwaysCheckPermissionsOnSave = false,

@@ -36,13 +36,13 @@ public class SqlRedbContext : RedbContextBase
     /// Create SQL Server context from connection string.
     /// </summary>
     /// <param name="connectionString">MS SQL Server connection string.</param>
-    public SqlRedbContext(string connectionString)
+    public SqlRedbContext(string connectionString, bool lazyReferences = false)
     {
         if (string.IsNullOrEmpty(connectionString))
             throw new ArgumentNullException(nameof(connectionString));
         
         ConnectionString = connectionString;
-        _connection = new SqlRedbConnection(connectionString);
+        _connection = new SqlRedbConnection(connectionString, lazyReferences);
         var domain = redb.Core.Models.Configuration.RedbServiceConfiguration.ComputeCacheDomain(connectionString);
         _keyGenerator = new SqlKeyGenerator(connectionString, domain);
         _bulkOperations = new SqlBulkOperations(_connection);

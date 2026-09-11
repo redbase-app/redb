@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Data;
@@ -39,7 +40,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     protected readonly RedbServiceConfiguration _configuration;
     protected readonly ISqlDialect _sql;
     protected readonly ISchemeSyncProvider? _schemeSync;
-    
+
     /// <summary>
     /// Metadata cache for this provider (domain-isolated).
     /// </summary>
@@ -67,66 +68,32 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         _orderingParser = CreateOrderingParser();
         _facetBuilder = CreateFacetBuilder();
     }
-    
+
     /// <summary>
     /// Creates filter expression parser. Override for Pro features.
     /// </summary>
     protected virtual IFilterExpressionParser CreateFilterParser() => new FilterExpressionParser();
-    
+
     /// <summary>
     /// Creates ordering expression parser.
     /// </summary>
     protected virtual IOrderingExpressionParser CreateOrderingParser() => new OrderingExpressionParser();
-    
+
     /// <summary>
     /// Creates facet filter builder.
     /// </summary>
     protected virtual IFacetFilterBuilder CreateFacetBuilder() => new FacetFilterBuilder(_logger);
-    
+
     /// <summary>
     /// Creates query provider for delegation. Override in derived classes.
     /// </summary>
     protected abstract IRedbQueryProvider CreateQueryProvider();
-    
+
     /// <summary>
     /// Creates tree queryable instance. Override in derived classes.
     /// </summary>
-    protected abstract IRedbQueryable<TProps> CreateTreeQueryable<TProps>(TreeQueryContext<TProps> context) 
+    protected abstract IRedbQueryable<TProps> CreateTreeQueryable<TProps>(TreeQueryContext<TProps> context)
         where TProps : class, new();
-    
-    /// <summary>
-    /// Determines if lazy loading should be used for this query.
-    /// </summary>
-    protected bool ShouldUseLazyLoading<TProps>(QueryContext<TProps> context) where TProps : class, new()
-    {
-        // If explicitly specified in context - use this value (priority)
-        if (context.UseLazyLoading.HasValue)
-            return context.UseLazyLoading.Value && _lazyPropsLoader != null;
-
-        // Global setting disabled - immediately false
-        if (!_configuration.EnableLazyLoadingForProps)
-            return false;
-
-        // If lazy loader not available - false
-        return _lazyPropsLoader != null;
-    }
-    
-    /// <summary>
-    /// Determines if lazy loading should be used for tree query.
-    /// </summary>
-    protected bool ShouldUseLazyLoading<TProps>(TreeQueryContext<TProps> context) where TProps : class, new()
-    {
-        // If explicitly specified in context - use this value (priority)
-        if (context.UseLazyLoading.HasValue)
-            return context.UseLazyLoading.Value && _lazyPropsLoader != null;
-
-        // Global setting disabled - immediately false
-        if (!_configuration.EnableLazyLoadingForProps)
-            return false;
-
-        // If lazy loader not available - false
-        return _lazyPropsLoader != null;
-    }
 
     /// <summary>
     /// Check for Pro-only Distinct features (DistinctBy, DistinctByRedb, DistinctRedb).
@@ -138,67 +105,66 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     }
 
     // ===== IRedbQueryProvider IMPLEMENTATION (BASE FUNCTIONALITY) =====
-    
-    public IRedbQueryable<TProps> CreateQuery<TProps>(long schemeId, long? userId = null, bool checkPermissions = false) 
+
+    public IRedbQueryable<TProps> CreateQuery<TProps>(long schemeId, long? userId = null, bool checkPermissions = false)
         where TProps : class, new()
     {
         // For regular queries create standard RedbQueryable
         // It will use search_objects_with_facets() through base QueryProviderBase
-        // Pass _lazyPropsLoader and _configuration for lazy loading support
         var baseProvider = CreateQueryProvider();
         return baseProvider.CreateQuery<TProps>(schemeId, userId, checkPermissions);
     }
 
     // ===== AGGREGATIONS IMPLEMENTATION (delegate to QueryProviderBase) =====
-    // ✅ virtual for override in Pro version
-    
-    public virtual async Task<decimal?> ExecuteAggregateAsync(long schemeId, string fieldPath, AggregateFunction function, string? filterJson = null)
+    // virtual for override in Pro version
+
+    public virtual async Task<decimal?> ExecuteAggregateAsync(long schemeId, string fieldPath, AggregateFunction function, string? filterJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteAggregateAsync(schemeId, fieldPath, function, filterJson);
     }
-    
-    public virtual async Task<decimal?> ExecuteAggregateAsync(long schemeId, string fieldPath, AggregateFunction function, QueryExpressions.FilterExpression? filter)
+
+    public virtual async Task<decimal?> ExecuteAggregateAsync(long schemeId, string fieldPath, AggregateFunction function, QueryExpressions.FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteAggregateAsync(schemeId, fieldPath, function, filter);
     }
-    
-    public virtual async Task<AggregateResult> ExecuteAggregateBatchAsync(long schemeId, IEnumerable<AggregateRequest> requests, string? filterJson = null)
+
+    public virtual async Task<AggregateResult> ExecuteAggregateBatchAsync(long schemeId, IEnumerable<AggregateRequest> requests, string? filterJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteAggregateBatchAsync(schemeId, requests, filterJson);
     }
-    
-    public virtual async Task<AggregateResult> ExecuteAggregateBatchAsync(long schemeId, IEnumerable<AggregateRequest> requests, QueryExpressions.FilterExpression? filter)
+
+    public virtual async Task<AggregateResult> ExecuteAggregateBatchAsync(long schemeId, IEnumerable<AggregateRequest> requests, QueryExpressions.FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteAggregateBatchAsync(schemeId, requests, filter);
     }
-    
+
     /// <summary>
     /// Get scheme by ID (for projections) - delegate to base provider
     /// </summary>
-    public virtual async Task<IRedbScheme?> GetSchemeAsync(long schemeId)
+    public virtual async Task<IRedbScheme?> GetSchemeAsync(long schemeId, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.GetSchemeAsync(schemeId);
     }
-    
+
     // ===== GROUPBY (delegate to QueryProviderBase) =====
-    // ✅ virtual for override in Pro version
-    
+    // virtual for override in Pro version
+
     public virtual async Task<System.Text.Json.JsonDocument?> ExecuteGroupedAggregateAsync(
         long schemeId,
         IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteGroupedAggregateAsync(schemeId, groupFields, aggregations, filterJson, havingJson);
     }
-    
+
     /// <summary>
     /// Execute GroupBy aggregation with FilterExpression (Pro version).
     /// Delegates to QueryProvider.
@@ -208,19 +174,19 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         QueryExpressions.FilterExpression? filter,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteGroupedAggregateAsync(schemeId, groupFields, aggregations, filter, havingJson);
     }
-    
+
     public virtual async Task<System.Text.Json.JsonDocument?> ExecuteArrayGroupedAggregateAsync(
         long schemeId,
         string arrayPath,
         IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         string? filterJson = null,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteArrayGroupedAggregateAsync(schemeId, arrayPath, groupFields, aggregations, filterJson);
@@ -237,15 +203,15 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         QueryExpressions.FilterExpression? filter,
-        string? havingJson = null)
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteArrayGroupedAggregateAsync(schemeId, arrayPath, groupFields, aggregations, filter, havingJson);
     }
-    
+
     // ===== WINDOW FUNCTIONS (delegate to QueryProviderBase) =====
-    // ✅ virtual for override in Pro version
-    
+    // virtual for override in Pro version
+
     public virtual async Task<System.Text.Json.JsonDocument?> ExecuteWindowQueryAsync(
         long schemeId,
         IEnumerable<redb.Core.Query.Window.WindowFieldRequest> selectFields,
@@ -255,12 +221,12 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         string? filterJson = null,
         string? frameJson = null,
         int? take = null,
-        int? skip = null)
+        int? skip = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteWindowQueryAsync(schemeId, selectFields, windowFuncs, partitionBy, orderBy, filterJson, frameJson, take, skip);
     }
-    
+
     public virtual async Task<System.Text.Json.JsonDocument?> ExecuteWindowQueryAsync(
         long schemeId,
         IEnumerable<redb.Core.Query.Window.WindowFieldRequest> selectFields,
@@ -270,12 +236,12 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         QueryExpressions.FilterExpression? filter,
         string? frameJson = null,
         int? take = null,
-        int? skip = null)
+        int? skip = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteWindowQueryAsync(schemeId, selectFields, windowFuncs, partitionBy, orderBy, filter, frameJson, take, skip);
     }
-    
+
     public virtual async Task<string> GetWindowSqlPreviewAsync(
         long schemeId,
         IEnumerable<redb.Core.Query.Window.WindowFieldRequest> selectFields,
@@ -285,14 +251,14 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         string? filterJson = null,
         string? frameJson = null,
         int? take = null,
-        int? skip = null)
+        int? skip = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.GetWindowSqlPreviewAsync(schemeId, selectFields, windowFuncs, partitionBy, orderBy, filterJson, frameJson, take, skip);
     }
-    
+
     // ===== GROUPED WINDOW (delegated to base provider) =====
-    
+
     public virtual async Task<System.Text.Json.JsonDocument?> ExecuteGroupedWindowQueryAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
@@ -300,13 +266,13 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? filterJson = null)
+        string? filterJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteGroupedWindowQueryAsync(
             schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
     }
-    
+
     public virtual async Task<System.Text.Json.JsonDocument?> ExecuteGroupedWindowQueryAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
@@ -314,13 +280,13 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        QueryExpressions.FilterExpression? filter)
+        QueryExpressions.FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteGroupedWindowQueryAsync(
             schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filter);
     }
-    
+
     public virtual async Task<string> GetGroupedWindowSqlPreviewAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
@@ -328,13 +294,13 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? filterJson = null)
+        string? filterJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.GetGroupedWindowSqlPreviewAsync(
             schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
     }
-    
+
     public virtual async Task<string> GetGroupedWindowSqlPreviewAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
@@ -342,7 +308,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        QueryExpressions.FilterExpression? filter)
+        QueryExpressions.FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.GetGroupedWindowSqlPreviewAsync(
@@ -350,10 +316,10 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     }
 
     // ===== ITreeQueryProvider IMPLEMENTATION (TREE FUNCTIONALITY) =====
-    
+
     public IRedbQueryable<TProps> CreateTreeQuery<TProps>(
-        long schemeId, 
-        long? userId = null, 
+        long schemeId,
+        long? userId = null,
         bool checkPermissions = false,
         long? rootObjectId = null,
         int? maxDepth = null
@@ -364,8 +330,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     }
 
     // ===== QUERY EXECUTION =====
-    
-    public async Task<object> ExecuteAsync(Expression expression, Type elementType)
+
+    public async Task<object> ExecuteAsync(Expression expression, Type elementType, CancellationToken cancellationToken = default)
     {
         // Extract context from expression
         if (expression is ConstantExpression constantExpr && constantExpr.Value != null)
@@ -373,7 +339,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             // Determine operation type by elementType
             if (elementType == typeof(int))
             {
-                return await ExecuteCountAsyncGeneric(constantExpr.Value);
+                return await ExecuteCountAsyncGeneric(constantExpr.Value, cancellationToken);
             }
             else if (elementType.IsGenericType)
             {
@@ -384,11 +350,11 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                     var itemType = elementType.GetGenericArguments()[0];
                     if (itemType.IsGenericType && itemType.GetGenericTypeDefinition() == typeof(TreeRedbObject<>))
                     {
-                        return await ExecuteTreeToListAsyncGeneric(constantExpr.Value);
+                        return await ExecuteTreeToListAsyncGeneric(constantExpr.Value, cancellationToken);
                     }
                     else
                     {
-                        return await ExecuteToListAsyncGeneric(constantExpr.Value);
+                        return await ExecuteToListAsyncGeneric(constantExpr.Value, cancellationToken);
                     }
                 }
             }
@@ -398,11 +364,11 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     }
 
     // ===== COUNT QUERY EXECUTION =====
-    
-    private async Task<int> ExecuteCountAsyncGeneric(object contextObj)
+
+    private async Task<int> ExecuteCountAsyncGeneric(object contextObj, CancellationToken cancellationToken)
     {
         // Use reflection to call typed method
-        // ✅ this.GetType() - support override in Pro version
+        // this.GetType() - support override in Pro version
         var contextType = contextObj.GetType();
 
         if (contextType.IsGenericType && contextType.GetGenericTypeDefinition() == typeof(TreeQueryContext<>))
@@ -411,66 +377,66 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             var propsType = contextType.GetGenericArguments()[0];
             var method = this.GetType().GetMethod(nameof(ExecuteTreeCountAsync), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             var genericMethod = method!.MakeGenericMethod(propsType);
-            var task = (Task<int>)genericMethod.Invoke(this, new[] { contextObj })!;
+            var task = (Task<int>)genericMethod.Invoke(this, new object[] { contextObj, cancellationToken })!;
             return await task;
         }
         else if (contextType.IsGenericType && contextType.GetGenericTypeDefinition() == typeof(QueryContext<>))
         {
             // Regular query - delegate to base provider
-            // Pass _lazyPropsLoader and _configuration for lazy loading support
             var baseProvider = CreateQueryProvider();
             return await (Task<int>)typeof(QueryProviderBase)
                 .GetMethod("ExecuteCountAsyncGeneric", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-                .Invoke(baseProvider, new[] { contextObj })!;
+                .Invoke(baseProvider, new object[] { contextObj, cancellationToken })!;
         }
-        
+
         throw new NotSupportedException($"Unsupported context type: {contextType.Name}");
     }
 
     // ===== TOLIST QUERY EXECUTION =====
-    
-    private async Task<object> ExecuteToListAsyncGeneric(object contextObj)
+
+    private async Task<object> ExecuteToListAsyncGeneric(object contextObj, CancellationToken cancellationToken)
     {
         var contextType = contextObj.GetType();
-        
+
         if (contextType.IsGenericType && contextType.GetGenericTypeDefinition() == typeof(QueryContext<>))
         {
             // Regular query - delegate to base provider
-            // Pass _lazyPropsLoader and _configuration for lazy loading support
             var baseProvider = CreateQueryProvider();
             return await (Task<object>)typeof(QueryProviderBase)
                 .GetMethod("ExecuteToListAsyncGeneric", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-                .Invoke(baseProvider, new[] { contextObj })!;
+                .Invoke(baseProvider, new object[] { contextObj, cancellationToken })!;
         }
         else if (contextType.IsGenericType && contextType.GetGenericTypeDefinition() == typeof(TreeQueryContext<>))
         {
             // Tree query - use our method
-            // ✅ this.GetType() - support override in Pro version
+            // this.GetType() - support override in Pro version
             var propsType = contextType.GetGenericArguments()[0];
             var method = this.GetType().GetMethod(nameof(ExecuteTreeToListAsync), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             var genericMethod = method!.MakeGenericMethod(propsType);
-            var task = (Task<object>)genericMethod.Invoke(this, new[] { contextObj })!;
-            return await task;
+            var lazyOverride = (bool?)contextType.GetProperty("LazyReferences")?.GetValue(contextObj);
+            return await LazyReferencesQueryScope.RunAsync(_context, _sql, _configuration, _logger, lazyOverride,
+                () => (Task<object>)genericMethod.Invoke(this, new object[] { contextObj, cancellationToken })!);
         }
-        
+
         throw new NotSupportedException($"Unsupported context type for ToList: {contextType.Name}");
     }
-    
-    private async Task<object> ExecuteTreeToListAsyncGeneric(object contextObj)
+
+    private async Task<object> ExecuteTreeToListAsyncGeneric(object contextObj, CancellationToken cancellationToken)
     {
         var contextType = contextObj.GetType();
-        
+
         if (contextType.IsGenericType && contextType.GetGenericTypeDefinition() == typeof(TreeQueryContext<>))
         {
             // Tree query
-            // ✅ this.GetType() - support override in Pro version
+            // this.GetType() - support override in Pro version
             var propsType = contextType.GetGenericArguments()[0];
             var method = this.GetType().GetMethod(nameof(ExecuteTreeToListAsync), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             var genericMethod = method!.MakeGenericMethod(propsType);
-            var task = (Task<object>)genericMethod.Invoke(this, new[] { contextObj })!;
-            return await task;
+            var lazyOverride = (bool?)contextType.GetProperty("LazyReferences")?.GetValue(contextObj);
+            return await LazyReferencesQueryScope.RunAsync(_context, _sql, _configuration, _logger, lazyOverride,
+                () => (Task<object>)genericMethod.Invoke(this, new object[] { contextObj, cancellationToken })!);
         }
-        
+
         throw new NotSupportedException($"Unsupported context type for TreeToList: {contextType.Name}");
     }
 
@@ -480,11 +446,11 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// Execute COUNT for tree query through search_tree_objects_with_facets
     /// </summary>
     [Obsolete("Legacy tree COUNT path. Postgres provider now overrides this and routes through pvt_build_query_sql ('tree_descendants'). This base implementation will be removed once all providers are migrated.")]
-    protected virtual async Task<int> ExecuteTreeCountAsync<TProps>(TreeQueryContext<TProps> context) where TProps : class, new()
+    protected virtual async Task<int> ExecuteTreeCountAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         // Check for Pro-only Distinct features (DistinctBy, DistinctByRedb, DistinctRedb)
         CheckProOnlyDistinctFeatures(context);
-        
+
         try
         {
             // Build JSON filter with tree operators
@@ -495,34 +461,32 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             // Props will be loaded separately via LoadPropsForManyAsync (with cache check)
             var treeFunctionName = _sql.Query_SearchTreeObjectsBaseFunction();
             var normalFunctionName = _sql.Query_SearchObjectsBaseFunction();
-            
+
             // Use dialect-specific SQL for COUNT
             int totalCount;
-            
-            // 🚀 FIX: If rootObjectId=null, use normal search across entire scheme
+
+            // FIX: If rootObjectId=null, use normal search across entire scheme
             if (!context.RootObjectId.HasValue)
             {
                 // Search entire scheme - use normal function
                 var sqlCount = _sql.Query_TreeCountNormalSql(normalFunctionName);
                 var countResult = await _context.ExecuteScalarAsync<int?>(
-                    sqlCount, 
-                    context.SchemeId,
+                    sqlCount, new object[] { context.SchemeId,
                     filterJson,
-                    context.MaxRecursionDepth ?? 10);  // Use default value instead of DBNull
+                    context.MaxRecursionDepth ?? 10 }, cancellationToken);  // Use default value instead of DBNull
                 totalCount = countResult ?? 0;
             }
             else
             {
                 // Subtree search - use dialect-specific tree count SQL
                 var sql = _sql.Query_TreeCountWithParentIdsSql(treeFunctionName);
-                
+
                 var countResult = await _context.ExecuteScalarAsync<int?>(
-                    sql, 
-                    context.SchemeId, 
-                    new[] { context.RootObjectId.Value },  // ✅ BATCH: Array with single ID
-                    filterJson, 
+                    sql, new object[] { context.SchemeId,
+                    new[] { context.RootObjectId.Value },  // BATCH: Array with single ID
+                    filterJson,
                     context.MaxDepth ?? 1000,              // Use default value instead of DBNull
-                    context.MaxRecursionDepth ?? 10);    // Use default value instead of DBNull
+                    context.MaxRecursionDepth ?? 10 }, cancellationToken);    // Use default value instead of DBNull
                 totalCount = countResult ?? 0;
             }
 
@@ -544,15 +508,15 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// Execute ToList for tree query through search_tree_objects_with_facets
     /// </summary>
     [Obsolete("Legacy tree ToList path. Postgres provider now overrides this and routes through pvt_build_query_sql ('tree_descendants'). This base implementation will be removed once all providers are migrated.")]
-    protected virtual async Task<object> ExecuteTreeToListAsync<TProps>(TreeQueryContext<TProps> context) where TProps : class, new()
+    protected virtual async Task<object> ExecuteTreeToListAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         // Check for Pro-only Distinct features (DistinctBy, DistinctByRedb, DistinctRedb)
         CheckProOnlyDistinctFeatures(context);
-        
+
         try
         {
-            // 🚀 AUTOMATIC OPTIMIZATION WhereHasAncestor/WhereHasDescendant
-            // _logger?.LogInformation($"🔍 ExecuteTreeToListAsync: TreeFilters.Count = {context.TreeFilters?.Count ?? 0}");
+            // AUTOMATIC OPTIMIZATION WhereHasAncestor/WhereHasDescendant
+            // _logger?.LogInformation($"ExecuteTreeToListAsync: TreeFilters.Count = {context.TreeFilters?.Count ?? 0}");
             // if (context.TreeFilters != null)
             // {
             //     foreach (var filter in context.TreeFilters)
@@ -560,10 +524,10 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             //         _logger?.LogInformation($"   - Filter: {filter.Operator}, TargetSchemeId={filter.TargetSchemeId}");
             //     }
             // }
-            
+
             var hasAncestorFilter = GetOptimizableHasAncestorFilter(context);
-            // _logger?.LogInformation($"🔍 GetOptimizableHasAncestorFilter returned: {(hasAncestorFilter != null ? "NOT NULL" : "NULL")}");
-            
+            // _logger?.LogInformation($"GetOptimizableHasAncestorFilter returned: {(hasAncestorFilter != null ? "NOT NULL" : "NULL")}");
+
             if (hasAncestorFilter != null)
             {
                 return (object)await ExecuteOptimizedWhereHasAncestor(context, hasAncestorFilter);
@@ -586,66 +550,48 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             // Props will be loaded separately via LoadPropsForManyAsync (with cache check)
             var treeFunctionName = _sql.Query_SearchTreeObjectsBaseFunction();
             var normalFunctionName = _sql.Query_SearchObjectsBaseFunction();
-            
-            // Calculate lazy loading mode ONCE for entire method
-            // UseLazyLoading overrides config if explicitly set (via .WithLazyLoading())
-            var useLazyOnDemand = context.UseLazyLoading ?? _configuration.EnableLazyLoadingForProps;
 
-            // Call function with correct parameters  
+            // Call function with correct parameters
             // Parameters: scheme_id, parent_ids, facet_filters, limit, offset, order_by, max_depth, max_recursion_depth
             var sql = _sql.Query_TreeSearchWithParentIdsSql(treeFunctionName);
 
             string objectsJson;
-            
-            // ✅ BATCH OPTIMIZATION: Process multiple parents with ONE request!
+
+            // BATCH OPTIMIZATION: Process multiple parents with ONE request!
             if (context.ParentIds != null && context.ParentIds.Length > 0)
             {
-                // 🔍 DEBUG: Log SQL and parameters
+                // DEBUG: Log SQL and parameters
                 _logger?.LogDebug($"SQL: {sql}");
                 _logger?.LogDebug($"Params: scheme_id={context.SchemeId}, parent_ids=[{string.Join(",", context.ParentIds)}], max_depth={context.MaxDepth ?? 1000}");
-                
-                // ✅ ONE SQL query instead of loop! Pass entire parent_ids array
+
+                // ONE SQL query instead of loop! Pass entire parent_ids array
                 objectsJson = await _context.ExecuteJsonAsync(
-                    sql,
-                    context.SchemeId,
-                    context.ParentIds,           // ✅ BATCH: All parent IDs!
+                    sql, new object[] { context.SchemeId,
+                    context.ParentIds,           // BATCH: All parent IDs!
                     filterJson,
                     context.Limit ?? int.MaxValue,
                     context.Offset ?? 0,
                     orderByJson,
                     context.MaxDepth ?? 1000,
-                    context.MaxRecursionDepth ?? 10);
-                
+                    context.MaxRecursionDepth ?? 10 }, cancellationToken);
+
                 if (string.IsNullOrEmpty(objectsJson))
                     return (object)new List<TreeRedbObject<TProps>>();
-                
+
                 var combinedResults = DeserializeTreeObjects<TProps>(objectsJson);
-                
+
                 // Apply common limits and sorting
                 if (context.Offset.HasValue && context.Offset.Value > 0)
                 {
                     combinedResults = combinedResults.Skip(context.Offset.Value).ToList();
                 }
-                
+
                 if (context.Limit.HasValue)
                 {
                     combinedResults = combinedResults.Take(context.Limit.Value).ToList();
                 }
-                
-                // SET _lazyLoader ONLY if useLazyOnDemand=true (on-demand loading)
-                if (useLazyOnDemand && combinedResults.Count > 0 && _lazyPropsLoader != null)
-                {
-                    foreach (var treeObj in combinedResults)
-                    {
-                        if (treeObj.id > 0)
-                        {
-                            treeObj._lazyLoader = _lazyPropsLoader;
-                            treeObj._propsLoaded = false;
-                            _logger?.LogDebug("Lazy loader set for object {ObjectId} (on-demand mode)", treeObj.id);
-                        }
-                    }
-                }
-                else if (combinedResults.Count > 0 && _lazyPropsLoader != null)
+
+                if (combinedResults.Count > 0 && _lazyPropsLoader != null)
                 {
                     // BULK LOAD Props via LoadPropsForManyAsync (two-phase loading)
                     var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -654,56 +600,42 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                     sw.Stop();
                     _logger?.LogDebug("Props loaded via batch (tree, multiple roots) in {ElapsedMs} ms", sw.ElapsedMilliseconds);
                 }
-                
-                // ✅ DISTINCT is now performed at SQL level (search_tree_objects_with_facets_base)
-                
+
+                // DISTINCT is now performed at SQL level (search_tree_objects_with_facets_base)
+
                 return (object)combinedResults;
             }
-            // 🚀 FIX: If rootObjectId=null, use normal search across entire scheme
+            // FIX: If rootObjectId=null, use normal search across entire scheme
             else if (!context.RootObjectId.HasValue)
             {
                 // Search across ENTIRE scheme - use search_objects_with_facets (without tree restrictions)
                 var sqlSearch = _sql.Query_TreeSearchNormalSql(normalFunctionName);
                 objectsJson = await _context.ExecuteJsonAsync(
-                    sqlSearch,
-                    context.SchemeId,
+                    sqlSearch, new object[] { context.SchemeId,
                     filterJson,
                     context.Limit ?? int.MaxValue,  // limit_count - if not specified, get all
                     context.Offset ?? 0,        // offset_count
                     orderByJson,                // order_by
-                    context.MaxRecursionDepth ?? 10);
+                    context.MaxRecursionDepth ?? 10 }, cancellationToken);
             }
             else
             {
                 // Subtree search - use search_tree_objects_with_facets
                 objectsJson = await _context.ExecuteJsonAsync(
-                    sql,
-                    context.SchemeId,
-                    new[] { context.RootObjectId.Value },  // ✅ BATCH: Array with single ID for compatibility
+                    sql, new object[] { context.SchemeId,
+                    new[] { context.RootObjectId.Value },  // BATCH: Array with single ID for compatibility
                     filterJson,
                     context.Limit ?? int.MaxValue,  // limit_count - if not specified, get all
                     context.Offset ?? 0,        // offset_count
                     orderByJson,                // order_by
                     context.MaxDepth ?? 1000,     // max_depth
-                    context.MaxRecursionDepth ?? 10);
+                    context.MaxRecursionDepth ?? 10 }, cancellationToken);
             }
 
             // Deserialize result to tree objects
             var result = DeserializeTreeObjects<TProps>(objectsJson);
-            
-            // SET _lazyLoader ONLY if useLazyOnDemand=true (on-demand loading)
-            if (useLazyOnDemand && result.Count > 0 && _lazyPropsLoader != null)
-            {
-                foreach (var treeObj in result)
-                {
-                    if (treeObj.id > 0)
-                    {
-                        treeObj._lazyLoader = _lazyPropsLoader;
-                        treeObj._propsLoaded = false;
-                    }
-                }
-            }
-            else if (result.Count > 0 && _lazyPropsLoader != null)
+
+            if (result.Count > 0 && _lazyPropsLoader != null)
             {
                 // BULK LOAD Props via LoadPropsForManyAsync (two-phase loading)
                 var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -712,9 +644,9 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                 sw.Stop();
                 _logger?.LogDebug("Props loaded via batch (tree) in {ElapsedMs} ms", sw.ElapsedMilliseconds);
             }
-            
-            // ✅ DISTINCT is now performed at SQL level (search_tree_objects_with_facets)
-            
+
+            // DISTINCT is now performed at SQL level (search_tree_objects_with_facets)
+
             return (object)result;
         }
         catch (NotSupportedException)
@@ -738,12 +670,12 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     {
         var filters = new Dictionary<string, object>();
 
-        // 1. 🚀 POWERFUL FILTER SYSTEM (use PostgresFacetFilterBuilder)
+        // 1. POWERFUL FILTER SYSTEM (use PostgresFacetFilterBuilder)
         if (context.Filter != null)
         {
             // Use the same powerful system as in regular LINQ - ALL 25+ operators!
             var facetFiltersJson = _facetBuilder.BuildFacetFilters(context.Filter);
-            
+
             // Parse JSON back to Dictionary for merging with tree filters
             if (facetFiltersJson != "{}")
             {
@@ -758,7 +690,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             }
         }
 
-        // 2. 🌳 Tree operators (new functionality)
+        // 2. Tree operators (new functionality)
         if (context.TreeFilters != null && context.TreeFilters.Any())
         {
             foreach (var treeFilter in context.TreeFilters)
@@ -767,16 +699,16 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             }
         }
 
-        // 3. 🌳 REMOVED: DO NOT add $descendantsOf if rootObjectId already exists
+        // 3. REMOVED: DO NOT add $descendantsOf if rootObjectId already exists
         // Reason: search_tree_objects_with_facets ALREADY restricts by parent_id
         // Additional $descendantsOf creates CONFLICT and returns 0 results!
         // if (context.RootObjectId.HasValue) - REMOVED!
 
         // Return JSON document if filters exist
         if (!filters.Any()) return null;
-        
-        var jsonString = JsonSerializer.Serialize(filters, new JsonSerializerOptions 
-        { 
+
+        var jsonString = JsonSerializer.Serialize(filters, new JsonSerializerOptions
+        {
             WriteIndented = false,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping  // Preserve Cyrillic without escaping
         });
@@ -786,32 +718,32 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// <summary>
     /// Determines if WhereHasAncestor can be optimized through logic inversion
     /// </summary>
-    protected TreeFilter? GetOptimizableHasAncestorFilter<TProps>(TreeQueryContext<TProps> context) 
+    protected TreeFilter? GetOptimizableHasAncestorFilter<TProps>(TreeQueryContext<TProps> context)
         where TProps : class, new()
     {
         // Find first WhereHasAncestor filter (optimize one by one)
         // TargetSchemeId can be 0 if type is not registered in AutomaticTypeRegistry
-        var filter = context.TreeFilters?.FirstOrDefault(f => 
+        var filter = context.TreeFilters?.FirstOrDefault(f =>
             f.Operator == TreeFilterOperator.HasAncestor);
-        
+
         // Check that TargetSchemeId exists and is not equal to 0
         if (filter != null && (!filter.TargetSchemeId.HasValue || filter.TargetSchemeId.Value == 0))
         {
-            _logger?.LogWarning("⚠️ WhereHasAncestor filter found, but TargetSchemeId not set (type not registered in AutomaticTypeRegistry). Optimization skipped.");
+            _logger?.LogWarning("WhereHasAncestor filter found, but TargetSchemeId not set (type not registered in AutomaticTypeRegistry). Optimization skipped.");
             return null;
         }
-        
+
         return filter;
     }
 
     /// <summary>
     /// Determines if WhereHasDescendant can be optimized through logic inversion
     /// </summary>
-    protected TreeFilter? GetOptimizableHasDescendantFilter<TProps>(TreeQueryContext<TProps> context) 
+    protected TreeFilter? GetOptimizableHasDescendantFilter<TProps>(TreeQueryContext<TProps> context)
         where TProps : class, new()
     {
-        return context.TreeFilters?.FirstOrDefault(f => 
-            f.Operator == TreeFilterOperator.HasDescendant && 
+        return context.TreeFilters?.FirstOrDefault(f =>
+            f.Operator == TreeFilterOperator.HasDescendant &&
             f.TargetSchemeId.HasValue);
     }
 
@@ -823,12 +755,12 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// </summary>
     protected async Task<List<TreeRedbObject<TProps>>> ExecuteOptimizedWhereHasAncestor<TProps>(
         TreeQueryContext<TProps> context,
-        TreeFilter hasAncestorFilter) where TProps : class, new()
+        TreeFilter hasAncestorFilter, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         _logger?.LogDebug("   [DETAILED ANALYSIS] OPTION A - Step by step:");
-        
+
         var swTotal = System.Diagnostics.Stopwatch.StartNew();
-        
+
         // Step 1: Find matching ancestors
         var sw1 = System.Diagnostics.Stopwatch.StartNew();
         var ancestorConditionJson = JsonSerializer.Serialize(
@@ -836,77 +768,75 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
         sw1.Stop();
         _logger?.LogDebug($"      A.1 - Condition serialization: {sw1.ElapsedMilliseconds} ms");
-        
+
         // OPTIMIZATION: ALWAYS use _base functions for fast search
         string ancestorsSql;
         List<string> ancestorIdStrings;
-        
+
         // If RootObjectId exists - find ancestors as children of root
         if (context.RootObjectId.HasValue)
         {
             var treeFunctionName = _sql.Query_SearchTreeObjectsBaseFunction();
-            
+
             // Use dialect-specific SQL for HasAncestor tree search
             ancestorsSql = _sql.Query_HasAncestorTreeSql(treeFunctionName);
-            
-            ancestorIdStrings = await _context.ExecuteJsonListAsync(ancestorsSql,
-                    hasAncestorFilter.TargetSchemeId.Value,
-                    new[] { context.RootObjectId.Value },  // ✅ BATCH: Array with single ID
+
+            ancestorIdStrings = await _context.ExecuteJsonListAsync(ancestorsSql, new object[] { hasAncestorFilter.TargetSchemeId.Value,
+                    new[] { context.RootObjectId.Value },  // BATCH: Array with single ID
                     ancestorConditionJson,
-                    context.MaxDepth ?? 1000);
+                    context.MaxDepth ?? 1000 }, cancellationToken);
         }
         else
         {
             // Find ancestors across entire scheme (without parent restriction)
             var functionName = _sql.Query_SearchObjectsBaseFunction();
-            
+
             // Use dialect-specific SQL for HasAncestor normal search
             ancestorsSql = _sql.Query_HasAncestorNormalSql(functionName);
-            
-            ancestorIdStrings = await _context.ExecuteJsonListAsync(ancestorsSql,
-                    hasAncestorFilter.TargetSchemeId.Value,
-                    ancestorConditionJson);
+
+            ancestorIdStrings = await _context.ExecuteJsonListAsync(ancestorsSql, new object[] { hasAncestorFilter.TargetSchemeId.Value,
+                    ancestorConditionJson }, cancellationToken);
         }
-        
-        // _logger?.LogInformation($"   🔍 DEBUG: Received {ancestorIdStrings.Count} rows from SQL");
+
+        // _logger?.LogInformation($"   DEBUG: Received {ancestorIdStrings.Count} rows from SQL");
         // foreach (var idStr in ancestorIdStrings.Take(5))
         // {
         //     _logger?.LogInformation($"      - ID string: '{idStr}'");
         // }
-        
+
         var ancestorIds = ancestorIdStrings
             .Where(s => !string.IsNullOrEmpty(s))
             .Select(s => long.Parse(s))
             .ToArray();
-        
+
         var sw2Elapsed = swTotal.ElapsedMilliseconds;
         _logger?.LogDebug($"      A.2 - SQL ancestor search: {sw2Elapsed - sw1.ElapsedMilliseconds} ms");
         _logger?.LogDebug($"A.2 - Found {ancestorIds.Length} ancestors");
-        
+
         if (!ancestorIds.Any())
         {
             return new List<TreeRedbObject<TProps>>();
         }
-        
+
         // Step 2: Create optimized context
         var sw2 = System.Diagnostics.Stopwatch.StartNew();
         var optimizedContext = context.Clone();
         optimizedContext.TreeFilters = new List<TreeFilter>(
             context.TreeFilters.Where(f => f != hasAncestorFilter));
         optimizedContext.ParentIds = ancestorIds;
-        
+
         sw2.Stop();
         _logger?.LogDebug($"      A.3 - Context creation: {sw2.ElapsedMilliseconds} ms");
-        
+
         // Step 3: Execute with remaining filters (preserves Where, OrderBy, Limit/Offset)
         var sw3 = System.Diagnostics.Stopwatch.StartNew();
         var result = (List<TreeRedbObject<TProps>>)await ExecuteTreeToListAsync(optimizedContext);
         sw3.Stop();
-        
+
         swTotal.Stop();
         _logger?.LogDebug($"      A.4 - Loading descendants: {sw3.ElapsedMilliseconds} ms ({result.Count} objects)");
         _logger?.LogDebug($"      A - TOTAL TIME: {swTotal.ElapsedMilliseconds} ms");
-        
+
         return result;
     }
 
@@ -918,81 +848,80 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// </summary>
     protected async Task<List<TreeRedbObject<TProps>>> ExecuteOptimizedWhereHasDescendant<TProps>(
         TreeQueryContext<TProps> context,
-        TreeFilter hasDescendantFilter) where TProps : class, new()
+        TreeFilter hasDescendantFilter, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         _logger?.LogDebug("OPTIMIZATION: Applying logic inversion for WhereHasDescendant");
-        
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        
+
         // Step 1: Find matching descendants
         var descendantConditionJson = JsonSerializer.Serialize(
             hasDescendantFilter.FilterConditions,
             new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
-        
+
         // OPTIMIZATION: ALWAYS use _base function for fast search
         var functionName = _sql.Query_SearchObjectsBaseFunction();
-        
+
         // Use dialect-specific SQL for HasDescendant search
         var descendantsSql = _sql.Query_HasDescendantSql(functionName);
-        
-        var descendantIdStrings = await _context.ExecuteJsonListAsync(descendantsSql,
-                hasDescendantFilter.TargetSchemeId.Value,
-                descendantConditionJson);
-        
+
+        var descendantIdStrings = await _context.ExecuteJsonListAsync(descendantsSql, new object[] { hasDescendantFilter.TargetSchemeId.Value,
+                descendantConditionJson }, cancellationToken);
+
         var descendantIds = descendantIdStrings
             .Where(s => !string.IsNullOrEmpty(s))
             .Select(s => long.Parse(s))
             .ToList();
-        
+
         sw.Stop();
         _logger?.LogDebug($"   Step 1: Found {descendantIds.Count} descendants in {sw.ElapsedMilliseconds} ms");
-        
+
         if (!descendantIds.Any())
         {
             _logger?.LogDebug("Descendants not found, returning empty result");
             return new List<TreeRedbObject<TProps>>();
         }
-        
+
         // Step 2: Get unique ancestors of all found descendants
         sw.Restart();
-        var parentIds = await GetParentIdsFromDescendants(descendantIds, hasDescendantFilter.MaxDepth);
+        var parentIds = await GetParentIdsFromDescendants(descendantIds, hasDescendantFilter.MaxDepth, cancellationToken);
         sw.Stop();
-        
+
         _logger?.LogDebug($"   Step 2: Found {parentIds.Length} unique ancestors in {sw.ElapsedMilliseconds} ms");
-        
+
         if (!parentIds.Any())
         {
             _logger?.LogDebug("Ancestors not found, returning empty result");
             return new List<TreeRedbObject<TProps>>();
         }
-        
+
         // Step 3: Load these objects with remaining filters
         sw.Restart();
         var result = await LoadObjectsByIdsWithFilters(parentIds, context);
         sw.Stop();
-        
+
         _logger?.LogDebug($"   Step 3: Loaded {result.Count} objects in {sw.ElapsedMilliseconds} ms");
         _logger?.LogDebug($"WhereHasDescendant optimization completed successfully");
-        
+
         return result;
     }
 
     /// <summary>
     /// Get parent IDs for found descendants considering depth
     /// </summary>
-    private async Task<long[]> GetParentIdsFromDescendants(List<long> descendantIds, int? maxDepth)
+    private async Task<long[]> GetParentIdsFromDescendants(List<long> descendantIds, int? maxDepth, CancellationToken cancellationToken)
     {
         if (!descendantIds.Any())
             return Array.Empty<long>();
-        
+
         var idsString = string.Join(",", descendantIds);
         var depthLimit = maxDepth ?? 50;
-        
+
         // Use dialect-specific SQL for recursive CTE (PostgreSQL: WITH RECURSIVE, MSSQL: WITH)
         var sql = _sql.Query_GetParentIdsFromDescendantsSql(idsString, depthLimit);
-        
-        var parentIds = await _context.QueryScalarListAsync<long>(sql);
-        
+
+        var parentIds = await _context.QueryScalarListAsync<long>(sql, System.Array.Empty<object>(), cancellationToken);
+
         return parentIds.ToArray();
     }
 
@@ -1005,18 +934,18 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     {
         if (!objectIds.Any())
             return new List<TreeRedbObject<TProps>>();
-        
+
         // Create WhereIn filter by ID
-        // ✅ FIX: IsBaseField = true to search in _objects._id instead of EAV field
+        // FIX: IsBaseField = true to search in _objects._id instead of EAV field
         var idsFilter = new InExpression(
             new redb.Core.Query.QueryExpressions.PropertyInfo("_id", typeof(long), true),
             objectIds.Cast<object>().ToList());
-        
+
         // Create new context with ID filter + existing filters
         var optimizedContext = context.Clone();
         optimizedContext.TreeFilters = new List<TreeFilter>(
             context.TreeFilters.Where(f => f.Operator != TreeFilterOperator.HasDescendant));
-        
+
         // Add ID filter to existing Filter
         if (optimizedContext.Filter != null)
         {
@@ -1028,7 +957,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         {
             optimizedContext.Filter = idsFilter;
         }
-        
+
         // Execute query through regular path
         return (List<TreeRedbObject<TProps>>)await ExecuteTreeToListAsync(optimizedContext);
     }
@@ -1043,53 +972,53 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             case TreeFilterOperator.HasAncestor:
                 // Polymorphic filter by ancestors with scheme_id and maxDepth support
                 var hasAncestorFilter = new Dictionary<string, object>();
-                
+
                 // Add filtering condition
                 if (treeFilter.FilterConditions != null)
                 {
                     hasAncestorFilter["condition"] = treeFilter.FilterConditions;
                 }
-                
+
                 // Add scheme_id for polymorphic queries
                 if (treeFilter.TargetSchemeId.HasValue)
                 {
                     hasAncestorFilter["scheme_id"] = treeFilter.TargetSchemeId.Value;
                 }
-                
+
                 // Add depth limit
                 if (treeFilter.MaxDepth.HasValue)
                 {
                     hasAncestorFilter["max_depth"] = treeFilter.MaxDepth.Value;
                 }
-                
+
                 filters["$hasAncestor"] = hasAncestorFilter;
                 break;
-            
+
             case TreeFilterOperator.HasDescendant:
                 // Polymorphic filter by descendants with scheme_id and maxDepth support
                 var hasDescendantFilter = new Dictionary<string, object>();
-                
+
                 // Add filtering condition
                 if (treeFilter.FilterConditions != null)
                 {
                     hasDescendantFilter["condition"] = treeFilter.FilterConditions;
                 }
-                
+
                 // Add scheme_id for polymorphic queries
                 if (treeFilter.TargetSchemeId.HasValue)
                 {
                     hasDescendantFilter["scheme_id"] = treeFilter.TargetSchemeId.Value;
                 }
-                
+
                 // Add depth limit
                 if (treeFilter.MaxDepth.HasValue)
                 {
                     hasDescendantFilter["max_depth"] = treeFilter.MaxDepth.Value;
                 }
-                
+
                 filters["$hasDescendant"] = hasDescendantFilter;
                 break;
-            
+
             case TreeFilterOperator.Level:
                 if (treeFilter.Value is int level)
                 {
@@ -1100,11 +1029,11 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                     filters["$level"] = treeFilter.FilterConditions;
                 }
                 break;
-            
+
             case TreeFilterOperator.IsRoot:
                 filters["$isRoot"] = true;
                 break;
-            
+
             case TreeFilterOperator.IsLeaf:
                 filters["$isLeaf"] = true;
                 break;
@@ -1114,9 +1043,9 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                 break;
 
             case TreeFilterOperator.DescendantsOf:
-                filters["$descendantsOf"] = new { 
+                filters["$descendantsOf"] = new {
                     ancestor_id = treeFilter.Value,
-                    max_depth = treeFilter.MaxDepth 
+                    max_depth = treeFilter.MaxDepth
                 };
                 break;
 
@@ -1129,19 +1058,19 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
 
     /// <summary>
     /// Build JSON for sorting (similar to base provider)
-    /// 🆕 FIXED: Uses _facetBuilder.BuildOrderBy to support 0$: prefix for base fields
+    /// FIXED: Uses _facetBuilder.BuildOrderBy to support 0$: prefix for base fields
     /// </summary>
     private JsonDocument? BuildOrderByFilter<TProps>(TreeQueryContext<TProps> context) where TProps : class, new()
     {
         if (context.Orderings == null || !context.Orderings.Any())
             return null;
 
-        // 🆕 Use _facetBuilder.BuildOrderBy which correctly handles IsBaseField
+        // Use _facetBuilder.BuildOrderBy which correctly handles IsBaseField
         var jsonString = _facetBuilder.BuildOrderBy(context.Orderings);
         return JsonDocument.Parse(jsonString);
     }
 
-    // 💀 ConvertFilterToFacets() REMOVED! REPLACED WITH PostgresFacetFilterBuilder!
+    // ConvertFilterToFacets() REMOVED! REPLACED WITH PostgresFacetFilterBuilder!
     // Now Tree uses THE SAME POWERFUL SYSTEM as regular LINQ - ALL 25+ operators!
 
     /// <summary>
@@ -1189,10 +1118,10 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
 
                     // Convert to TreeRedbObject
                     var treeObj = ConvertToTreeObject(redbObj);
-                    
-                    // NOTE: _lazyLoader setup happens later in ExecuteTreeToListAsync
-                    // after DeserializeTreeObjects call, when we have access to context
-                    
+
+                    // NOTE: Props are batch-loaded by ExecuteTreeToListAsync; boundary stubs get their
+                    // loader from LazyReferenceInstaller after that (V4).
+
                     result.Add(treeObj);
                 }
                 catch (Exception ex)
@@ -1213,7 +1142,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
 
     /// <summary>
     /// Convert RedbObject to TreeRedbObject
-    /// ✅ FIXED: Props copied from source (fixed bug with empty Props)
+    /// FIXED: Props copied from source (fixed bug with empty Props)
     /// </summary>
     protected TreeRedbObject<TProps> ConvertToTreeObject<TProps>(RedbObject<TProps> source) where TProps : class, new()
     {
@@ -1241,8 +1170,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             note = source.note,
             hash = source.hash
         };
-        
-        // ✅ CRITICAL FIX: Copy Props directly
+
+        // CRITICAL FIX: Copy Props directly
         // Use GetPropsDirectly() to NOT trigger lazy load in source
         // Props setter is safe - it just sets the value
         var sourceProps = source.GetPropsDirectly();
@@ -1255,7 +1184,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             // Props was loaded but it's null - set flag
             treeObj._propsLoaded = true;
         }
-        
+
         return treeObj;
     }
 
@@ -1264,7 +1193,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// <summary>
     /// Get IDs of all objects and their parents up to root through recursive CTE
     /// </summary>
-    public async Task<List<long>> GetIdsWithAncestorsAsync<TProps>(List<long> filteredIds) where TProps : class, new()
+    public async Task<List<long>> GetIdsWithAncestorsAsync<TProps>(List<long> filteredIds, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         if (filteredIds == null || !filteredIds.Any())
             return new List<long>();
@@ -1275,7 +1204,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             var idsString = string.Join(",", filteredIds);
             var sql = _sql.Query_GetIdsWithAncestorsSql(idsString);
 
-            var idsResult = await _context.QueryScalarListAsync<long>(sql);
+            var idsResult = await _context.QueryScalarListAsync<long>(sql, System.Array.Empty<object>(), cancellationToken);
 
             return idsResult;
         }
@@ -1289,7 +1218,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// <summary>
     /// Load full objects by ID list via get_object_json function
     /// </summary>
-    public async Task<List<TreeRedbObject<TProps>>> LoadObjectsByIdsAsync<TProps>(List<long> objectIds, int? propsDepth = null) where TProps : class, new()
+    public async Task<List<TreeRedbObject<TProps>>> LoadObjectsByIdsAsync<TProps>(List<long> objectIds, int? propsDepth = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         if (objectIds == null || !objectIds.Any())
             return new List<TreeRedbObject<TProps>>();
@@ -1299,7 +1228,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         if (_lazyPropsLoader != null)
         {
             var rows = await _context.QueryAsync<RedbObjectRow>(
-                _sql.ObjectStorage_SelectObjectsByIds(), objectIds.ToArray());
+                _sql.ObjectStorage_SelectObjectsByIds(), new object[] { objectIds.ToArray() }, cancellationToken);
             return await MaterializeTreeObjectsFromRowsAsync<TProps>(rows, propsDepth);
         }
 
@@ -1310,7 +1239,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             var effectiveDepth = propsDepth ?? _configuration.DefaultMaxTreeDepth;
             var sql = _sql.Query_LoadObjectsByIdsSql(idsString, effectiveDepth);
 
-            var objectsJsonList = await _context.ExecuteJsonListAsync(sql);
+            var objectsJsonList = await _context.ExecuteJsonListAsync(sql, System.Array.Empty<object>(), cancellationToken);
 
             var result = new List<TreeRedbObject<TProps>>();
 
@@ -1345,7 +1274,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// Used for polymorphic trees where objects can be of different types.
     /// Each object is deserialized to its real type based on scheme_id.
     /// </summary>
-    public async Task<List<ITreeRedbObject>> LoadObjectsByIdsAsync(List<long> objectIds, int? propsDepth = null)
+    public async Task<List<ITreeRedbObject>> LoadObjectsByIdsAsync(List<long> objectIds, int? propsDepth = null, CancellationToken cancellationToken = default)
     {
         if (objectIds == null || !objectIds.Any())
             return new List<ITreeRedbObject>();
@@ -1355,7 +1284,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         if (_lazyPropsLoader != null)
         {
             var rows = await _context.QueryAsync<RedbObjectRow>(
-                _sql.ObjectStorage_SelectObjectsByIds(), objectIds.ToArray());
+                _sql.ObjectStorage_SelectObjectsByIds(), new object[] { objectIds.ToArray() }, cancellationToken);
 
             var proResult = new List<ITreeRedbObject>();
             foreach (var schemeGroup in rows.GroupBy(r => r.IdScheme))
@@ -1388,7 +1317,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             var effectiveDepth = propsDepth ?? _configuration.DefaultMaxTreeDepth;
             var sql = _sql.Query_LoadObjectsByIdsSql(idsString, effectiveDepth);
 
-            var objectsJsonList = await _context.ExecuteJsonListAsync(sql);
+            var objectsJsonList = await _context.ExecuteJsonListAsync(sql, System.Array.Empty<object>(), cancellationToken);
 
 
             var result = new List<ITreeRedbObject>();
@@ -1398,21 +1327,21 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                 // 1. Extract scheme_id from JSON for polymorphic deserialization
                 using var jsonDoc = JsonDocument.Parse(objectJson);
                 var schemeId = jsonDoc.RootElement.GetProperty("scheme_id").GetInt64();
-                
+
                 // 2. Get real C# type via AutomaticTypeRegistry
                 var propsType = Cache.GetClrType(schemeId)
                     ?? throw new InvalidOperationException(
                         $"Type not found for scheme_id={schemeId}. Register type in AutomaticTypeRegistry.");
-                
+
                 // 3. Polymorphic deserialization: first RedbObject, then TreeRedbObject
                 var redbObj = _serializer.DeserializeRedbDynamic(objectJson, propsType);
-                
+
                 if (redbObj != null)
                 {
                     // Convert to TreeRedbObject via reflection (call ConvertToTreeObject<TProps>)
-                    var method = typeof(TreeQueryProviderBase).GetMethod(nameof(ConvertToTreeObject), 
+                    var method = typeof(TreeQueryProviderBase).GetMethod(nameof(ConvertToTreeObject),
                         System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    
+
                     if (method != null)
                     {
                         var genericMethod = method.MakeGenericMethod(propsType);
@@ -1479,6 +1408,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             value_numeric = row.ValueNumeric,
             value_datetime = row.ValueDatetime,
             value_bytes = row.ValueBytes,
+            value_unique = row.ValueUnique,
             note = row.Note,
             hash = row.Hash
         };
@@ -1487,44 +1417,43 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// <summary>
     /// Returns SQL query for tree search that will be executed (for debugging)
     /// </summary>
-    public virtual async Task<string> GetSqlPreviewAsync<TProps>(TreeQueryContext<TProps> context)
+    public virtual async Task<string> GetSqlPreviewAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken = default)
         where TProps : class, new()
     {
         var facetFilters = _facetBuilder.BuildFacetFilters(context.Filter);
         var parameters = _facetBuilder.BuildQueryParameters(context.Limit, context.Offset);
         var orderByDoc = BuildOrderByFilter(context);
         var orderByJson = orderByDoc?.RootElement.GetRawText();
-        
+
         // OPTIMIZATION: ALWAYS use _base preview function
         var functionName = _sql.Query_TreeSqlPreviewBaseFunction();
-        
-        _logger?.LogDebug("Getting Tree SQL Preview: Function={FunctionName}, SchemeId={SchemeId}, RootObjectId={RootObjectId}, MaxDepth={MaxDepth}", 
+
+        _logger?.LogDebug("Getting Tree SQL Preview: Function={FunctionName}, SchemeId={SchemeId}, RootObjectId={RootObjectId}, MaxDepth={MaxDepth}",
             functionName, context.SchemeId, context.RootObjectId, context.MaxDepth);
-        
+
         // Build parent_ids array for the SQL function
         var parentIds = context.ParentIds ?? (context.RootObjectId.HasValue ? new[] { context.RootObjectId.Value } : Array.Empty<long>());
-        
+
         var sqlQuery = _sql.Query_TreeSqlPreviewTemplate(functionName);
         var result = await _context.QueryFirstOrDefaultAsync<SqlPreviewResult>(
-            sqlQuery,
-            context.SchemeId,
+            sqlQuery, new object[] { context.SchemeId,
             parentIds,
-            facetFilters, 
+            facetFilters,
             parameters.Limit ?? int.MaxValue,
             parameters.Offset ?? 0,
             orderByJson ?? "null",
             context.MaxDepth ?? 100,
-            context.MaxRecursionDepth ?? 10);
-        
+            context.MaxRecursionDepth ?? 10 }, cancellationToken);
+
         return result?.sql_preview ?? "-- Tree SQL preview not available";
     }
-    
+
     // ===== DELETE =====
-    
+
     /// <summary>
     /// Get SQL preview for standard QueryContext (for IRedbQueryProvider compatibility)
     /// </summary>
-    public Task<string> GetSqlPreviewAsync<TProps>(QueryContext<TProps> context) 
+    public Task<string> GetSqlPreviewAsync<TProps>(QueryContext<TProps> context, CancellationToken cancellationToken = default)
         where TProps : class, new()
     {
         // For Tree provider convert to TreeQueryContext
@@ -1532,12 +1461,12 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         {
             return GetSqlPreviewAsync(treeContext);
         }
-        
+
         // Create TreeQueryContext from regular QueryContext
         var newTreeContext = new TreeQueryContext<TProps>(
-            context.SchemeId, 
-            context.UserId, 
-            context.CheckPermissions, 
+            context.SchemeId,
+            context.UserId,
+            context.CheckPermissions,
             null, // rootObjectId
             context.MaxDepth)
         {
@@ -1545,60 +1474,60 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             Orderings = context.Orderings.ToList(),
             Limit = context.Limit,
             Offset = context.Offset,
-            UseLazyLoading = context.UseLazyLoading
+            LazyReferences = context.LazyReferences,
         };
-        
+
         return GetSqlPreviewAsync(newTreeContext);
     }
-    
+
     /// <summary>
     /// Returns the JSON filter that will be sent to SQL function (for diagnostics)
     /// </summary>
-    public Task<string> GetFilterJsonAsync<TProps>(QueryContext<TProps> context) 
+    public Task<string> GetFilterJsonAsync<TProps>(QueryContext<TProps> context, CancellationToken cancellationToken = default)
         where TProps : class, new()
     {
         var facetFilters = _facetBuilder.BuildFacetFilters(context.Filter);
         return Task.FromResult(facetFilters);
     }
-    
+
     /// <summary>
     /// Delete objects by filter. Delegates to base QueryProvider.
     /// Cascade delete in DB handles children automatically.
     /// </summary>
-    public async Task<int> ExecuteDeleteAsync(long schemeId, string? filterJson = null)
+    public async Task<int> ExecuteDeleteAsync(long schemeId, string? filterJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteDeleteAsync(schemeId, filterJson);
     }
-    
+
     /// <summary>
     /// Delete objects by FilterExpression. Delegates to base QueryProvider.
     /// Cascade delete in DB handles children automatically.
     /// </summary>
-    public async Task<int> ExecuteDeleteAsync(long schemeId, QueryExpressions.FilterExpression? filter)
+    public async Task<int> ExecuteDeleteAsync(long schemeId, QueryExpressions.FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteDeleteAsync(schemeId, filter);
     }
-    
+
     /// <summary>
     /// Delete objects by ID array (cascade with children).
     /// </summary>
-    public async Task<int> ExecuteTreeDeleteAsync(long[] objectIds)
+    public async Task<int> ExecuteTreeDeleteAsync(long[] objectIds, CancellationToken cancellationToken = default)
     {
         if (objectIds.Length == 0)
             return 0;
-        
+
         // Use dialect's cascade delete (handles children automatically)
         // MSSQL context auto-converts long[] to comma-separated string
         var deletedCount = await _context.ExecuteAsync(
-            _sql.ObjectStorage_DeleteByIds(), objectIds);
-        
+            _sql.ObjectStorage_DeleteByIds(), new object[] { objectIds }, cancellationToken);
+
         _logger?.LogDebug("TreeDelete: Deleted {Count} objects (cascade)", deletedCount);
-        
+
         return deletedCount;
     }
-    
+
     /// <summary>
     /// Execute GROUP BY with tree context (CTE for tree traversal).
     /// Base implementation: gets tree object IDs first, then delegates to base GroupBy with filter.
@@ -1608,37 +1537,37 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         TreeQueryContext<TProps> context,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<Aggregation.AggregateRequest> aggregations,
-        string? havingJson = null) where TProps : class, new()
+        string? havingJson = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         // Base implementation: get tree object IDs first, then filter grouping
-        var treeObjectIds = await GetTreeObjectIdsAsync(context);
-        
+        var treeObjectIds = await GetTreeObjectIdsAsync(context, cancellationToken);
+
         if (treeObjectIds.Count == 0)
             return System.Text.Json.JsonDocument.Parse("[]");
-        
+
         // Build filter JSON with object IDs
         var filterJson = BuildObjectIdsFilterJson(treeObjectIds);
-        
+
         // Delegate to base grouped aggregate with ID filter (PVT path honors having)
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteGroupedAggregateAsync(
             context.SchemeId, groupFields, aggregations, filterJson, havingJson);
     }
-    
+
     /// <summary>
     /// Gets object IDs matching tree query context.
     /// </summary>
-    private async Task<List<long>> GetTreeObjectIdsAsync<TProps>(TreeQueryContext<TProps> context) 
+    private async Task<List<long>> GetTreeObjectIdsAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken)
         where TProps : class, new()
     {
         // Use existing tree query infrastructure to get matching IDs
         var treeQueryable = new TreeQueryableBase<TProps>(
             this, context.Clone(), _filterParser, _orderingParser, _facetBuilder);
-        
-        var objects = await treeQueryable.ToListAsync();
+
+        var objects = await treeQueryable.ToListAsync(cancellationToken);
         return objects.Select(o => o.Id).ToList();
     }
-    
+
     /// <summary>
     /// Builds filter JSON with object ID constraint.
     /// Uses 0$: prefix for base fields - required for PostgreSQL.
@@ -1649,7 +1578,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         var idsJson = System.Text.Json.JsonSerializer.Serialize(objectIds);
         return $"{{\"0$:id\":{{\"$in\":{idsJson}}}}}";
     }
-    
+
     /// <summary>
     /// Execute Window Functions with tree context.
     /// Base implementation: get tree object IDs first, then execute window functions with ID filter.
@@ -1661,26 +1590,26 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? frameJson = null) where TProps : class, new()
+        string? frameJson = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         // Base implementation: get tree object IDs first, then filter window query
-        var treeObjectIds = await GetTreeObjectIdsAsync(context);
-        
+        var treeObjectIds = await GetTreeObjectIdsAsync(context, cancellationToken);
+
         if (treeObjectIds.Count == 0)
         {
             return System.Text.Json.JsonDocument.Parse("[]");
         }
-        
+
         // Build filter JSON with object IDs
         var filterJson = BuildObjectIdsFilterJson(treeObjectIds);
-        
+
         // Delegate to base window query with ID filter
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteWindowQueryAsync(
-            context.SchemeId, selectFields, windowFuncs, partitionBy, orderBy, filterJson, frameJson, 
+            context.SchemeId, selectFields, windowFuncs, partitionBy, orderBy, filterJson, frameJson,
             context.Limit, context.Offset);
     }
-    
+
     /// <summary>
     /// Get SQL preview for tree window query.
     /// Base implementation: returns placeholder, override in Pro for actual SQL.
@@ -1691,11 +1620,11 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? frameJson = null) where TProps : class, new()
+        string? frameJson = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         // Mirror the runtime path: fetch tree object IDs, then delegate to
         // the non-tree window preview with a `0$:id $in [...]` filter.
-        var treeObjectIds = await GetTreeObjectIdsAsync(context);
+        var treeObjectIds = await GetTreeObjectIdsAsync(context, cancellationToken);
         if (treeObjectIds.Count == 0)
         {
             return $"-- Tree Window: subtree is empty (no objects matched RootObjectId={context.RootObjectId})\n-- SchemeId: {context.SchemeId}";
@@ -1717,9 +1646,9 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         TreeQueryContext<TProps> context,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<Aggregation.AggregateRequest> aggregations,
-        string? havingJson = null) where TProps : class, new()
+        string? havingJson = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
-        var treeObjectIds = await GetTreeObjectIdsAsync(context);
+        var treeObjectIds = await GetTreeObjectIdsAsync(context, cancellationToken);
         if (treeObjectIds.Count == 0)
         {
             return $"-- Tree GroupBy: subtree is empty (no objects matched RootObjectId={context.RootObjectId})\n-- SchemeId: {context.SchemeId}";
@@ -1736,7 +1665,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             typeof(IEnumerable<Grouping.GroupFieldRequest>),
             typeof(IEnumerable<Aggregation.AggregateRequest>),
             typeof(string),
-            typeof(string)
+            typeof(string),
+            typeof(CancellationToken)
         });
         object?[] methodArgs;
         if (method == null)
@@ -1746,13 +1676,14 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
                 typeof(long),
                 typeof(IEnumerable<Grouping.GroupFieldRequest>),
                 typeof(IEnumerable<Aggregation.AggregateRequest>),
-                typeof(string)
+                typeof(string),
+                typeof(CancellationToken)
             });
-            methodArgs = new object?[] { context.SchemeId, groupFields, aggregations, filterJson };
+            methodArgs = new object?[] { context.SchemeId, groupFields, aggregations, filterJson, cancellationToken };
         }
         else
         {
-            methodArgs = new object?[] { context.SchemeId, groupFields, aggregations, filterJson, havingJson };
+            methodArgs = new object?[] { context.SchemeId, groupFields, aggregations, filterJson, havingJson, cancellationToken };
         }
         if (method == null)
         {
@@ -1766,9 +1697,9 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         var preview = task != null ? await task : "-- SQL preview failed";
         return $"-- Tree GroupBy: subtree resolved to {treeObjectIds.Count} object(s) (RootObjectId={context.RootObjectId})\n" + preview;
     }
-    
+
     // ===== TREE GROUPED WINDOW =====
-    
+
     /// <summary>
     /// Execute GroupBy + Window with tree context.
     /// Base implementation: gets tree object IDs first, then delegates to base GroupBy + Window with filter.
@@ -1780,23 +1711,23 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
-        IEnumerable<Window.WindowOrderRequest> orderBy) where TProps : class, new()
+        IEnumerable<Window.WindowOrderRequest> orderBy, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         // Base implementation: get tree object IDs first, then filter grouping + window
-        var treeObjectIds = await GetTreeObjectIdsAsync(context);
-        
+        var treeObjectIds = await GetTreeObjectIdsAsync(context, cancellationToken);
+
         if (treeObjectIds.Count == 0)
             return System.Text.Json.JsonDocument.Parse("[]");
-        
+
         // Build filter JSON with object IDs
         var filterJson = BuildObjectIdsFilterJson(treeObjectIds);
-        
+
         // Delegate to base grouped window query with ID filter
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteGroupedWindowQueryAsync(
             context.SchemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
     }
-    
+
     /// <summary>
     /// Get SQL preview for tree GroupBy + Window.
     /// Base implementation: returns placeholder.
@@ -1807,9 +1738,9 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
-        IEnumerable<Window.WindowOrderRequest> orderBy) where TProps : class, new()
+        IEnumerable<Window.WindowOrderRequest> orderBy, CancellationToken cancellationToken = default) where TProps : class, new()
     {
-        var treeObjectIds = await GetTreeObjectIdsAsync(context);
+        var treeObjectIds = await GetTreeObjectIdsAsync(context, cancellationToken);
         if (treeObjectIds.Count == 0)
         {
             return $"-- Tree GroupBy + Window: subtree is empty (no objects matched RootObjectId={context.RootObjectId})\n-- SchemeId: {context.SchemeId}";
@@ -1831,11 +1762,11 @@ public class TreeQueryContext<TProps> : QueryContext<TProps> where TProps : clas
 {
     public long? RootObjectId { get; set; }               // Limit search to subtree
     public List<TreeFilter> TreeFilters { get; set; }     // Tree filters
-    
-    // ✅ FIX: MaxDepth now inherited from base QueryContext
 
-    public TreeQueryContext(long schemeId, long? userId, bool checkPermissions, long? rootObjectId, int? maxDepth) 
-        : base(schemeId, userId, checkPermissions, null, maxDepth)  // ✅ Pass maxDepth to base constructor
+    // FIX: MaxDepth now inherited from base QueryContext
+
+    public TreeQueryContext(long schemeId, long? userId, bool checkPermissions, long? rootObjectId, int? maxDepth)
+        : base(schemeId, userId, checkPermissions, null, maxDepth)  // Pass maxDepth to base constructor
     {
         RootObjectId = rootObjectId;
         TreeFilters = new List<TreeFilter>();
@@ -1846,10 +1777,10 @@ public class TreeQueryContext<TProps> : QueryContext<TProps> where TProps : clas
     /// </summary>
     public new TreeQueryContext<TProps> Clone()
     {
-        // ✅ FIX: MaxDepth now passed via base constructor
+        // FIX: MaxDepth now passed via base constructor
         var clone = new TreeQueryContext<TProps>(SchemeId, UserId, CheckPermissions, RootObjectId, MaxDepth)
         {
-            ParentIds = ParentIds,      // ✅ SYNC: copy batch array
+            ParentIds = ParentIds,      // SYNC: copy batch array
             Filter = Filter,
             Orderings = new List<OrderingExpression>(Orderings),
             Limit = Limit,
@@ -1859,14 +1790,14 @@ public class TreeQueryContext<TProps> : QueryContext<TProps> where TProps : clas
             DistinctByField = DistinctByField,
             DistinctByIsBaseField = DistinctByIsBaseField,
             MaxRecursionDepth = MaxRecursionDepth,
-            IsEmpty = IsEmpty,          // ✅ FIX: copy IsEmpty flag for TreeQueryContext
-            UseLazyLoading = UseLazyLoading,           // ✅ copy lazy loading flag
+            IsEmpty = IsEmpty,          // FIX: copy IsEmpty flag for TreeQueryContext
+            LazyReferences = LazyReferences,
             ProjectedStructureIds = ProjectedStructureIds,
             ProjectedFieldPaths = ProjectedFieldPaths,
             SkipPropsLoading = SkipPropsLoading,
             PropsDepth = PropsDepth
         };
-        
+
         // Copy tree filters
         clone.TreeFilters = new List<TreeFilter>(TreeFilters);
         return clone;
@@ -1899,7 +1830,7 @@ public class TreeFilter
 public enum TreeFilterOperator
 {
     HasAncestor,      // $hasAncestor - find objects with ancestor matching condition
-    HasDescendant,    // $hasDescendant - find objects with descendant matching condition  
+    HasDescendant,    // $hasDescendant - find objects with descendant matching condition
     Level,            // $level - filter by level in tree
     IsRoot,           // $isRoot - only root objects
     IsLeaf,           // $isLeaf - only leaves

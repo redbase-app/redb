@@ -19,9 +19,689 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.0.0] — 2026-09-12
+
+### Added
+### Security
+- **The default password hasher of a bare redb deployment is bcrypt now, not salted SHA256**
+  (external security report). Every provider's stock user-provider factory used to hard-wire
+  `SimplePasswordHasher` (SHA256+salt), and `IPasswordHasher` was not registered in DI at all,
+  so `BcryptPasswordHasher` sat in the tree unreachable. Now: `AddRedb` registers
+  `IPasswordHasher` as bcrypt via TryAdd (your own registration wins), the factories resolve it
+  from DI, and the short user-provider constructors default to bcrypt too. Existing databases
+  are safe: `BcryptPasswordHasher.VerifyPassword` recognizes both formats, so legacy SHA256+salt
+  hashes keep authenticating and migrate to bcrypt naturally on the next password change.
+  Pinned by PasswordHasherDefaultTests x3 (new hashes carry the `$2` bcrypt prefix; a legacy
+  hash still validates and still rejects a wrong password).
+
+### Added
+- **Element-level uniqueness scopes: `[RedbUnique(Scope = ...)]` on collections** (S3 of the
+  subtree-unique plan). `Scope = Collection` - no duplicate elements inside one object's
+  collection (each element's canonical form is salted with the owning collection identity);
+  `Scope = Scheme` - element values unique across every object of the scheme, globally
+  probeable via `GetByUniqueAsync(p => p.Emails, value)`. Reference elements canonicalise by
+  TARGET id - `Scope = Collection` on a collection of references reads as "no duplicate
+  links". The scope lives in `_structures._unique_scope` (mirrored into the metadata cache)
+  and is delivered by the versioned mechanism (PostgreSQL pvt 0.7.8, MSSQL pvt 0.2.13,
+  SQLite user_version 9); the unique index itself is untouched. A scope change recomputes the
+  structure's keys; `Scope` on a scalar or nested class is rejected at synchronisation.
+  Pinned by eleven ElemKey scenarios in all six suites, including the change-tracking
+  alignment path (a collection-scoped element added on update is re-keyed with the FINAL
+  collection identity after base-row alignment - without that the salt encoded a discarded
+  candidate id and the duplicate keyed past the stored element).
+- **`_tags`: a free-form 450-character marker on `_schemes` and `_structures`** (reserved for
+  future and custom extensions; indexed on structures, mirrored into the metadata cache,
+  delivered by the same versioned step). `[RedbTags("...")]` on the Props class or a property
+  writes it at synchronisation; a column WITHOUT the attribute is never touched by sync, so
+  values written directly by applications survive. No semantics imposed by redb.
+- **`[RedbUnique]` on a whole nested class, array or dictionary - SUBTREE keys** (S1 of the
+  subtree-unique plan). The key is the CONTENT of the subtree: the canonical hash the storage
+  already maintains on the base row, encoded through the same `UniqueKeyEncoder` formula as
+  scalar keys, so "unique" reads as "no two objects of the scheme hold this exact content".
+  Semantics follow the canonical forms: a dictionary is order-insensitive (`{a:1,b:2}` IS
+  `{b:2,a:1}`), a list is ordered (`[1,2,3]` equals only `[1,2,3]`), references canonicalise
+  by id (a collection of references reads as "unique SET of references"), an absent or EMPTY
+  collection claims no key. `GetByUniqueAsync(p => p.Config, value)` accepts the subtree value
+  itself and canonicalises it the way the save did (reference collections are outside the
+  by-value lookup); `RecomputeUniqueAsync` repairs subtree keys from the stored base-row
+  hashes. In classic SQL the closest shape is an indexed view or a trigger-maintained hash
+  column; here it is one attribute. Pinned by seven Subtree scenarios in all six suites.
+- **`[RedbUnique]` on scalars inside nested classes** (S2 of the subtree-unique plan). A key
+  field of a nested class - reached from the Props root without crossing a collection - is now
+  a legal unique key: same encoder, same index, same typed
+  `RedbUniqueViolationException`. `GetByUniqueAsync` accepts the path both as a lambda
+  (`p => p.Identity.Passport`) and as a dotted string; `RecomputeUniqueAsync` takes the same
+  path for explicit backfill. A key inside an ELEMENT of a collection of classes stays
+  rejected at synchronisation: those rows share one structure across every element of every
+  object. The unique index `UIX__values__structure_unique` now covers keyed rows at ANY
+  position (the old positional filter silently kept nested rows OUT of the index); the new
+  form is delivered to existing databases by the versioned mechanism (PostgreSQL pvt 0.7.7,
+  MSSQL pvt 0.2.12, SQLite user_version 8). Pinned by eight NestedKey scenarios in all six
+  integration suites.
+- **CancellationToken across the entire async API** (discussion #12, item 1). Every async
+  method of the public contracts - storage (`IObjectStorageProvider`, ~46 methods), queries
+  (`IRedbQueryable` and friends, grouped/windowed/projected included), schemes, trees, lists,
+  permissions, users, roles, validation, the lazy loader, plus the `IRedbService` facade -
+  now takes a trailing `CancellationToken cancellationToken = default`. Source-compatible:
+  existing calls compile unchanged (binary-breaking, as everything in the V4 major). Where the
+  last parameter is `params` (`LockForUpdateAsync`, the query/execute family of the contexts)
+  the token rides a paired overload instead - `params` cannot be followed by anything.
+  The semantics, not just the plumbing: cancellation surfaces as `OperationCanceledException`
+  and nothing else; a cancelled `SaveAsync` rolls back completely (rollback and dispose always
+  run on `CancellationToken.None` - an abort must land even on a cancelled token); the point of
+  no return is the commit - the token is read for the LAST time right before `CommitAsync`, and
+  the post-commit tail (cache updates, `SavedAsync`/`DeletedAsync` interceptors) never consults
+  it again, so "cancelled" can never mean "but actually saved"; `DeadlockRetryHelper` checks the
+  token before every attempt and cancels its backoff delay; the parallel ChangeTracking diff
+  cancels through `ParallelOptions.CancellationToken` (one clean OCE instead of an
+  `AggregateException` pile); the id generator honours the token only at the entry - a refill
+  in flight feeds a shared cache and is never torn mid-way; the synchronous lazy `Props` getter
+  stays token-free by design (`LoadPropsAsync` takes one). CancellationTests suite x6: every
+  verb refuses a pre-cancelled token before the first write, an in-flight cancel tears down a
+  server-side sleep (PG `pg_sleep`, MSSQL `WAITFOR`), and a cancelled batch save leaves zero
+  rows - or commits whole, never in between.
+- **`PurgeTrashAsync` joins the unified cancellation contract.** It used to return quietly on
+  a cancelled token (a Cancelled progress report and a soft exit) - the one verb with its own
+  cancellation dialect. Now it throws `OperationCanceledException` like everything else: the
+  token gates every batch boundary and rides into the purge command itself. The farewell
+  progress report with `PurgeStatus.Cancelled` still fires before the throw, so a UI knows
+  where the purge stopped. Nothing is lost on cancel: each purge batch commits on its own and
+  the remainder stays queued in the database - the background deletion worker (which now passes
+  its stop token through, so host shutdown actually interrupts a long purge) or any retry picks
+  it up.
+- **`IRedbSaveInterceptor` - write-lifecycle interceptors, EF-shaped** (discussion #12,
+  items 3-4; owner decision "EF behaviour is what developers know", deletes included by owner
+  decision too). Four hooks with default implementations (subscribe to what you need):
+  `SavingAsync` fires right after the object graph is collected and BEFORE ids, hashes and the
+  unchanged-set are computed, so an interceptor MAY mutate Props (EF's SavingChanges contract;
+  objects being created still show Id=0 - temporary-key semantics) and an exception CANCELS the
+  whole save; `SavedAsync` fires after the commit - an exception propagates, but the data is
+  saved; `DeletingAsync`/`DeletedAsync` apply the same rules around hard deletes (veto before
+  the SQL, fact after; SoftDelete is not intercepted). Both save hooks run inside the SaveAsync
+  call on the same scope - an audit journal written as redb objects goes through a separate
+  scope (documented on the interface). Register any number via DI; they run in registration
+  order; with no subscribers the pipeline pays nothing. Under ChangeTracking
+  `RedbSavedContext.Changes` carries the diff the save actually applied (`RedbValueChange`:
+  Insert/Update/Delete, a model-level `PropertyPath` - "Title", "Items[1].Price" - plus the old
+  and new row) as a flat projection onto Core types, the tree machinery stays internal; under
+  DeleteInsert it is null. Saving carries `NewObjects` (references, Id still 0), Saved their
+  final `NewObjectIds` (works under both strategies) and `UnchangedByHash` from the F1 shortcut
+  (computed AFTER Saving, so it reflects interceptor edits). This also closes impersonation
+  tracking (item 3): the application sees the objects and the effective user next to whatever
+  real/effective pair it tracks, and writes its own journal. SaveInterceptorTests suite x6
+  (veto from Saving, propagation from Saved with the data kept, feed per strategy).
+- **`RedbObject`: DebuggerDisplay, and `ToString()` = the canonical JSON** (discussion #12,
+  item 2). The debugger shows a short "{name} (id=..., scheme=...)" line with no expanding and
+  no database round-trips; `ToString()` returns the same contract `get_object_json(id)` does,
+  through the same serializer - a lazy stub is never woken (base fields + `properties:null`).
+  A serialization failure neither escapes ToString nor gets swallowed - it rides inside the
+  fallback JSON.
+- **`LoadJsonAsync(id, depth)` - the whole object as raw JSON, no CLR props type.** A public
+  wrapper over the in-database materializer `get_object_json` (present on all three providers:
+  a SQL function on PG/MSSQL, a C port inside the native extension on SQLite; the eager load
+  path already uses it). Permission checks as in `LoadAsync` (`DefaultCheckPermissionsOnLoad`),
+  not-found per `ThrowOnObjectNotFound`; the typed props cache is untouched (it is keyed by a
+  CLR type, which does not exist here). Introduced for declarative Route-XML routes: a pure XML
+  module with no assembly reads redb objects (`<redbGet id="…"/>`), but the method is an
+  ordinary part of `IObjectStorageProvider`/`IRedbService`, callable from any code.
+
+### Added
+- **`IRedbService.Maintenance` - storage maintenance facade** (`IMaintenanceProvider`):
+  `AnalyzeAsync` refreshes planner statistics with one call on every engine (PostgreSQL
+  `ANALYZE`, MSSQL `sp_updatestats`, SQLite `PRAGMA analysis_limit; ANALYZE` - the limit
+  comes from `MaintenanceAnalysisLimit`, default 1000), and `GetIndexStatsAsync` reads index
+  health from the engine's catalogs into one honestly-nullable model (name, table,
+  uniqueness, size, row estimate, usage counters, last use - null where an engine cannot
+  say; SQLite reports no usage at all, MSSQL counters reset on restart, last-use needs
+  PostgreSQL 16+). Explicit calls only - never a side effect of a save. Born out of the
+  2026-09-10 incident where stale statistics after a bulk seed made a 30ms query run for a
+  second. One implementation in the core; all provider variability lives in three dialect
+  SQL texts normalized to a single column-alias contract.
 
 ### Fixed
+- **An empty database is named as such at start-up.** `InitializeAsync()` without
+  `ensureCreated: true` on a database that has no redb schema used to fail on the first
+  start-up query with a raw driver error (`relation "_structures" does not exist`, `Cannot find
+  the object "dbo._structures"`, `no such table: _schemes`) that said nothing about how to
+  proceed. It now throws `RedbSchemaMissingException`, whose message names the two ways out -
+  `InitializeAsync(ensureCreated: true)` / `RedbServiceConfiguration.EnsureCreated = true`, or
+  the script from `GetSchemaScript()` for the schema owner - and reminds that an unexpectedly
+  empty database is usually a wrong connection string. Schema creation stays opt-in by design.
+  Pinned on all three providers against a throwaway empty database.
+- **`_hash` covers the whole object, and a props-cache hit no longer serves a stale header**
+  (cluster review, 2026-09-11). `_hash` used to cover Props only; the header - `name`, `note`,
+  `value_*`, `value_unique`, parent, owner, `date_begin/complete` - was written on every save
+  and never hashed, so a save on another node could change it without moving the hash, and
+  the point load (`LoadAsync` and its sync twin `Load`), answering from the cache, handed out
+  a stale header with a valid hash. `RedbHash` now hashes the header canon together with the
+  Props; only the hash itself, the identity (`id`, scheme id) and the audit trio
+  (`date_create`, `date_modify`, `who_change`) stay out - they are stamped outside the hash
+  computation and could never be reproduced from a reloaded row. Header dates canonicalise
+  at second precision in UTC. The partial row updates that bypass the save path - a tree move,
+  the trash - reset `_hash` to NULL so no cached copy outlives them. The cache probe stays
+  the narrow `_id/_hash/_id_scheme` read and a hit still serves the cached object whole.
+  Consequences: a header-only save no longer takes the ChangeTracking hash shortcut (the
+  values are diffed, not rewritten); `value_unique` is now hashed - a key change invalidates
+  the cache, which reverses the earlier P5 note below; hashes stored by earlier builds follow
+  the old formula, so such an object misses the cache until its first save under this build
+  (correctness is never at stake: a mismatch is a miss). Pinned by PropsCacheHeaderTests on
+  all three providers, Free and Pro (a second ServiceProvider plays the other node), and by
+  RedbHashHeaderCanonTests.
+- **Tree loads carry `value_unique`** (found by the same pins). The tree conversions and
+  the reflection row-to-object mapper of the Pro tree provider had not learned the V4 object
+  key: `LoadTreeAsync`, `GetChildrenAsync`, `LoadPolymorphicTreeAsync` and the polymorphic
+  children returned `ValueUnique = null` on every object. All row-to-object mapping now goes
+  through one `RedbObjectRowExtensions` (six hand-written copies of the column list removed).
+- **Scope teardown no longer races an in-flight command** (tsum garage report:
+  `NpgsqlOperationInProgressException` on `ReleaseScopes()` after an HTTP → SEDA hand-off of
+  `RedbListItem`; depending on timing the same race also HUNG the disposal outright, which
+  the red pin caught on the un-fixed code). Every provider connection always carried a
+  fail-fast guard against two concurrent commands - but teardown was exempt from it. The
+  shared `CommandGate` (redb.Core) now gives commands and teardown ONE exclusion on all
+  three providers: `DisposeAsync` waits for the in-flight command before touching the
+  physical connection, a command entered after teardown began is refused with
+  `ObjectDisposedException`, and the lazy list-item loader falls back to a detached
+  (fresh-scope) load on that signal - so an item handed across an exchange boundary keeps
+  working instead of dying with the scope. Pinned by ConnectionTeardownTests on all three
+  providers; the reporter's workaround (passing ids instead of live items) is no longer
+  required.
+- **redb.Export carries the V4 unique-key hash and survives SQLite roundtrips** (owner
+  finding). `_values._unique` was missing from the export entirely - an exported database
+  came back with every `[RedbUnique]` key silently unenforced until the next scheme sync
+  recomputed them. And on SQLite the uuid-semantic BLOB columns (`_users._hash`,
+  `_schemes._structure_hash`, `_objects._hash`) were read through the driver's `GetGuid`,
+  which byte-swaps an RFC-ordered BLOB, and written back as TEXT - a roundtrip corrupted
+  every stored hash. All four columns now go through a provider seam (`GuidFromDb`/`GuidToDb`):
+  PostgreSQL/MSSQL pass the native Guid, SQLite converts RFC-ordered BLOB(16) both ways
+  (legacy TEXT still read). Genuine binary columns (`_value_bytes`, `_values._ByteArray`)
+  never touch the seam. Old backups without the field import cleanly: keys stay NULL and the
+  standing recompute trigger restores them on the next synchronisation. Verified by a
+  SQLite-to-SQLite roundtrip: all four columns byte-identical, JSONL carries canonical guids.
+- **MSSQL: bulk delete of values by list-item ids no longer scans the whole `_values` table**
+  (E114 finding, 33s cold on a seeded 8.4M-row database). The `STRING_SPLIT` semi-join form
+  cannot match the FILTERED index `IX__values__ListItem_not_null`, so the plan degraded to a
+  full clustered scan; the method now sends a chunked parameterized `IN` list, which seeks the
+  index. The other bulk deletes keep their `STRING_SPLIT` form on purpose - their indexes are
+  unfiltered and seek fine. Pinned by MsSqlBulkDeletePlanTests over the actual cached plan.
+- **XML documentation restored for `BeginTransactionAsync` and the isolation-level
+  `ExecuteAtomicAsync` overloads** (owner finding). The BR-1 wave had inserted the
+  doc comments double-spaced; a blank line splits a `///` block, so the compiler dropped the
+  docs of eleven members from the shipped `redb.Core.xml` / provider XML files
+  (`IRedbConnection`, `IRedbContext`, all three provider connections). Also removed two
+  dangling half-blocks in `ISqlDialect` left over from deleted members.
+- **Reflective walkers no longer wake `RedbListItem.Object`** (production stand, 2026-09-09).
+  The lazy-loader install walk (and the nested-object cache walk) read every property of every
+  business object - including the lazy `Object` of list-item fields, whose getter LOADS on
+  read. Materializing anything with dictionary fields therefore fired a synchronous phantom
+  load per item (~150/s on the stand, with not a single explicit `.Object` in application
+  code). A list item is a leaf now: no reflective walk descends into it.
+- **`NpgsqlDataSource` is owned by the container now** (factory registration instead of a
+  pre-built instance). Disposing the service provider disposes the data source and closes its
+  connection pool; the old form left every pool open forever, so container restarts (module
+  hot-reload, test runs) stacked orphaned pools of idle sessions until the server-side pruner
+  collected them minutes later.
+- **FK-column indexes on `_values` (`_ListItem`, `_Object`) - partial, delivered by upgrade**
+  (perf finding, 2026-09-10). Both columns carry foreign keys, and without a leading index
+  every DELETE of a referenced object or list item scanned the whole table for the FK check:
+  measured on an ~8.4M-row seed - SQLite 1.5-5.5s, PostgreSQL 5.9s, MSSQL 6.5-7s per check,
+  milliseconds with the indexes. The partial form (`WHERE ... IS NOT NULL`) keeps them nearly
+  empty - reference fields are a small fraction of rows - so writes barely pay, which is why
+  the full-column ancestors of these indexes (retired for save throughput long ago) stay
+  retired. Fresh databases get them from the base DDL; existing ones through each provider's
+  versioned upgrade (PostgreSQL pvt 0.7.6, MSSQL pvt 0.2.11, SQLite schema version 7), pinned
+  by a delivery test on all six suites.
+- **`SqliteDataSource` is disposable and owned by the container now** (the SQLite counterpart
+  of the `NpgsqlDataSource` fix). Microsoft.Data.Sqlite pools are static, keyed by connection
+  string, and a pooled handle keeps the database FILE open - on Windows, locked. Disposing the
+  service provider now clears the pool of its connection string, so a dead container (test
+  host teardown, module hot-reload) releases the file instead of locking it until process
+  exit.
+- **`RedbListItem.Object`: the sync getter no longer seizes the process** (tsum production
+  freeze, 2026-09-09; reproduced locally: 8 touches of one shared item on a starved thread
+  pool froze the process for 90+ seconds with zero exceptions - even timeout continuations
+  had no thread to run on). Two mechanisms removed: the lock was held ACROSS the load, so
+  every toucher of a shared item (items live in the process-wide list cache) parked behind
+  the first one; and Task.Run needed a SECOND pool thread per touch on top of the one blocked
+  in GetAwaiter().GetResult(). The getter now loads outside any lock and without Task.Run:
+  one blocked thread per touch, concurrent touchers proceed independently, the first
+  published result wins (a racing duplicate load is harmless). Same scenario after the fix:
+  228ms, all touches parallel. The getter remains a synchronous convenience that blocks a
+  thread - hot paths should prefer `IdObject` plus an explicit load; the detached-borrow
+  diagnostics point at offenders by stack.
+- **`RedbListItem.Object`: the sync getter is thread-pool-free now** (the completion of the
+  fix above). The getter used to block over the async load chain, so the parked thread waited
+  for pool-scheduled continuations - on a saturated pool that meant degradation, and on a
+  hard-capped one a total freeze. The whole lazy load now has a synchronous twin down to
+  ADO.NET: sync `ExecuteScalar`/`QueryFirstOrDefault`/`ExecuteJson` on every provider
+  connection, a sync `Load` on the object storage (same permission check, cache discipline and
+  get_object_json path as the async one on every tier), and a sync linked-object loader wired
+  through the list provider and the process-wide fallback. Loader preference is specificity
+  first, then transport: item-sync, item-async, global-sync, global-async. A/B on the
+  starvation stand (pool hard-capped at 4, 8 touches of one shared item): the blocking-over-
+  async path freezes so completely that even its own watchdog timer never fires; the sync path
+  completes in ~150ms. Custom `IRedbConnection`/`IObjectStorageProvider` implementations keep
+  compiling - the new members default to blocking on the async forms.
+- **ChangeTracking: a failed save no longer poisons the next saves of its scope** (Identity
+  backfill report, 2026-09-10). The diff parks its DELETE/INSERT rows in pending channels on
+  the provider instance and the flush cleared them only AFTER each bulk call - so a save that
+  failed mid-flush (a legitimate unique violation, a deadlock retry, a cancellation) left its
+  rows behind, and every following save of the scope re-sent the FAILED object's values inside
+  its own batch. Observable as a serial poisoning: after one legitimate duplicate, unrelated
+  saves die one after another on the failed value's unique hash while their own Props are
+  intact. The channels are reset at the start of every batch save now; the same reset also
+  stops a deadlock retry from doubling the channels. Affected every provider under
+  ChangeTracking (DeleteInsert does not use the channels).
+- **Props cache: the graph is detached at the hand-OUT, not on Set** (tsum production
+  incident). Putting an object into the cache used to swap its lazy loaders to the detached
+  loader immediately - on the very instance the writing request was still working with. Every
+  reference touch of the writer then borrowed a fresh DI scope and a pooled connection, and a
+  parallel tick drained the entire connection pool right after startup. Now Set leaves the
+  writer's scoped loaders alone; a graph is switched to the detached loader once, at the moment
+  the cache actually serves it to another scope (Get, GetWithoutHashValidation, the bulk
+  FilterNeedToLoad), tracked per instance so a hot cache does not re-walk the graph on every
+  hit. The safety invariant is unchanged: nothing served from the cache ever carries another
+  scope's connection.
+- **Lazy `RedbListItem.Object` no longer loads through a dead scope, and a disposed context no
+  longer re-opens a connection** (production, 2026-09: idle PostgreSQL sessions grew by ~30 a day
+  until a restart; 49 of them had the `_types` load that ends a materialization as their last
+  statement). Two halves. (1) Every `RedbService` constructor installed the process-wide
+  `RedbListItem` object loader over its OWN scoped context; the service is Scoped, so the static
+  pointed at whichever scope was created last - almost always one already disposed - and reading
+  `Object` ran a load through it. Serializing a list item was enough to read it: the property was
+  visible to System.Text.Json, so an HTTP response or an audit record woke the loader. (2)
+  `NpgsqlRedbConnection` / `SqlRedbConnection` / `SqliteRedbConnection.GetOpenConnectionAsync`
+  saw the `null` that Dispose leaves behind and opened a NEW physical connection on the dead
+  wrapper; the second Dispose was a no-op, so that connection was never returned, and Npgsql has
+  no finalizer to rescue it - the session sat `idle` in `pg_stat_activity` for the life of the
+  process. Now: items carry a loader from the provider that hands them out
+  (`IListProvider.LinkedObjectLoader`, attached by `ListProviderBase` on every hand-out and by
+  the Pro materializer), resolving through that scope while it lives and through a fresh scope
+  from the root `IServiceScopeFactory` once it is gone; the process-wide `SetGlobalObjectLoader`
+  fallback only ever borrows a fresh scope and no longer captures scoped state; `Object` is
+  `[JsonIgnore]` (serialize `IdObject`, load the object explicitly where the JSON needs it); a
+  context whose scope has ended throws `ObjectDisposedException` instead of re-opening. Fixed on
+  the way: the loader looked `IObjectStorageProvider.LoadAsync` up by parameter list, which
+  returned null (NRE at runtime) once that signature grew a `CancellationToken`; the linked
+  object now loads under the configured permission policy rather than an unconditional skip.
+  Breaking: `object` disappears from the System.Text.Json output of a list item. Pinned by
+  DisposedScopeGuardTests x6 (every provider, both tiers), PostgresListItemObjectLoaderLeakTests
+  x2 (the production sequence, with `pg_stat_activity` counting the container's own sessions
+  after its data source is disposed) and RedbListItemSerializationTests.
+- **SQLite: id-generator self-deadlock inside the caller's transaction** (live worker storms:
+  15-30s "database is locked" waves killing Quartz and every other writer). The id cache is
+  process memory and starts empty, so the first save after startup must fetch a block from the
+  database - a write. When that save ran inside the caller's own BEGIN IMMEDIATE
+  (`ExecuteAtomicAsync` around `SaveAsync` - the heartbeat shape), the refill went through a
+  SEPARATE pooled connection and waited for the file's only write lock, held by the very
+  transaction waiting for the refill; only busy_timeout x deadlock retries unwound the pair.
+  Now, inside an active scope transaction, keys are allocated through that same connection
+  (the write lock is already ours - no waiting), bypassing the shared cache: a rollback takes
+  the sequence bump back together with the transaction, and those ids were never visible
+  outside it, so no duplicates on either outcome. PostgreSQL/MSSQL are untouched - their
+  sequences live outside transactions and the trap does not exist there. Pinned by
+  SqliteKeygenInTransactionTests x2: the cold-cache save inside a user transaction was a 33s
+  "database is locked" before the fix and is instant now; ids re-issued after a rollback do
+  not collide.
+- **A bare (non-generic) `RedbObject` as a Props field - a loud refusal instead of a crash.**
+  The scheme sync classified it as a business class and reflected over the framework's own
+  service fields in two casings (`id`/`Id`...): MSSQL died on its CI collation against UNIQUE
+  `IX__structures`, PG on the reserved-name trigger (23514) - a driver error naming neither the
+  field nor the cure (discussion #12, item 6). The sync now rejects such fields with the hint
+  "declare RedbObject<TProps>; for raw bytes use byte[]". Pins x6 (scalar + collection).
+- **`NullToDefaultConverter.Write` recursed into itself - StackOverflow on the first non-zero
+  primitive serialized with the redb serializer options.** A dormant bomb: writes through these
+  Options had only ever met default values, cut off by WhenWritingDefault before the converter.
+  Write rewritten with direct `writer.Write*Value` calls.
+- **Pro on PostgreSQL and SQLite never upgraded an existing database: a V4 start over 3.x died
+  with "column _unique does not exist".** `ProRedbService` of both providers silenced
+  `EnsurePvtModuleDeployedAsync` with a one-liner - on the grounds that Pro generates its
+  queries in C# and needs none of the module's SQL functions. True of the functions, but the
+  same pass carries the schema upgrades (V4 added `_structures._unique/_unique_version`,
+  `_values._unique`, `_objects._value_unique` and their indexes), and those every tier needs.
+  An existing database never received them: the full init runs only on an empty one, and the
+  only catch-up path was switched off - start-up died on the very first scheme read (`_unique`
+  sits in the `Structures_SelectByScheme*` column list). MSSQL Pro was not affected - it never
+  skipped. Pins: `PostgresProSchemaUpgradeTests`, `SqliteProUniqueUpgradeTests`,
+  `MsSqlProSchemaUpgradeTests` - the upgrade contract is now checked on all six tier-providers,
+  not only Free (red-before: 4 of 6 red on PG Pro with 42703, SQLite Pro with "no such column:
+  _unique").
+- **Cross-database poisoning of the structure-tree cache: two services on different databases
+  in one process silently broke each other's saves.** StructureTreeCache/SubtreeCache were
+  static dictionaries keyed by scheme_id alone, and scheme ids coincide across databases (same
+  seed): a foreign database warmed the id with ITS tree, the save walked foreign structures,
+  not one property name matched - and the object was written with ZERO value rows, no error
+  anywhere. Cache keys now carry the domain ((domain, schemeId)), derived from the connection
+  string like every other cache. It only ever showed order-dependently (six fixtures in the
+  test process: full gates went 133-468 red depending on class order); after the fix the full
+  gate is 2831/2831.
+- **MSSQL: base64 in the JSON projection via FOR XML instead of an XML instance - blob reads
+  twice as cheap.** `CAST(N'' AS XML).value('xs:base64Binary(...)')` in four emitter sites cost
+  112 ms per megabyte against 25 ms for `FOR XML PATH(''), BINARY BASE64`; the full read of an
+  object with a 1 MB byte[] dropped from 336 to 134 ms server-side. Traps defused by measuring
+  first: without `AS [*]` the value arrives wrapped in `<_ByteArray>...</_ByteArray>` and
+  corrupts the JSON, and inside `STRING_AGG` a subquery is forbidden (Msg 130) - the array and
+  dictionary branches take the value from an `OUTER APPLY`. Equivalence proven on NULL, the
+  empty array, all three padding classes, all 256 byte values and a megabyte; the bytes suite
+  extended with the same boundaries (78 tests on six fixtures). MSSQL bundle 0.2.10.
+- **Root value_bytes on Free: Postgres returned bytea hex instead of base64, MSSQL did not emit
+  the field on read at all (what was written came back null).** The tail of the
+  docs/BUG_BYTES_FREE_JSON_PROJECTION.md report (§3.2/§3.3): the Б1 claim covered byte[]
+  properties in Props, while the JSON projection walked around the root `_objects._value_bytes`
+  column. PG 08 - encode(..., base64) without MIME line breaks (bundle 0.7.5); MSSQL 09 -
+  base64 emitted via the XML trick (bundle 0.2.9). The report's manual byte matrix is now the
+  permanent BytesRoundTripTests suite x6 (Props bytes + the scalar BLOB layout + the root bytes
+  reaching the column, pinned against the silent NULL) - red-before: two cells red before the
+  fix, 12/12 after.
+- **ChangeTracking performance waves F1-F9 (docs/V4/CT_DEEP_REVIEW_PERF.md) - no semantic
+  change, each wave its own commit with a benchmark and a regression run.** F1: an object whose
+  recomputed hash matches the persisted one skips the whole value pipeline (id+hash pairs ride
+  the existence check; a 60-object batch with 3 edits - 2-2.5x, resaving untouched up to 9x on
+  SQLite; a batch-neighbour pin). F2: an equal canonical collection base hash cancels the
+  element-by-element walk - and along the way the Ш4 matrix exposed a DEGENERATE collection
+  base-hash canon (a List hashed as Capacity|Count, content never entered) - fixed in its own
+  commit with a red-before pin. F3: deferred sweep of replaced rows in Align instead of a
+  RemoveAll per replacement. F4+F5: ILookups instead of linear scans in tree building and array
+  comparison (B3 -15%, B4 -20%). F6: SQLite bulk UPDATE in chunks via UPDATE FROM (VALUES).
+  F7: the single-object save without the Parallel scaffolding. F9: the P7/Э2 clears only when a
+  key is actually incoming. Full gate 2819/2819.
+- **"null must be null" - null collection elements read back as nulls on every provider
+  (В-1/В-2/В-3, owner verdict).** The Pro materializer lost nulls everywhere: plain arrays
+  shortened, null references collapsed, a ListItem array vanished whole on an empty preloaded
+  set, a dictionary key with a null value was dropped, a null element of a class list read back
+  as an empty object. The Free JSON emitters built an empty object instead of null for class
+  elements. Fixed on one shared discriminator - "a null element is a row without _Guid": five
+  ProPropsMaterializer sites, PG 08 (bundle 0.7.3), MSSQL 09 - array and dictionary (bundle
+  0.2.5), the SQLite native extension (0.6.4, rebuilt x3). Pins: a null in a primitive array /
+  a null class in a list / a null dictionary value - green x6.
+- **DTO/MemberInit in all five grouping families; post-Select predicates travel back to SQL;
+  the CT pending channels are real now.** The shared selector parser (GroupSelectorMembers) is
+  wired into the plain, tree, array and both window groupers plus the fifth family the tests
+  discovered (standalone WithWindow, where a DTO crashed and unrecognized members silently
+  yielded default). A Where after Select over simple projected props members (nested included)
+  translates back into the source - the filter and the page are server-side; the untranslatable
+  is filtered in memory correctly, and pushdown is refused once the source is already paged
+  (call order). ChangeTracking's diff DELETE/INSERTs ride their pending channels to a single
+  flush point (the DELETE -> UPDATE -> INSERT order preserved).
+- **GroupBy/Having small fixes (G-4/G-5, CT-5).** Having is a copy-on-write builder in both
+  groupers (branching a query used to infect the sibling branch with both predicates); a null
+  constant in HAVING is a loud refusal (it used to become the string "null"); the CT diff lost
+  its positional descendant pairing, and the nested-array alignment limit rose from 10 to 32
+  passes.
+- **ChangeTracking on SQLite joined the permanent test coverage - and the in-batch exchange of
+  field unique keys got fixed (CT-1).** Investigation showed DeleteInsert in the SqlitePro
+  fixture was a coverage hole, not a deliberate opt-out - under ChangeTracking the set went
+  436/437 at once (the review's Julian hypothesis disproven). The single red exposed a
+  bulk-layer defect: SQLite executes bulk UPDATE row by row, and swapping [RedbUnique] values
+  between two objects hit the immediate index check; on PG/MSSQL the outcome depended on row
+  order. Fixed x3 providers - the Э2 twin of P7: `_values._unique` of the rows about to be
+  rewritten is released by one UPDATE before the bulk rewrite, in the same transaction.
+  SqlitePro now runs ChangeTracking permanently: 437/437.
+- **The dead ChangeTracking twin is gone (CT-3).** Next to the living Pro algorithm lay a
+  second, diverging one: the single-object SavePropertiesAsync path with its own Delete/Insert
+  and per-field CT - its entry point had zero callers. The core cluster, Methods.cs whole and
+  two dead SQL methods across ISqlDialect and three dialects removed (-813 lines); the living
+  ProcessNestedObjectsAsync kept. The twin's real risk was never its weight - it was editing
+  the wrong algorithm.
+- **ChangeTracking: the array base row's hash after element edits is canonical (CT-2 plus the
+  bug hiding under it).** The diverging re-computation of the hash from _values rows (string
+  index sort, lost Numeric/ByteArray/null elements) is gone - and the canon pin exposed the
+  real root: UpdateExistingValueFields copied the column by the structure's dbType, which for a
+  collection is the ELEMENT type - the canonical hash in the base row's _Guid was never copied,
+  so every CT edit of array elements left the old hash behind (an eternal pseudo-diff on every
+  following save). New save-invariants suite x6: a re-save is a zero diff (row _id stability
+  under ChangeTracking included), point edits of arrays/dictionaries/nested classes, the hash
+  canon.
+- **GroupBy.SelectAsync: DTOs supported, everything unrecognized is loud (G-1/G-2/G-3, owner
+  decisions).** A DTO with a member initializer (MemberInit) materializes on par with an
+  anonymous type - every row used to come back null silently. A selector member that uses the
+  group but is neither g.Key nor a direct Agg.* call - NotSupportedException naming the member
+  (used to be a silent null); a member with no group reference is a client-side value computed
+  once. A computed grouping key is a loud refusal (used to be a silently empty GROUP BY).
+  Array/Tree/window groupers gained a fail-closed guard on non-anonymous selectors.
+- **Select: Take/Skip called after in-memory operations now cut the filtered rows (S-4, owner
+  decision 2026-09-04).** A Take issued after Where-after-Select went into SQL before the
+  filter - the server returned whatever page came first and rows were silently lost (Skip
+  skewed the pages). Such Take/Skip now apply in memory after the filter/sort in call order;
+  Take/Skip before any in-memory operation keep the server-side LIMIT. The canonical
+  Where-before-Select order stays fully server-side as it was.
+- **The SaveAsync operational guard, EF-style (CT-4, owner decision 2026-09-04).** A second
+  save entering the same scope before the first completes (interleaved async operations the
+  connection's command guard cannot see) gets a loud InvalidOperationException in the
+  EF-DbContext style - instead of silently scrambling ChangeTracking's pending state.
+- **Select projections: the first e2e suite and a fix pack (review 2026-09-03).** 16 scenarios
+  x6 fixtures (red-before 24/96): fixed the OrderBy-after-Select crasher on a null key
+  (Comparer<object> killed the query), CountAsync lying after Distinct, Select with Agg.* now
+  routed into the aggregation path (the Agg example from the XML docs only worked by
+  exception), the path extractor flipped from fail-open to fail-safe (an unrecognized lambda
+  node means a full load, not a silently nulled field; nested object initializers and ternary
+  conditions are parsed; the catch narrowed to NotSupportedException - no deaf catches), and on
+  a Pro partial load an object with zero _values rows no longer arrives with null Props under
+  the lambda. Regression slice 567/567.
+- **LIKE metacharacters in StartsWith/EndsWith/Contains operands are literals now (BR-7, Tsak
+  report, 2026-09-02).** The sugar operators spliced their operand raw into the LIKE pattern:
+  `%`/`_` acted as wildcards (a superset), `[` on MSSQL opened a character class (a WRONG SUBSET no
+  post-filter can restore), and a backslash on PostgreSQL acted as LIKE's own escape character.
+  Six pattern-assembly engines carried the bug and all six are fixed: the PostgreSQL plpgsql
+  builders (new `pvt_like_escape()`, bundle **0.7.2**), the T-SQL builders (new
+  `dbo.pvt_like_escape()` paired with `ESCAPE '\'` at every site, bundle **0.2.4**), the SQLite
+  native extension (`pvtLikeEscape` + the ESCAPE clause emitted with the pattern, module 0.6.3,
+  binaries rebuilt for win-x64/linux-x64/linux-arm64), and the three Pro C# builders
+  (`LikeOperandSql` wraps the operand with the engines' built-in `replace()` - deliberately not the
+  bundle function, so a Pro assembly never depends on a bundle version). Field, class-field, dict,
+  listitem, array and expression sugar included; the raw `$like`/`$ilike`/`$arrayMatches`/`$matches`
+  operators keep interpreting the caller's pattern on purpose. Red-before: 28 of 36 new tests were
+  red across the six fixtures - exactly the predicted matrix (`%`/`_`/IgnoreCase everywhere, `[` on
+  MSSQL only, backslash on PostgreSQL only).
+- **`SaveByUniqueAsync` survives the vanish race and never masks a property collision (BR-8, Tsak
+  report, 2026-09-02).** The one-shot retry onto the winner's row used to fire only when the key was
+  not found at resolve time; a Remove+Set+Set interleave (row resolved, deleted, key recreated
+  elsewhere) escaped to the caller. The retry is now driven by the NEW first-class discrimination:
+  `RedbUniqueViolationException.Kind` says which index rejected the save - `ObjectKey`
+  (`UIX__objects__scheme_unique`) or `Property` (`UIX__values__structure_unique`) - classified on
+  every provider (SQLite from column names; its driver still names no key tuple, so
+  StructureId/PropertyName stay null there, documented). Object-key violations retry once onto the
+  current winner; property violations surface immediately - Tsak's api-key rotation used to die in
+  the old catch. Red-before: the interleave is deterministic through a virtual resolve seam.
+- **`LockForUpdateAsync` no longer no-ops silently on a missing id (BR-9, Tsak report, 2026-09-02).** It
+  now returns how many of the requested rows exist (and are locked) - a deleted id locks nothing and
+  the count is the signal. New strict `LockForUpdateRequiredAsync` throws `RedbLockNotAcquiredException`
+  naming the missing ids (a CAS after a silent no-op lock plus the default `AutoSwitchToInsert` used
+  to resurrect deleted objects) and refuses to run outside an active transaction. Breaking for
+  implementers of `IObjectStorageProvider` (return type `Task` -> `Task<int>`); plain `await` callers
+  recompile unchanged.
+- **The zero-DB cache shortcut no longer applies inside a transaction (bug report п.1,
+  2026-09-02).** With `EnablePropsCache` + `SkipHashValidationOnCacheCheck` a single `LoadAsync(id)`
+  answered from the cache with no database query at all - even between `LockForUpdateAsync` and
+  the save, where the re-read IS the read of a read-modify-write: increments committed by another
+  process before the lock were silently overwritten. Inside an active transaction (explicit or
+  ambient) the load now always consults the database hash; outside transactions the single-writer
+  trade-off stays exactly as documented.
+- **A caught unique violation no longer aborts the CALLER's transaction (bug report п.2,
+  2026-09-02).** Inside a foreign transaction the batch save runs under a savepoint
+  (`SAVEPOINT`/`ROLLBACK TO`; MSSQL `SAVE TRANSACTION`, not available in distributed
+  transactions): on PostgreSQL the typed `RedbUniqueViolationException` used to leave the caller
+  in 25P02 - every follow-up statement of a catch-and-recover pattern died, `SaveByUniqueAsync`'s
+  own one-shot retry included. The rollback to the savepoint happens before the violation is
+  translated (the translation itself queries the database), and the caller's transaction stays
+  alive.
+- **A truly fresh database failed to install from the generated `redb_init.sql` (BR-5, reported
+  from redb.Tsak; review).** The 28th migration's cache resync was a top-level call that a fresh
+  database planned BEFORE the 29th file had created the function - 42883 mid-init; lived-in
+  databases kept the previous version of the function (00 does not drop it) and never noticed,
+  which is also why every long-lived suite database stayed green. The resync moved to the tail of
+  29 on both providers, where the functions exist whatever the history (dump-restored databases
+  included); bundles bumped to PostgreSQL **0.7.1** / MSSQL **0.2.1**. Fixing it exposed a second
+  fresh-install breaker from this very review: the deterministic sort added to the SQL
+  concatenation task also re-ordered `redb_init.sql`, whose group order (main DDL first) is
+  deliberate - the sort is opt-in now and applies to the pvt bundle only. Both breakers are pinned
+  by the new fresh-install test (`FreshDatabase_InitializesFromScratch_AndRoundTrips`: an empty
+  database, the full init, a round trip - red with 42883 on PostgreSQL before the fix).
+- **Plain `StartsWith`/`Contains`/`EndsWith` keep each database's own case rules - now a documented
+  contract (BR-6; owner decision 2026-09-02).** PostgreSQL: case-sensitive; SQLite: ASCII
+  case-insensitive; MSSQL: whatever the collation says (CI on the default). redb does not decide
+  for the programmer; explicit control is the `*IgnoreCase` forms plus `StringCollation`. Pinned
+  per provider by `PlainStartsWith_IsTheDatabasesOwnSemantics_ByContract` and documented in
+  COLLATION.md and llms.txt.
+- **The props-cache dirty guard sees unsaved edits inside a cached graph again (review, owner
+  decision 2026-09-01).** The guard exists because the cache serves the SHARED instance: it refuses
+  to serve an object whose live hash drifted from the one stored at caching (the
+  SetStatus-before-Save incident). After L.2 the parent's hash is id:hash of its references, so an
+  unsaved in-memory edit INSIDE a loaded nested object no longer moved it and the guard served the
+  graph with the phantom edit; only a direct load of the nested object itself was refused. On a
+  cache hit the guard now also walks the LOADED part of the graph (raw Props, stubs neither touched
+  nor woken) and compares each nested object's live content hash with its own persisted hash - the
+  two are equal by construction for an unmodified object since the hash fixes above. Any drift is a
+  miss: the caller gets the committed state from the database. Applies to the single and the batch
+  read paths; hash semantics unchanged (the hybrid that would hash live content into the parent was
+  rejected: an independently re-saved child would turn the parent into a permanent miss).
+- **A reference inside a CACHED object loaded through the connection of the scope that cached it
+  (review, owner question 2026-09-01: "which context does it get?").** The props cache serves one
+  shared instance to every scope; the stubs inside it carried the lazy loader of the scope that
+  loaded it, i.e. one connection disposed with that scope. A later request touching such a stub
+  quietly resurrected a pooled connection nobody returned - or used the connection of another
+  request still in flight. Now the cache hands every reference of a cached object a
+  `DetachedLazyPropsLoader`: each load opens its own DI scope, takes the provider's loader from it
+  (Free or Pro), loads and closes the scope; whatever a load attaches to the fresh Props is replaced
+  by the detached loader again, and a scoped loader never overwrites a detached one. Such a load
+  reads committed state through its own connection, not the caller's uncommitted transaction - a
+  shared instance cannot belong to one caller's transaction. Without DI (no `IServiceScopeFactory`)
+  the previous behaviour stays.
+- **A reference that is NOT cached and outlived its scope refuses loudly instead of resurrecting a
+  connection.** The scoped loaders check `IRedbContext.IsDisposed` (new, backed by the connections'
+  own flag) and throw `RedbLazyLoadScopeEndedException` naming the way out: load it inside a live
+  scope, or load the parent deeper while the scope is alive. The EF analogue is "attempt was made
+  to lazy-load after the associated DbContext was disposed".
+- **`"properties": null` in incoming JSON no longer marks a reference as loaded-with-nothing
+  (review, owner decision 2026-09-01).** A stub written by a foreign serializer (ASP.NET's default
+  JSON, a client app: the getter of a loader-less stub answers null) came back through the Props
+  setter as a LOADED object without values, and the parent save then treated it as one: values
+  deleted, nothing written - the wipe 9fa79c45 closed for our own stubs, reopened by any other
+  serializer. The redb reader now treats null or absent Props as "not loaded": the nested object
+  stays the reference it is. A root with null Props is saved exactly as before (an object without
+  values). EF has no such trap only because a null navigation never touches the target entity;
+  this restores the same rule.
+- **The native SQLite extension refuses to load on a host older than 3.44.0 (review).** It reads
+  its per-connection lazy flag through `sqlite3_get_clientdata` (3.44+); on an older host the
+  routine-table slot lies past the end and the first `get_object_json` jumped into nothing.
+  `sqlite3_redb_init` now checks `sqlite3_libversion_number()` and fails with a message naming
+  the host version. .NET consumers (SQLitePCLRaw 3.50) were never affected; the `sqlite3` CLI on
+  Debian 12 (3.40) / Ubuntu 22.04 (3.37) was. Binaries rebuilt for win-x64, linux-x64, linux-arm64.
+- **Review of the V4 work (2026-09-01): eleven defects found by six adversarial passes over the
+  commit range, every one fixed with a test that was red on the previous code.**
+  - *The `byte[]` storage conversion (Б1) wiped nested payloads and blanked rows on a retry.* It
+    told base rows from element rows by the NULLness of `_array_parent_id`; a `byte[]` nested in
+    a class has a base row pointing at the class row, so it was classified as an element and
+    deleted - every `File.Data` of a pre-V4 database vanished on the first start. A base row
+    already converted (crash between the delete and the type flip, or a second node) was
+    overwritten with an empty payload. Membership decides now, converted rows are kept, and the
+    element delete is set-based instead of a million inlined ids.
+  - *The Pro materializer cut nested classes by depth, unlike the SQL builders.* Class fields,
+    array-of-class elements and dictionary-of-class values consumed a depth level; harmless while
+    Pro loaded 50 levels, but after Л1 `LoadAsync(id, depth: 1)` and every first access to a stub
+    came back with EMPTY nested classes on Pro. Depth counts reference hops only, on all four paths.
+  - *PostgreSQL session settings did not survive the connection pool.* `redb.lazy_refs` and the
+    3.7 `redb.string_collation` were set in Npgsql's physical-connection initializer; `DISCARD ALL`
+    on return to the pool reset both, so only the first scope on each connection had them - in a
+    web host, request 1. They are re-applied on every hand-out now, one round trip per context,
+    the shape MSSQL and SQLite already used.
+  - *SQLite schema upgrades reached an existing file only through `EnsureDatabaseAsync`.* The
+    plain `InitializeAsync()` skipped them and failed later with `no such column: _lazy`. The
+    pass now runs from the same start-up hook the PostgreSQL/MSSQL bundle block uses.
+  - *SQLite soft delete kept `[RedbUnique]` keys in the trash.* Its `mark_for_deletion` nulled
+    `_value_unique` but not `_values._unique`, so a repeated or cross-scheme delete tripped the
+    index; the suites hid it by hard-deleting. Parity with PG/MSSQL; the suites soft-delete now.
+  - *Object hashes were computed before nested objects had ids.* A parent with a nested object
+    created in the same save hashed `0:` for it, and a hand-made `{ id = x }` reference hashed
+    `x:` without the target's hash - the persisted `_objects._hash` was unreproducible on reload
+    (a props-cache miss for ever, a hash shift on the first re-save) and the reference row's
+    `_Guid` carried nothing. Hashes are computed once ids exist, children first; the persisted
+    hashes of hand-made references are resolved in one query; an existing nested object re-saved
+    through its parent gets its hash refreshed.
+  - *With the props cache on, caching a loaded graph woke every lazy stub.* `CacheNestedObjects`
+    read `Props` through the getter; with the loaders attached (Free bulk load, Pro single load)
+    that was the lazy load itself, synchronous, for the whole reachable graph. The walker skips
+    stubs and reads raw Props.
+  - *P7 released keys only for objects taking a new key.* The object giving its key up (new key
+    NULL) in the same batch was never released; the update tripped the unique index on
+    PostgreSQL/SQLite depending on row order. Every existing object in the batch is released (the
+    statement touches keyed rows only), and under an ambient transaction the violation surfaces as
+    `RedbUniqueViolationException` like everywhere else.
+  - *`LoadReferencesAsync` and the Free batch loader ignored the depth.* The batch
+    `get_object_json` hard-coded 10 (Pro: 50): a batch reload pulled ten levels where a stub's
+    first access pulls one, and `WithPropsDepth` was ignored on Free query pages. The depth is a
+    parameter of the batch on the three dialects, the batch reload passes 1, and the Pro bulk
+    load honours the requested depth like the single one.
+  - *Smaller items.* Pro nested materialization dropped `value_unique` on nested and boundary
+    objects; lazy-stub enrichment wrote the synthetic `Object_<id>` name into `name`; a second
+    instance of one reference id in a Pro batch stayed unloaded; the Pro recursion guard was per
+    loader instance (now per async flow); the reflection walkers boxed every element of `byte[]`
+    and primitive collections; `Structures_SelectById` and the export/import of `_structures`
+    lacked `_lazy`; `EnableLazyReferences` had inherited the `StringCollation` XML summary and was
+    missing from `Clone()`; a debug `Console.WriteLine` shipped in the SQLite loader; the per-query
+    `WithLazyReferences` wrap existed in three copies (one without the degrade path, all able to
+    mask the query's own exception from `finally`) and is one helper now; the SQL bundle
+    concatenation order depended on filesystem order; the owner namespace of a scheme is
+    enforced on every adoption path - explicit name, FullName, creation-race loser - with
+    `RedbSchemeNamespaceMismatchException` (owner decision), not only on the short-name fallback;
+    SQLite upgrade step 6 duplicated step 5.
+- **MSSQL loaded query-page Props at depth 1 where PostgreSQL and SQLite used 10.** The batch
+  `get_object_json` behind LINQ results hard-coded a different depth per provider, so the same
+  query materialised nested references on two providers and cut them on the third. Aligned at 10.
+- **The SQLite metadata-cache WARMUP carried its own column list and silently nulled new
+  columns.** `Warmup_AllMetadataCaches` (runs once per start) rebuilt the whole cache without
+  `_lazy`, erasing what the per-scheme sync had just written; PostgreSQL and MSSQL delegate the
+  warmup to the per-scheme function and were immune. The list now carries the marker, the schema
+  upgrades repair affected caches, and updating the flag resyncs the scheme cache explicitly.
+- **`_structure_hash` never reflected `AllowNotNull`, `StoreNull`, `CollectionType` or `KeyType`.**
+  The hash is computed from `Structures_SelectBySchemeShort`, which carried none of those columns, so
+  `SchemeHashCalculator` hashed eternal NULLs: making a field required or nullable-stored changed
+  nothing, and the metadata cache kept answering from the old shape until a restart. The short select
+  now carries them (and the new `_unique` flag, which must invalidate caches when a key appears or
+  disappears). One-time consequence: every scheme's hash changes on the first synchronisation after
+  the upgrade, rebuilding its metadata cache once.
+
+- **Saving a parent whose reference was by id only destroyed the referenced object (all providers,
+  Free and Pro).** `new RedbObject<T> { id = x }` in a Props property — or the stub a load returns
+  at its depth boundary — was collected as an object to save. The save then treated it as a full
+  object that happens to have no properties: the DeleteInsert strategy removed every `_values` row of
+  the target, the name was reset to `Object_<id>`, the hash cleared. Silently, on the single and the
+  batch path alike. The collector now recognises a reference — an id with no loaded properties,
+  `RedbObject.IsPropsLoaded` — and writes the parent's `_Object` row only; the referenced object is
+  not touched. A reference is not deduplicated against a loaded copy of the same object elsewhere in
+  the graph, so that copy is still saved. Proven red-before/green-after by `ReferenceStubTestsBase`
+  on the three providers.
+
+- **MSSQL returned `null` for a reference at the depth boundary where PostgreSQL and SQLite return a
+  stub.** `dbo.get_object_json` guarded the recursive call with `@max_depth > 0`; the other two
+  builders let depth 0 produce the base fields with `hash` and no `properties`. Same employee, same
+  depth: a project on two providers, none on the third. The guard is gone; the three builders agree.
+  The shape — id, `scheme_id`, `hash`, no `properties`, never `null` — is now a contract test
+  (`ReferenceStubTests` ×3), since lazy references are built on it.
+
+- **The `DateOnly` correction never reached an existing database (all providers).** `DateOnly` was
+  seeded with `_db_type = 'DateTime'`, a value no JSON projection branches on, so every `DateOnly`
+  property materialised as `0001-01-01`. The correction for it was written, and then put in `sql/` —
+  which lands only in `redb_init.sql`, applied when the tables are absent. Nothing else applied it. It
+  therefore reached new databases and no existing one, however many times the package was upgraded:
+  shipped, and dead on arrival.
+
+  The general shape of the problem is worth stating, because it is not specific to this fix: a
+  correction to seeded data has exactly one automatic delivery channel, the version-gated
+  `sql/v2-pvt/*` bundle, and anything outside it silently applies to fresh databases only.
+
+  PostgreSQL and MSSQL now carry the correction in that bundle
+  (`sql/v2-pvt/28_migrate_dateonly_db_type.sql`), so `EnsurePvtModuleDeployedAsync` reapplies it on the
+  next start. `pvt_module_version` PostgreSQL 0.6.6 → **0.6.7**, MSSQL 0.1.7 → **0.1.8**.
+
+  SQLite has no such channel at all — no stored functions, therefore no module and no version to
+  compare against — so it got an explicit idempotent step on the existing-database path of
+  `EnsureDatabaseAsync`. It is a no-op once the seed is right.
+
+  Verified against live databases rather than by inspection: the seed was rolled back to `'DateTime'` on
+  both PostgreSQL and MSSQL, an ordinary service start corrected it and moved the module version; on
+  SQLite the upgrade path is covered by a test that owns its own file and opens it twice, since the
+  shared fixture deletes the database on every run and can only model a new one.
+
 - **An empty `IN` set threw instead of matching nothing (`RedBase.Postgres.Pro`).**
   `.Where(x => wanted.Contains(x.Department))` with an empty `wanted` failed with
   `42883: operator does not exist: text = bigint`. An empty `object[]` gives Npgsql no element type
@@ -54,7 +734,206 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The three compound: the query that surfaced this filters a ListItem id against 55 values next to an
   ordinary field, and needed all three fixes to get a plan.
 
+### Changed
+- **`_objects._value_string` is an identifier column: 450 characters, indexed on MSSQL too (owner
+  decision 2026-09-02).** It was NVARCHAR(MAX) there - a type SQL Server refuses to index at all
+  (Msg 1919), so every filter on the column scanned while PostgreSQL and SQLite had their partial
+  indexes all along. The column narrows to NVARCHAR(450) (the width `_name` already uses) and gets
+  the same `IX__objects__value_string`; the limit is enforced in C# on every provider
+  (`RedbValueStringTooLongException`), so the contract is one. Long text belongs in `_note` or in a
+  Props field. Migration: a database holding longer values REFUSES the upgrade loudly, naming the
+  offenders query - move those values to `_note`/Props and start again; nothing is truncated
+  silently. MSSQL bundle **0.2.2**.
+- **Pro loads honour `depth` on the bulk path as well (review).** Before Л1 Pro materialised 50
+  levels on a single load and ignored `depth`; Л1 made the single load honour it (default 10)
+  while `LoadAsync(ids)` and `LoadWithParentsAsync` stayed at 50. Both honour `depth` now, so
+  `LoadAsync(id, depth: 2)` and `LoadAsync(new[] { id }, depth: 2)` yield the same graph.
+- **The hash of a parent takes each nested reference's own `hash` instead of walking its Props
+  (V4, Л1).** Walking meant that computing a parent's hash could trigger lazy loading of the
+  whole graph, and that the eager and the lazy hash of the same object differed (a stub has no
+  Props). Now they agree, the computation never touches the `Props` getter, and `ChangeTracking`
+  sees an untouched reference as unchanged — its `_Guid` rides the same persisted hash. One
+  consequence: the first re-save of an object with nested references may write a different
+  `_objects._hash` than the old algorithm did; the value is stable from then on and the props
+  cache heals itself on that save.
+- **Serializing a `RedbObject<T>` never triggers lazy loading (V4, Л1).** `Props` is
+  `[JsonIgnore]`; the `properties` JSON travels through an internal bridge that reads only what
+  is loaded — an unloaded stub serializes as its base fields, the same shape the JSON builders
+  emit for a reference at the depth boundary. Deserialization is unchanged.
+- **The Free lazy loaders reload a reference with depth 1** (was a hard-coded 10), so the
+  references under a reloaded object are stubs again; a missing target (trash) returns `null`
+  instead of `InvalidOperationException` — `ILazyPropsLoader.LoadProps`/`LoadPropsAsync` are
+  nullable now (V4, Л1).
+- **SQLite stores its 128-bit hashes as `BLOB(16)`, not 36-character TEXT (`_objects._hash`,
+  `_schemes._structure_hash`, `_users._hash`).** The TEXT form was inherited from a copy of the
+  PostgreSQL script, where the column is a native `uuid`; SQLite has no uuid, and 36 bytes compared
+  as text where 16 compared with `memcmp` would do is the wrong trade on the one column every cache
+  check reads and the index everyone hits. The byte order is the text order (RFC 4122, left to
+  right) and lives in one place, `SqliteHash`: writes go through the Guid's TEXT parameter and
+  `unhex(replace($n,'-',''))` in the statement, reads convert the `byte[]` back, the native extension
+  does the same in its own statements, and a filter by hash (`Where(o => o.hash == h)`) converts the
+  value side so the index stays usable. `_migrations._expression_hash` is a string in the model and
+  stays TEXT.
+
+  An existing database is converted on the next open (`ApplySchemaUpgradesAsync`, the SQLite
+  counterpart of the module bundle's schema step): SQLite keeps the storage class a value was written
+  with whatever the column declares, so the values are rewritten in place — `WHERE typeof() = 'text'`,
+  idempotent, no `ALTER` — and a reader that still meets a TEXT value understands it. The pass is
+  gated by `PRAGMA user_version`, SQLite's counterpart of `pvt_module_version()`: a file stamped with
+  the current schema version skips it, so the `typeof()` scan of `_objects` happens once per upgrade,
+  not once per start. Needs SQLite 3.41+ for `unhex()`; the bundled library is newer. Native extension rebuilt for win-x64, linux-x64,
+  linux-arm64. Covered by `SqliteHashStorageTests` on Free and Pro: byte order, conversion of a
+  legacy database across three opens, filter by hash.
+
 ### Added
+- **Transaction isolation level on demand (BR-1 from redb.Tsak; owner decision 2026-09-02).**
+  `BeginTransactionAsync(IsolationLevel?)` and `ExecuteAtomicAsync(IsolationLevel, ...)`: the
+  parameter is optional and nothing changes without it - each provider keeps its own default.
+  PostgreSQL and MSSQL apply the requested level to the transaction they open; SQLite accepts it
+  for portability and stays a single serial writer (BEGIN IMMEDIATE). An active or ambient
+  transaction is joined as it is - its level is never changed. Under elevated levels the database
+  may abort the loser (PostgreSQL 40001, MSSQL 3960/3961): the WHOLE transaction must be retried
+  by its owner, and `DbErrorClassifier.IsSerializationFailure(ex)` classifies that without
+  provider-specific code.
+- **`LazyReferenceAccess` (Blocking | Throw) and a deadlock-free blocking getter (review, owner
+  decision 2026-09-01).** The `Props` getter of an unloaded reference still loads synchronously by
+  default, but the load now runs on the thread pool: a host with a `SynchronizationContext`
+  (Blazor Server, WPF, WinForms, MAUI) waits for the query instead of deadlocking on its own
+  continuations. `LazyReferenceAccess = Throw` makes the getter refuse with
+  `RedbSynchronousLazyLoadException` naming the explicit way (`LoadPropsAsync`,
+  `LoadReferencesAsync`, a larger depth) - for Blazor WebAssembly, which cannot block at all, and
+  for UI hosts where a hidden query on property access is a defect. The async APIs work in both
+  modes.
+- **The `virtual` marker and the lazy-references option (V4, Л2).** A reference property declared
+  `virtual` lands in `_structures._lazy` at synchronisation — the code is the source of truth,
+  a hand-edited flag is restored, and the scheme hash includes the marker, so adding or removing
+  `virtual` invalidates the caches. With `EnableLazyReferences` on, the JSON builders emit the
+  base-fields stub for a marked reference REGARDLESS of depth; the option travels as a session
+  flag of the context's connection (PostgreSQL GUC `redb.lazy_refs`, MSSQL `SESSION_CONTEXT`,
+  a per-connection flag of the SQLite native extension — `redb_lazy_refs(1)`, readable back as
+  `redb_lazy_refs()`), so not a single builder signature changed. `WithLazyReferences(bool)`
+  overrides per query by riding the same flag around the execution; the Pro materializer honours
+  the GLOBAL option live, but not the per-query override — a recorded Л2 boundary.
+  `LoadReferencesAsync(parent, p => p.Children)` reloads a collection of stubs in one batch.
+  Non-virtual references stay eager whatever the option says; with the option off behaviour is
+  byte-for-byte the previous one. PostgreSQL bundle 0.7.0, MSSQL 0.2.0, SQLite user_version 6,
+  native extension rebuilt for the three platforms.
+- **Lazy references out of the box: `LoadAsync(depth: 1)` (V4, Л1).** A reference at the depth
+  boundary is a stub (the W1 contract: base fields, no properties) that now carries a loader —
+  the first access to its `Props` loads exactly that object, whose own references are stubs
+  again: laziness is transitive and independent of the original depth. A collection of references
+  arrives as a list of stubs, each loadable. A stub whose target left for the trash loads `null`
+  Props instead of throwing. Covered by `LazyReferenceTestsBase` on the six fixtures.
+- **A scheme knows which namespace owns it: `_schemes._name_space` is written on every sync (V4,
+  К7).** The column existed from the start and was read into `RedbScheme.NameSpace`, but nothing
+  ever wrote it. Now the CLR namespace of the Props type is recorded on creation and on the first
+  synchronisation of a scheme that has none (a pre-namespace database), and a scheme has ONE
+  owner on every path a type can reach it by - explicit name, FullName, the short-name fallback,
+  the loser of a creation race: a foreign namespace is a hard stop before anything is renamed or
+  reshaped, the typed `RedbSchemeNamespaceMismatchException` names both owners and the way out
+  (move the mark in `_schemes._name_space` when the type moved, or rename one of the two) instead
+  of silently attaching one project's type to another project's data - two unrelated `Order`
+  classes are the textbook case. The short-name adoption of a NULL owner logs a warning.
+- **`byte[]` is stored as the scalar BLOB it is: one `_values._ByteArray` value per property (V4,
+  Б1).** Before, the scheme sync classified a `byte[]` property as an ARRAY of Byte — a base row
+  plus one row per byte, a megabyte of payload becoming a million rows. The scalar machinery (the
+  ByteArray type, the `_ByteArray` column, base64 in the JSON builders, the Pro materializer)
+  existed all along and was unreachable from class models. The sync now classifies `byte[]` as a
+  scalar, and a database with the old layout heals itself on the next synchronisation: the bytes
+  are reassembled in index order into the base row, the element rows are deleted, the structure is
+  retyped — idempotent, type flips last, so a crash half-way just converts again. `[RedbUnique]`
+  on a `byte[]` property is now allowed (dedup by content is the ordinary binary-key scenario);
+  the canonical form was ready in the encoder since stage 1. Two latent emit bugs surfaced by the
+  first reachable ByteArray value were fixed on the way: PostgreSQL `get_object_json` decoded
+  `bytea::text` (hex, not base64 — error 22023), and the MSSQL builder fetched `_ByteArray` but
+  had no emit branch at all, so the property loaded as `null`. Covered on the six fixtures by
+  storage-shape, legacy-conversion and megabyte-key tests.
+- **The object key: `_objects._value_unique` (V4, UNIQUE stage 1).** A plain readable base field the
+  application fills itself — `obj.ValueUnique = "ORD-2026-0001"` — unique per scheme under the
+  partial index `UIX__objects__scheme_unique (_id_scheme, _value_unique) INCLUDE (_id)`. Full radius
+  by decision: the column behaves exactly like `_value_string` — JSON projections
+  (`get_object_json`, the native SQLite extension), the PVT base-field surface, LINQ
+  (`WhereRedb(o => o.ValueUnique == x)`, prefix search), bulk writers, export/import. A violation is
+  the same typed `RedbUniqueViolationException`. NULL never participates; comparison semantics are
+  each database's own (no trimming, no case folding by redb — the application normalises its own
+  keys); composite keys are the application's concatenation. The 440-character limit is enforced in
+  C# on every provider, because SQLite checks no VARCHAR lengths. `_value_unique` was at first
+  deliberately kept out of `_hash` (P5: the key is identity, not content); the full-object hash
+  (see the Fixed entry above) reversed that - the key is header state a cluster node must see.
+
+  Two batch semantics ride along: an in-batch key exchange passes (P7 — the batch releases every key
+  it is about to retake before the row updates, inside the batch transaction, on the DeleteInsert and
+  the Pro ChangeTracking paths alike), and `SaveByUniqueAsync` (P1) is the upsert by key:
+  resolve-then-save with a one-shot retry onto the winner's row after a lost creation race — chosen
+  over a single-statement native upsert on purpose, since ON CONFLICT/MERGE on `_objects` would
+  bypass the values pipeline. Soft delete releases the object key in the same transaction
+  (decision 9). Delivery: the schema-upgrades block (`00_module_init.sql`), PostgreSQL 0.6.9 →
+  **0.6.10**, MSSQL 0.1.10 → **0.1.11**, SQLite `PRAGMA user_version` 2 → **3**; native extension
+  rebuilt for win-x64, linux-x64, linux-arm64.
+
+- **Unique keys on Props fields: `[RedbUnique]` (V4, UNIQUE stage 2).** A property marked with the
+  attribute is unique within its scheme, enforced by the database: the value's canonical form
+  (`UniqueKeyEncoder` — NFC for strings, no trimming and no case folding, one zero, UTC milliseconds
+  for timestamps, `G29` for decimals, a column tag for cross-column injectivity) is hashed with
+  `RedbMd5` into `_values._unique` (`uuid` / `UNIQUEIDENTIFIER` / `BLOB(16)`), guarded by the partial
+  unique index `UIX__values__structure_unique` over `(_id_structure, _unique) INCLUDE (_id_object)` —
+  root scalars only, NULL never participates. A violation surfaces as one typed
+  `RedbUniqueViolationException` on every provider — naming the scheme and property where the driver
+  reports the key tuple — instead of three driver errors. Misplaced attributes (collections,
+  dictionaries, nested classes, references, enums) are rejected at scheme synchronisation with
+  `RedbUniqueKeyDefinitionException`, not silently ignored at insert.
+
+  The attribute on a populated structure recomputes the column at the next synchronisation and
+  *reports* duplicates (`UniqueRecomputeReport`; losers stay outside the index with `_unique IS NULL`)
+  instead of failing start-up. The same recomputation fires when `_structures._unique_version` is
+  behind the encoder, when rows carry a value but no key — the trace of a SQL-side writer
+  (`migrate_structure_type`, Pro data migrations and the SQLite conversion now release the keys they
+  touch), and explicitly via `RecomputeUniqueAsync<TProps>(property)`. Soft delete releases keys in
+  the same transaction (`_values._unique = NULL` on the way into scheme `-10`), so repeated and
+  cross-scheme deletion of equal keys works and a released key is immediately reusable. Point lookup:
+  `GetByUniqueAsync<TProps>(p => p.Code, value)` — one probe of the unique index.
+
+  Delivery to existing databases opens the module bundle's new "0. Schema upgrades" block
+  (`00_module_init.sql`): `_structures._unique` + `_unique_version`, `_values._unique`, the index, and
+  the same columns on `_scheme_metadata_cache`; `sync_metadata_cache_for_scheme` /
+  `warmup_all_metadata_caches` (they carry the cache column list) and the soft-delete functions moved
+  from `sql/` into the versioned bundle (`29_metadata_cache_sync.sql`, `30_soft_delete.sql`) — outside
+  it they reached fresh databases only. PostgreSQL 0.6.8 → **0.6.9**, MSSQL 0.1.9 → **0.1.10**, SQLite
+  `PRAGMA user_version` 1 → **2**. Keys on `byte[]` are deferred: the scheme sync of this version
+  stores a `byte[]` property as an array of bytes, not a root scalar — an open owner decision
+  (`docs/V4/ROADMAP.md` §5); the encoder is ready for it.
+
+- **A schema-upgrade contract for databases the application does not own
+  (`RedbSchemaOutdatedException`, `AutoApplyDatabaseUpgrades`, `IRedbService.GetUpgradeScript()`,
+  `redb schema --upgrade`).** Until now start-up against a database whose SQL module was behind the
+  build had one behaviour: apply the bundle. A role the DBA had stripped of owner rights after
+  installation got a raw driver error from the middle of the bundle. Now: the module is out of date
+  and the role may not change the schema → `RedbSchemaOutdatedException` naming the deployed and the
+  required version, with the privilege error as its cause; `AutoApplyDatabaseUpgrades = false` → the
+  same exception without trying, whatever the rights; `GetUpgradeScript()` returns the versioned
+  bundle as text for the DBA to apply, and the CLI exports it. SQLite has no module and reports no
+  script. Driver error codes are classified in one place (`DbErrorClassifier`), replacing the two
+  duck-typed copies that had grown in `DeadlockRetryHelper` and `RedbServiceBase`.
+
+  Upgrade note for large installations (review 2026-09-01): the V4 block "0. Schema upgrades" adds
+  columns and builds two partial unique indexes (`_values(_id_structure, _unique)`,
+  `_objects(_id_scheme, _value_unique)`) inside the module bundle, which runs as ONE command at
+  start-up. On PostgreSQL the `ALTER TABLE ... ADD COLUMN` statements hold `ACCESS EXCLUSIVE` on
+  `_values`, `_objects`, `_structures` and `_scheme_metadata_cache` until the bundle ends, and the
+  index build scans `_values`; on MSSQL the offline `CREATE INDEX` holds a table lock for its
+  duration. Every other node blocks on those tables meanwhile, and `CONCURRENTLY` / `ONLINE = ON`
+  cannot run inside the atomic bundle. On a multi-gigabyte `_values` treat the first start of 4.0
+  as a maintenance step: apply `GetUpgradeScript()` (or `redb schema --upgrade`) from one node in
+  a quiet window, and start the application nodes with `AutoApplyDatabaseUpgrades = false` so none
+  of them races the DBA. A pre-V4 database with a small `_values` needs nothing special.
+
+  `pvt_module_version` moved from the first file of the bundle to the last (`99_module_version.sql`),
+  on both providers: a bundle that fails half-way now leaves the old version behind, and the next start
+  retries instead of believing the upgrade succeeded — which is what happened on MSSQL, where every
+  `GO` batch commits on its own. PostgreSQL 0.6.7 → **0.6.8**, MSSQL 0.1.8 → **0.1.9**.
+  Covered by `SchemaUpgradeTestsBase` on PostgreSQL and MSSQL against a private database
+  (`redb_upgrade`) and a restricted login (`redb_noddl`) the tests create themselves.
+
 - **Nine differential tests for membership and ListItem fields (`redb.Tests.Integration`).**
   Membership over a string field, a numeric field and an empty set; a three-condition conjunction;
   and a separate suite for ListItem accessors, which are the one place where a single structure
@@ -63,6 +942,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `_list_items` and need a join no row predicate can express. The suite pins that the first is taken,
   the other two are refused, an array of ListItem is refused, and a filter naming `.Id` and `.Value`
   together still yields one branch on the right column.
+
+### Removed
+- **The full-text index on `_values._String` (MSSQL) is gone (owner decision 2026-09-02).** It
+  accelerated only `CONTAINS()`/`FREETEXT()`, which redb never generates - every string predicate
+  translates to `LIKE`, and `LIKE` does not use full-text - while `CHANGE_TRACKING AUTO` paid a
+  background reindex on every `_values` write. The upgrade block drops it from existing databases;
+  MSSQL bundle **0.2.3**. The standing (pre-existing) parity boundary is now stated instead of
+  implied: string-VALUE search over props is index-assisted on PostgreSQL only (the trigram
+  `IX__values__String_pattern`); MSSQL (`NVARCHAR(MAX)`) and SQLite scan, exactly as they did with
+  the full-text index in place. If a word-search operator (`$match`) ever lands, the index returns
+  with it deliberately.
+- **Dead save paths and a dead dialect member (review 2026-09-01).** The batch save has been the
+  only live save path for a while; `ObjectStorageProviderBase.SaveAsyncNew` (public, no callers in
+  the ecosystem) and everything only it reached - `PrepareValuesByStrategy`, `CommitAllChangesBatch`,
+  the `IsValueChanged` / array-element change tracking of the single-object path, the
+  `*ForCollection` value builders, `FindObjectInCollector`, the whole `SaveAsyncDeleteInsertBulk`
+  family, `PrepareValuesWithTreeDeleteInsert` and the Pro override of `PrepareValuesByStrategy` -
+  are removed after a call-graph pass over every project in the tree, including Identity,
+  Route, Tsak and TGChatLmm. `ISqlDialect.Query_SqlPreviewBaseFunction` went with the Props-level
+  lazy switch it served. Nothing public that had a caller changed; `AddNewObjectsAsync` stays.
+- **The Props-level lazy-loading mechanism (V4, Л1 — BREAKING).** `EnableLazyLoadingForProps`
+  (global and per-user), `WithLazyLoading()` on queries and tree queries, and the `lazyLoadProps`
+  parameter of every `LoadAsync`/`LoadWithParentsAsync` overload are gone, along with the
+  `useLazyOnDemand` branches in the query pipeline. The mechanism made the cheap part lazy (the
+  scalars of one object) and kept the expensive part eager (the reference graph to depth 10), sat
+  behind three switches, and had no tests. Loading the requested object is now always eager; what
+  became lazy instead is the reference — see Added. Migration: delete the flag, the call and the
+  parameter; the default was OFF, so unconfigured projects behave identically - with one
+  exception that needs no flag: a reference beyond `depth` used to be a stub whose `Props` were
+  simply null; it now carries a loader, and `Props` on it is a synchronous database round trip
+  (the load runs on the thread pool, so a `SynchronizationContext` host waits rather than
+  deadlocks). Blazor WebAssembly cannot block at all: set `LazyReferenceAccess = Throw` there and
+  reload through `LoadReferencesAsync` / `LoadPropsAsync`; UI hosts that want no hidden queries
+  on property access use the same switch.
 
 ## [3.7.2] — 2026-08-27
 

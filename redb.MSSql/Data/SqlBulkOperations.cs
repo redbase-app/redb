@@ -26,7 +26,7 @@ public class SqlBulkOperations : IBulkOperations
     /// <summary>
     /// Bulk insert objects using SqlBulkCopy.
     /// </summary>
-    public async Task BulkInsertObjectsAsync(IEnumerable<RedbObjectRow> objects)
+    public async Task BulkInsertObjectsAsync(IEnumerable<RedbObjectRow> objects, CancellationToken cancellationToken = default)
     {
         var objectsList = objects.ToList();
         if (objectsList.Count == 0) return;
@@ -44,14 +44,14 @@ public class SqlBulkOperations : IBulkOperations
             
             MapObjectColumns(bulkCopy);
             var dataTable = CreateObjectsDataTable(objectsList);
-            await bulkCopy.WriteToServerAsync(dataTable);
+            await bulkCopy.WriteToServerAsync(dataTable, cancellationToken);
         });
     }
 
     /// <summary>
     /// Bulk insert values using SqlBulkCopy.
     /// </summary>
-    public async Task BulkInsertValuesAsync(IEnumerable<RedbValue> values)
+    public async Task BulkInsertValuesAsync(IEnumerable<RedbValue> values, CancellationToken cancellationToken = default)
     {
         var valuesList = values.ToList();
         if (valuesList.Count == 0) return;
@@ -69,7 +69,7 @@ public class SqlBulkOperations : IBulkOperations
             
             MapValueColumns(bulkCopy);
             var dataTable = CreateValuesDataTable(valuesList);
-            await bulkCopy.WriteToServerAsync(dataTable);
+            await bulkCopy.WriteToServerAsync(dataTable, cancellationToken);
         });
     }
 
@@ -77,17 +77,18 @@ public class SqlBulkOperations : IBulkOperations
     /// Bulk update objects using MERGE statement.
     /// Single round-trip for entire batch instead of N individual UPDATEs.
     /// </summary>
-    public async Task BulkUpdateObjectsAsync(IEnumerable<RedbObjectRow> objects)
+    public async Task BulkUpdateObjectsAsync(IEnumerable<RedbObjectRow> objects, CancellationToken cancellationToken = default)
     {
         var objectsList = objects.ToList();
         if (objectsList.Count == 0) return;
         
-        // MSSQL parameter limit ~2100, 20 columns per object = max 100 objects per batch
-        const int batchSize = 100;
+        // MSSQL parameter limit ~2100, 21 columns per object = max 100 objects per batch
+        const int batchSize = 95;
         
         foreach (var batch in objectsList.Chunk(batchSize))
         {
-            await ExecuteObjectsMergeAsync(batch);
+            cancellationToken.ThrowIfCancellationRequested();
+            await ExecuteObjectsMergeAsync(batch, cancellationToken);
         }
     }
     
@@ -95,7 +96,7 @@ public class SqlBulkOperations : IBulkOperations
     /// Execute MERGE for a batch of objects.
     /// Uses explicit CAST for varbinary columns to avoid type inference errors.
     /// </summary>
-    private async Task ExecuteObjectsMergeAsync(RedbObjectRow[] batch)
+    private async Task ExecuteObjectsMergeAsync(RedbObjectRow[] batch, CancellationToken cancellationToken)
     {
         var sb = new StringBuilder();
         var parameters = new List<object>();
@@ -106,14 +107,14 @@ public class SqlBulkOperations : IBulkOperations
         for (int i = 0; i < batch.Length; i++)
         {
             var obj = batch[i];
-            var offset = i * 20;
+            var offset = i * 21; // 21 columns per row - keep in sync with the source list and parameter order below
             
             if (i > 0) sb.AppendLine(",");
             // Cast varbinary columns explicitly to avoid type inference errors
             sb.Append($"    (@p{offset}, @p{offset + 1}, @p{offset + 2}, @p{offset + 3}, @p{offset + 4}, ");
             sb.Append($"@p{offset + 5}, @p{offset + 6}, @p{offset + 7}, @p{offset + 8}, @p{offset + 9}, ");
             sb.Append($"@p{offset + 10}, @p{offset + 11}, @p{offset + 12}, @p{offset + 13}, @p{offset + 14}, ");
-            sb.Append($"@p{offset + 15}, @p{offset + 16}, CAST(@p{offset + 17} AS VARBINARY(MAX)), @p{offset + 18}, @p{offset + 19})");
+            sb.Append($"@p{offset + 15}, @p{offset + 16}, CAST(@p{offset + 17} AS VARBINARY(MAX)), @p{offset + 18}, @p{offset + 19}, @p{offset + 20})");
             
             parameters.Add(obj.Id);
             parameters.Add((object?)obj.IdParent ?? DBNull.Value);
@@ -135,13 +136,14 @@ public class SqlBulkOperations : IBulkOperations
             parameters.Add((object?)obj.ValueBytes ?? DBNull.Value);
             parameters.Add((object?)obj.Note ?? DBNull.Value);
             parameters.Add((object?)obj.Hash ?? DBNull.Value);
+            parameters.Add((object?)obj.ValueUnique ?? DBNull.Value);
         }
         
         sb.AppendLine();
         sb.AppendLine(") AS source(_id, _id_parent, _id_scheme, _name, _id_owner, _id_who_change,");
         sb.AppendLine("            _date_modify, _date_begin, _date_complete, _key, _value_long, _value_string,");
         sb.AppendLine("            _value_guid, _value_bool, _value_double, _value_numeric, _value_datetime,");
-        sb.AppendLine("            _value_bytes, _note, _hash)");
+        sb.AppendLine("            _value_bytes, _note, _hash, _value_unique)");
         sb.AppendLine("ON target._id = source._id");
         sb.AppendLine("WHEN MATCHED THEN UPDATE SET");
         sb.AppendLine("    _id_parent = source._id_parent,");
@@ -162,26 +164,28 @@ public class SqlBulkOperations : IBulkOperations
         sb.AppendLine("    _value_datetime = source._value_datetime,");
         sb.AppendLine("    _value_bytes = source._value_bytes,");
         sb.AppendLine("    _note = source._note,");
-        sb.AppendLine("    _hash = source._hash;");
+        sb.AppendLine("    _hash = source._hash,");
+        sb.AppendLine("    _value_unique = source._value_unique;");
         
-        await _db.ExecuteAsync(sb.ToString(), parameters.ToArray());
+        await _db.ExecuteAsync(sb.ToString(), parameters.ToArray(), cancellationToken);
     }
 
     /// <summary>
     /// Bulk update values using MERGE statement.
     /// Single round-trip for entire batch instead of N individual UPDATEs.
     /// </summary>
-    public async Task BulkUpdateValuesAsync(IEnumerable<RedbValue> values)
+    public async Task BulkUpdateValuesAsync(IEnumerable<RedbValue> values, CancellationToken cancellationToken = default)
     {
         var valuesList = values.ToList();
         if (valuesList.Count == 0) return;
         
-        // MSSQL parameter limit ~2100, 13 columns per value = max 160 values per batch
-        const int batchSize = 150;
+        // MSSQL parameter limit ~2100, 14 columns per value = max 150 values per batch
+        const int batchSize = 140;
         
         foreach (var batch in valuesList.Chunk(batchSize))
         {
-            await ExecuteValuesMergeAsync(batch);
+            cancellationToken.ThrowIfCancellationRequested();
+            await ExecuteValuesMergeAsync(batch, cancellationToken);
         }
     }
     
@@ -189,7 +193,7 @@ public class SqlBulkOperations : IBulkOperations
     /// Execute MERGE for a batch of values.
     /// Uses explicit CAST for varbinary columns to avoid type inference errors.
     /// </summary>
-    private async Task ExecuteValuesMergeAsync(RedbValue[] batch)
+    private async Task ExecuteValuesMergeAsync(RedbValue[] batch, CancellationToken cancellationToken)
     {
         var sb = new StringBuilder();
         var parameters = new List<object>();
@@ -200,13 +204,13 @@ public class SqlBulkOperations : IBulkOperations
         for (int i = 0; i < batch.Length; i++)
         {
             var val = batch[i];
-            var offset = i * 13;
+            var offset = i * 14; // 14 columns per row - keep in sync with the source list and parameter order below
             
             if (i > 0) sb.AppendLine(",");
             // Cast varbinary column (_ByteArray at offset+7) explicitly
             sb.Append($"    (@p{offset}, @p{offset + 1}, @p{offset + 2}, @p{offset + 3}, @p{offset + 4}, ");
             sb.Append($"@p{offset + 5}, @p{offset + 6}, CAST(@p{offset + 7} AS VARBINARY(MAX)), @p{offset + 8}, @p{offset + 9}, ");
-            sb.Append($"@p{offset + 10}, @p{offset + 11}, @p{offset + 12})");
+            sb.Append($"@p{offset + 10}, @p{offset + 11}, @p{offset + 12}, @p{offset + 13})");
             
             parameters.Add(val.Id);
             parameters.Add((object?)val.String ?? DBNull.Value);
@@ -219,13 +223,14 @@ public class SqlBulkOperations : IBulkOperations
             parameters.Add((object?)val.Numeric ?? DBNull.Value);
             parameters.Add((object?)val.ListItem ?? DBNull.Value);
             parameters.Add((object?)val.Object ?? DBNull.Value);
+            parameters.Add((object?)val.Unique ?? DBNull.Value);
             parameters.Add((object?)val.ArrayParentId ?? DBNull.Value);
             parameters.Add((object?)val.ArrayIndex ?? DBNull.Value);
         }
         
         sb.AppendLine();
         sb.AppendLine(") AS source(_id, _String, _Long, _Guid, _Double, _DateTimeOffset, _Boolean,");
-        sb.AppendLine("            _ByteArray, _Numeric, _ListItem, _Object, _array_parent_id, _array_index)");
+        sb.AppendLine("            _ByteArray, _Numeric, _ListItem, _Object, _unique, _array_parent_id, _array_index)");
         sb.AppendLine("ON target._id = source._id");
         sb.AppendLine("WHEN MATCHED THEN UPDATE SET");
         sb.AppendLine("    [_String] = source._String,");
@@ -238,16 +243,17 @@ public class SqlBulkOperations : IBulkOperations
         sb.AppendLine("    [_Numeric] = source._Numeric,");
         sb.AppendLine("    [_ListItem] = source._ListItem,");
         sb.AppendLine("    [_Object] = source._Object,");
+        sb.AppendLine("    [_unique] = source._unique,");
         sb.AppendLine("    [_array_parent_id] = source._array_parent_id,");
         sb.AppendLine("    [_array_index] = source._array_index;");
         
-        await _db.ExecuteAsync(sb.ToString(), parameters.ToArray());
+        await _db.ExecuteAsync(sb.ToString(), parameters.ToArray(), cancellationToken);
     }
 
     /// <summary>
     /// Bulk delete objects by IDs.
     /// </summary>
-    public async Task BulkDeleteObjectsAsync(IEnumerable<long> objectIds)
+    public async Task BulkDeleteObjectsAsync(IEnumerable<long> objectIds, CancellationToken cancellationToken = default)
     {
         var ids = objectIds.ToArray();
         if (ids.Length == 0) return;
@@ -255,50 +261,71 @@ public class SqlBulkOperations : IBulkOperations
         // MSSQL uses STRING_SPLIT instead of array parameter
         var idList = string.Join(",", ids);
         await _db.ExecuteAsync(
-            $"DELETE FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))", 
-            idList);
+            $"DELETE FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))",
+            new object[] { idList }, cancellationToken);
     }
 
     /// <summary>
     /// Bulk delete values by IDs.
     /// </summary>
-    public async Task BulkDeleteValuesAsync(IEnumerable<long> valueIds)
+    public async Task BulkDeleteValuesAsync(IEnumerable<long> valueIds, CancellationToken cancellationToken = default)
     {
         var ids = valueIds.ToArray();
         if (ids.Length == 0) return;
         
         var idList = string.Join(",", ids);
         await _db.ExecuteAsync(
-            $"DELETE FROM _values WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))", 
-            idList);
+            $"DELETE FROM _values WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))",
+            new object[] { idList }, cancellationToken);
     }
 
     /// <summary>
     /// Bulk delete values by object IDs.
     /// </summary>
-    public async Task BulkDeleteValuesByObjectIdsAsync(IEnumerable<long> objectIds)
+    public async Task BulkDeleteValuesByObjectIdsAsync(IEnumerable<long> objectIds, CancellationToken cancellationToken = default)
     {
         var ids = objectIds.ToArray();
         if (ids.Length == 0) return;
         
         var idList = string.Join(",", ids);
         await _db.ExecuteAsync(
-            $"DELETE FROM _values WHERE _id_object IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))", 
-            idList);
+            $"DELETE FROM _values WHERE _id_object IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))",
+            new object[] { idList }, cancellationToken);
     }
     
     /// <summary>
     /// Bulk delete values by ListItem IDs.
     /// </summary>
-    public async Task BulkDeleteValuesByListItemIdsAsync(IEnumerable<long> listItemIds)
+    public async Task BulkDeleteValuesByListItemIdsAsync(IEnumerable<long> listItemIds, CancellationToken cancellationToken = default)
     {
         var ids = listItemIds.ToArray();
         if (ids.Length == 0) return;
-        
-        var idList = string.Join(",", ids);
-        await _db.ExecuteAsync(
-            $"DELETE FROM _values WHERE _ListItem IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))", 
-            idList);
+
+        // Deliberately NOT the STRING_SPLIT form the other bulk deletes use. _ListItem is
+        // covered by a FILTERED index (IX__values__ListItem_not_null), and SQL Server does not
+        // match a filtered index through the STRING_SPLIT semi-join - the plan degrades to a
+        // full clustered scan of _values (tens of seconds cold on millions of rows). The
+        // _id/_id_object deletes above sit on unfiltered indexes, where the semi-join seeks
+        // fine. A parameterized IN list seeks the filtered index; chunked to stay well under
+        // the 2100-parameter limit.
+        const int chunkSize = 500;
+        await _db.ExecuteAtomicAsync(async () =>
+        {
+            for (var offset = 0; offset < ids.Length; offset += chunkSize)
+            {
+                var count = Math.Min(chunkSize, ids.Length - offset);
+                var sb = new StringBuilder("DELETE FROM _values WHERE _ListItem IN (");
+                var parameters = new object[count];
+                for (var i = 0; i < count; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    sb.Append("@p").Append(i);
+                    parameters[i] = ids[offset + i];
+                }
+                sb.Append(')');
+                await _db.ExecuteAsync(sb.ToString(), parameters, cancellationToken);
+            }
+        }, cancellationToken);
     }
 
     // === COLUMN MAPPINGS ===
@@ -326,6 +353,7 @@ public class SqlBulkOperations : IBulkOperations
         bulkCopy.ColumnMappings.Add("_value_bytes", "_value_bytes");
         bulkCopy.ColumnMappings.Add("_note", "_note");
         bulkCopy.ColumnMappings.Add("_hash", "_hash");
+        bulkCopy.ColumnMappings.Add("_value_unique", "_value_unique");
     }
     
     private static void MapValueColumns(SqlBulkCopy bulkCopy)
@@ -343,6 +371,7 @@ public class SqlBulkOperations : IBulkOperations
         bulkCopy.ColumnMappings.Add("_Numeric", "_Numeric");
         bulkCopy.ColumnMappings.Add("_ListItem", "_ListItem");
         bulkCopy.ColumnMappings.Add("_Object", "_Object");
+        bulkCopy.ColumnMappings.Add("_unique", "_unique");
         bulkCopy.ColumnMappings.Add("_array_parent_id", "_array_parent_id");
         bulkCopy.ColumnMappings.Add("_array_index", "_array_index");
     }
@@ -374,6 +403,7 @@ public class SqlBulkOperations : IBulkOperations
         dt.Columns.Add("_value_bytes", typeof(byte[]));
         dt.Columns.Add("_note", typeof(string));
         dt.Columns.Add("_hash", typeof(Guid));
+        dt.Columns.Add("_value_unique", typeof(string));
         
         foreach (var obj in objects)
         {
@@ -398,7 +428,8 @@ public class SqlBulkOperations : IBulkOperations
                 (object?)obj.ValueDatetime ?? DBNull.Value,
                 (object?)obj.ValueBytes ?? DBNull.Value,
                 (object?)obj.Note ?? DBNull.Value,
-                (object?)obj.Hash ?? DBNull.Value
+                (object?)obj.Hash ?? DBNull.Value,
+                (object?)obj.ValueUnique ?? DBNull.Value
             );
         }
         
@@ -422,6 +453,7 @@ public class SqlBulkOperations : IBulkOperations
         dt.Columns.Add("_Numeric", typeof(decimal));
         dt.Columns.Add("_ListItem", typeof(long));
         dt.Columns.Add("_Object", typeof(long));
+        dt.Columns.Add("_unique", typeof(Guid));
         dt.Columns.Add("_array_parent_id", typeof(long));
         dt.Columns.Add("_array_index", typeof(string));
         
@@ -441,6 +473,7 @@ public class SqlBulkOperations : IBulkOperations
                 (object?)val.Numeric ?? DBNull.Value,
                 (object?)val.ListItem ?? DBNull.Value,
                 (object?)val.Object ?? DBNull.Value,
+                (object?)val.Unique ?? DBNull.Value,
                 (object?)val.ArrayParentId ?? DBNull.Value,
                 (object?)val.ArrayIndex ?? DBNull.Value
             );

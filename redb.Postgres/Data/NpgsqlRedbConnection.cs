@@ -21,30 +21,17 @@ namespace redb.Postgres.Data
         private NpgsqlConnection? _connection;
         private NpgsqlRedbTransaction? _currentTransaction;
         private bool _disposed = false;
+        public bool IsDisposed => _disposed;
 
-        // Fail-fast concurrency guard. A single NpgsqlRedbConnection wraps ONE physical connection
-        // (reused for every command — EF-DbContext model) and is NOT thread-safe. If two threads
-        // enter a command at once (i.e. one IRedbService instance was shared across concurrent
-        // exchanges/requests — resolve a SCOPED instance per exchange instead), fail immediately with
-        // a clear message rather than corrupting the connection ("command already in progress").
-        private int _inUse;
+        // Commands and teardown share ONE exclusion (CommandGate, tsum garage report
+        // 2026-09-11): a single NpgsqlRedbConnection wraps ONE physical connection and is NOT
+        // thread-safe. Two concurrent commands fail fast with a clear message; a command after
+        // teardown began is refused with ObjectDisposedException (the lazy loader falls back
+        // to a detached scope on it); and DisposeAsync WAITS for the in-flight command instead
+        // of racing it with Close/Reset.
+        private readonly CommandGate _gate = new(nameof(NpgsqlRedbConnection));
 
-        private CommandGuard EnterCommand()
-        {
-            if (Interlocked.CompareExchange(ref _inUse, 1, 0) != 0)
-                throw new InvalidOperationException(
-                    "IRedbService used concurrently: the same NpgsqlRedbConnection was entered from two threads. " +
-                    "Each exchange/request must resolve its OWN scoped IRedbService (ProcessWithRedb / controller.Redb()) — " +
-                    "one instance is a single, non-thread-safe DB connection.");
-            return new CommandGuard(this);
-        }
-
-        private readonly struct CommandGuard : IDisposable
-        {
-            private readonly NpgsqlRedbConnection _owner;
-            public CommandGuard(NpgsqlRedbConnection owner) => _owner = owner;
-            public void Dispose() => Interlocked.Exchange(ref _owner._inUse, 0);
-        }
+        private CommandGate.Releaser EnterCommand() => _gate.Enter();
         
         /// <summary>
         /// Connection string.
@@ -86,25 +73,46 @@ namespace redb.Postgres.Data
         }
 
         // === CONNECTION MANAGEMENT ===
-        
+
+        // Dispose nulls _connection. Without this check a call after Dispose would see the null,
+        // open a NEW physical connection on a wrapper whose second Dispose is a no-op, and that
+        // connection would sit in the server's session list until the process died (prod, 2026-09).
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(NpgsqlRedbConnection),
+                    "The scope that owned this connection has ended. Resolve a fresh scoped IRedbService " +
+                    "instead of reusing one from a finished scope or exchange.");
+        }
+
         /// <summary>
         /// Get underlying connection (for bulk operations).
         /// This ensures all operations use the same connection and transaction.
         /// </summary>
-        public async Task<System.Data.Common.DbConnection> GetUnderlyingConnectionAsync()
+        public async Task<System.Data.Common.DbConnection> GetUnderlyingConnectionAsync(CancellationToken cancellationToken = default)
         {
-            return await GetOpenConnectionAsync();
+            return await GetOpenConnectionAsync(cancellationToken);
         }
         
-        private async Task<NpgsqlConnection> GetOpenConnectionAsync()
+        private async Task<NpgsqlConnection> GetOpenConnectionAsync(CancellationToken cancellationToken = default)
         {
+            ThrowIfDisposed();
             if (_connection == null)
             {
-                _connection = await _dataSource.OpenConnectionAsync();
+                _connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+                // Session settings (collation, lazy refs) do not survive the pool: DISCARD ALL on
+                // return resets them. Re-armed on every hand-out, like MSSQL and SQLite do.
+                await NpgsqlDataSourceFactory.ApplySessionSettingsAsync(_dataSource, _connection);
             }
             else if (_connection.State != System.Data.ConnectionState.Open)
             {
-                await _connection.OpenAsync();
+                // Closed OR Broken (a cancellation tearing down a COPY breaks the connector).
+                // A broken NpgsqlConnection cannot be re-opened in place - replace it with a
+                // fresh one so the scope heals instead of failing every call from here on.
+                try { await _connection.DisposeAsync(); }
+                finally { _connection = null; }
+                _connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+                await NpgsqlDataSourceFactory.ApplySessionSettingsAsync(_dataSource, _connection);
             }
             return _connection;
         }
@@ -179,95 +187,173 @@ namespace redb.Postgres.Data
         /// Execute SQL query and map results to list of objects.
         /// Uses JsonPropertyName attribute for snake_case to PascalCase mapping.
         /// </summary>
-        public async Task<List<T>> QueryAsync<T>(string sql, params object[] parameters) where T : new()
+        public Task<List<T>> QueryAsync<T>(string sql, params object[] parameters) where T : new()
+            => QueryAsync<T>(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<List<T>> QueryAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
         {
             using var _guard = EnterCommand();
-            var conn = await GetOpenConnectionAsync();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
             await using var cmd = CreateCommand(conn, sql, parameters);
-            await using var reader = await cmd.ExecuteReaderAsync();
-            
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
             var results = new List<T>();
             var mapper = new RedbRowMapper<T>();
-            
-            while (await reader.ReadAsync())
+
+            while (await reader.ReadAsync(cancellationToken))
             {
                 results.Add(mapper.MapRow(reader));
             }
-            
+
             return results;
         }
         
         /// <summary>
         /// Execute SQL query and return first result.
         /// </summary>
-        public async Task<T?> QueryFirstOrDefaultAsync<T>(string sql, params object[] parameters) where T : class, new()
+        public Task<T?> QueryFirstOrDefaultAsync<T>(string sql, params object[] parameters) where T : class, new()
+            => QueryFirstOrDefaultAsync<T>(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<T?> QueryFirstOrDefaultAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : class, new()
         {
             using var _guard = EnterCommand();
-            var conn = await GetOpenConnectionAsync();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
             await using var cmd = CreateCommand(conn, sql, parameters);
-            await using var reader = await cmd.ExecuteReaderAsync();
-            
-            if (await reader.ReadAsync())
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
+            if (await reader.ReadAsync(cancellationToken))
             {
                 var mapper = new RedbRowMapper<T>();
                 return mapper.MapRow(reader);
             }
-            
+
             return null;
         }
         
         /// <summary>
         /// Execute SQL query and return scalar value.
         /// </summary>
-        public async Task<T?> ExecuteScalarAsync<T>(string sql, params object[] parameters)
+        public Task<T?> ExecuteScalarAsync<T>(string sql, params object[] parameters)
+            => ExecuteScalarAsync<T>(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<T?> ExecuteScalarAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken)
         {
             using var _guard = EnterCommand();
-            var conn = await GetOpenConnectionAsync();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
             await using var cmd = CreateCommand(conn, sql, parameters);
-            var result = await cmd.ExecuteScalarAsync();
-            
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+            return CoerceScalar<T>(result);
+        }
+
+        private static T? CoerceScalar<T>(object? result)
+        {
             if (result == null || result == DBNull.Value)
                 return default;
-            
+
             // Handle nullable types
             var targetType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
-            
+
             // Direct cast if types match
             if (result.GetType() == targetType || targetType.IsAssignableFrom(result.GetType()))
             {
                 return (T)result;
             }
-            
+
             // Convert for numeric types etc.
             return (T)Convert.ChangeType(result, targetType);
+        }
+
+        // === SYNCHRONOUS COUNTERPARTS (thread-pool-free lazy path) ===
+        // The sync getter of RedbListItem.Object runs the whole load on the calling thread; these
+        // are true sync ADO calls - no thread-pool continuation anywhere, so a saturated pool
+        // cannot slow or deadlock them. Same command shape, same session settings as the async
+        // twins above.
+
+        private NpgsqlConnection GetOpenConnection()
+        {
+            ThrowIfDisposed();
+            if (_connection == null)
+            {
+                _connection = _dataSource.OpenConnection();
+                NpgsqlDataSourceFactory.ApplySessionSettings(_dataSource, _connection);
+            }
+            else if (_connection.State != System.Data.ConnectionState.Open)
+            {
+                // Same healing as the async twin: a broken connector is replaced, not re-opened.
+                try { _connection.Dispose(); }
+                finally { _connection = null; }
+                _connection = _dataSource.OpenConnection();
+                NpgsqlDataSourceFactory.ApplySessionSettings(_dataSource, _connection);
+            }
+            return _connection;
+        }
+
+        /// <inheritdoc />
+        public T? QueryFirstOrDefault<T>(string sql, params object[] parameters) where T : class, new()
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            using var cmd = CreateCommand(conn, sql, parameters);
+            using var reader = cmd.ExecuteReader();
+            return reader.Read() ? new RedbRowMapper<T>().MapRow(reader) : null;
+        }
+
+        /// <inheritdoc />
+        public T? ExecuteScalar<T>(string sql, params object[] parameters)
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            using var cmd = CreateCommand(conn, sql, parameters);
+            return CoerceScalar<T>(cmd.ExecuteScalar());
+        }
+
+        /// <inheritdoc />
+        public string? ExecuteJson(string sql, params object[] parameters)
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            using var cmd = CreateCommand(conn, sql, parameters);
+            var result = cmd.ExecuteScalar();
+            return result == null || result == DBNull.Value ? null : result.ToString();
         }
         
         /// <summary>
         /// Execute SQL command (INSERT, UPDATE, DELETE).
         /// </summary>
-        public async Task<int> ExecuteAsync(string sql, params object[] parameters)
+        public Task<int> ExecuteAsync(string sql, params object[] parameters)
+            => ExecuteAsync(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<int> ExecuteAsync(string sql, object[] parameters, CancellationToken cancellationToken)
         {
             using var _guard = EnterCommand();
-            var conn = await GetOpenConnectionAsync();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
             await using var cmd = CreateCommand(conn, sql, parameters);
-            return await cmd.ExecuteNonQueryAsync();
+            return await cmd.ExecuteNonQueryAsync(cancellationToken);
         }
         
         /// <summary>
         /// Execute SQL query and return list of scalar values (first column only).
         /// Use for simple queries like SELECT _id FROM ... that return single column.
         /// </summary>
-        public async Task<List<T>> QueryScalarListAsync<T>(string sql, params object[] parameters)
+        public Task<List<T>> QueryScalarListAsync<T>(string sql, params object[] parameters)
+            => QueryScalarListAsync<T>(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<List<T>> QueryScalarListAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken)
         {
             using var _guard = EnterCommand();
-            var conn = await GetOpenConnectionAsync();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
             await using var cmd = CreateCommand(conn, sql, parameters);
-            await using var reader = await cmd.ExecuteReaderAsync();
-            
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
             var results = new List<T>();
             var targetType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
-            
-            while (await reader.ReadAsync())
+
+            while (await reader.ReadAsync(cancellationToken))
             {
                 if (reader.IsDBNull(0))
                 {
@@ -288,7 +374,7 @@ namespace redb.Postgres.Data
         /// <summary>
         /// Begin new transaction.
         /// </summary>
-        public async Task<IRedbTransaction> BeginTransactionAsync()
+        public async Task<IRedbTransaction> BeginTransactionAsync(System.Data.IsolationLevel? isolationLevel = null, CancellationToken cancellationToken = default)
         {
             using var _guard = EnterCommand();
             if (_currentTransaction != null && _currentTransaction.IsActive)
@@ -299,8 +385,10 @@ namespace redb.Postgres.Data
                     "Ambient TransactionScope detected. Cannot create explicit transaction inside TransactionScope. " +
                     "Use ExecuteAtomicAsync() which respects ambient transactions.");
             
-            var conn = await GetOpenConnectionAsync();
-            var npgsqlTx = await conn.BeginTransactionAsync();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            var npgsqlTx = isolationLevel.HasValue
+                ? await conn.BeginTransactionAsync(isolationLevel.Value, cancellationToken)   // BR-1: the requested level
+                : await conn.BeginTransactionAsync(cancellationToken);                        // the provider default, as always
             _currentTransaction = new NpgsqlRedbTransaction(npgsqlTx, () => _currentTransaction = null);
             return _currentTransaction;
         }
@@ -308,9 +396,124 @@ namespace redb.Postgres.Data
         // === ATOMIC OPERATIONS ===
         
         /// <summary>
+        /// Atomic execution under an explicit isolation level (BR-1). An active or ambient transaction
+        /// wins: operations join it and its level is NOT changed.
+        /// </summary>
+        public async Task ExecuteAtomicAsync(System.Data.IsolationLevel isolationLevel, Func<Task> operations, CancellationToken cancellationToken = default)
+        {
+
+        
+            if (IsInTransaction)
+
+        
+            {
+
+        
+                await operations();
+
+        
+                return;
+
+        
+            }
+
+
+        
+            await using var tx = await BeginTransactionAsync(isolationLevel, cancellationToken);
+
+        
+            try
+
+        
+            {
+
+        
+                await operations();
+
+        
+                await tx.CommitAsync();
+
+        
+            }
+
+        
+            catch
+
+        
+            {
+
+        
+                await tx.RollbackAsync();
+
+        
+                throw;
+
+        
+            }
+
+        
+        }
+
+
+        
+        /// <summary>Result-returning form of the isolation-level overload (BR-1).</summary>
+        public async Task<T> ExecuteAtomicAsync<T>(System.Data.IsolationLevel isolationLevel, Func<Task<T>> operations, CancellationToken cancellationToken = default)
+
+        
+        {
+
+        
+            if (IsInTransaction)
+
+        
+                return await operations();
+
+
+        
+            await using var tx = await BeginTransactionAsync(isolationLevel, cancellationToken);
+
+        
+            try
+
+        
+            {
+
+        
+                var result = await operations();
+
+        
+                await tx.CommitAsync();
+
+        
+                return result;
+
+        
+            }
+
+        
+            catch
+
+        
+            {
+
+        
+                await tx.RollbackAsync();
+
+        
+                throw;
+
+        
+            }
+
+        
+        }
+
+
+        
+        /// <summary>
         /// Execute operations atomically (SaveChanges replacement).
         /// </summary>
-        public async Task ExecuteAtomicAsync(Func<Task> operations)
+        public async Task ExecuteAtomicAsync(Func<Task> operations, CancellationToken cancellationToken = default)
         {
             // EF pattern: if any transaction active (explicit or ambient TransactionScope) — just execute
             if (IsInTransaction)
@@ -320,7 +523,7 @@ namespace redb.Postgres.Data
             }
             
             // Otherwise create auto-transaction
-            await using var tx = await BeginTransactionAsync();
+            await using var tx = await BeginTransactionAsync(cancellationToken: cancellationToken);
             try
             {
                 await operations();
@@ -336,7 +539,7 @@ namespace redb.Postgres.Data
         /// <summary>
         /// Execute operations atomically and return result.
         /// </summary>
-        public async Task<T> ExecuteAtomicAsync<T>(Func<Task<T>> operations)
+        public async Task<T> ExecuteAtomicAsync<T>(Func<Task<T>> operations, CancellationToken cancellationToken = default)
         {
             // EF pattern: if any transaction active (explicit or ambient TransactionScope) — just execute
             if (IsInTransaction)
@@ -344,7 +547,7 @@ namespace redb.Postgres.Data
                 return await operations();
             }
             
-            await using var tx = await BeginTransactionAsync();
+            await using var tx = await BeginTransactionAsync(cancellationToken: cancellationToken);
             try
             {
                 var result = await operations();
@@ -363,12 +566,16 @@ namespace redb.Postgres.Data
         /// <summary>
         /// Execute SQL returning JSON (for PostgreSQL functions).
         /// </summary>
-        public async Task<string?> ExecuteJsonAsync(string sql, params object[] parameters)
+        public Task<string?> ExecuteJsonAsync(string sql, params object[] parameters)
+            => ExecuteJsonAsync(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<string?> ExecuteJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken)
         {
             using var _guard = EnterCommand();
-            var conn = await GetOpenConnectionAsync();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
             await using var cmd = CreateCommand(conn, sql, parameters);
-            var result = await cmd.ExecuteScalarAsync();
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
             
             if (result == null || result == DBNull.Value)
                 return null;
@@ -379,15 +586,19 @@ namespace redb.Postgres.Data
         /// <summary>
         /// Execute SQL returning multiple JSON rows.
         /// </summary>
-        public async Task<List<string>> ExecuteJsonListAsync(string sql, params object[] parameters)
+        public Task<List<string>> ExecuteJsonListAsync(string sql, params object[] parameters)
+            => ExecuteJsonListAsync(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<List<string>> ExecuteJsonListAsync(string sql, object[] parameters, CancellationToken cancellationToken)
         {
             using var _guard = EnterCommand();
-            var conn = await GetOpenConnectionAsync();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
             await using var cmd = CreateCommand(conn, sql, parameters);
-            await using var reader = await cmd.ExecuteReaderAsync();
-            
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
             var results = new List<string>();
-            while (await reader.ReadAsync())
+            while (await reader.ReadAsync(cancellationToken))
             {
                 // Skip NULL values (e.g. get_object_json returns NULL for deleted objects)
                 if (reader.IsDBNull(0))
@@ -409,6 +620,21 @@ namespace redb.Postgres.Data
                 return;
 
             _disposed = true;
+
+            // Teardown takes the SAME exclusion as commands: wait for the in-flight one (new
+            // entrants bounce with ObjectDisposedException the moment the gate flag is set),
+            // so Close/Reset never runs under a running command. The budget follows the
+            // connection's own Command Timeout - a command may legally run that long. The LIVE
+            // object is the source of truth (it can be changed programmatically); the string
+            // is the fallback for a connection that was never opened.
+            int commandTimeout;
+            try
+            {
+                commandTimeout = _connection?.CommandTimeout
+                    ?? new NpgsqlConnectionStringBuilder(_dataSource.ConnectionString).CommandTimeout;
+            }
+            catch { commandTimeout = 0; }
+            await _gate.DisposeAndWaitAsync(CommandGate.BudgetFrom(commandTimeout));
 
             // The physical connection MUST return to the pool even if disposing a broken transaction
             // throws (e.g. after a mid-query failure): finally guarantees the return, and the exception

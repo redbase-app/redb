@@ -43,7 +43,8 @@ namespace redb.SQLite.Data
             DataSource = dataSource;
             _connection = new SqliteRedbConnection(dataSource);
             var domain = redb.Core.Models.Configuration.RedbServiceConfiguration.ComputeCacheDomain(dataSource.ConnectionString);
-            _keyGenerator = new SqliteKeyGenerator(dataSource, domain);
+            _keyGenerator = new SqliteKeyGenerator(dataSource, domain,
+                ambientTransactionAccessor: () => _connection.TryGetAmbientTransaction());
             _bulkOperations = new SqliteBulkOperations(_connection);
         }
         

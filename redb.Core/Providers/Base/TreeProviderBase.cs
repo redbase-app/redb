@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Data;
 using redb.Core.Models;
@@ -59,7 +60,7 @@ public abstract class TreeProviderBase : ITreeProvider
     // === INTERFACE IMPLEMENTATION ===
     // ============================================================
 
-    public async Task InitializeTypeRegistryAsync()
+    public async Task InitializeTypeRegistryAsync(CancellationToken cancellationToken = default)
     {
         if (!Cache.IsClrTypeRegistryInitialized)
         {
@@ -72,52 +73,52 @@ public abstract class TreeProviderBase : ITreeProvider
     /// <summary>
     /// Load tree by root object ID (uses _securityContext).
     /// </summary>
-    public async Task<TreeRedbObject<TProps>> LoadTreeAsync<TProps>(long rootObjectId, int? maxDepth = null) where TProps : class, new()
+    public async Task<TreeRedbObject<TProps>> LoadTreeAsync<TProps>(long rootObjectId, int? maxDepth = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
         return await LoadTreeWithUserAsync<TProps>(rootObjectId, actualMaxDepth, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<TreeRedbObject<TProps>> LoadTreeAsync<TProps>(IRedbObject rootObj, int? maxDepth = null) where TProps : class, new()
+    public async Task<TreeRedbObject<TProps>> LoadTreeAsync<TProps>(IRedbObject rootObj, int? maxDepth = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
         return await LoadTreeWithUserAsync<TProps>(rootObj.Id, actualMaxDepth, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetChildrenAsync<TProps>(IRedbObject parentObj) where TProps : class, new()
+    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetChildrenAsync<TProps>(IRedbObject parentObj, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         return await GetChildrenWithUserAsync<TProps>(parentObj.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetPathToRootAsync<TProps>(IRedbObject obj) where TProps : class, new()
+    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetPathToRootAsync<TProps>(IRedbObject obj, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         return await GetPathToRootWithUserAsync<TProps>(obj.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetDescendantsAsync<TProps>(IRedbObject parentObj, int? maxDepth = null) where TProps : class, new()
+    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetDescendantsAsync<TProps>(IRedbObject parentObj, int? maxDepth = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
         return await GetDescendantsWithUserAsync<TProps>(parentObj.Id, actualMaxDepth, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task MoveObjectAsync(IRedbObject obj, IRedbObject? newParentObj)
+    public async Task MoveObjectAsync(IRedbObject obj, IRedbObject? newParentObj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         await MoveObjectWithUserAsync(obj.Id, newParentObj?.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnSave);
     }
     
-    public async Task<long> CreateChildAsync<TProps>(TreeRedbObject<TProps> obj, IRedbObject parentObj) where TProps : class, new()
+    public async Task<long> CreateChildAsync<TProps>(TreeRedbObject<TProps> obj, IRedbObject parentObj, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         return await CreateChildWithUserAsync(obj, parentObj.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnSave);
     }
 
-    public async Task<int> DeleteSubtreeAsync(IRedbObject parentObj)
+    public async Task<int> DeleteSubtreeAsync(IRedbObject parentObj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         return await DeleteSubtreeWithUserAsync(parentObj.Id, effectiveUser);
@@ -128,61 +129,61 @@ public abstract class TreeProviderBase : ITreeProvider
     /// <summary>
     /// Load tree by root object ID with explicit user.
     /// </summary>
-    public async Task<TreeRedbObject<TProps>> LoadTreeAsync<TProps>(long rootObjectId, IRedbUser user, int? maxDepth = null) where TProps : class, new()
+    public async Task<TreeRedbObject<TProps>> LoadTreeAsync<TProps>(long rootObjectId, IRedbUser user, int? maxDepth = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
         return await LoadTreeWithUserAsync<TProps>(rootObjectId, actualMaxDepth, user.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<TreeRedbObject<TProps>> LoadTreeAsync<TProps>(IRedbObject rootObj, IRedbUser user, int? maxDepth = null) where TProps : class, new()
+    public async Task<TreeRedbObject<TProps>> LoadTreeAsync<TProps>(IRedbObject rootObj, IRedbUser user, int? maxDepth = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
         return await LoadTreeWithUserAsync<TProps>(rootObj.Id, actualMaxDepth, user.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetChildrenAsync<TProps>(IRedbObject parentObj, IRedbUser user) where TProps : class, new()
+    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetChildrenAsync<TProps>(IRedbObject parentObj, IRedbUser user, CancellationToken cancellationToken = default) where TProps : class, new()
         => await GetChildrenWithUserAsync<TProps>(parentObj.Id, user.Id, Configuration.DefaultCheckPermissionsOnLoad);
     
-    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetPathToRootAsync<TProps>(IRedbObject obj, IRedbUser user) where TProps : class, new()
+    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetPathToRootAsync<TProps>(IRedbObject obj, IRedbUser user, CancellationToken cancellationToken = default) where TProps : class, new()
         => await GetPathToRootWithUserAsync<TProps>(obj.Id, user.Id, Configuration.DefaultCheckPermissionsOnLoad);
     
-    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetDescendantsAsync<TProps>(IRedbObject parentObj, IRedbUser user, int? maxDepth = null) where TProps : class, new()
+    public async Task<IEnumerable<TreeRedbObject<TProps>>> GetDescendantsAsync<TProps>(IRedbObject parentObj, IRedbUser user, int? maxDepth = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
         return await GetDescendantsWithUserAsync<TProps>(parentObj.Id, actualMaxDepth, user.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task MoveObjectAsync(IRedbObject obj, IRedbObject? newParentObj, IRedbUser user)
-        => await MoveObjectWithUserAsync(obj.Id, newParentObj?.Id, user.Id, Configuration.DefaultCheckPermissionsOnSave);
+    public async Task MoveObjectAsync(IRedbObject obj, IRedbObject? newParentObj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await MoveObjectWithUserAsync(obj.Id, newParentObj?.Id, user.Id, Configuration.DefaultCheckPermissionsOnSave, cancellationToken);
     
-    public async Task<long> CreateChildAsync<TProps>(TreeRedbObject<TProps> obj, IRedbObject parentObj, IRedbUser user) where TProps : class, new()
+    public async Task<long> CreateChildAsync<TProps>(TreeRedbObject<TProps> obj, IRedbObject parentObj, IRedbUser user, CancellationToken cancellationToken = default) where TProps : class, new()
         => await CreateChildWithUserAsync(obj, parentObj.Id, user.Id, Configuration.DefaultCheckPermissionsOnSave);
 
-    public async Task<int> DeleteSubtreeAsync(IRedbObject parentObj, IRedbUser user)
-        => await DeleteSubtreeWithUserAsync(parentObj.Id, user);
+    public async Task<int> DeleteSubtreeAsync(IRedbObject parentObj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await DeleteSubtreeWithUserAsync(parentObj.Id, user, cancellationToken);
 
     // ===== POLYMORPHIC METHODS =====
     
-    public async Task<ITreeRedbObject> LoadPolymorphicTreeAsync(IRedbObject rootObj, int? maxDepth = null)
+    public async Task<ITreeRedbObject> LoadPolymorphicTreeAsync(IRedbObject rootObj, int? maxDepth = null, CancellationToken cancellationToken = default)
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
         return await LoadPolymorphicTreeWithUserAsync(rootObj.Id, actualMaxDepth, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicChildrenAsync(IRedbObject parentObj)
+    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicChildrenAsync(IRedbObject parentObj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         return await GetPolymorphicChildrenWithUserAsync(parentObj.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicPathToRootAsync(IRedbObject obj)
+    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicPathToRootAsync(IRedbObject obj, CancellationToken cancellationToken = default)
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         return await GetPolymorphicPathToRootWithUserAsync(obj.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicDescendantsAsync(IRedbObject parentObj, int? maxDepth = null)
+    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicDescendantsAsync(IRedbObject parentObj, int? maxDepth = null, CancellationToken cancellationToken = default)
     {
         var effectiveUser = SecurityContext.GetEffectiveUser();
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
@@ -191,19 +192,19 @@ public abstract class TreeProviderBase : ITreeProvider
 
     // ===== POLYMORPHIC METHODS WITH EXPLICIT USER =====
     
-    public async Task<ITreeRedbObject> LoadPolymorphicTreeAsync(IRedbObject rootObj, IRedbUser user, int? maxDepth = null)
+    public async Task<ITreeRedbObject> LoadPolymorphicTreeAsync(IRedbObject rootObj, IRedbUser user, int? maxDepth = null, CancellationToken cancellationToken = default)
     {
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
         return await LoadPolymorphicTreeWithUserAsync(rootObj.Id, actualMaxDepth, user.Id, Configuration.DefaultCheckPermissionsOnLoad);
     }
     
-    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicChildrenAsync(IRedbObject parentObj, IRedbUser user)
-        => await GetPolymorphicChildrenWithUserAsync(parentObj.Id, user.Id, Configuration.DefaultCheckPermissionsOnLoad);
+    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicChildrenAsync(IRedbObject parentObj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await GetPolymorphicChildrenWithUserAsync(parentObj.Id, user.Id, Configuration.DefaultCheckPermissionsOnLoad, cancellationToken);
     
-    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicPathToRootAsync(IRedbObject obj, IRedbUser user)
-        => await GetPolymorphicPathToRootWithUserAsync(obj.Id, user.Id, Configuration.DefaultCheckPermissionsOnLoad);
+    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicPathToRootAsync(IRedbObject obj, IRedbUser user, CancellationToken cancellationToken = default)
+        => await GetPolymorphicPathToRootWithUserAsync(obj.Id, user.Id, Configuration.DefaultCheckPermissionsOnLoad, cancellationToken);
     
-    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicDescendantsAsync(IRedbObject parentObj, IRedbUser user, int? maxDepth = null)
+    public async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicDescendantsAsync(IRedbObject parentObj, IRedbUser user, int? maxDepth = null, CancellationToken cancellationToken = default)
     {
         var actualMaxDepth = maxDepth ?? Configuration.DefaultMaxTreeDepth;
         return await GetPolymorphicDescendantsWithUserAsync(parentObj.Id, actualMaxDepth, user.Id, Configuration.DefaultCheckPermissionsOnLoad);
@@ -214,7 +215,7 @@ public abstract class TreeProviderBase : ITreeProvider
     // ============================================================
 
     protected virtual async Task<TreeRedbObject<TProps>> LoadTreeWithUserAsync<TProps>(
-        long rootId, int maxDepth = 10, long? userId = null, bool checkPermissions = false) where TProps : class, new()
+        long rootId, int maxDepth = 10, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var baseObject = await ObjectStorage.LoadAsync<TProps>(rootId, 1);
         if (baseObject == null)
@@ -227,13 +228,13 @@ public abstract class TreeProviderBase : ITreeProvider
     }
 
     protected virtual async Task<IEnumerable<TreeRedbObject<TProps>>> GetChildrenWithUserAsync<TProps>(
-        long parentId, long? userId = null, bool checkPermissions = false) where TProps : class, new()
+        long parentId, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var scheme = await SchemeSyncProvider.GetSchemeByTypeAsync<TProps>();
         if (scheme == null)
             throw new InvalidOperationException($"Scheme for type {typeof(TProps).Name} not found. Use SyncSchemeAsync<{typeof(TProps).Name}>() to create scheme.");
         
-        var jsonResults = await Context.ExecuteJsonListAsync(Sql.Tree_SelectChildrenJson(), parentId, scheme.Id);
+        var jsonResults = await Context.ExecuteJsonListAsync(Sql.Tree_SelectChildrenJson(), new object[] { parentId, scheme.Id }, cancellationToken);
         
         var children = new List<TreeRedbObject<TProps>>();
         
@@ -265,7 +266,7 @@ public abstract class TreeProviderBase : ITreeProvider
     }
 
     protected virtual async Task<IEnumerable<TreeRedbObject<TProps>>> GetPathToRootWithUserAsync<TProps>(
-        long objectId, long? userId = null, bool checkPermissions = false) where TProps : class, new()
+        long objectId, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var path = new List<TreeRedbObject<TProps>>();
         var visited = new HashSet<long>();
@@ -307,14 +308,14 @@ public abstract class TreeProviderBase : ITreeProvider
     }
 
     protected virtual async Task<IEnumerable<TreeRedbObject<TProps>>> GetDescendantsWithUserAsync<TProps>(
-        long parentId, int maxDepth = 50, long? userId = null, bool checkPermissions = false) where TProps : class, new()
+        long parentId, int maxDepth = 50, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var descendants = new List<TreeRedbObject<TProps>>();
         await CollectDescendants(parentId, descendants, maxDepth, 0, userId, checkPermissions);
         return descendants;
     }
 
-    protected virtual async Task MoveObjectWithUserAsync(long objectId, long? newParentId, long userId, bool checkPermissions = true)
+    protected virtual async Task MoveObjectWithUserAsync(long objectId, long? newParentId, long userId, bool checkPermissions = true, CancellationToken cancellationToken = default)
     {
         if (checkPermissions)
         {
@@ -326,7 +327,7 @@ public abstract class TreeProviderBase : ITreeProvider
         
         if (newParentId.HasValue)
         {
-            var parentExists = await Context.ExecuteScalarAsync<long?>(Sql.Tree_ObjectExists(), newParentId.Value);
+            var parentExists = await Context.ExecuteScalarAsync<long?>(Sql.Tree_ObjectExists(), new object[] { newParentId.Value }, cancellationToken);
             if (!parentExists.HasValue)
                 throw new ArgumentException($"Parent object {newParentId} does not exist");
             
@@ -334,18 +335,17 @@ public abstract class TreeProviderBase : ITreeProvider
         }
         
         var rowsAffected = await Context.ExecuteAsync(
-            Sql.Tree_UpdateParent(),
-            newParentId.HasValue ? (object)newParentId.Value : DBNull.Value,
+            Sql.Tree_UpdateParent(), new object[] { newParentId.HasValue ? (object)newParentId.Value : DBNull.Value,
             DateTimeOffset.UtcNow,
             userId,
-            objectId);
+            objectId }, cancellationToken);
         
         if (rowsAffected == 0)
             throw new ArgumentException($"Object {objectId} not found");
     }
 
     protected virtual async Task<long> CreateChildWithUserAsync<TProps>(
-        TreeRedbObject<TProps> obj, long parentId, long? userId = null, bool checkPermissions = false) where TProps : class, new()
+        TreeRedbObject<TProps> obj, long parentId, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         if (obj.id == 0)
         {
@@ -358,7 +358,7 @@ public abstract class TreeProviderBase : ITreeProvider
         return await ObjectStorage.SaveAsync(obj, effectiveUser);
     }
 
-    protected virtual async Task<int> DeleteSubtreeWithUserAsync(long parentId, IRedbUser user)
+    protected virtual async Task<int> DeleteSubtreeWithUserAsync(long parentId, IRedbUser user, CancellationToken cancellationToken = default)
     {
         var checkPermissions = Configuration.DefaultCheckPermissionsOnDelete;
         
@@ -373,8 +373,8 @@ public abstract class TreeProviderBase : ITreeProvider
         await CollectDescendantIds(parentId, objectIds, 100, 0);
         objectIds.Add(parentId);
 
-        await Context.ExecuteAsync(Sql.Tree_DeleteValuesByObjectIds(), objectIds.ToArray());
-        await Context.ExecuteAsync(Sql.Tree_DeleteObjectsByIds(), objectIds.ToArray());
+        await Context.ExecuteAsync(Sql.Tree_DeleteValuesByObjectIds(), new object[] { objectIds.ToArray() }, cancellationToken);
+        await Context.ExecuteAsync(Sql.Tree_DeleteObjectsByIds(), new object[] { objectIds.ToArray() }, cancellationToken);
 
         // The collected id list IS the subtree (self + descendants), so its count is the correct,
         // dialect-independent number of objects deleted. The raw DELETE rows-affected is unreliable
@@ -384,13 +384,13 @@ public abstract class TreeProviderBase : ITreeProvider
         return objectIds.Count;
     }
 
-    private async Task CollectDescendantIds(long parentId, List<long> ids, int maxDepth, int currentDepth)
+    private async Task CollectDescendantIds(long parentId, List<long> ids, int maxDepth, int currentDepth, CancellationToken cancellationToken = default)
     {
         if (currentDepth >= maxDepth) return;
         
         // Id-only: no get_object_json materialization (lighter, and works on tiers without that
         // function such as SQLite Pro, where the heavier polymorphic recipe is unavailable).
-        var childIds = await Context.QueryScalarListAsync<long>(Sql.Tree_SelectChildrenIds(), parentId);
+        var childIds = await Context.QueryScalarListAsync<long>(Sql.Tree_SelectChildrenIds(), new object[] { parentId }, cancellationToken);
         foreach (var childId in childIds)
         {
             ids.Add(childId);
@@ -402,7 +402,7 @@ public abstract class TreeProviderBase : ITreeProvider
     // === POLYMORPHIC IMPLEMENTATION ===
     // ============================================================
 
-    protected virtual async Task<IRedbObject> LoadDynamicObjectAsync(long objectId, IRedbUser? user = null)
+    protected virtual async Task<IRedbObject> LoadDynamicObjectAsync(long objectId, IRedbUser? user = null, CancellationToken cancellationToken = default)
     {
         if (Configuration.DefaultCheckPermissionsOnLoad && user != null)
         {
@@ -411,7 +411,7 @@ public abstract class TreeProviderBase : ITreeProvider
                 throw new UnauthorizedAccessException($"User {user.Id} does not have permission to read object {objectId}");
         }
 
-        var result = await Context.QueryFirstOrDefaultAsync<SchemeWithJson>(Sql.Tree_SelectSchemeAndJson(), objectId);
+        var result = await Context.QueryFirstOrDefaultAsync<SchemeWithJson>(Sql.Tree_SelectSchemeAndJson(), new object[] { objectId }, cancellationToken);
 
         if (result == null || string.IsNullOrEmpty(result.JsonData))
             throw new InvalidOperationException($"Object with ID {objectId} not found");
@@ -421,7 +421,7 @@ public abstract class TreeProviderBase : ITreeProvider
     }
     
     protected virtual async Task<ITreeRedbObject> LoadPolymorphicTreeWithUserAsync(
-        long rootId, int maxDepth = 10, long? userId = null, bool checkPermissions = false)
+        long rootId, int maxDepth = 10, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default)
     {
         var user = userId.HasValue ? await GetUserByIdAsync(userId.Value) : null;
         var baseObject = await LoadDynamicObjectAsync(rootId, user);
@@ -433,9 +433,9 @@ public abstract class TreeProviderBase : ITreeProvider
     }
 
     protected virtual async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicChildrenWithUserAsync(
-        long parentId, long? userId = null, bool checkPermissions = false)
+        long parentId, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default)
     {
-        var results = await Context.QueryAsync<ChildObjectInfo>(Sql.Tree_SelectPolymorphicChildren(), parentId);
+        var results = await Context.QueryAsync<ChildObjectInfo>(Sql.Tree_SelectPolymorphicChildren(), new object[] { parentId }, cancellationToken);
         
         var children = new List<ITreeRedbObject>();
         
@@ -466,7 +466,7 @@ public abstract class TreeProviderBase : ITreeProvider
     }
 
     protected virtual async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicPathToRootWithUserAsync(
-        long objectId, long? userId = null, bool checkPermissions = false)
+        long objectId, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default)
     {
         var path = new List<ITreeRedbObject>();
         var visited = new HashSet<long>();
@@ -513,7 +513,7 @@ public abstract class TreeProviderBase : ITreeProvider
     }
 
     protected virtual async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicDescendantsWithUserAsync(
-        long parentId, int maxDepth = 50, long? userId = null, bool checkPermissions = false)
+        long parentId, int maxDepth = 50, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default)
     {
         var descendants = new List<ITreeRedbObject>();
         await CollectPolymorphicDescendants(parentId, descendants, maxDepth, 0, userId, checkPermissions);
@@ -553,7 +553,7 @@ public abstract class TreeProviderBase : ITreeProvider
         }
     }
 
-    private async Task ValidateNoCyclicReference(long objectId, long newParentId)
+    private async Task ValidateNoCyclicReference(long objectId, long newParentId, CancellationToken cancellationToken = default)
     {
         var visited = new HashSet<long>();
         long? currentId = newParentId;
@@ -568,7 +568,7 @@ public abstract class TreeProviderBase : ITreeProvider
             
             visited.Add(currentId.Value);
             
-            var parent = await Context.ExecuteScalarAsync<long?>(Sql.Tree_SelectParentId(), currentId.Value);
+            var parent = await Context.ExecuteScalarAsync<long?>(Sql.Tree_SelectParentId(), new object[] { currentId.Value }, cancellationToken);
             currentId = parent;
         }
     }
@@ -632,6 +632,7 @@ public abstract class TreeProviderBase : ITreeProvider
             value_numeric = source.value_numeric,
             value_datetime = source.value_datetime,
             value_bytes = source.value_bytes,
+            value_unique = source.value_unique,
             name = source.name,
             note = source.note,
             hash = source.hash,
@@ -665,6 +666,7 @@ public abstract class TreeProviderBase : ITreeProvider
             value_numeric = redbObj.value_numeric,
             value_datetime = redbObj.value_datetime,
             value_bytes = redbObj.value_bytes,
+            value_unique = redbObj.value_unique,
             name = redbObj.name,
             note = redbObj.note,
             hash = redbObj.hash

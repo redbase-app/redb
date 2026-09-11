@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Models.Entities;
 using redb.Core.Models.Contracts;
@@ -74,32 +75,34 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// <summary>
     /// Execute query and return list of objects.
     /// </summary>
-    Task<List<RedbObject<TProps>>> ToListAsync();
+    Task<List<RedbObject<TProps>>> ToListAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Count records without loading data.
     /// </summary>
-    Task<int> CountAsync();
+    Task<int> CountAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get first object or null.
     /// </summary>
-    Task<RedbObject<TProps>?> FirstOrDefaultAsync();
+    Task<RedbObject<TProps>?> FirstOrDefaultAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get first object matching condition, or null.
     /// </summary>
-    Task<RedbObject<TProps>?> FirstOrDefaultAsync(Expression<Func<TProps, bool>> predicate);
+    Task<RedbObject<TProps>?> FirstOrDefaultAsync(Expression<Func<TProps, bool>> predicate,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Check if any records exist.
     /// </summary>
-    Task<bool> AnyAsync();
+    Task<bool> AnyAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Check if any records match condition.
     /// </summary>
-    Task<bool> AnyAsync(Expression<Func<TProps, bool>> predicate);
+    Task<bool> AnyAsync(Expression<Func<TProps, bool>> predicate,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Filter by value in list (WHERE field IN (...)).
@@ -119,7 +122,8 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// <summary>
     /// Check if ALL records match condition.
     /// </summary>
-    Task<bool> AllAsync(Expression<Func<TProps, bool>> predicate);
+    Task<bool> AllAsync(Expression<Func<TProps, bool>> predicate,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Project fields - return only selected properties.
@@ -161,16 +165,13 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// Default: 10 levels.
     /// </summary>
     IRedbQueryable<TProps> WithMaxRecursionDepth(int depth);
-    
+
     /// <summary>
-    /// Enable/disable lazy loading of Props for this query.
-    /// Overrides global EnableLazyLoadingForProps configuration setting.
-    /// With lazy loading: Props loaded in BULK for ALL objects via LoadPropsForManyAsync after ToListAsync.
-    /// Without lazy loading: Props loaded immediately via get_object_json (legacy behavior).
+    /// V4 (LAZY Л2): per-query override of the lazy-references option. true = references whose
+    /// structures carry the `virtual` marker come back as stubs; false = full objects, whatever
+    /// the global option says.
     /// </summary>
-    /// <param name="enabled">true = lazy loading, false = eager loading</param>
-    /// <returns>Query with configured Props loading mode</returns>
-    IRedbQueryable<TProps> WithLazyLoading(bool enabled = true);
+    IRedbQueryable<TProps> WithLazyReferences(bool enabled = true);
     
     // ===== TREE FILTERS =====
     
@@ -289,7 +290,7 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// Children contain only objects from loaded chain (not all children from DB).
     /// </summary>
     /// <returns>List of filtered TreeRedbObject with populated relationships</returns>
-    Task<List<TreeRedbObject<TProps>>> ToTreeListAsync();
+    Task<List<TreeRedbObject<TProps>>> ToTreeListAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute query and get list of root tree nodes.
@@ -298,21 +299,21 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// Supports polymorphic trees - each object of its own type via ITreeRedbObject.
     /// </summary>
     /// <returns>List of root ITreeRedbObject (polymorphic - each of its own TProps type)</returns>
-    Task<List<ITreeRedbObject>> ToRootListAsync();
+    Task<List<ITreeRedbObject>> ToRootListAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Execute query and get flat list of tree objects.
     /// Without loading Parent/Children relationships (for performance).
     /// </summary>
     /// <returns>Flat list of TreeRedbObject</returns>
-    Task<List<TreeRedbObject<TProps>>> ToFlatListAsync();
+    Task<List<TreeRedbObject<TProps>>> ToFlatListAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Delete objects without loading data.
     /// Executes DELETE with filters from query.
     /// </summary>
     /// <returns>Number of deleted records</returns>
-    Task<int> DeleteAsync();
+    Task<int> DeleteAsync(CancellationToken cancellationToken = default);
     
     // ===== AGGREGATIONS (EAV) =====
     
@@ -323,22 +324,26 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// <example>
     /// var total = await query.Where(x => x.Status == "Active").SumAsync(x => x.Price);
     /// </example>
-    Task<decimal> SumAsync<TField>(Expression<Func<TProps, TField>> selector) where TField : struct;
+    Task<decimal> SumAsync<TField>(Expression<Func<TProps, TField>> selector,
+        CancellationToken cancellationToken = default) where TField : struct;
     
     /// <summary>
     /// Average of field values.
     /// </summary>
-    Task<decimal> AverageAsync<TField>(Expression<Func<TProps, TField>> selector) where TField : struct;
+    Task<decimal> AverageAsync<TField>(Expression<Func<TProps, TField>> selector,
+        CancellationToken cancellationToken = default) where TField : struct;
     
     /// <summary>
     /// Minimum field value.
     /// </summary>
-    Task<TField?> MinAsync<TField>(Expression<Func<TProps, TField>> selector) where TField : struct;
+    Task<TField?> MinAsync<TField>(Expression<Func<TProps, TField>> selector,
+        CancellationToken cancellationToken = default) where TField : struct;
     
     /// <summary>
     /// Maximum field value.
     /// </summary>
-    Task<TField?> MaxAsync<TField>(Expression<Func<TProps, TField>> selector) where TField : struct;
+    Task<TField?> MaxAsync<TField>(Expression<Func<TProps, TField>> selector,
+        CancellationToken cancellationToken = default) where TField : struct;
     
     /// <summary>
     /// Get field statistics (Sum, Avg, Min, Max, Count) in single call.
@@ -348,7 +353,8 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// var stats = await query.GetStatisticsAsync(x => x.Price);
     /// stats.Sum, stats.Average, stats.Min, stats.Max, stats.Count
     /// </example>
-    Task<FieldStatistics<TField>> GetStatisticsAsync<TField>(Expression<Func<TProps, TField>> selector) where TField : struct;
+    Task<FieldStatistics<TField>> GetStatisticsAsync<TField>(Expression<Func<TProps, TField>> selector,
+        CancellationToken cancellationToken = default) where TField : struct;
     
     /// <summary>
     /// Flexible aggregation - choose what to aggregate via Agg.Sum/Avg/Min/Max/Count.
@@ -363,7 +369,8 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     ///         OrderCount = Agg.Count()
     ///     });
     /// </example>
-    Task<TResult> AggregateAsync<TResult>(Expression<Func<RedbObject<TProps>, TResult>> selector);
+    Task<TResult> AggregateAsync<TResult>(Expression<Func<RedbObject<TProps>, TResult>> selector,
+        CancellationToken cancellationToken = default);
     
     // ===== AGGREGATIONS FOR BASE FIELDS =====
     
@@ -374,25 +381,29 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// <example>
     /// var totalValue = await query.SumRedbAsync(x => x.ValueLong);
     /// </example>
-    Task<decimal> SumRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector) where TField : struct;
+    Task<decimal> SumRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector,
+        CancellationToken cancellationToken = default) where TField : struct;
     
     /// <summary>
     /// Average of IRedbObject base field values.
     /// Uses IRedbObject for compile-time safety - Props not visible!
     /// </summary>
-    Task<decimal> AverageRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector) where TField : struct;
+    Task<decimal> AverageRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector,
+        CancellationToken cancellationToken = default) where TField : struct;
     
     /// <summary>
     /// Minimum IRedbObject base field value (ValueLong, Key, DateCreate, etc.).
     /// Uses IRedbObject for compile-time safety - Props not visible!
     /// </summary>
-    Task<TField?> MinRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector) where TField : struct;
+    Task<TField?> MinRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector,
+        CancellationToken cancellationToken = default) where TField : struct;
     
     /// <summary>
     /// Maximum IRedbObject base field value (ValueLong, Key, DateCreate, etc.).
     /// Uses IRedbObject for compile-time safety - Props not visible!
     /// </summary>
-    Task<TField?> MaxRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector) where TField : struct;
+    Task<TField?> MaxRedbAsync<TField>(Expression<Func<IRedbObject, TField>> selector,
+        CancellationToken cancellationToken = default) where TField : struct;
     
     /// <summary>
     /// Flexible aggregation for IRedbObject base fields ONLY.
@@ -407,7 +418,8 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     ///         Count = Agg.Count()
     ///     });
     /// </example>
-    Task<TResult> AggregateRedbAsync<TResult>(Expression<Func<IRedbObject, TResult>> selector);
+    Task<TResult> AggregateRedbAsync<TResult>(Expression<Func<IRedbObject, TResult>> selector,
+        CancellationToken cancellationToken = default);
     
     // ===== GROUPBY =====
     
@@ -486,12 +498,12 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// <summary>
     /// Async version of getting SQL (recommended).
     /// </summary>
-    Task<string> ToSqlStringAsync();
+    Task<string> ToSqlStringAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get JSON filter that will be sent to SQL function (for diagnostics).
     /// </summary>
-    Task<string> ToFilterJsonAsync();
+    Task<string> ToFilterJsonAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>

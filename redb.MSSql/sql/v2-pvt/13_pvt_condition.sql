@@ -34,6 +34,21 @@ BEGIN
 END;
 GO
 
+-- ---------- pvt_like_escape: make a sugar operand LITERAL under LIKE --
+-- BR-7 (2026-09-02): $startsWith/$endsWith/$contains (+IgnoreCase; field, dict, listitem,
+-- array and expression sugar) splice their operand into a LIKE pattern. The operand is a
+-- LITERAL by contract: '%'/'_' must not act as wildcards and '[' must not open a character
+-- class. Every escaped site pairs the pattern with ESCAPE '\'. The raw $like/$arrayMatches
+-- operators do NOT pass through here - their pattern belongs to the caller.
+CREATE OR ALTER FUNCTION dbo.pvt_like_escape(@v NVARCHAR(MAX))
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    RETURN REPLACE(REPLACE(REPLACE(REPLACE(@v,
+        N'\', N'\\'), N'%', N'\%'), N'_', N'\_'), N'[', N'\[');
+END;
+GO
+
 -- ---------- pvt_jsonb_to_sql_literal ----------------------------------
 -- @type follows OPENJSON convention: 0=null, 1=string, 2=number, 3=true/false,
 -- 4=array, 5=object. For arrays/objects, callers must use OPENJSON themselves.
@@ -167,17 +182,17 @@ BEGIN
             ELSE IF @don = N'$like'
                 SET @dpiece = @dict_exist_pfx + N' AND ' + @dict_db_col + N' LIKE ' + dbo.pvt_sql_string_literal(@dov) + N')';
             ELSE IF @don = N'$contains'
-                SET @dpiece = @dict_exist_pfx + N' AND ' + @dict_db_col + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + @dov + N'%') + N')';
+                SET @dpiece = @dict_exist_pfx + N' AND ' + @dict_db_col + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@dov) + N'%') + N' ESCAPE ''\'')';
             ELSE IF @don = N'$startswith'
-                SET @dpiece = @dict_exist_pfx + N' AND ' + @dict_db_col + N' LIKE ' + dbo.pvt_sql_string_literal(@dov + N'%') + N')';
+                SET @dpiece = @dict_exist_pfx + N' AND ' + @dict_db_col + N' LIKE ' + dbo.pvt_sql_string_literal(dbo.pvt_like_escape(@dov) + N'%') + N' ESCAPE ''\'')';
             ELSE IF @don = N'$endswith'
-                SET @dpiece = @dict_exist_pfx + N' AND ' + @dict_db_col + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + @dov) + N')';
+                SET @dpiece = @dict_exist_pfx + N' AND ' + @dict_db_col + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@dov)) + N' ESCAPE ''\'')';
             ELSE IF @don = N'$containsignorecase'
-                SET @dpiece = @dict_exist_pfx + N' AND LOWER(' + @dict_db_col + N') LIKE ' + dbo.pvt_sql_string_literal(N'%' + LOWER(@dov) + N'%') + N')';
+                SET @dpiece = @dict_exist_pfx + N' AND LOWER(' + @dict_db_col + N') LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(LOWER(@dov)) + N'%') + N' ESCAPE ''\'')';
             ELSE IF @don = N'$startswithignorecase'
-                SET @dpiece = @dict_exist_pfx + N' AND LOWER(' + @dict_db_col + N') LIKE ' + dbo.pvt_sql_string_literal(LOWER(@dov) + N'%') + N')';
+                SET @dpiece = @dict_exist_pfx + N' AND LOWER(' + @dict_db_col + N') LIKE ' + dbo.pvt_sql_string_literal(dbo.pvt_like_escape(LOWER(@dov)) + N'%') + N' ESCAPE ''\'')';
             ELSE IF @don = N'$endswithignorecase'
-                SET @dpiece = @dict_exist_pfx + N' AND LOWER(' + @dict_db_col + N') LIKE ' + dbo.pvt_sql_string_literal(N'%' + LOWER(@dov)) + N')';
+                SET @dpiece = @dict_exist_pfx + N' AND LOWER(' + @dict_db_col + N') LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(LOWER(@dov))) + N' ESCAPE ''\'')';
             ELSE IF @don IN (N'$in', N'$nin')
             BEGIN
                 IF @dot <> 4
@@ -332,10 +347,10 @@ BEGIN
                     + dbo.pvt_sql_string_literal(@li_ov) + N')';
             ELSE IF @li_on = N'$contains'
                 SET @li_piece = @li_pfx + N' AND ' + @li_cmp_col + N' LIKE '
-                    + dbo.pvt_sql_string_literal(N'%' + @li_ov + N'%') + N')';
+                    + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@li_ov) + N'%') + N' ESCAPE ''\'')';
             ELSE IF @li_on = N'$startswith'
                 SET @li_piece = @li_pfx + N' AND ' + @li_cmp_col + N' LIKE '
-                    + dbo.pvt_sql_string_literal(@li_ov + N'%') + N')';
+                    + dbo.pvt_sql_string_literal(dbo.pvt_like_escape(@li_ov) + N'%') + N' ESCAPE ''\'')';
             -- Array ops on ListItem-array accessor (parity with PG `= ANY(arr)`):
             -- the @li_pfx already restricts to array elements when @li_is_array=1,
             -- so $arrayContains is just an equality on the per-element column.
@@ -430,18 +445,18 @@ BEGIN
         ELSE IF @on = N'$like'
             SET @piece = @col_name + N' LIKE ' + dbo.pvt_sql_string_literal(@opv);
         ELSE IF @on = N'$startswith'
-            SET @piece = @col_name + N' LIKE ' + dbo.pvt_sql_string_literal(@opv + N'%');
+            SET @piece = @col_name + N' LIKE ' + dbo.pvt_sql_string_literal(dbo.pvt_like_escape(@opv) + N'%') + N' ESCAPE ''\''';
         ELSE IF @on = N'$endswith'
-            SET @piece = @col_name + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + @opv);
+            SET @piece = @col_name + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@opv)) + N' ESCAPE ''\''';
         ELSE IF @on = N'$contains'
-            SET @piece = @col_name + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + @opv + N'%');
+            SET @piece = @col_name + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@opv) + N'%') + N' ESCAPE ''\''';
         -- T-SQL has no ILIKE; use COLLATE for case-insensitive matching.
         ELSE IF @on = N'$startswithignorecase'
-            SET @piece = N'LOWER(' + @col_name + N') LIKE ' + dbo.pvt_sql_string_literal(LOWER(@opv) + N'%');
+            SET @piece = N'LOWER(' + @col_name + N') LIKE ' + dbo.pvt_sql_string_literal(dbo.pvt_like_escape(LOWER(@opv)) + N'%') + N' ESCAPE ''\''';
         ELSE IF @on = N'$endswithignorecase'
-            SET @piece = N'LOWER(' + @col_name + N') LIKE ' + dbo.pvt_sql_string_literal(N'%' + LOWER(@opv));
+            SET @piece = N'LOWER(' + @col_name + N') LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(LOWER(@opv))) + N' ESCAPE ''\''';
         ELSE IF @on = N'$containsignorecase'
-            SET @piece = N'LOWER(' + @col_name + N') LIKE ' + dbo.pvt_sql_string_literal(N'%' + LOWER(@opv) + N'%');
+            SET @piece = N'LOWER(' + @col_name + N') LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(LOWER(@opv)) + N'%') + N' ESCAPE ''\''';
         ELSE IF @on IN (N'$null', N'$isnull')
             SET @piece = CASE WHEN @opv = N'true' THEN @col_name + N' IS NULL' ELSE @col_name + N' IS NOT NULL' END;
         ELSE IF @on IN (N'$notnull', N'$exists')
@@ -568,7 +583,7 @@ BEGIN
                     + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
                     + N' AND av._id_structure = ' + @sid
                     + N' AND av._array_index IS NOT NULL'
-                    + N' AND av.[_String] LIKE ' + dbo.pvt_sql_string_literal(@opv + N'%') + N')';
+                    + N' AND av.[_String] LIKE ' + dbo.pvt_sql_string_literal(dbo.pvt_like_escape(@opv) + N'%') + N' ESCAPE ''\'')';
         END
         ELSE IF @on = N'$arrayendswith'
         BEGIN
@@ -579,7 +594,7 @@ BEGIN
                     + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
                     + N' AND av._id_structure = ' + @sid
                     + N' AND av._array_index IS NOT NULL'
-                    + N' AND av.[_String] LIKE ' + dbo.pvt_sql_string_literal(N'%' + @opv) + N')';
+                    + N' AND av.[_String] LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@opv)) + N' ESCAPE ''\'')';
         END
         -- ---- $arrayMatches: LIKE pattern against array element strings ----
         ELSE IF @on = N'$arraymatches'

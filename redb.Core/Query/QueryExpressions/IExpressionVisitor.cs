@@ -38,7 +38,7 @@ public enum PropertyFunction
     Length,
     /// <summary>Collection element count (array.Count)</summary>
     Count,
-    
+
     // Pro: String functions
     /// <summary>Convert to lowercase (string.ToLower())</summary>
     ToLower,
@@ -82,7 +82,7 @@ public enum PropertyFunction
     LogBase,
     /// <summary>Exponentiation (Math.Pow(x, y)). Multi-arg.</summary>
     Pow,
-    
+
     // Pro: Date/time functions
     /// <summary>Year from date (DateTime.Year)</summary>
     Year,
@@ -139,7 +139,7 @@ public enum ArithmeticOperator
 /// </summary>
 public enum ComparisonOperator
 {
-    // 📋 Basic operators
+    // Basic operators
     Equal,
     NotEqual,
     GreaterThan,
@@ -155,11 +155,11 @@ public enum ComparisonOperator
     RegexMatch,             // POSIX regex match (Regex.IsMatch) — PG '~'
     RegexMatchIgnoreCase,   // POSIX regex match, IgnoreCase — PG '~*'
     In,                     // membership in a constant set; the value carries the whole list
-    
-    // 🎯 NULL semantics  
+
+    // NULL semantics
     Exists,             // $exists - explicit field existence check
-    
-    // 🚀 Basic array operators
+
+    // Basic array operators
     ArrayContains,      // $arrayContains - search value in array
     ArrayAny,           // $arrayAny - check that array is not empty
     ArrayEmpty,         // $arrayEmpty - check that array is empty
@@ -168,18 +168,18 @@ public enum ComparisonOperator
     ArrayCountGte,      // $arrayCountGte - element count greater than or equal to N
     ArrayCountLt,       // $arrayCountLt - element count less than N
     ArrayCountLte,      // $arrayCountLte - element count less than or equal to N
-    
-    // 🎯 Positional array operators
+
+    // Positional array operators
     ArrayAt,            // $arrayAt - array element by index
     ArrayFirst,         // $arrayFirst - first array element
     ArrayLast,          // $arrayLast - last array element
-    
-    // 🔍 Search array operators (for strings)
+
+    // Search array operators (for strings)
     ArrayStartsWith,    // $arrayStartsWith - string values starting with prefix
     ArrayEndsWith,      // $arrayEndsWith - string values ending with suffix
     ArrayMatches,       // $arrayMatches - search by regular expression
-    
-    // 📈 Aggregation array operators
+
+    // Aggregation array operators
     ArraySum,           // $arraySum - sum of numeric elements
     ArrayAvg,           // $arrayAvg - arithmetic average
     ArrayMin,           // $arrayMin - minimum value

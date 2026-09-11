@@ -116,7 +116,13 @@ internal static class HavingPredicateParser
         if (!ReferencesParameter(expr, groupParam))
         {
             var value = EvaluateConstant(expr);
-            return new Dictionary<string, object> { ["$const"] = value ?? (object)"null" };
+            if (value is null)
+                // G-5 (ревью 2026-09-03): null превращался в СТРОКУ "null" и сравнение шло с
+                // текстом. NULL-семантики у HAVING-констант нет - отказ громкий.
+                throw new NotSupportedException(
+                    "HAVING: сравнение с null-константой не поддерживается - сравните с Count или не-null значением.");
+            return new Dictionary<string, object> { ["$const"] = value };
+
         }
 
         throw new NotSupportedException(

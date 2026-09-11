@@ -130,6 +130,8 @@ namespace redb.Core.Models.Configuration
         /// </summary>
         public bool EnablePvtPrefilter { get; set; } = false;
 
+        private string? _stringCollation;
+
         /// <summary>
         /// Unicode-aware case folding for case-insensitive text operations
         /// (<c>ContainsIgnoreCase</c>, <c>StartsWithIgnoreCase</c>, <c>EndsWithIgnoreCase</c>,
@@ -169,7 +171,6 @@ namespace redb.Core.Models.Configuration
         ///
         /// Default is null: behaviour is exactly what it was, on every provider.
         /// </summary>
-        private string? _stringCollation;
         public string? StringCollation
         {
             get => _stringCollation;
@@ -183,19 +184,74 @@ namespace redb.Core.Models.Configuration
         }
 
         /// <summary>
-        /// Enable lazy loading for RedbObject Props.
-        /// true = Props loaded on demand when accessing obj.Props
-        /// false = Props in main JSON (everything at once)
-        /// Default is false (backward compatibility)
+        /// V4 (LAZY Л2): lazy references. With the option on, the JSON builders emit a STUB for
+        /// every reference whose structure carries the `virtual` marker (`_structures._lazy`),
+        /// regardless of depth; first access to the stub's Props loads exactly that object.
+        /// The option travels to the builders as a session flag of the context's connection
+        /// (PostgreSQL GUC `redb.lazy_refs`, MSSQL SESSION_CONTEXT, a connection flag of the
+        /// SQLite native extension) - no builder signature changes (plan decision 5).
+        /// Per-query override: `WithLazyReferences(bool)`. Default is false: behaviour is
+        /// exactly what it was.
         /// </summary>
-        public bool EnableLazyLoadingForProps { get; set; } = false;
+        public bool EnableLazyReferences { get; set; } = false;
+
+        /// <summary>
+        /// V4 (review): what the <c>Props</c> getter of an UNLOADED reference does. <c>Blocking</c>
+        /// (default) loads the object synchronously - a hidden database round trip that waits for
+        /// the query on the calling thread (the load itself runs on the thread pool, so a host with a
+        /// SynchronizationContext does not deadlock). <c>Throw</c> refuses with
+        /// <see cref="Exceptions.RedbSynchronousLazyLoadException"/> and names the explicit way
+        /// (<c>LoadPropsAsync</c>, <c>LoadReferencesAsync</c>, a larger depth): for Blazor WebAssembly,
+        /// which cannot block at all, and for UI hosts where a synchronous query on property access
+        /// is a defect. The async APIs work in both modes.
+        /// </summary>
+        public LazyReferenceAccessMode LazyReferenceAccess { get; set; } = LazyReferenceAccessMode.Blocking;
+
+        /// <summary>
+        /// Apply the versioned SQL module (functions and, from V4, schema upgrades) automatically at
+        /// start-up when the database reports a different module version than this build requires.
+        ///
+        /// <para>
+        /// <c>true</c> (default) keeps the long-standing behaviour: pull, restart, the database
+        /// follows. When the connected role is not allowed to — the DBA revoked owner rights after the
+        /// initial installation — start-up stops with <see cref="Exceptions.RedbSchemaOutdatedException"/>
+        /// naming the script for the DBA, rather than a raw driver error.
+        /// </para>
+        ///
+        /// <para>
+        /// <c>false</c> is for installations where the policy is "only the DBA changes the schema":
+        /// start-up then checks the version and stops with the same exception without trying.
+        /// SQLite ignores this setting — the database file belongs to the process and there is no
+        /// DBA to defer to.
+        /// </para>
+        /// </summary>
+        public bool AutoApplyDatabaseUpgrades { get; set; } = true;
 
         /// <summary>
         /// Enable transparent whole-object (Props) caching, validated by object hash.
-        /// Independent of <see cref="EnableLazyLoadingForProps"/> — works with lazy loading on or off.
         /// Default is false.
         /// </summary>
         public bool EnablePropsCache { get; set; } = false;
+
+        /// <summary>
+        /// When list items are handed out (list reads, item lookups), load their linked objects
+        /// (<see cref="Models.Entities.RedbListItem.Object"/>) in ONE batch up front, so touching
+        /// the property later is a field read: no database call, no blocked thread. Lists are
+        /// dictionaries by design (dozens of rows), so the batch is one cheap SELECT; disable only
+        /// when a list is unusually large AND its objects are rarely needed. Default: enabled -
+        /// the lazy sync getter blocks a thread per touch, and a hot loop over fresh items froze
+        /// a production process (2026-09-09).
+        /// </summary>
+        public bool PreloadListItemLinkedObjects { get; set; } = true;
+
+        /// <summary>
+        /// Sample bound for SQLite's ANALYZE in <c>IMaintenanceProvider.AnalyzeAsync</c>
+        /// (PRAGMA analysis_limit; 0 = unbounded full scan). PostgreSQL and MSSQL ignore it.
+        /// The bounded form turns a minutes-long full-file ANALYZE into seconds while producing
+        /// estimates just as good for redb's query shapes. Default: 1000 (SQLite's own
+        /// recommended ballpark).
+        /// </summary>
+        public int MaintenanceAnalysisLimit { get; set; } = 1000;
 
         /// <summary>
         /// Maximum number of objects in Props cache.
@@ -239,6 +295,13 @@ namespace redb.Core.Models.Configuration
         /// false - for distributed systems (safer, check freshness)
         /// Default false (safe)
         /// </summary>
+        /// <remarks>
+        /// The zero-DB shortcut applies OUTSIDE transactions only: inside an active transaction
+        /// (explicit or ambient) a load always consults the database hash, so the canonical
+        /// ExecuteAtomicAsync + LockForUpdateAsync + re-read pattern stays correct even with this
+        /// flag on (bug report п.1, 2026-09-02). The flag remains a single-writer trade-off: outside
+        /// transactions, changes committed by ANOTHER process stay invisible until the TTL expires.
+        /// </remarks>
         public bool SkipHashValidationOnCacheCheck { get; set; } = false;
 
         /// <summary>
@@ -402,8 +465,9 @@ namespace redb.Core.Models.Configuration
                 DefaultLoadDepth = DefaultLoadDepth,
                 DefaultMaxTreeDepth = DefaultMaxTreeDepth,
                 ThrowOnObjectNotFound = ThrowOnObjectNotFound,
-                EnableLazyLoadingForProps = EnableLazyLoadingForProps,
                 EnablePropsCache = EnablePropsCache,
+                PreloadListItemLinkedObjects = PreloadListItemLinkedObjects,
+                MaintenanceAnalysisLimit = MaintenanceAnalysisLimit,
                 PropsCacheMaxSize = PropsCacheMaxSize,
                 PropsCacheTtl = PropsCacheTtl,
                 SkipHashValidationOnCacheCheck = SkipHashValidationOnCacheCheck,
@@ -419,6 +483,8 @@ namespace redb.Core.Models.Configuration
                 EnableDataValidation = EnableDataValidation,
                 AutoSetModifyDate = AutoSetModifyDate,
                 AutoRecomputeHash = AutoRecomputeHash,
+                EnableLazyReferences = EnableLazyReferences,
+                LazyReferenceAccess = LazyReferenceAccess,
                 // DefaultSecurityPriority removed,
                 SystemUserId = SystemUserId,
                 JsonOptions = new JsonSerializationOptions

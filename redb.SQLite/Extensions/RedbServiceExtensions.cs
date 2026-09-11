@@ -42,8 +42,11 @@ namespace redb.SQLite.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(config.ConnectionString))
             {
-                var dataSource = Data.SqliteDataSource.Create(config.ConnectionString, config.StringCollation != null);
-                services.AddSingleton(dataSource);
+                // Factory registration: the container OWNS the data source it creates and
+                // disposes it on shutdown, releasing the connection pool (an instance
+                // registration is never disposed by MS DI - the pool would outlive the
+                // container and keep the database file locked).
+                services.AddSingleton(_ => Data.SqliteDataSource.Create(config.ConnectionString, config.StringCollation != null, config.EnableLazyReferences));
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.SqliteRedbContext(sp.GetRequiredService<Data.SqliteDataSource>()));
             }
@@ -93,8 +96,11 @@ namespace redb.SQLite.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(config.ConnectionString))
             {
-                var dataSource = Data.SqliteDataSource.Create(config.ConnectionString, config.StringCollation != null);
-                services.AddSingleton(dataSource);
+                // Factory registration: the container OWNS the data source it creates and
+                // disposes it on shutdown, releasing the connection pool (an instance
+                // registration is never disposed by MS DI - the pool would outlive the
+                // container and keep the database file locked).
+                services.AddSingleton(_ => Data.SqliteDataSource.Create(config.ConnectionString, config.StringCollation != null, config.EnableLazyReferences));
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.SqliteRedbContext(sp.GetRequiredService<Data.SqliteDataSource>()));
             }
@@ -137,8 +143,11 @@ namespace redb.SQLite.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(configuration.ConnectionString))
             {
-                var dataSource = Data.SqliteDataSource.Create(configuration.ConnectionString, configuration.StringCollation != null);
-                services.AddSingleton(dataSource);
+                // Factory registration: the container OWNS the data source it creates and
+                // disposes it on shutdown, releasing the connection pool (an instance
+                // registration is never disposed by MS DI - the pool would outlive the
+                // container and keep the database file locked).
+                services.AddSingleton(_ => Data.SqliteDataSource.Create(configuration.ConnectionString, configuration.StringCollation != null, configuration.EnableLazyReferences));
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.SqliteRedbContext(sp.GetRequiredService<Data.SqliteDataSource>()));
             }

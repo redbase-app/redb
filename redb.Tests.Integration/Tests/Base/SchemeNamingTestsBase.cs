@@ -46,12 +46,17 @@ public abstract class SchemeNamingTestsBase
     private Task<string?> SchemeAliasAsync(string name) =>
         Redb.Context.ExecuteScalarAsync<string?>($"SELECT _alias FROM _schemes WHERE _name = '{name}'");
 
+    private Task<string?> SchemeNameSpaceAsync(string name) =>
+        Redb.Context.ExecuteScalarAsync<string?>($"SELECT _name_space FROM _schemes WHERE _name = '{name}'");
+
     /// <summary>Creates a scheme row directly, bypassing the library — the "other node" in race tests.</summary>
-    private async Task<long> InsertSchemeRawAsync(string name, long type = RedbTypeIds.Class)
+    private async Task<long> InsertSchemeRawAsync(string name, long type = RedbTypeIds.Class, string? nameSpace = null)
     {
         var id = await Redb.Context.NextObjectIdAsync();
+        var nsColumn = nameSpace != null ? ", _name_space" : "";
+        var nsValue = nameSpace != null ? $", '{nameSpace}'" : "";
         await Redb.Context.ExecuteAsync(
-            $"INSERT INTO _schemes (_id, _name, _type) VALUES ({id}, '{name}', {type})");
+            $"INSERT INTO _schemes (_id, _name, _type{nsColumn}) VALUES ({id}, '{name}', {type}{nsValue})");
         Redb.Cache.Clear();
         return id;
     }
@@ -89,6 +94,8 @@ public abstract class SchemeNamingTestsBase
         scheme.Name.Should().Be(fullName);
         scheme.Id.Should().Be(legacyId, "renaming must preserve the id so objects stay attached");
         (await SchemeIdAsync(shortName)).Should().BeNull();
+        (await SchemeNameSpaceAsync(fullName)).Should().Be(typeof(NamingByTypeProps).Namespace,
+            "К7: adoption via the short name stamps the owner namespace");
     }
 
     // ============================================================
@@ -382,5 +389,92 @@ public abstract class SchemeNamingTestsBase
             $"SELECT COUNT(*) FROM _schemes WHERE _name = '{objectSchemeName}'")).Should().Be(1);
 
         await DropSchemesAsync(objectSchemeName);
+    }
+
+    // ============================================================
+    // === V, W, X — namespace as the ownership mark (V4, К7) ===
+    // ============================================================
+
+    [Fact]
+    public async Task V_NameSpace_WrittenOnCreate_AndRestoredFromCode()
+    {
+        var fullName = FullNameOf<NamingByTypeProps>();
+        await DropSchemesAsync(fullName, nameof(NamingByTypeProps));
+
+        await Redb.EnsureSchemeFromTypeAsync<NamingByTypeProps>();
+        (await SchemeNameSpaceAsync(fullName)).Should().Be(typeof(NamingByTypeProps).Namespace);
+
+        // A cleared owner (a pre-namespace database, or a deliberate hand-off) is re-stamped.
+        await Redb.Context.ExecuteAsync($"UPDATE _schemes SET _name_space = NULL WHERE _name = '{fullName}'");
+        Redb.Cache.Clear();
+        await Redb.EnsureSchemeFromTypeAsync<NamingByTypeProps>();
+        (await SchemeNameSpaceAsync(fullName)).Should().Be(typeof(NamingByTypeProps).Namespace);
+
+        // A different owner is never overwritten, on any path: a scheme has one owner (К7, owner
+        // decision 2026-09-01) - the typed stop names the way out instead.
+        await Redb.Context.ExecuteAsync($"UPDATE _schemes SET _name_space = 'Hacked.Ns' WHERE _name = '{fullName}'");
+        Redb.Cache.Clear();
+        var act = async () => await Redb.EnsureSchemeFromTypeAsync<NamingByTypeProps>();
+        var ex = (await act.Should().ThrowAsync<RedbSchemeNamespaceMismatchException>()).Which;
+        ex.SchemeNameSpace.Should().Be("Hacked.Ns");
+        ex.Message.Should().Contain("_name_space", "the message tells the operator what to do");
+        (await SchemeNameSpaceAsync(fullName)).Should().Be("Hacked.Ns", "the row is left as it is");
+    }
+
+    [Fact]
+    public async Task W_ShortNameAdoption_MatchingNamespace_Renames()
+    {
+        var fullName = FullNameOf<NamingByTypeProps>();
+        var shortName = nameof(NamingByTypeProps);
+        await DropSchemesAsync(fullName, shortName);
+
+        var legacyId = await InsertSchemeRawAsync(shortName, nameSpace: typeof(NamingByTypeProps).Namespace);
+
+        var scheme = await Redb.EnsureSchemeFromTypeAsync<NamingByTypeProps>();
+
+        scheme.Id.Should().Be(legacyId, "a matching namespace proves ownership — adoption proceeds");
+        scheme.Name.Should().Be(fullName);
+        (await SchemeNameSpaceAsync(fullName)).Should().Be(typeof(NamingByTypeProps).Namespace);
+    }
+
+    [Fact]
+    public async Task X_ShortNameAdoption_ForeignNamespace_Throws()
+    {
+        var fullName = FullNameOf<NamingByTypeProps>();
+        var shortName = nameof(NamingByTypeProps);
+        await DropSchemesAsync(fullName, shortName);
+
+        var foreignId = await InsertSchemeRawAsync(shortName, nameSpace: "Some.Other.Project");
+
+        var act = async () => await Redb.EnsureSchemeFromTypeAsync<NamingByTypeProps>();
+        await act.Should().ThrowAsync<RedbSchemeNamespaceMismatchException>(
+            "a short name proves nothing — the scheme belongs to another project");
+
+        // Untouched: still under the short name, same id, same owner.
+        (await SchemeIdAsync(shortName)).Should().Be(foreignId);
+        (await SchemeNameSpaceAsync(shortName)).Should().Be("Some.Other.Project");
+
+        await DropSchemesAsync(shortName);
+    }
+
+    [Fact]
+    public async Task Y_ExplicitNameAdoption_ForeignNamespace_Throws()
+    {
+        const string pinned = "naming.pinned";
+        await DropSchemesAsync(pinned, FullNameOf<NamingPinnedProps>(), nameof(NamingPinnedProps));
+        var foreignId = await InsertSchemeRawAsync(pinned, nameSpace: "Some.Other.Project");
+        try
+        {
+            var act = async () => await Redb.EnsureSchemeFromTypeAsync<NamingPinnedProps>();
+            await act.Should().ThrowAsync<RedbSchemeNamespaceMismatchException>(
+                "К7: a scheme has one owner - an explicit name from another project must not take it over");
+
+            (await SchemeIdAsync(pinned)).Should().Be(foreignId);
+            (await SchemeNameSpaceAsync(pinned)).Should().Be("Some.Other.Project", "the row stays untouched");
+        }
+        finally
+        {
+            await DropSchemesAsync(pinned);
+        }
     }
 }

@@ -108,6 +108,35 @@ static void appendTextCol(sqlite3_str *o, sqlite3_stmt *s, int col){
   appendJsonString(o, t ? t : "", n);
 }
 
+/* Append a 128-bit hash column as a JSON string in canonical 8-4-4-4-12 form.
+   Stored as BLOB(16) in RFC 4122 byte order (V4, see SqliteHash.cs); a TEXT
+   value — a database not yet converted, or written by an older build — is
+   passed through as it is. */
+static void appendHashCol(sqlite3_str *o, sqlite3_stmt *s, int col){
+  static const char hx[] = "0123456789abcdef";
+  const unsigned char *b;
+  char t[36];
+  int i, p = 0;
+  if(sqlite3_column_type(s, col) != SQLITE_BLOB){
+    appendTextCol(o, s, col);
+    return;
+  }
+  /* blob first, then bytes: the order the SQLite docs call safe. */
+  b = (const unsigned char*)sqlite3_column_blob(s, col);
+  if(sqlite3_column_bytes(s, col) != 16 || !b){
+    sqlite3_str_append(o, "null", 4);
+    return;
+  }
+  for(i = 0; i < 16; i++){
+    if(i == 4 || i == 6 || i == 8 || i == 10) t[p++] = '-';
+    t[p++] = hx[b[i] >> 4];
+    t[p++] = hx[b[i] & 15];
+  }
+  sqlite3_str_appendchar(o, 1, '"');
+  sqlite3_str_append(o, t, 36);
+  sqlite3_str_appendchar(o, 1, '"');
+}
+
 /* ------------------------------------------------------------------------- */
 /* Materializer                                                              */
 /* ------------------------------------------------------------------------- */
@@ -115,6 +144,26 @@ static void appendTextCol(sqlite3_str *o, sqlite3_stmt *s, int col){
 /* Returns a sqlite3_malloc'd JSON string for the object, or NULL if missing.
 ** Caller frees with sqlite3_free. */
 static char *redbObjectJson(sqlite3 *db, sqlite3_int64 id, int max_depth);
+/* V4 (LAZY L2): per-connection lazy-references flag. The C# side arms it with
+** SELECT redb_lazy_refs(1) right after opening the connection (the counterpart of the
+** PostgreSQL GUC redb.lazy_refs). Unset means off: old extensions and the off state
+** behave byte-for-byte as before. Stored via sqlite3 clientdata (3.44+).  */
+static int redbLazyRefsOn(sqlite3 *db){
+  return sqlite3_get_clientdata(db, "redb_lazy_refs") != 0;
+}
+
+static void redbLazyRefsGetFunc(sqlite3_context *ctx, int argc, sqlite3_value **argv){
+  (void)argc; (void)argv;
+  sqlite3_result_int(ctx, redbLazyRefsOn(sqlite3_context_db_handle(ctx)));
+}
+
+static void redbLazyRefsFunc(sqlite3_context *ctx, int argc, sqlite3_value **argv){
+  sqlite3 *db = sqlite3_context_db_handle(ctx);
+  int on = argc > 0 ? sqlite3_value_int(argv[0]) : 1;
+  sqlite3_set_clientdata(db, "redb_lazy_refs", on ? (void*)1 : 0, 0);
+  sqlite3_result_int(ctx, on ? 1 : 0);
+}
+
 
 static void buildProps(sqlite3 *db, sqlite3_int64 obj_id, sqlite3_int64 scheme_id,
                        int has_pstruct, sqlite3_int64 pstruct_id,
@@ -186,7 +235,7 @@ static int buildListItem(sqlite3 *db, sqlite3_int64 li_id, int max_depth,
 /* Emit a primitive value from a positioned _values row by db_type.
 ** Returns 1 if a non-null value was appended, 0 if the value is null. */
 static int emitPrimitive(sqlite3 *db, sqlite3_stmt *r, const char *db_type,
-                         const char *type_semantic, int max_depth,
+                         const char *type_semantic, int max_depth, int lazy,
                          sqlite3_str *out){
   /* ListItem stored in old schema as Long, or explicit ListItem db_type. */
   if(sqlite3_column_type(r, VC_LISTITEM) != SQLITE_NULL ||
@@ -198,7 +247,8 @@ static int emitPrimitive(sqlite3 *db, sqlite3_stmt *r, const char *db_type,
   /* Object reference inside a primitive array. */
   if(strcmp(type_semantic, "_RObject") == 0){
     if(sqlite3_column_type(r, VC_OBJECT) == SQLITE_NULL) return 0;
-    char *child = redbObjectJson(db, sqlite3_column_int64(r, VC_OBJECT), max_depth - 1);
+    char *child = redbObjectJson(db, sqlite3_column_int64(r, VC_OBJECT),
+                                 (lazy && redbLazyRefsOn(db)) ? 0 : max_depth - 1);
     if(!child) return 0;
     sqlite3_str_append(out, child, (int)strlen(child));
     sqlite3_free(child);
@@ -270,13 +320,25 @@ static int findCollectionHead(sqlite3 *db, sqlite3_int64 struct_id, sqlite3_int6
   return found;
 }
 
+/* Р-1 legacy tolerance: does any _values row attach to this parent value id? A true null
+** element never has children; a class element missing its legacy hash still does. */
+static int hasChildRows(sqlite3 *db, sqlite3_int64 parent_value_id){
+  sqlite3_stmt *st = 0; int found = 0;
+  sqlite3_prepare_v2(db, "SELECT 1 FROM _values WHERE _array_parent_id=?1 LIMIT 1", -1, &st, 0);
+  if(!st) return 0;
+  sqlite3_bind_int64(st, 1, parent_value_id);
+  if(sqlite3_step(st) == SQLITE_ROW) found = 1;
+  sqlite3_finalize(st);
+  return found;
+}
+
 /* Build an array/dictionary collection value into out. Returns 1 if appended
 ** (head record exists), 0 if the property is null (no head record). */
 static int buildCollection(sqlite3 *db, sqlite3_int64 obj_id, sqlite3_int64 scheme_id,
                            sqlite3_int64 struct_id, const char *db_type,
                            const char *type_semantic, int is_dict,
                            int has_pval, sqlite3_int64 pval_id,
-                           int max_depth, sqlite3_str *out){
+                           int max_depth, int lazy, sqlite3_str *out){
   sqlite3_int64 head_id;
   if(!findCollectionHead(db, struct_id, obj_id, has_pval, pval_id, &head_id)) return 0;
 
@@ -303,19 +365,27 @@ static int buildCollection(sqlite3 *db, sqlite3_int64 obj_id, sqlite3_int64 sche
       sqlite3_str_appendchar(out, 1, ':');
     }
     if(strcmp(type_semantic, "Object") == 0){
-      /* Element is a Class field — recurse by parent_value_id. */
-      buildProps(db, obj_id, scheme_id, 1, struct_id, 0, 1, elem_id, max_depth, out);
+      /* Element is a Class field - recurse by parent_value_id. A null element is a row
+      ** WITHOUT _Guid (a real class always carries its hash): emit JSON null, do not
+      ** fabricate an empty object («null должен быть null», В-1 2026-09-03). */
+      if(sqlite3_column_type(st, VC_GUID) == SQLITE_NULL && !hasChildRows(db, elem_id)){
+        sqlite3_str_append(out, "null", 4);
+      }else{
+        buildProps(db, obj_id, scheme_id, 1, struct_id, 0, 1, elem_id, max_depth, out);
+      }
     }else if(strcmp(type_semantic, "_RObject") == 0){
+
       if(sqlite3_column_type(st, VC_OBJECT) == SQLITE_NULL){
         sqlite3_str_append(out, "null", 4);
       }else{
-        char *child = redbObjectJson(db, sqlite3_column_int64(st, VC_OBJECT), max_depth - 1);
+        char *child = redbObjectJson(db, sqlite3_column_int64(st, VC_OBJECT),
+                                     (lazy && redbLazyRefsOn(db)) ? 0 : max_depth - 1);
         if(child){ sqlite3_str_append(out, child, (int)strlen(child)); sqlite3_free(child); }
         else sqlite3_str_append(out, "null", 4);
       }
     }else{
       /* Primitive element — preserve nulls so positions/keys stay aligned. */
-      if(!emitPrimitive(db, st, db_type, type_semantic, max_depth, out))
+      if(!emitPrimitive(db, st, db_type, type_semantic, max_depth, lazy, out))
         sqlite3_str_append(out, "null", 4);
     }
   }
@@ -333,7 +403,7 @@ static void buildProps(sqlite3 *db, sqlite3_int64 obj_id, sqlite3_int64 scheme_i
                        int has_pval, sqlite3_int64 pval_id,
                        int max_depth, sqlite3_str *out){
   char *sql = sqlite3_mprintf(
-      "SELECT _structure_id,_name,_collection_type,type_name,db_type,type_semantic "
+      "SELECT _structure_id,_name,_collection_type,type_name,db_type,type_semantic,COALESCE(_lazy,0) "
       "FROM _scheme_metadata_cache WHERE _scheme_id=?1 AND %s "
       "ORDER BY _order,_structure_id",
       has_pstruct ? "_parent_structure_id=?2" : "_parent_structure_id IS NULL");
@@ -356,6 +426,7 @@ static void buildProps(sqlite3 *db, sqlite3_int64 obj_id, sqlite3_int64 scheme_i
     const char *type_name = (const char*)sqlite3_column_text(cs, 3);
     const char *db_type   = (const char*)sqlite3_column_text(cs, 4);
     const char *type_sem  = (const char*)sqlite3_column_text(cs, 5);
+    int lazy = (int)sqlite3_column_int64(cs, 6); /* V4 (LAZY L2) */
     if(!type_name) type_name = "";
     if(!db_type)   db_type = "";
     if(!type_sem)  type_sem = "";
@@ -368,12 +439,14 @@ static void buildProps(sqlite3 *db, sqlite3_int64 obj_id, sqlite3_int64 scheme_i
 
     if(is_array || is_dict){
       got = buildCollection(db, obj_id, scheme_id, struct_id, db_type, type_sem,
-                            is_dict, has_pval, pval_id, max_depth, fv);
+                            is_dict, has_pval, pval_id, max_depth, lazy, fv);
     }else if(strcmp(type_name, "Object") == 0 && strcmp(type_sem, "_RObject") == 0){
+      /* V4 (LAZY L2): a virtual reference with the connection flag on is a stub (depth 0). */
+      int ref_depth = (lazy && redbLazyRefsOn(db)) ? 0 : max_depth - 1;
       sqlite3_stmt *r = findValueRow(db, struct_id, obj_id, array_index, has_pval, pval_id);
       if(r){
         if(sqlite3_column_type(r, VC_OBJECT) != SQLITE_NULL){
-          char *child = redbObjectJson(db, sqlite3_column_int64(r, VC_OBJECT), max_depth - 1);
+          char *child = redbObjectJson(db, sqlite3_column_int64(r, VC_OBJECT), ref_depth);
           if(child){ sqlite3_str_append(fv, child, (int)strlen(child)); sqlite3_free(child); got = 1; }
         }
         sqlite3_finalize(r);
@@ -392,7 +465,7 @@ static void buildProps(sqlite3 *db, sqlite3_int64 obj_id, sqlite3_int64 scheme_i
     }else{
       sqlite3_stmt *r = findValueRow(db, struct_id, obj_id, array_index, has_pval, pval_id);
       if(r){
-        got = emitPrimitive(db, r, db_type, type_sem, max_depth, fv);
+        got = emitPrimitive(db, r, db_type, type_sem, max_depth, lazy, fv);
         sqlite3_finalize(r);
       }
     }
@@ -423,7 +496,7 @@ static char *redbObjectJson(sqlite3 *db, sqlite3_int64 id, int max_depth){
       "strftime('%Y-%m-%dT%H:%M:%fZ',o._date_begin),strftime('%Y-%m-%dT%H:%M:%fZ',o._date_complete),"
       "o._key,o._value_long,o._value_string,"
       "o._value_guid,o._note,o._value_bool,o._value_double,o._value_numeric,"
-      "strftime('%Y-%m-%dT%H:%M:%fZ',o._value_datetime),o._value_bytes,o._hash "
+      "strftime('%Y-%m-%dT%H:%M:%fZ',o._value_datetime),o._value_bytes,o._hash,o._value_unique "
       /* Soft-deleted objects (_id_scheme = -10, @@__deleted) are treated as
          non-existent: a nested _Object reference to a trashed object resolves
          to NULL (caller appends "null") instead of materializing the tombstone.
@@ -486,7 +559,9 @@ static char *redbObjectJson(sqlite3 *db, sqlite3_int64 id, int max_depth){
     sqlite3_str_appendchar(out, 1, '"');
   }
   sqlite3_str_append(out, ",\"hash\":", 8);
-  if(sqlite3_column_type(st, 21) == SQLITE_NULL) sqlite3_str_append(out, "null", 4); else appendTextCol(out, st, 21);
+  if(sqlite3_column_type(st, 21) == SQLITE_NULL) sqlite3_str_append(out, "null", 4); else appendHashCol(out, st, 21);
+  sqlite3_str_append(out, ",\"value_unique\":", 16);
+  if(sqlite3_column_type(st, 22) == SQLITE_NULL) sqlite3_str_append(out, "null", 4); else appendTextCol(out, st, 22);
   sqlite3_finalize(st);
 
   if(max_depth > 0){
@@ -962,7 +1037,8 @@ static sqlite3_int64 saveObject(sqlite3 *db, const char *json, int *ok){
         "_name=json_extract(?2,'$.name'),"
         "_note=json_extract(?2,'$.note'),"
         "_key=json_extract(?2,'$.key'),"
-        "_hash=json_extract(?2,'$.hash'),"
+        "_hash=unhex(replace(json_extract(?2,'$.hash'),'-','')),"
+        "_value_unique=json_extract(?2,'$.value_unique'),"
         "_date_modify=julianday('now'),"  /* REAL Julian day (UTC) */
         "_date_begin=julianday(json_extract(?2,'$.date_begin')),"
         "_date_complete=julianday(json_extract(?2,'$.date_complete')),"
@@ -990,7 +1066,7 @@ static sqlite3_int64 saveObject(sqlite3 *db, const char *json, int *ok){
     sqlite3_stmt *st = 0;
     sqlite3_prepare_v2(db,
         "INSERT INTO _objects("
-        "_id,_id_scheme,_id_parent,_id_owner,_id_who_change,_name,_note,_key,_hash,"
+        "_id,_id_scheme,_id_parent,_id_owner,_id_who_change,_name,_note,_key,_hash,_value_unique,"
         "_date_create,_date_modify,_date_begin,_date_complete,"
         "_value_long,_value_string,_value_guid,_value_bool,_value_double,"
         "_value_numeric,_value_datetime,_value_bytes) VALUES("
@@ -998,7 +1074,8 @@ static sqlite3_int64 saveObject(sqlite3 *db, const char *json, int *ok){
         "COALESCE(json_extract(?2,'$.owner_id'),1),"
         "COALESCE(json_extract(?2,'$.who_change_id'),1),"
         "json_extract(?2,'$.name'),json_extract(?2,'$.note'),json_extract(?2,'$.key'),"
-        "json_extract(?2,'$.hash'),"
+        "unhex(replace(json_extract(?2,'$.hash'),'-','')),"
+        "json_extract(?2,'$.value_unique'),"
         "COALESCE(julianday(json_extract(?2,'$.date_create')),julianday('now')),"
         "julianday('now'),"
         "julianday(json_extract(?2,'$.date_begin')),julianday(json_extract(?2,'$.date_complete')),"
@@ -1063,7 +1140,19 @@ __declspec(dllexport)
 int sqlite3_redb_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *pApi){
   int rc;
   SQLITE_EXTENSION_INIT2(pApi);
-  (void)pzErrMsg;
+
+  /* The per-connection lazy flag rides sqlite3_set_clientdata / sqlite3_get_clientdata (3.44.0+).
+  ** A loadable extension reaches SQLite through the host's routine table; on an older host those
+  ** slots lie past its end and the first get_object_json would jump into nothing. Refuse to load
+  ** with a clear message instead (the version routines are early slots, safe on any host). */
+  if( sqlite3_libversion_number() < 3044000 ){
+    if( pzErrMsg ){
+      *pzErrMsg = sqlite3_mprintf(
+        "redb extension requires SQLite 3.44.0 or newer (sqlite3_get_clientdata); this host is %s",
+        sqlite3_libversion());
+    }
+    return SQLITE_ERROR;
+  }
 
   rc = sqlite3_create_function(db, "redb_version", 0,
                                SQLITE_UTF8 | SQLITE_DETERMINISTIC, 0,
@@ -1079,6 +1168,14 @@ int sqlite3_redb_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *
 
   rc = sqlite3_create_function(db, "save_object_json", 1, SQLITE_UTF8, 0,
                                saveObjectJsonFunc, 0, 0);
+  if(rc != SQLITE_OK) return rc;
+
+  /* V4 (LAZY L2): the per-connection lazy-references switch. */
+  rc = sqlite3_create_function(db, "redb_lazy_refs", 1, SQLITE_UTF8, 0,
+                               redbLazyRefsFunc, 0, 0);
+  if(rc != SQLITE_OK) return rc;
+  rc = sqlite3_create_function(db, "redb_lazy_refs", 0, SQLITE_UTF8, 0,
+                               redbLazyRefsGetFunc, 0, 0);
   if(rc != SQLITE_OK) return rc;
 
   /* v2-pvt SQL-generation engine (separate translation unit). */

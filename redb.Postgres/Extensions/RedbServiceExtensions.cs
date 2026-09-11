@@ -42,8 +42,11 @@ namespace redb.Postgres.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(config.ConnectionString))
             {
-                var dataSource = Data.NpgsqlDataSourceFactory.Create(config.ConnectionString, config.StringCollation);
-                services.AddSingleton(dataSource);
+                // Factory registration hands OWNERSHIP to the container: disposing the provider disposes
+                // the NpgsqlDataSource and closes its pool. The old instance-registration form left the
+                // pool open forever - every container restart (module hot-reload, tests) stacked another
+                // orphaned pool of idle sessions until the server-side pruner got them (2026-09-09).
+                services.AddSingleton(_ => Data.NpgsqlDataSourceFactory.Create(config.ConnectionString, config.StringCollation, config.EnableLazyReferences));
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.NpgsqlRedbContext(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));
             }
@@ -93,8 +96,11 @@ namespace redb.Postgres.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(config.ConnectionString))
             {
-                var dataSource = Data.NpgsqlDataSourceFactory.Create(config.ConnectionString, config.StringCollation);
-                services.AddSingleton(dataSource);
+                // Factory registration hands OWNERSHIP to the container: disposing the provider disposes
+                // the NpgsqlDataSource and closes its pool. The old instance-registration form left the
+                // pool open forever - every container restart (module hot-reload, tests) stacked another
+                // orphaned pool of idle sessions until the server-side pruner got them (2026-09-09).
+                services.AddSingleton(_ => Data.NpgsqlDataSourceFactory.Create(config.ConnectionString, config.StringCollation, config.EnableLazyReferences));
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.NpgsqlRedbContext(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));
             }
@@ -137,8 +143,11 @@ namespace redb.Postgres.Extensions
             // Auto-register IRedbContext if ConnectionString is provided
             if (!string.IsNullOrEmpty(configuration.ConnectionString))
             {
-                var dataSource = Data.NpgsqlDataSourceFactory.Create(configuration.ConnectionString, configuration.StringCollation);
-                services.AddSingleton(dataSource);
+                // Factory registration hands OWNERSHIP to the container: disposing the provider disposes
+                // the NpgsqlDataSource and closes its pool. The old instance-registration form left the
+                // pool open forever - every container restart (module hot-reload, tests) stacked another
+                // orphaned pool of idle sessions until the server-side pruner got them (2026-09-09).
+                services.AddSingleton(_ => Data.NpgsqlDataSourceFactory.Create(configuration.ConnectionString, configuration.StringCollation, configuration.EnableLazyReferences));
                 services.AddScoped<Core.Data.IRedbContext>(sp => 
                     new Data.NpgsqlRedbContext(sp.GetRequiredService<Npgsql.NpgsqlDataSource>()));
             }

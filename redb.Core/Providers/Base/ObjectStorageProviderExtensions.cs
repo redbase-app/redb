@@ -10,7 +10,7 @@ namespace redb.Core.Providers.Base
     /// </summary>
     public static class ObjectStorageProviderExtensions
     {
-        // ===== ✅ NEW METHODS FOR FIELD PROCESSING UNDER THE NEW PARADIGM =====
+        // ===== NEW METHODS FOR FIELD PROCESSING UNDER THE NEW PARADIGM =====
 
         /// <summary>
         /// Determine if a record should be created in _values based on value and _store_null
@@ -19,7 +19,7 @@ namespace redb.Core.Providers.Base
         {
             // If the value is not NULL - always create a record
             if (rawValue != null) return true;
-            
+
             // If the value is NULL - create a record only if _store_null = true
             return storeNull;
         }
@@ -29,7 +29,7 @@ namespace redb.Core.Providers.Base
         /// </summary>
         internal static bool IsClassType(string typeSemantic)
         {
-            // ✅ FIXED: Class type has Type1 = "Object" (looking at TypeSemantic from _types._type)
+            // FIXED: Class type has Type1 = "Object" (looking at TypeSemantic from _types._type)
             // Business classes are mapped to type "Class" with _type="Object"
             return typeSemantic == "Object";
         }

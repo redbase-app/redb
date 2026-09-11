@@ -104,6 +104,13 @@ namespace redb.Core.Models.Entities
         public string? ArrayIndex { get; set; }
 
         /// <summary>
+        /// Unique-key hash of the typed value (UniqueKeyEncoder) for a [RedbUnique] root scalar; NULL
+        /// for every other row. Backs the unique index over (_id_structure, _unique).
+        /// </summary>
+        [JsonPropertyName("unique")]
+        public Guid? Unique { get; set; }
+
+        /// <summary>
         /// Default constructor for deserialization and mapping.
         /// </summary>
         public RedbValue()

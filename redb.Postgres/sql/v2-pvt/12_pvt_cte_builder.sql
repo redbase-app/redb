@@ -84,7 +84,7 @@ DECLARE
         || 'o._name, o._date_create, o._date_modify, o._date_begin, o._date_complete, '
         || 'o._key, o._note, o._hash, '
         || 'o._value_long, o._value_string, o._value_guid, o._value_bool, '
-        || 'o._value_double, o._value_numeric, o._value_datetime, o._value_bytes';
+        || 'o._value_double, o._value_numeric, o._value_datetime, o._value_bytes, o._value_unique';
     v_where           text := format('o._id_scheme = %s', p_scheme_id::text);
     v_cte_parts       text[] := ARRAY[]::text[];
     v_has_recursive   boolean := false;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Query.QueryExpressions;
@@ -33,7 +34,7 @@ public partial class MssqlQueryProvider
         string? filterJson = null,
         string? frameJson = null,
         int? take = null,
-        int? skip = null)
+        int? skip = null, CancellationToken cancellationToken = default)
     {
         return ExecuteWindowQueryInternalAsync(schemeId, selectFields, windowFuncs,
             partitionBy, orderBy, filterJson, frameJson, take, skip);
@@ -49,7 +50,7 @@ public partial class MssqlQueryProvider
         FilterExpression? filter,
         string? frameJson = null,
         int? take = null,
-        int? skip = null)
+        int? skip = null, CancellationToken cancellationToken = default)
     {
         var filterJson = filter is null ? null : _facetBuilder.BuildFacetFilters(filter);
         return ExecuteWindowQueryInternalAsync(schemeId, selectFields, windowFuncs,
@@ -65,7 +66,7 @@ public partial class MssqlQueryProvider
         string? filterJson,
         string? frameJson,
         int? take,
-        int? skip)
+        int? skip, CancellationToken cancellationToken = default)
     {
         var innerSql = await BuildWindowInnerSqlAsync(schemeId, selectFields, windowFuncs,
             partitionBy, orderBy, filterJson, frameJson, take, skip);
@@ -73,7 +74,7 @@ public partial class MssqlQueryProvider
         var wrapped = "SELECT (SELECT * FROM (" + innerSql
             + ") _win_rows FOR JSON PATH, INCLUDE_NULL_VALUES)";
 
-        var jsonArray = await _context.ExecuteScalarAsync<string>(wrapped);
+        var jsonArray = await _context.ExecuteScalarAsync<string>(wrapped, System.Array.Empty<object>(), cancellationToken);
         if (string.IsNullOrEmpty(jsonArray))
             return JsonDocument.Parse("[]");
         return JsonDocument.Parse(jsonArray);
@@ -89,7 +90,7 @@ public partial class MssqlQueryProvider
         string? filterJson = null,
         string? frameJson = null,
         int? take = null,
-        int? skip = null)
+        int? skip = null, CancellationToken cancellationToken = default)
     {
         return BuildWindowInnerSqlAsync(schemeId, selectFields, windowFuncs,
             partitionBy, orderBy, filterJson, frameJson, take, skip);
@@ -104,7 +105,7 @@ public partial class MssqlQueryProvider
         string? filterJson,
         string? frameJson,
         int? take,
-        int? skip)
+        int? skip, CancellationToken cancellationToken = default)
     {
         var selectList = selectFields?.ToList() ?? new List<WindowFieldRequest>();
         var funcList = windowFuncs?.ToList() ?? new List<WindowFuncRequest>();
@@ -144,7 +145,7 @@ public partial class MssqlQueryProvider
             schemeId, selectJson, filterJson ?? "null", take, skip);
 
         var innerSql = await _context.ExecuteScalarAsync<string>(
-            invocation, filterParam, selectJson, limitParam, offsetParam);
+            invocation, new object[] { filterParam, selectJson, limitParam, offsetParam }, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(

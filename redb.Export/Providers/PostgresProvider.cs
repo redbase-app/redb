@@ -163,4 +163,10 @@ public sealed class PostgresProvider : IDataProvider
             await _connection.DisposeAsync();
         }
     }
+
+    /// <inheritdoc />
+    public Guid GuidFromDb(object raw) => (Guid)raw;
+
+    /// <inheritdoc />
+    public object GuidToDb(Guid value) => value;
 }

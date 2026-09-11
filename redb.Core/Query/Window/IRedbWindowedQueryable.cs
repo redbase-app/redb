@@ -13,11 +13,13 @@ public interface IRedbWindowedQueryable<TProps> where TProps : class, new()
     /// Projection with window functions.
     /// </summary>
     Task<List<TResult>> SelectAsync<TResult>(
-        Expression<Func<RedbObject<TProps>, TResult>> selector);
+        Expression<Func<RedbObject<TProps>, TResult>> selector,
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Returns SQL string for debugging (like EF Core ToQueryString).
     /// </summary>
     Task<string> ToSqlStringAsync<TResult>(
-        Expression<Func<RedbObject<TProps>, TResult>> selector);
+        Expression<Func<RedbObject<TProps>, TResult>> selector,
+        CancellationToken cancellationToken = default);
 }

@@ -28,7 +28,7 @@ public class MssqlUserProvider : UserProviderBase
         IRedbContext context, 
         IRedbSecurityContext securityContext,
         ILogger? logger = null)
-        : base(context, securityContext, new MsSqlDialect(), new SimplePasswordHasher(), logger)
+        : base(context, securityContext, new MsSqlDialect(), new BcryptPasswordHasher(), logger)
     {
     }
 

@@ -9,20 +9,23 @@ public static class DeadlockRetryHelper
     private const int DefaultMaxRetries = 3;
     private const int DefaultBaseDelayMs = 50;
 
-    public static Task ExecuteWithRetryAsync(Func<Task> operation, int maxRetries = DefaultMaxRetries, int baseDelayMs = DefaultBaseDelayMs)
+    public static Task ExecuteWithRetryAsync(Func<Task> operation, int maxRetries = DefaultMaxRetries, int baseDelayMs = DefaultBaseDelayMs, System.Threading.CancellationToken cancellationToken = default)
     {
-        return ExecuteWithRetryInternalAsync(operation, maxRetries, baseDelayMs);
+        return ExecuteWithRetryInternalAsync(operation, maxRetries, baseDelayMs, cancellationToken);
     }
 
-    public static Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, int maxRetries = DefaultMaxRetries, int baseDelayMs = DefaultBaseDelayMs)
+    public static Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, int maxRetries = DefaultMaxRetries, int baseDelayMs = DefaultBaseDelayMs, System.Threading.CancellationToken cancellationToken = default)
     {
-        return ExecuteWithRetryInternalAsync(operation, maxRetries, baseDelayMs);
+        return ExecuteWithRetryInternalAsync(operation, maxRetries, baseDelayMs, cancellationToken);
     }
 
-    private static async Task ExecuteWithRetryInternalAsync(Func<Task> operation, int maxRetries, int baseDelayMs)
+    private static async Task ExecuteWithRetryInternalAsync(Func<Task> operation, int maxRetries, int baseDelayMs, System.Threading.CancellationToken cancellationToken)
     {
         for (int attempt = 0; ; attempt++)
         {
+            // Cancellation checks before each attempt and inside the backoff delay (never
+            // mid-transaction: the operation itself owns its rollback path).
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 await operation();
@@ -32,15 +35,16 @@ public static class DeadlockRetryHelper
             {
                 var delay = baseDelayMs * (1 << attempt);
                 var jitter = Random.Shared.Next(delay);
-                await Task.Delay(delay + jitter);
+                await Task.Delay(delay + jitter, cancellationToken);
             }
         }
     }
 
-    private static async Task<T> ExecuteWithRetryInternalAsync<T>(Func<Task<T>> operation, int maxRetries, int baseDelayMs)
+    private static async Task<T> ExecuteWithRetryInternalAsync<T>(Func<Task<T>> operation, int maxRetries, int baseDelayMs, System.Threading.CancellationToken cancellationToken)
     {
         for (int attempt = 0; ; attempt++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 return await operation();
@@ -49,36 +53,14 @@ public static class DeadlockRetryHelper
             {
                 var delay = baseDelayMs * (1 << attempt);
                 var jitter = Random.Shared.Next(delay);
-                await Task.Delay(delay + jitter);
+                await Task.Delay(delay + jitter, cancellationToken);
             }
         }
     }
 
     /// <summary>
-    /// Walks the full exception chain to detect deadlock.
-    /// MsSql: SqlException.Number == 1205
-    /// Postgres: PostgresException.SqlState == "40P01"
+    /// Deadlock detection lives in <see cref="DbErrorClassifier"/> with every other code check;
+    /// this is kept as the name the retry loop and its tests use.
     /// </summary>
-    internal static bool IsDeadlock(Exception ex)
-    {
-        var current = ex;
-        while (current != null)
-        {
-            var typeName = current.GetType().Name;
-            if (typeName == "SqlException" && GetErrorNumber(current) == 1205)
-                return true;
-            if (typeName == "PostgresException" && GetSqlState(current) == "40P01")
-                return true;
-            current = current.InnerException;
-        }
-
-        return false;
-    }
-
-    // Reflection-based to avoid hard dependency on Npgsql/Microsoft.Data.SqlClient
-    private static int GetErrorNumber(Exception ex)
-        => (int)(ex.GetType().GetProperty("Number")?.GetValue(ex) ?? 0);
-
-    private static string? GetSqlState(Exception ex)
-        => ex.GetType().GetProperty("SqlState")?.GetValue(ex) as string;
+    internal static bool IsDeadlock(Exception ex) => DbErrorClassifier.IsDeadlock(ex);
 }

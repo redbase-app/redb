@@ -19,15 +19,15 @@ namespace redb.Core.Caching
         private readonly int _maxSize;
         private readonly TimeSpan _ttl;
         private readonly ILogger? _logger;
-        
+
         // Fields for user quota accounting
         private readonly Func<long>? _getUserIdFunc;
         private readonly Func<long, System.Threading.Tasks.Task<int?>>? _getQuotaFunc;
         private readonly Dictionary<long, HashSet<long>> _userOwnedObjects = new();
-        
+
         private long _hitCount;
         private long _missCount;
-        
+
         /// <summary>
         /// Constructor.
         /// </summary>
@@ -37,7 +37,7 @@ namespace redb.Core.Caching
         /// <param name="getQuotaFunc">Function to get user quota (returns null for sys)</param>
         /// <param name="logger">Optional logger for cache diagnostics</param>
         public MemoryRedbObjectCache(
-            int maxSize = 10000, 
+            int maxSize = 10000,
             TimeSpan? ttl = null,
             Func<long>? getUserIdFunc = null,
             Func<long, System.Threading.Tasks.Task<int?>>? getQuotaFunc = null,
@@ -49,7 +49,7 @@ namespace redb.Core.Caching
             _getQuotaFunc = getQuotaFunc;
             _logger = logger;
         }
-        
+
         /// <summary>
         /// Get WHOLE RedbObject from cache with hash validation.
         /// </summary>
@@ -63,14 +63,14 @@ namespace redb.Core.Caching
                     Interlocked.Increment(ref _missCount);
                     return null;  // Not in cache
                 }
-                
+
                 // TTL check
                 if (DateTime.UtcNow - entry.CreatedAt > _ttl)
                 {
                     Interlocked.Increment(ref _missCount);
                     return null;  // Expired by time
                 }
-                
+
                 // Hash check (against the DB hash the caller passed in)
                 if (entry.Hash != currentHash)
                 {
@@ -85,6 +85,15 @@ namespace redb.Core.Caching
                 // committed state from the DB instead of getting a stale ("already redeemed") snapshot.
                 var typed = entry.RedbObject as RedbObject<TProps>;
                 if (typed != null && typed.ComputeHash() != entry.Hash)
+                {
+                    Interlocked.Increment(ref _missCount);
+                    return null;
+                }
+
+                // V4 (review): the root's hash is id:hash of its references - an unsaved edit INSIDE
+                // a loaded nested object does not move it. Ask the loaded part of the graph as well;
+                // stubs are neither touched nor woken (raw Props access only).
+                if (typed != null && Utils.LoadedGraphInspector.HasDirtyLoadedReference(typed.GetPropsDirectly()))
                 {
                     Interlocked.Increment(ref _missCount);
                     return null;
@@ -141,19 +150,28 @@ namespace redb.Core.Caching
                     Interlocked.Increment(ref _missCount);
                     return null;  // Not in cache
                 }
-                
+
                 // TTL check
                 if (DateTime.UtcNow - entry.CreatedAt > _ttl)
                 {
                     Interlocked.Increment(ref _missCount);
                     return null;  // Expired by time
                 }
-                
-                // ✅ Skip DB-hash validation - trust cache. But still guard against an in-place mutation
+
+                // Skip DB-hash validation - trust cache. But still guard against an in-place mutation
                 // of the shared cached object (dirty snapshot): if the live hash drifted from the one
                 // stored at Set, the object was mutated after caching → MISS, reload committed from DB.
                 var typed = entry.RedbObject as RedbObject<TProps>;
                 if (typed != null && typed.ComputeHash() != entry.Hash)
+                {
+                    Interlocked.Increment(ref _missCount);
+                    return null;
+                }
+
+                // V4 (review): the root's hash is id:hash of its references - an unsaved edit INSIDE
+                // a loaded nested object does not move it. Ask the loaded part of the graph as well;
+                // stubs are neither touched nor woken (raw Props access only).
+                if (typed != null && Utils.LoadedGraphInspector.HasDirtyLoadedReference(typed.GetPropsDirectly()))
                 {
                     Interlocked.Increment(ref _missCount);
                     return null;
@@ -199,15 +217,15 @@ namespace redb.Core.Caching
         /// <summary>
         /// Save WHOLE RedbObject to cache.
         /// </summary>
-        // 🛡️ Protection from recursion: scheme_id for UserConfigurationProps
+        // Protection from recursion: scheme_id for UserConfigurationProps
         private static long? _userConfigSchemeId = null;
         private static readonly object _schemeIdLock = new();
-        
+
         public void Set<TProps>(RedbObject<TProps> obj) where TProps : class, new()
         {
             if (!obj.hash.HasValue) return;  // Cannot cache without hash
-            
-            // 🛡️ Determine scheme_id for UserConfigurationProps (once)
+
+            // Determine scheme_id for UserConfigurationProps (once)
             if (_userConfigSchemeId == null && typeof(TProps).Name == "UserConfigurationProps")
             {
                 lock (_schemeIdLock)
@@ -215,22 +233,22 @@ namespace redb.Core.Caching
                     _userConfigSchemeId ??= obj.scheme_id;
                 }
             }
-            
+
             // FIX DEADLOCK: Get userId and quota BEFORE acquiring lock
             // BUT: skip for UserConfigurationProps to avoid infinite recursion!
                 long userId = _getUserIdFunc?.Invoke() ?? 0;
                 int? quota = null;
             Dictionary<long, int?>? allQuotas = null;
-            
+
             // DO NOT call getQuotaFunc for UserConfigurationProps — this will cause recursion!
             bool isUserConfig = _userConfigSchemeId.HasValue && obj.scheme_id == _userConfigSchemeId.Value;
-            
+
             if (_getQuotaFunc != null && !isUserConfig)
             {
                 try
                 {
                     quota = _getQuotaFunc(userId).GetAwaiter().GetResult();
-                    
+
                     // Preload quotas for EvictGlobalObject (need all users)
                     allQuotas = PreloadQuotasForEviction();
                 }
@@ -240,7 +258,7 @@ namespace redb.Core.Caching
                     quota = null;
                 }
             }
-            
+
             _lock.EnterWriteLock();
             try
             {
@@ -254,7 +272,7 @@ namespace redb.Core.Caching
                     existing.OwnerUserIds.Add(userId);  // Add user as owner
                     return;
                 }
-                
+
                 // Object is new - check user quota (if quota != null, i.e. not sys)
                 if (quota.HasValue && _userOwnedObjects.ContainsKey(userId))
                 {
@@ -263,7 +281,7 @@ namespace redb.Core.Caching
                     {
                         // User quota exceeded - try to evict
                         bool evicted = EvictUserObject(userId);
-                        
+
                         if (!evicted)
                         {
                             // Eviction failed (all objects protected by multiple owners)
@@ -274,13 +292,13 @@ namespace redb.Core.Caching
                         }
                     }
                 }
-                
+
                 // Check global limit
                 if (_cache.Count >= _maxSize)
                 {
                     // Global limit exceeded - smart eviction (use preloaded quotas)
                     bool evicted = EvictGlobalObjectWithQuotas(allQuotas);
-                    
+
                     if (!evicted)
                     {
                         // Global cache full and eviction failed
@@ -290,7 +308,7 @@ namespace redb.Core.Caching
                         return;
                     }
                 }
-                
+
                 // Add new object
                 _cache[obj.id] = new CacheEntry
                 {
@@ -302,7 +320,7 @@ namespace redb.Core.Caching
                     OwnerUserIds = new HashSet<long> { userId },
                     AccessCount = 0
                 };
-                
+
                 // Register ownership
                 if (!_userOwnedObjects.ContainsKey(userId))
                 {
@@ -315,14 +333,14 @@ namespace redb.Core.Caching
                 _lock.ExitWriteLock();
             }
         }
-        
+
         /// <summary>
         /// Preload quotas for all users (called BEFORE lock acquisition).
         /// </summary>
         private Dictionary<long, int?>? PreloadQuotasForEviction()
         {
             if (_getQuotaFunc == null) return null;
-            
+
             // Read userId list under ReadLock (fast)
             List<long> userIds;
             _lock.EnterReadLock();
@@ -334,7 +352,7 @@ namespace redb.Core.Caching
             {
                 _lock.ExitReadLock();
             }
-            
+
             // Load quotas OUTSIDE lock (may call async operations)
             var quotas = new Dictionary<long, int?>();
             foreach (var uid in userIds)
@@ -348,10 +366,10 @@ namespace redb.Core.Caching
                     quotas[uid] = null;
                 }
             }
-            
+
             return quotas;
         }
-        
+
         /// <summary>
         /// BULK: determine which objects need to be loaded from DB.
         /// Returns cached WHOLE RedbObject instances.
@@ -361,7 +379,7 @@ namespace redb.Core.Caching
             out Dictionary<long, RedbObject<TProps>> fromCache) where TProps : class, new()
         {
             var cacheDict = new Dictionary<long, RedbObject<TProps>>();
-            
+
             _lock.EnterReadLock();
             try
             {
@@ -374,12 +392,12 @@ namespace redb.Core.Caching
                         cacheDict[obj.objectId] = cached;
                     }
                 }
-                
+
                 // LINQ: set difference
                 var allIds = objects.Select(o => o.objectId).ToHashSet();
                 var inCache = cacheDict.Keys.ToHashSet();
                 var needToLoad = allIds.Except(inCache).ToHashSet();
-                
+
                 fromCache = cacheDict;
                 return needToLoad;
             }
@@ -388,9 +406,9 @@ namespace redb.Core.Caching
                 _lock.ExitReadLock();
             }
         }
-        
+
         // === EVICTION METHODS (for quotas) ===
-        
+
         /// <summary>
         /// Evict user object (used when quota exceeded).
         /// Evicts only objects where user is the sole owner.
@@ -400,33 +418,33 @@ namespace redb.Core.Caching
         {
             if (!_userOwnedObjects.TryGetValue(userId, out var userObjects) || userObjects.Count == 0)
                 return false;
-                
+
             // Find objects where user is the sole owner
             var candidatesForEviction = userObjects
                 .Where(objId => _cache.ContainsKey(objId) && _cache[objId].OwnerUserIds.Count == 1)
                 .OrderBy(objId => _cache[objId].LastAccessAt)  // LRU - least recently used
                 .ToList();
-                
+
             if (candidatesForEviction.Any())
             {
                 var toEvict = candidatesForEviction.First();
-                
+
                 // Remove from cache
                 _cache.Remove(toEvict);
-                
+
                 // Remove from user accounting
                 userObjects.Remove(toEvict);
-                
+
                 return true;  // Eviction successful
             }
-            
+
             return false;  // No objects to evict (all protected)
         }
-        
+
         /// <summary>
         /// Global eviction with preloaded quotas (used when global limit exceeded).
         /// Fair Share strategy: evicts user with highest quota usage percentage.
-        /// ✅ FIX DEADLOCK: Quotas passed as parameter (loaded BEFORE lock acquisition).
+        /// FIX DEADLOCK: Quotas passed as parameter (loaded BEFORE lock acquisition).
         /// </summary>
         /// <param name="preloadedQuotas">Preloaded quotas (may be null)</param>
         /// <returns>true if eviction occurred, false if eviction impossible</returns>
@@ -434,40 +452,40 @@ namespace redb.Core.Caching
         {
             // 1. Find users exceeding quota (>100%)
             var usersOverQuota = new List<(long userId, int overBy)>();
-            
+
             if (preloadedQuotas != null)
             {
                 foreach (var kvp in _userOwnedObjects)
                 {
                     var userId = kvp.Key;
                     var objectCount = kvp.Value.Count;
-                    
+
                     if (preloadedQuotas.TryGetValue(userId, out var quota) && quota.HasValue && objectCount > quota.Value)
                     {
                         usersOverQuota.Add((userId, objectCount - quota.Value));
                     }
                 }
             }
-            
+
             // 2. If there are users exceeding quota - evict the one who exceeded most
             if (usersOverQuota.Any())
             {
                 var userToEvict = usersOverQuota.OrderByDescending(u => u.overBy).First().userId;
                 return EvictUserObject(userToEvict);
             }
-            
+
             // 3. No one exceeded quota - use Fair Share (percentage ratio)
             var userGreediness = new List<(long userId, double greediness)>();
-            
+
             if (preloadedQuotas != null)
             {
                 foreach (var kvp in _userOwnedObjects)
                 {
                     var userId = kvp.Key;
                     var objectCount = kvp.Value.Count;
-                    
+
                     if (objectCount == 0) continue;  // Skip users without objects
-                    
+
                     if (preloadedQuotas.TryGetValue(userId, out var quota))
                     {
                     if (quota.HasValue && quota.Value > 0)
@@ -484,7 +502,7 @@ namespace redb.Core.Caching
                     }
                 }
             }
-            
+
             // 4. Evict user with maximum quota usage percentage
             if (userGreediness.Any())
             {
@@ -492,18 +510,18 @@ namespace redb.Core.Caching
                     .OrderByDescending(u => u.greediness)
                     .ThenByDescending(u => _userOwnedObjects[u.userId].Count)  // At equal greediness - who has more objects
                     .First().userId;
-                
+
                 return EvictUserObject(greedyUser);  // He will evict the oldest (LRU)
             }
-            
+
             // 5. Fallback: simple FIFO if no quotas
             if (_cache.Any())
             {
                 var oldestEntry = _cache.Values.OrderBy(e => e.CreatedAt).First();
-                
+
                 // Remove from cache
                 _cache.Remove(oldestEntry.ObjectId);
-                
+
                 // Remove from accounting of all owners
                 foreach (var ownerId in oldestEntry.OwnerUserIds)
                 {
@@ -512,17 +530,17 @@ namespace redb.Core.Caching
                         userObjects.Remove(oldestEntry.ObjectId);
                     }
                 }
-                
+
                 return true;
             }
-            
+
             return false;  // Cache is empty
         }
-        
+
         // === LEGACY METHODS for backward compatibility ===
-        
+
         // === LEGACY METHODS (COMMENTED OUT - use Get/Set for full RedbObject) ===
-        
+
         // /// <summary>
         // /// [LEGACY] Get only Props from cached object
         // /// </summary>
@@ -531,7 +549,7 @@ namespace redb.Core.Caching
         //     var obj = Get<TProps>(objectId, currentHash);
         //     return obj?.Props;
         // }
-        
+
         // /// <summary>
         // /// [LEGACY] Save only Props (creates minimal RedbObject)
         // /// </summary>
@@ -546,7 +564,7 @@ namespace redb.Core.Caching
         //     };
         //     Set(obj);
         // }
-        
+
         public void Remove(long objectId)
         {
             _lock.EnterWriteLock();
@@ -563,7 +581,7 @@ namespace redb.Core.Caching
                             userObjects.Remove(objectId);
                         }
                     }
-                    
+
                     _cache.Remove(objectId);
                 }
             }
@@ -572,7 +590,7 @@ namespace redb.Core.Caching
                 _lock.ExitWriteLock();
             }
         }
-        
+
         public void Clear()
         {
             _lock.EnterWriteLock();
@@ -588,7 +606,7 @@ namespace redb.Core.Caching
                 _lock.ExitWriteLock();
             }
         }
-        
+
         public PropsCacheStatistics GetStats()
         {
             _lock.EnterReadLock();
@@ -606,10 +624,10 @@ namespace redb.Core.Caching
                 _lock.ExitReadLock();
             }
         }
-        
+
         /// <summary>
         /// Get detailed user statistics.
-        /// ✅ FIX DEADLOCK: Quotas loaded BEFORE lock acquisition.
+        /// FIX DEADLOCK: Quotas loaded BEFORE lock acquisition.
         /// </summary>
         public Dictionary<long, UserCacheStats> GetUserStatistics()
         {
@@ -626,7 +644,7 @@ namespace redb.Core.Caching
             {
                 _lock.ExitReadLock();
             }
-            
+
             // Step 2: Load quotas OUTSIDE lock (may call async operations)
             var quotas = new Dictionary<long, int?>();
                     if (_getQuotaFunc != null)
@@ -643,27 +661,27 @@ namespace redb.Core.Caching
                     }
                 }
             }
-            
+
             // Step 3: Collect statistics
             var stats = new Dictionary<long, UserCacheStats>();
             foreach (var (userId, objectCount) in userData)
             {
                 quotas.TryGetValue(userId, out var quota);
-                    
+
                     stats[userId] = new UserCacheStats
                     {
                         UserId = userId,
                     ObjectCount = objectCount,
                         Quota = quota,
-                        UsagePercent = quota.HasValue && quota.Value > 0 
-                        ? (double)objectCount / quota.Value * 100 
+                        UsagePercent = quota.HasValue && quota.Value > 0
+                        ? (double)objectCount / quota.Value * 100
                             : 0
                     };
                 }
-                
+
                 return stats;
         }
-        
+
         /// <summary>
         /// Internal Get method with statistics tracking (for FilterNeedToLoad).
         /// Already called inside ReadLock, so no lock needed.
@@ -675,19 +693,19 @@ namespace redb.Core.Caching
                 Interlocked.Increment(ref _missCount);
                 return null;
             }
-            
+
             if (DateTime.UtcNow - entry.CreatedAt > _ttl)
             {
                 Interlocked.Increment(ref _missCount);
                 return null;
             }
-            
+
             if (entry.Hash != currentHash)
             {
                 Interlocked.Increment(ref _missCount);
                 return null;
             }
-            
+
             var result = entry.RedbObject as RedbObject<TProps>;
             if (result == null)
             {
@@ -704,10 +722,17 @@ namespace redb.Core.Caching
                 return null;
             }
 
+            // V4 (review): and the loaded part of the graph - see Get.
+            if (Utils.LoadedGraphInspector.HasDirtyLoadedReference(result.GetPropsDirectly()))
+            {
+                Interlocked.Increment(ref _missCount);
+                return null;
+            }
+
             Interlocked.Increment(ref _hitCount);
             return result;
         }
-        
+
         /// <summary>
         /// Cache entry - now stores WHOLE RedbObject.
         /// </summary>
@@ -715,16 +740,16 @@ namespace redb.Core.Caching
         {
             public long ObjectId { get; set; }
             public Guid Hash { get; set; }
-            public object RedbObject { get; set; } = null!;  // ✅ Now RedbObject, not Props!
+            public object RedbObject { get; set; } = null!;  // Now RedbObject, not Props!
             public DateTime CreatedAt { get; set; }
-            
+
             // Fields for ownership and user quota accounting
             public DateTime LastAccessAt { get; set; }  // For LRU strategy
             public HashSet<long> OwnerUserIds { get; set; } = new();  // Who uses the object
             public int AccessCount { get; set; }  // For LFU strategy
         }
     }
-    
+
     /// <summary>
     /// User cache statistics.
     /// </summary>
@@ -734,17 +759,17 @@ namespace redb.Core.Caching
         /// User ID.
         /// </summary>
         public long UserId { get; set; }
-        
+
         /// <summary>
         /// Number of user objects in cache.
         /// </summary>
         public int ObjectCount { get; set; }
-        
+
         /// <summary>
         /// User quota (null = unlimited, for sys).
         /// </summary>
         public int? Quota { get; set; }
-        
+
         /// <summary>
         /// Quota usage percentage (0-100+).
         /// </summary>

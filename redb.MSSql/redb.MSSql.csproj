@@ -11,7 +11,7 @@
     <!-- NuGet Package Metadata -->
     <PackageId>redb.MSSql</PackageId>
     <Product>REDB - Entity Database for .NET</Product>
-    <Description>SQL Server provider for REDB. Includes optimized T-SQL generation, tree queries with CTEs, and full LINQ support.</Description>
+    <Description>SQL Server provider for REDB. Includes optimized T-SQL generation, tree queries with CTEs, and full LINQ support. Requires SQL Server 2017 or newer (2022+ only for the $min / $max expression operators).</Description>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>
     <PackageTags>database;orm;redb;redbase;sqlserver;mssql;linq;dotnet;typed-storage;cte;tree-query</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -55,6 +55,7 @@
     <ParameterGroup>
       <InputFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
       <OutputFile ParameterType="System.String" Required="true" />
+      <SortByFileName ParameterType="System.Boolean" Required="false" />
     </ParameterGroup>
     <Task>
       <Code Type="Fragment" Language="cs"><![CDATA[
@@ -64,7 +65,17 @@
         sb.AppendLine("-- DO NOT EDIT — this file is overwritten on every build.");
         sb.AppendLine("-- ==========================================================");
         sb.AppendLine();
-        foreach (var item in InputFiles)
+        var items = InputFiles;
+        if (SortByFileName)
+        {
+            // Glob order is filesystem order (NTFS: uppercase-ordinal; ext4: hash order). The pvt
+            // bundle is pinned to the order it is verified with: 00 first, 06a before 06_, 99 last.
+            items = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.OrderBy(InputFiles, i => System.IO.Path.GetFileName(i.ItemSpec), System.StringComparer.OrdinalIgnoreCase));
+        }
+        // redb_init.sql is NOT sorted: its groups (main DDL, metadata cache, helpers, pvt) carry a
+        // deliberate cross-group order that a filename sort destroys (review regression: a fresh
+        // database died with `relation _structures does not exist`; caught by the fresh-install test).
+        foreach (var item in items)
         {
             var path = item.ItemSpec;
             sb.AppendLine("-- ===== " + System.IO.Path.GetFileName(path) + " =====");
@@ -113,7 +124,7 @@
          to existing databases that pre-date its introduction (EnsureDatabaseAsync
          skips redb_init.sql when _schemes already exists). Kept in sync with the
          standalone _bundle.ps1 used during MSSql development. -->
-    <ConcatenateSqlFiles InputFiles="@(SqlPvtBundle)" OutputFile="sql\v2-pvt\pvt_bundle.sql" />
+    <ConcatenateSqlFiles InputFiles="@(SqlPvtBundle)" OutputFile="sql\v2-pvt\pvt_bundle.sql" SortByFileName="true" />
   </Target>
 
 </Project>

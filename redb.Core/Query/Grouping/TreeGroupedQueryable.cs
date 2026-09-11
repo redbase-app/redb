@@ -36,39 +36,39 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
     }
 
     public async Task<List<TResult>> SelectAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector)
+        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var groupFields = ParseGroupFields(_keySelector);
         var aggregations = ParseAggregations(selector);
 
         // Use tree-aware execution with full context
         var jsonResult = await _treeProvider.ExecuteTreeGroupedAggregateAsync(
-            _treeContext, groupFields, aggregations, BuildHavingJson());
+            _treeContext, groupFields, aggregations, BuildHavingJson(), cancellationToken: cancellationToken);
 
         return MaterializeResults<TResult>(jsonResult, selector, groupFields);
     }
 
-    public async Task<int> CountAsync()
+    public async Task<int> CountAsync(CancellationToken cancellationToken = default)
     {
         var groupFields = ParseGroupFields(_keySelector);
         var aggregations = new[] { new AggregateRequest { FieldPath = "*", Function = AggregateFunction.Count, Alias = "cnt" } };
 
         var jsonResult = await _treeProvider.ExecuteTreeGroupedAggregateAsync(
-            _treeContext, groupFields, aggregations, BuildHavingJson());
+            _treeContext, groupFields, aggregations, BuildHavingJson(), cancellationToken: cancellationToken);
 
         if (jsonResult == null) return 0;
         return jsonResult.RootElement.GetArrayLength();
     }
 
     public async Task<string> ToSqlStringAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector)
+        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var groupFields = ParseGroupFields(_keySelector);
         var aggregations = ParseAggregations(selector);
 
         // Delegate to tree provider for real SQL preview
         return await _treeProvider.GetTreeGroupBySqlPreviewAsync(
-            _treeContext, groupFields, aggregations, BuildHavingJson());
+            _treeContext, groupFields, aggregations, BuildHavingJson(), cancellationToken: cancellationToken);
     }
     
     /// <summary>
@@ -191,49 +191,46 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
         Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector)
     {
         var result = new List<AggregateRequest>();
+        var groupParam = selector.Parameters[0];
 
-        if (selector.Body is NewExpression newExpr)
+        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, "TreeGroupBy.SelectAsync"))
         {
-            for (int i = 0; i < newExpr.Arguments.Count; i++)
+            var expr = GroupSelectorMembers.StripConvert(rawExpr);
+
+            if (GroupSelectorMembers.IsKeyAccess(expr, groupParam))
+                continue;
+
+            if (expr is MethodCallExpression methodCall && methodCall.Method.DeclaringType == typeof(Agg))
             {
-                var arg = newExpr.Arguments[i];
-                var alias = newExpr.Members?[i].Name ?? $"Agg{i}";
-
-                if (arg is MemberExpression member && member.Member.Name == "Key")
-                    continue;
-
-                if (arg is MethodCallExpression methodCall &&
-                    methodCall.Method.DeclaringType == typeof(Agg))
+                var funcName = methodCall.Method.Name;
+                var function = funcName switch
                 {
-                    var funcName = methodCall.Method.Name;
-                    var function = funcName switch
-                    {
-                        "Sum" => AggregateFunction.Sum,
-                        "Average" => AggregateFunction.Average,
-                        "Min" => AggregateFunction.Min,
-                        "Max" => AggregateFunction.Max,
-                        "Count" => AggregateFunction.Count,
-                        _ => throw new NotSupportedException($"Unknown aggregation: {funcName}")
-                    };
+                    "Sum" => AggregateFunction.Sum,
+                    "Average" => AggregateFunction.Average,
+                    "Min" => AggregateFunction.Min,
+                    "Max" => AggregateFunction.Max,
+                    "Count" => AggregateFunction.Count,
+                    _ => throw new NotSupportedException($"Unknown aggregation: {funcName}")
+                };
 
-                    string fieldPath = "*";
-                    if (methodCall.Arguments.Count >= 2)
-                    {
-                        fieldPath = ExtractFieldPathFromLambda(methodCall.Arguments[1]);
-                    }
+                string fieldPath = "*";
+                if (methodCall.Arguments.Count >= 2)
+                    fieldPath = ExtractFieldPathFromLambda(methodCall.Arguments[1]);
 
-                    result.Add(new AggregateRequest
-                    {
-                        FieldPath = fieldPath,
-                        Function = function,
-                        Alias = alias
-                    });
-                }
+                result.Add(new AggregateRequest { FieldPath = fieldPath, Function = function, Alias = name });
+                continue;
             }
+
+            if (!GroupSelectorMembers.ReferencesParameter(expr, groupParam))
+                continue; // клиентское значение - вычислится при материализации
+
+            throw new NotSupportedException(
+                $"TreeGroupBy.SelectAsync: член '{name}' использует группу, но не является ни g.Key, ни прямым Agg.* вызовом.");
         }
 
         return result;
     }
+
 
     private string ExtractFieldPath(MemberExpression? member)
     {
@@ -286,56 +283,43 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
         var results = new List<TResult>();
         if (jsonResult == null) return results;
 
+        var members = GroupSelectorMembers.Extract(selector, "TreeGroupBy.SelectAsync");
+        var groupParam = selector.Parameters[0];
+
+        var clientValues = new object?[members.Count];
+        var isClient = new bool[members.Count];
+        for (int i = 0; i < members.Count; i++)
+        {
+            if (!GroupSelectorMembers.ReferencesParameter(GroupSelectorMembers.StripConvert(members[i].Expr), groupParam))
+            {
+                isClient[i] = true;
+                clientValues[i] = Expression.Lambda(members[i].Expr).Compile().DynamicInvoke();
+            }
+        }
+
         foreach (var element in jsonResult.RootElement.EnumerateArray())
         {
-            var result = MaterializeSingleResult<TResult>(element, selector, groupFields);
-            results.Add(result);
+            var values = new object?[members.Count];
+            for (int i = 0; i < members.Count; i++)
+            {
+                if (isClient[i]) { values[i] = clientValues[i]; continue; }
+
+                var (name, type, rawExpr) = members[i];
+                if (element.TryGetProperty(name, out var prop))
+                    values[i] = JsonValueConverter.Convert(prop, type);
+                else
+                {
+                    var jsonAlias = ExtractJsonAliasFromArgument(GroupSelectorMembers.StripConvert(rawExpr), groupFields);
+                    if (!string.IsNullOrEmpty(jsonAlias) && element.TryGetProperty(jsonAlias, out prop))
+                        values[i] = JsonValueConverter.Convert(prop, type);
+                }
+            }
+            results.Add(GroupSelectorMembers.Construct<TResult>(selector, values));
         }
 
         return results;
     }
 
-    private TResult MaterializeSingleResult<TResult>(
-        JsonElement element,
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector,
-        List<GroupFieldRequest> groupFields)
-    {
-        if (selector.Body is NewExpression newExpr)
-        {
-            var args = new object?[newExpr.Arguments.Count];
-
-            for (int i = 0; i < newExpr.Arguments.Count; i++)
-            {
-                var alias = newExpr.Members?[i].Name ?? $"Item{i}";
-                var propType = newExpr.Members?[i] is System.Reflection.PropertyInfo pi
-                    ? pi.PropertyType
-                    : typeof(object);
-
-                // Try direct property lookup first
-                if (element.TryGetProperty(alias, out var prop))
-                {
-                    args[i] = JsonValueConverter.Convert(prop, propType);
-                }
-                else
-                {
-                    // Handle g.Key / g.Key.Field.Id patterns
-                    var jsonAlias = ExtractJsonAliasFromArgument(newExpr.Arguments[i], groupFields);
-                    if (!string.IsNullOrEmpty(jsonAlias) && element.TryGetProperty(jsonAlias, out prop))
-                    {
-                        args[i] = JsonValueConverter.Convert(prop, propType);
-                    }
-                }
-            }
-
-            var ctor = newExpr.Constructor;
-            if (ctor != null)
-            {
-                return (TResult)ctor.Invoke(args);
-            }
-        }
-
-        return default!;
-    }
     
     /// <summary>
     /// Extracts JSON field alias from selector argument.

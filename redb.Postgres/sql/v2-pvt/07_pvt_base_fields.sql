@@ -24,6 +24,7 @@ AS $$
         'key', o._key,
         'value_long', o._value_long,
         'value_string', o._value_string,
+        'value_unique', o._value_unique,
         'value_guid', o._value_guid,
         'note', o._note,
         'value_bool', o._value_bool,

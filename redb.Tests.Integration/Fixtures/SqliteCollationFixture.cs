@@ -47,7 +47,6 @@ public sealed class SqliteCollationFixture : IAsyncLifetime
             {
                 c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert;
                 c.SkipHashValidationOnCacheCheck = false;
-                c.EnableLazyLoadingForProps = false;
                 c.EnablePropsCache = false;
                 // On SQLite the value is not a collation name — there is nothing to attach it to.
                 // It is the switch that installs the Unicode-aware like/lower/upper overrides on
@@ -67,6 +66,7 @@ public sealed class SqliteCollationFixture : IAsyncLifetime
         await Redb.InitializeTypeRegistryAsync();
 
         var ctx = ServiceProvider.GetRequiredService<IRedbContext>();
+        await FixtureWipeGuard.EnsureLooksLikeATestDatabaseAsync(ctx, nameof(SqliteCollationFixture));
         await ctx.ExecuteAsync("DELETE FROM _values");
         await ctx.ExecuteAsync("DELETE FROM _objects");
     }

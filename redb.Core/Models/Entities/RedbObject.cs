@@ -92,7 +92,7 @@ namespace redb.Core.Models.Entities
                             _propsLoaded = true;
                             _lazyLoader = null;
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (ex is not Exceptions.RedbSynchronousLazyLoadException and not Exceptions.RedbLazyLoadScopeEndedException)
                         {
                             throw new InvalidOperationException(
                                 $"Error during lazy loading Props for object {id}: {ex.Message}", ex);
@@ -109,6 +109,10 @@ namespace redb.Core.Models.Entities
                 _lazyLoader = null;
             }
         }
+
+        /// <inheritdoc/>
+        [JsonIgnore]
+        public override bool IsPropsLoaded => _propsLoaded;
 
         /// <summary>
         /// Get Props without triggering lazy loading (for internal use in cache).
@@ -242,13 +246,19 @@ namespace redb.Core.Models.Entities
         }
 
         /// <summary>
-        /// Create object copy with same metadata but new properties.
+        /// Create object copy with same metadata but new properties. The copy is a NEW object:
+        /// it takes no <c>id</c>, no <c>hash</c> (recomputed from the new properties on save) and
+        /// no <c>value_unique</c> - the object key is identity, not content, and a copy must
+        /// claim its own or none (copying it would trip <c>UIX__objects__scheme_unique</c> on the
+        /// first save).
         /// </summary>
         public IRedbObject<TProps> CloneWithProperties(TProps newProperties)
         {
             return new RedbObject<TProps>(newProperties)
             {
-                // Copy all metadata except ID (to create new object)
+                // Copy all metadata except ID (to create new object). Deliberately NOT copied:
+                // value_unique (the key is identity - one object per key per scheme) and hash
+                // (the new Props get their own on save).
                 parent_id = this.parent_id,
                 scheme_id = this.scheme_id,
                 owner_id = this.owner_id,

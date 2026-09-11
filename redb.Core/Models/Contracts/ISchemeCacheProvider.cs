@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Caching;
 
@@ -70,19 +71,21 @@ namespace redb.Core.Models.Contracts
         /// Useful for performance optimization during application startup
         /// </summary>
         /// <typeparam name="TProps">Object properties type</typeparam>
-        Task WarmupCacheAsync<TProps>() where TProps : class;
+        Task WarmupCacheAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class;
         
         /// <summary>
         /// Preload metadata for array of C# types
         /// </summary>
         /// <param name="types">Array of types to preload</param>
-        Task WarmupCacheAsync(Type[] types);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task WarmupCacheAsync(Type[] types,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Preload metadata for all known schemes
         /// Use carefully - can be resource-intensive
         /// </summary>
-        Task WarmupAllSchemesAsync();
+        Task WarmupAllSchemesAsync(CancellationToken cancellationToken = default);
         
         // ===== DIAGNOSTICS =====
         

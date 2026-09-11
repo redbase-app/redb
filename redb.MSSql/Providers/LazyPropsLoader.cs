@@ -3,6 +3,8 @@ using redb.Core.Caching;
 using redb.Core.Data;
 using redb.Core.Models.Configuration;
 using redb.Core.Models.Entities;
+using redb.Core.Exceptions;
+using redb.Core.Models.Configuration;
 using redb.Core.Providers;
 using redb.Core.Serialization;
 using Microsoft.Extensions.Logging;
@@ -16,6 +18,8 @@ namespace redb.MSSql.Providers;
 /// </summary>
 public class LazyPropsLoader : ILazyPropsLoader
 {
+    // get_object_json depth the batch uses when the caller names none (query pages, tree loads).
+    private const int DefaultBatchDepth = 10;
     private readonly ConcurrentDictionary<long, byte> _loadingInProgress = new();
     
     private readonly IRedbContext _context;
@@ -44,25 +48,32 @@ public class LazyPropsLoader : ILazyPropsLoader
     /// <summary>
     /// Synchronous Props loading (for getter).
     /// </summary>
-    public TProps LoadProps<TProps>(long objectId, long schemeId) where TProps : class, new()
+    public TProps? LoadProps<TProps>(long objectId, long schemeId) where TProps : class, new()
     {
-        return LoadPropsAsync<TProps>(objectId, schemeId)
-            .ConfigureAwait(false)
-            .GetAwaiter()
-            .GetResult();
+        if (_config.LazyReferenceAccess == LazyReferenceAccessMode.Throw)
+            throw new RedbSynchronousLazyLoadException(objectId, schemeId);
+
+        // Blocking by design (the getter is synchronous), but never on the caller's context: the load
+        // runs on the thread pool, so a host with a SynchronizationContext (Blazor Server, WPF, MAUI)
+        // waits instead of deadlocking on its own continuations (review). The caller blocks meanwhile,
+        // so the context stays single-threaded; ExecutionContext (the AsyncLocal scope) flows in.
+        return Task.Run(() => LoadPropsAsync<TProps>(objectId, schemeId)).GetAwaiter().GetResult();
     }
     
     /// <summary>
     /// Async Props loading for single object via get_object_json.
     /// Simple and efficient for OpenSource version.
     /// </summary>
-    public async Task<TProps> LoadPropsAsync<TProps>(long objectId, long schemeId) where TProps : class, new()
+    public async Task<TProps?> LoadPropsAsync<TProps>(long objectId, long schemeId, CancellationToken cancellationToken = default) where TProps : class, new()
     {
+        if (_context.IsDisposed)
+            throw new RedbLazyLoadScopeEndedException(objectId, schemeId);
+
         // 1. Check cache first
         if (_config.EnablePropsCache && _propsCache.Instance != null)
         {
             var hashes = await _context.QueryScalarListAsync<Guid>(
-                _sql.LazyLoader_SelectObjectHash(), objectId);
+                _sql.LazyLoader_SelectObjectHash(), new object[] { objectId }, cancellationToken);
             
             if (hashes.Count > 0)
             {
@@ -79,14 +90,15 @@ public class LazyPropsLoader : ILazyPropsLoader
 
         // 2. Load via get_object_json — ONE query, simple!
         var jsonResults = await _context.QueryScalarListAsync<string>(
-            _sql.LazyLoader_GetObjectJson(), objectId, 10);
+            _sql.LazyLoader_GetObjectJson(), new object[] { objectId, 1 }, cancellationToken); // V4 (L.3): the reloaded object's own references are stubs again
         var json = jsonResults.FirstOrDefault();
 
         if (string.IsNullOrEmpty(json))
-            throw new InvalidOperationException($"Object {objectId} not found");
+            return null; // V4 (L.3): a reference whose target left for the trash reloads as null Props, not an exception
 
         // 3. Deserialize
         var obj = _serializer.Deserialize<TProps>(json);
+        redb.Core.Utils.LazyReferenceInstaller.Install(obj, this); // V4 (L.3): nested stubs get their loader
 
         // 4. Cache the result
         if (_config.EnablePropsCache && obj.hash.HasValue)
@@ -94,14 +106,22 @@ public class LazyPropsLoader : ILazyPropsLoader
             _propsCache.Set(obj);
         }
 
-        return obj.Props;
+        // Raw access instead of the getter: for an object with properties:null (values wiped by a
+
+
+        // race, or a bare object) Install has attached the loader to the root itself, so the Props
+
+
+        // getter would start a new load - endless recursion eating a pool thread per turn.
+        return obj.GetPropsDirectly();
     }
     
     /// <summary>
     /// BULK Props loading for multiple objects via get_object_json batch.
     /// </summary>
-    public async Task LoadPropsForManyAsync<TProps>(List<RedbObject<TProps>> objects) where TProps : class, new()
+    public async Task LoadPropsForManyAsync<TProps>(List<RedbObject<TProps>> objects, int? propsDepth, CancellationToken cancellationToken = default) where TProps : class, new()
     {
+        var depth = propsDepth ?? DefaultBatchDepth;
         if (objects.Count == 0) return;
         
         // Protection from infinite recursion
@@ -157,7 +177,7 @@ public class LazyPropsLoader : ILazyPropsLoader
                 
                 // Batch query via STRING_SPLIT + get_object_json
                 var results = await _context.QueryAsync<ObjectJsonResult>(
-                    _sql.LazyLoader_GetObjectJsonBatch(), idsString);
+                    _sql.LazyLoader_GetObjectJsonBatch(), new object[] { idsString, depth }, cancellationToken);
 
                 var jsonById = results.ToDictionary(r => r.Id, r => r.JsonData);
 
@@ -173,6 +193,7 @@ public class LazyPropsLoader : ILazyPropsLoader
                             obj.Props = loaded.Props;
                             obj._propsLoaded = true;
                             obj._lazyLoader = null;
+                            redb.Core.Utils.LazyReferenceInstaller.Install(obj, this); // V4 (L.3)
 
                             // Cache
                             if (_config.EnablePropsCache && obj.hash.HasValue)
@@ -201,42 +222,37 @@ public class LazyPropsLoader : ILazyPropsLoader
     /// </summary>
     public Task LoadPropsForManyAsync<TProps>(
         List<RedbObject<TProps>> objects, 
-        HashSet<long>? projectedStructureIds) where TProps : class, new()
+        HashSet<long>? projectedStructureIds, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         // OpenSource: ignore projection, load full objects
-        return LoadPropsForManyAsync(objects);
+        return LoadPropsForManyAsync(objects, propsDepth: null);
     }
 
     /// <summary>
-    /// BULK Props loading with custom depth for nested RedbObject.
-    /// In OpenSource version, propsDepth is ignored — uses get_object_json with default depth.
+    /// BULK Props loading at the default batch depth; the depth form above is the core.
+    /// A stub reload passes 1 (transitive laziness), query pages their PropsDepth.
     /// </summary>
-    public Task LoadPropsForManyAsync<TProps>(
-        List<RedbObject<TProps>> objects,
-        int? propsDepth) where TProps : class, new()
-    {
-        // OpenSource: ignore propsDepth, use default get_object_json
-        return LoadPropsForManyAsync(objects);
-    }
+    public Task LoadPropsForManyAsync<TProps>(List<RedbObject<TProps>> objects, CancellationToken cancellationToken = default) where TProps : class, new()
+        => LoadPropsForManyAsync(objects, propsDepth: null);
 
     /// <summary>
     /// BULK Props loading with projection filter and custom depth.
-    /// In OpenSource version, both parameters are ignored — full objects loaded via get_object_json.
+    /// In OpenSource version the projection is ignored (full objects); the depth is honoured.
     /// </summary>
     public Task LoadPropsForManyAsync<TProps>(
         List<RedbObject<TProps>> objects,
         HashSet<long>? projectedStructureIds,
-        int? propsDepth) where TProps : class, new()
+        int? propsDepth, CancellationToken cancellationToken = default) where TProps : class, new()
     {
-        // OpenSource: ignore projection and depth, load full objects
-        return LoadPropsForManyAsync(objects);
+        // OpenSource: ignore projection; the depth is honoured
+        return LoadPropsForManyAsync(objects, propsDepth);
     }
 
     /// <summary>
     /// BULK loading for polymorphic objects (different schemes).
     /// Each object is deserialized to its own type based on scheme_id.
     /// </summary>
-    public async Task LoadPropsForManyPolymorphicAsync(List<Core.Models.Contracts.IRedbObject> objects)
+    public async Task LoadPropsForManyPolymorphicAsync(List<Core.Models.Contracts.IRedbObject> objects, CancellationToken cancellationToken = default)
     {
         if (objects.Count == 0) return;
 
@@ -258,9 +274,11 @@ public class LazyPropsLoader : ILazyPropsLoader
             // For MSSQL, convert array to comma-separated string
             var idsString = string.Join(",", uniqueIds);
             
+            var depth = DefaultBatchDepth;
+            
             // Batch query
             var results = await _context.QueryAsync<ObjectJsonResult>(
-                _sql.LazyLoader_GetObjectJsonBatch(), idsString);
+                _sql.LazyLoader_GetObjectJsonBatch(), new object[] { idsString, depth }, cancellationToken);
 
             var jsonById = results.ToDictionary(r => r.Id, r => r.JsonData);
 

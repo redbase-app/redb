@@ -54,6 +54,39 @@ public abstract class GroupByHavingTestsBase
         });
     }
 
+
+    [Fact]
+    public async Task Having_Branching_DoesNotContaminateSiblingQueries()
+    {
+        // G-4 (ревью 2026-09-03): Having мутировал this - ветвление заражало сестринскую
+        // ветку обоими предикатами.
+        await SeedAsync();
+        var grouped = Redb.Query<EmployeeProps>().GroupBy(e => e.Department);
+        var strict = grouped.Having(g => Agg.Count(g) > 1_000_000);
+        var loose = grouped.Having(g => Agg.Count(g) > 0);
+
+        var looseRows = await loose.SelectAsync(g => new { Department = g.Key, Cnt = Agg.Count(g) });
+        looseRows.Should().NotBeEmpty("предикат сестринской ветки не должен протекать в эту");
+
+        var strictRows = await strict.SelectAsync(g => new { Department = g.Key, Cnt = Agg.Count(g) });
+        strictRows.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Having_NullConstant_IsLoud()
+    {
+        // G-5 (ревью 2026-09-03): null-константа превращалась в СТРОКУ "null".
+        await SeedAsync();
+        long? nothing = null;
+        var act = async () => await Redb.Query<EmployeeProps>()
+            .GroupBy(e => e.Department)
+            .Having(g => Agg.Count(g) == nothing)
+            .SelectAsync(g => new { g.Key });
+
+        await act.Should().ThrowAsync<NotSupportedException>(
+            "сравнение с текстом \"null\" - тихо неверный результат");
+    }
+
     [Fact]
     public async Task GroupBy_Having_CountGt_FiltersAll()
     {

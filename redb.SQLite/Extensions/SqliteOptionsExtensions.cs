@@ -31,7 +31,7 @@ public static class SqliteOptionsExtensions
     /// <example>
     /// services.AddRedb(options => options
     ///     .UseSqlite("Host=localhost;Database=mydb;Username=user;Password=pass")
-    ///     .Configure(c => c.EnableLazyLoadingForProps = true));
+    ///     .Configure(c => c.EnablePropsCache = true));
     /// </example>
     public static RedbOptionsBuilder UseSqlite(
         this RedbOptionsBuilder builder,
@@ -70,8 +70,10 @@ public static class SqliteOptionsExtensions
         // DataSource and Context
         if (!string.IsNullOrEmpty(config.ConnectionString))
         {
-            var dataSource = Data.SqliteDataSource.Create(config.ConnectionString, config.StringCollation != null);
-            services.AddSingleton(dataSource);
+            // Factory registration: the container OWNS the data source it creates and disposes it
+            // on shutdown, releasing the connection pool (an instance registration is never
+            // disposed by MS DI - the pool would outlive the container and keep the file locked).
+            services.AddSingleton(_ => Data.SqliteDataSource.Create(config.ConnectionString, config.StringCollation != null, config.EnableLazyReferences));
             services.AddScoped<IRedbContext>(sp => 
                 new SqliteRedbContext(sp.GetRequiredService<Data.SqliteDataSource>()));
         }

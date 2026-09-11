@@ -102,6 +102,7 @@ CREATE TABLE _schemes(
 	_alias text NULL,
 	_name_space text NULL,
 	_structure_hash uuid NULL,
+	_tags varchar(450) NULL,       -- V4: free-form marker for future / custom extensions ([RedbTags] or direct writes; sync never wipes it)
 	_type bigint NOT NULL DEFAULT -9223372036854775675, -- Scheme type: Class (default), Array, Dictionary, JsonDocument, XDocument
     CONSTRAINT PK__schemes PRIMARY KEY (_id),
 	CONSTRAINT IX__schemes UNIQUE (_name),
@@ -126,6 +127,11 @@ CREATE TABLE _structures(
 	_key_type bigint NULL,         -- Key type for Dictionary fields
 	_is_compress boolean NULL,
 	_store_null boolean NULL,
+	_unique boolean NULL,          -- V4: field is a unique key within its scheme ([RedbUnique])
+	_unique_version bigint NULL,   -- V4: UniqueKeyEncoder.Version the stored keys were computed with
+	_unique_scope bigint NULL,     -- S3: element-key scope of a collection key (NULL = default; 1 = Scheme elements; 2 = Collection elements)
+	_lazy boolean NULL,  -- V4 (LAZY Л2): lazy reference marker (virtual)
+	_tags varchar(450) NULL,       -- V4: free-form marker for future / custom extensions ([RedbTags] or direct writes; sync never wipes it)
 	_default_value bytea NULL,
 	_default_editor text NULL,
     CONSTRAINT PK__structure PRIMARY KEY (_id),
@@ -165,13 +171,14 @@ CREATE TABLE _objects(
 	-- Value columns for RedbPrimitive<T> (Props = primitive value stored directly)
 	-- Replaces old _code_int, _code_string, _code_guid, _bool columns
 	_value_long bigint NULL,        -- was _code_int
-	_value_string text NULL,        -- was _code_string (expanded to text!)
+	_value_string text NULL,        -- identifiers/external keys; contract limit 450 (C#-enforced, owner decision 2026-09-02), long text belongs in _note
 	_value_guid uuid NULL,          -- was _code_guid
 	_value_bool boolean NULL,       -- was _bool
 	_value_double float NULL,       -- NEW
 	_value_numeric NUMERIC(38, 18) NULL,  -- NEW
 	_value_datetime timestamptz NULL,     -- NEW
 	_value_bytes bytea NULL,        -- NEW
+	_value_unique varchar(440) NULL, -- V4: unique key within the scheme (UNIQUE stage 1); index below
     CONSTRAINT PK__objects PRIMARY KEY (_id),
     CONSTRAINT FK__objects__objects FOREIGN KEY (_id_parent) REFERENCES _objects (_id) ON DELETE CASCADE,
     CONSTRAINT FK__objects__schemes FOREIGN KEY (_id_scheme) REFERENCES _schemes (_id) ON DELETE CASCADE, 
@@ -207,6 +214,8 @@ CREATE TABLE _values(
 	_Numeric NUMERIC(38, 18) NULL,
 	_ListItem bigint NULL,
 	_Object bigint NULL,
+    -- V4: unique-key hash of the typed value (UniqueKeyEncoder) for [RedbUnique] root scalars
+	_unique uuid NULL,
     -- Fields for relational storage of collections (arrays, dictionaries, JSON/XML documents)
     _array_parent_id bigint NULL, -- Reference to parent element (for nested structures)
     _array_index text NULL, -- Key/index of element: '0','1','2' for arrays, string key for dictionaries
@@ -240,7 +249,7 @@ COMMENT ON COLUMN _schemes._type IS 'Scheme type ID (FK to _types): Class (defau
 -- Comments for _objects._value_* columns (RedbPrimitive<T> support)
 -- These columns replace old _code_int, _code_string, _code_guid, _bool
 COMMENT ON COLUMN _objects._value_long IS 'Direct value for RedbPrimitive<long/int/short/byte>. Replaces _code_int.';
-COMMENT ON COLUMN _objects._value_string IS 'Direct value for RedbPrimitive<string>. Replaces _code_string, expanded to text.';
+COMMENT ON COLUMN _objects._value_string IS 'Identifier / external-key value (RedbPrimitive<string>). Contract limit 450 characters, enforced in C# on every provider; long text belongs in _note.';
 COMMENT ON COLUMN _objects._value_guid IS 'Direct value for RedbPrimitive<Guid>. Replaces _code_guid.';
 COMMENT ON COLUMN _objects._value_bool IS 'Direct value for RedbPrimitive<bool>. Replaces _bool.';
 COMMENT ON COLUMN _objects._value_double IS 'Direct value for RedbPrimitive<double/float>. NEW column.';
@@ -291,6 +300,12 @@ CREATE INDEX IF NOT EXISTS "IX__permissions__users" ON _permissions (_id_user) W
 CREATE INDEX IF NOT EXISTS "IX__permissions__ref" ON _permissions (_id_ref);
 CREATE INDEX IF NOT EXISTS "IX__values__objects" ON _values (_id_object) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__values__structures" ON _values (_id_structure) WITH (deduplicate_items=True);
+-- V4: uniqueness of [RedbUnique] fields. Covers keyed rows at ANY position (root scalars and
+-- S2 nested scalars; element keys join in S3) - the writer decides which rows carry a key, the
+-- partial form keeps the index to exactly those rows. INCLUDE makes the lookup index-only (P6).
+CREATE UNIQUE INDEX IF NOT EXISTS "UIX__values__structure_unique"
+    ON _values (_id_structure, _unique) INCLUDE (_id_object)
+    WHERE _unique IS NOT NULL;
 
 -- ============================================
 -- REMOVED REDUNDANT INDEXES (migration_drop_redundant_indexes.sql)
@@ -306,6 +321,13 @@ CREATE INDEX IF NOT EXISTS "IX__values__structures" ON _values (_id_structure) W
 -- CREATE INDEX IF NOT EXISTS "IX__values__Numeric" ON _values (_Numeric) WITH (deduplicate_items=True);
 -- CREATE INDEX IF NOT EXISTS "IX__values__ListItem" ON _values (_ListItem) WITH (deduplicate_items=True);
 -- CREATE INDEX IF NOT EXISTS "IX__values__Object" ON _values (_Object) WITH (deduplicate_items=True);
+-- The two FK columns return in PARTIAL form (perf, 2026-09-10): _Object/_ListItem carry foreign
+-- keys, and without a leading index every DELETE of a referenced object or list item seq-scans
+-- the whole table for the FK check (measured ~5.9s on 8.7M rows; 0.5ms with the index). Partial
+-- WHERE IS NOT NULL keeps them nearly empty (16 kB on that same table), so writes barely pay -
+-- which is why the full-column form above stays retired.
+CREATE INDEX IF NOT EXISTS "IX__values__ListItem_not_null" ON _values (_ListItem) WHERE _ListItem IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__Object_not_null"   ON _values (_Object)   WHERE _Object   IS NOT NULL;
 
 -- Indexes for relational arrays of all types
 CREATE INDEX IF NOT EXISTS "IX__values__array_parent_id" ON _values (_array_parent_id) WITH (deduplicate_items=True);
@@ -349,6 +371,13 @@ CREATE INDEX IF NOT EXISTS "IX__objects__hash" ON _objects (_hash) WITH (dedupli
 -- Indexes for RedbPrimitive<T> value columns (replaces old _code_* indexes)
 CREATE INDEX IF NOT EXISTS "IX__objects__value_long" ON _objects (_value_long) WHERE _value_long IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_string" ON _objects (_value_string) WHERE _value_string IS NOT NULL;
+-- V4: application-defined object key, unique per scheme. 440 keeps the index entry under the
+-- MSSQL 900-byte house convention (parity of limits across providers); INCLUDE makes the key
+-- lookup index-only (P6). The trash (-10) is one more point of the same index - which is why
+-- mark_for_deletion nulls the key on the way in (decision 9).
+CREATE UNIQUE INDEX IF NOT EXISTS "UIX__objects__scheme_unique"
+    ON _objects (_id_scheme, _value_unique) INCLUDE (_id)
+    WHERE _value_unique IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_guid" ON _objects (_value_guid) WHERE _value_guid IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_datetime" ON _objects (_value_datetime) WHERE _value_datetime IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_numeric" ON _objects (_value_numeric) WHERE _value_numeric IS NOT NULL;
@@ -356,6 +385,8 @@ CREATE INDEX IF NOT EXISTS "IX__dependencies__schemes_1" ON _dependencies (_id_s
 CREATE INDEX IF NOT EXISTS "IX__dependencies__schemes_2" ON _dependencies (_id_scheme_2) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__structures__structures" ON _structures (_id_parent) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__structures__schemes" ON _structures (_id_scheme) WITH (deduplicate_items=True);
+-- V4: lookup by the free-form _tags marker; partial - most structures carry no tags.
+CREATE INDEX IF NOT EXISTS "IX__structures__tags" ON _structures (_tags) WHERE _tags IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__structures__types" ON _structures (_id_type) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__structures__lists" ON _structures (_id_list) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__schemes__schemes" ON _schemes (_id_parent) WITH (deduplicate_items=True);

@@ -15,13 +15,13 @@ public interface IOrderingExpressionParser
     /// Parse sorting expression (Props fields)
     /// </summary>
     OrderingExpression ParseOrdering<TProps, TKey>(Expression<Func<TProps, TKey>> keySelector, SortDirection direction) where TProps : class;
-    
+
     /// <summary>
-    /// 🆕 Parse sorting expression by base IRedbObject fields (id, name, date_create, etc.)
+    /// Parse sorting expression by base IRedbObject fields (id, name, date_create, etc.)
     /// Uses IRedbObject for compile-time safety - Props not visible!
     /// </summary>
     OrderingExpression ParseRedbOrdering<TKey>(Expression<Func<IRedbObject, TKey>> keySelector, SortDirection direction);
-    
+
     /// <summary>
     /// Parse multiple sorting
     /// </summary>

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using redb.Core.Caching;
 using redb.Core.Models.Contracts;
@@ -33,36 +34,39 @@ namespace redb.Core.Providers
         /// Create/get scheme by name from Props type.
         /// If schemeName = null, uses TProps class name.
         /// </summary>
-        Task<IRedbScheme> EnsureSchemeFromTypeAsync<TProps>() where TProps : class;
+        Task<IRedbScheme> EnsureSchemeFromTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class;
 
         /// <summary>
         /// Synchronize scheme structures from Props type (by default deletes extra fields).
         /// </summary>
-        Task<List<IRedbStructure>> SyncStructuresFromTypeAsync<TProps>(IRedbScheme scheme, bool strictDeleteExtra = true) where TProps : class;
+        Task<List<IRedbStructure>> SyncStructuresFromTypeAsync<TProps>(IRedbScheme scheme, bool strictDeleteExtra = true,
+        CancellationToken cancellationToken = default) where TProps : class;
 
         /// <summary>
         /// Simplified scheme synchronization method with auto-detection of name and alias.
         /// Scheme name and alias determined from RedbSchemeAttribute.
         /// </summary>
-        Task<IRedbScheme> SyncSchemeAsync<TProps>() where TProps : class;
+        Task<IRedbScheme> SyncSchemeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class;
         
         // ===== SCHEME SEARCH =====
         
         /// <summary>
         /// Get scheme by ID.
         /// </summary>
-        Task<IRedbScheme?> GetSchemeByIdAsync(long schemeId);
+        Task<IRedbScheme?> GetSchemeByIdAsync(long schemeId,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get scheme by name.
         /// </summary>
-        Task<IRedbScheme?> GetSchemeByNameAsync(string schemeName);
+        Task<IRedbScheme?> GetSchemeByNameAsync(string schemeName,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get scheme by C# class type.
         /// Uses class name for scheme search.
         /// </summary>
-        Task<IRedbScheme?> GetSchemeByTypeAsync<TProps>() where TProps : class;
+        Task<IRedbScheme?> GetSchemeByTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class;
         
         /// <summary>
         /// Get scheme from cache synchronously (no DB call).
@@ -80,54 +84,60 @@ namespace redb.Core.Providers
         /// Get scheme by C# class type.
         /// Uses class name for scheme search.
         /// </summary>
-        Task<IRedbScheme?> GetSchemeByTypeAsync(Type type);
+        Task<IRedbScheme?> GetSchemeByTypeAsync(Type type,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Load scheme by C# class type (throws exception if not found).
         /// </summary>
-        Task<IRedbScheme> LoadSchemeByTypeAsync<TProps>() where TProps : class;
+        Task<IRedbScheme> LoadSchemeByTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class;
         
         /// <summary>
         /// Load scheme by C# class type (throws exception if not found).
         /// </summary>
-        Task<IRedbScheme> LoadSchemeByTypeAsync(Type type);
+        Task<IRedbScheme> LoadSchemeByTypeAsync(Type type,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get all schemes.
         /// </summary>
-        Task<List<IRedbScheme>> GetSchemesAsync();
+        Task<List<IRedbScheme>> GetSchemesAsync(CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get scheme structures.
         /// </summary>
-        Task<List<IRedbStructure>> GetStructuresAsync(IRedbScheme scheme);
+        Task<List<IRedbStructure>> GetStructuresAsync(IRedbScheme scheme,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get scheme structures by C# class type.
         /// </summary>
-        Task<List<IRedbStructure>> GetStructuresByTypeAsync<TProps>() where TProps : class;
+        Task<List<IRedbStructure>> GetStructuresByTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class;
         
         /// <summary>
         /// Get scheme structures by C# class type.
         /// </summary>
-        Task<List<IRedbStructure>> GetStructuresByTypeAsync(Type type);
+        Task<List<IRedbStructure>> GetStructuresByTypeAsync(Type type,
+        CancellationToken cancellationToken = default);
         
         // ===== SCHEME EXISTENCE CHECKS =====
         
         /// <summary>
         /// Check if scheme exists for C# class type.
         /// </summary>
-        Task<bool> SchemeExistsForTypeAsync<TProps>() where TProps : class;
+        Task<bool> SchemeExistsForTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class;
         
         /// <summary>
         /// Check if scheme exists for C# class type.
         /// </summary>
-        Task<bool> SchemeExistsForTypeAsync(Type type);
+        Task<bool> SchemeExistsForTypeAsync(Type type,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if scheme exists by name.
         /// </summary>
-        Task<bool> SchemeExistsByNameAsync(string schemeName);
+        Task<bool> SchemeExistsByNameAsync(string schemeName,
+        CancellationToken cancellationToken = default);
         
         // ===== UTILITY METHODS =====
         
@@ -163,13 +173,16 @@ namespace redb.Core.Providers
         /// Scheme will have _type = Object (not Class).
         /// </summary>
         /// <param name="name">Scheme name (e.g. "RedbObject" or custom name)</param>
-        Task<IRedbScheme> EnsureObjectSchemeAsync(string name);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbScheme> EnsureObjectSchemeAsync(string name,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get scheme for Object type by name.
         /// Returns null if not found.
         /// </summary>
-        Task<IRedbScheme?> GetObjectSchemeAsync(string name);
+        Task<IRedbScheme?> GetObjectSchemeAsync(string name,
+        CancellationToken cancellationToken = default);
         
         // ===== TYPE MIGRATION =====
         
@@ -182,19 +195,31 @@ namespace redb.Core.Providers
         /// <param name="newTypeName">New type name (e.g. "Long")</param>
         /// <param name="dryRun">If true, only returns count without actual migration</param>
         /// <returns>Migration result with affected rows count</returns>
-        Task<TypeMigrationResult> MigrateStructureTypeAsync(long structureId, string oldTypeName, string newTypeName, bool dryRun = false);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<TypeMigrationResult> MigrateStructureTypeAsync(long structureId, string oldTypeName, string newTypeName, bool dryRun = false,
+        CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Recompute the stored unique keys of one [RedbUnique] property and report duplicates
+        /// (rows left outside the unique index). The automatic triggers run the same algorithm at
+        /// scheme synchronisation; this is the explicit form (UNIQUE plan 2.8).
+        /// </summary>
+        Task<Models.UniqueRecomputeReport> RecomputeUniqueAsync<TProps>(string propertyName,
+        CancellationToken cancellationToken = default) where TProps : class;
         
         // ===== STRUCTURE TREE CACHE =====
         
         /// <summary>
         /// Get structure tree for scheme (cached).
         /// </summary>
-        Task<List<StructureTreeNode>> GetStructureTreeAsync(long schemeId);
+        Task<List<StructureTreeNode>> GetStructureTreeAsync(long schemeId,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get subtree starting from parent structure (cached).
         /// </summary>
-        Task<List<StructureTreeNode>> GetSubtreeAsync(long schemeId, long? parentStructureId);
+        Task<List<StructureTreeNode>> GetSubtreeAsync(long schemeId, long? parentStructureId,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Invalidate structure tree cache for scheme.

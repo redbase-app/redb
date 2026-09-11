@@ -7,21 +7,21 @@ using redb.Examples.Output;
 namespace redb.Examples.Examples;
 
 /// <summary>
-/// Sequential create tree hierarchy (Pro feature) - SLOW version.
-/// 
-/// Creates ~100 tree nodes using sequential CreateChildAsync.
-/// Compare with E088 (bulk AddNewObjectsAsync).
-/// 
+/// Sequential create tree hierarchy - deliberate ANTIPATTERN demo.
+///
+/// This example is SLOW BY DESIGN: it saves ~100 tree nodes one CreateChildAsync at a time,
+/// paying a full save pipeline (key allocation, hash, values insert, commit) per node, to give
+/// E088 (bulk AddNewObjectsAsync, one round-trip for the whole level) a baseline to beat.
+/// Do NOT copy this shape into application code - use the bulk API of E088.
+///
 /// Structure:
 /// - 1 root (TechCorp)
 /// - 10 regional offices
 /// - 50 departments (5 per office)
 /// - 40 teams (4 per first 10 departments)
-/// 
-/// Each CreateChildAsync = separate DB round-trip.
 /// </summary>
-[ExampleMeta("E089", "Tree Create Sequential - Slow", "Trees",
-    ExampleTier.Free, 3, "Tree", "CreateChildAsync", "Sequential", "Pro", Order = 89)]
+[ExampleMeta("E089", "Tree Create Sequential - ANTIPATTERN (slow by design)", "Trees",
+    ExampleTier.Free, 3, "Tree", "CreateChildAsync", "Sequential", "Antipattern", "Pro", Order = 89)]
 public class E089_TreeCreate : ExampleBase
 {
     private const int OfficeCount = 10;
@@ -41,8 +41,14 @@ public class E089_TreeCreate : ExampleBase
 
         var rate = count * 1000 / Math.Max(sw.ElapsedMilliseconds, 1);
 
-        return Ok("E089", "Tree Create Sequential - Slow", ExampleTier.Free, sw.ElapsedMilliseconds, count,
-            [$"Sequential created: {count} tree nodes in 4 levels", $"Rate: {rate} nodes/sec"]);
+        Console.WriteLine($"[E089] ANTIPATTERN demo: {count} nodes saved one round-trip each on purpose - compare with E088 (bulk).");
+
+        return Ok("E089", "Tree Create Sequential - ANTIPATTERN (slow by design)", ExampleTier.Free, sw.ElapsedMilliseconds, count,
+            [
+                "ANTIPATTERN: one CreateChildAsync round-trip per node, slow on purpose.",
+                $"Sequential created: {count} tree nodes in 4 levels",
+                $"Rate: {rate} nodes/sec - compare with E088 (bulk AddNewObjectsAsync)"
+            ]);
     }
 
     /// <summary>Creates tree using sequential CreateChildAsync calls.</summary>

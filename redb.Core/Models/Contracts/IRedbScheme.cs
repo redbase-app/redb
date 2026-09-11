@@ -39,7 +39,14 @@ namespace redb.Core.Models.Contracts
         /// Used for automatic change detection and cache invalidation
         /// </summary>
         Guid? StructureHash { get; }
-        
+
+        /// <summary>
+        /// Free-form marker for future / custom extensions (450 chars), written by [RedbTags]
+        /// at synchronisation. Default implementation returns null so third-party
+        /// implementations keep compiling - the same contract as <see cref="IRedbStructure.Tags"/>.
+        /// </summary>
+        string? Tags => null;
+
         /// <summary>
         /// Collection of structures (fields) of this scheme
         /// Scheme encapsulates its structures for data integrity

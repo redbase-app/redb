@@ -83,6 +83,36 @@ namespace redb.Core.Models.Contracts
         /// Store null values
         /// </summary>
         bool? StoreNull { get; }
+
+        /// <summary>
+        /// V4 (LAZY Л2): the reference is lazy (`virtual` on the property). With the option on,
+        /// the JSON builders emit a stub for it regardless of depth.
+        /// </summary>
+        bool? Lazy { get; }
+
+        /// <summary>
+        /// The field is a unique key within its scheme ([RedbUnique]); its values carry a hash in
+        /// _values._unique and the database enforces uniqueness over it.
+        /// </summary>
+        bool? Unique { get; }
+
+        /// <summary>
+        /// UniqueKeyEncoder.Version the stored keys were computed with; a structure whose stamp is
+        /// behind the current encoder is recomputed at synchronisation.
+        /// </summary>
+        long? UniqueVersion { get; }
+
+        /// <summary>
+        /// S3: element-key scope of a collection key (NULL = default reading; 1 = element values
+        /// unique per scheme; 2 = no duplicate elements per collection). Default implementation
+        /// returns null so third-party implementations keep compiling.
+        /// </summary>
+        long? UniqueScope => null;
+
+        /// <summary>
+        /// Free-form marker for future / custom extensions. Default implementation returns null.
+        /// </summary>
+        string? Tags => null;
         
         /// <summary>
         /// Default value (in binary form)

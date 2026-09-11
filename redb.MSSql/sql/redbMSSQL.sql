@@ -148,6 +148,7 @@ CREATE TABLE [dbo].[_schemes](
     [_alias] NVARCHAR(450) NULL,
     [_name_space] NVARCHAR(MAX) NULL,
     [_structure_hash] UNIQUEIDENTIFIER NULL,
+    [_tags] NVARCHAR(450) NULL,      -- V4: free-form marker for future / custom extensions (sync never wipes it)
     [_type] BIGINT NOT NULL DEFAULT -9223372036854775675, -- Class by default
     CONSTRAINT [PK__schemes] PRIMARY KEY CLUSTERED ([_id]),
     CONSTRAINT [IX__schemes] UNIQUE ([_name]),
@@ -254,6 +255,11 @@ CREATE TABLE [dbo].[_structures](
     [_key_type] BIGINT NULL,         -- Key type for Dictionary fields
     [_is_compress] BIT NULL,
     [_store_null] BIT NULL,
+    [_unique] BIT NULL,             -- V4: field is a unique key within its scheme ([RedbUnique])
+    [_unique_version] BIGINT NULL,  -- V4: UniqueKeyEncoder.Version the stored keys were computed with
+    [_unique_scope] BIGINT NULL,    -- S3: element-key scope of a collection key (NULL = default; 1 = Scheme elements; 2 = Collection elements)
+    [_lazy] BIT NULL,  -- V4 (LAZY Л2): lazy reference marker (virtual)
+    [_tags] NVARCHAR(450) NULL,     -- V4: free-form marker for future / custom extensions (sync never wipes it)
     [_default_value] VARBINARY(MAX) NULL,
     [_default_editor] NVARCHAR(MAX) NULL,
     CONSTRAINT [PK__structures] PRIMARY KEY CLUSTERED ([_id]),
@@ -296,13 +302,14 @@ CREATE TABLE [dbo].[_objects](
     [_hash] UNIQUEIDENTIFIER NULL,
     -- Value columns for RedbPrimitive<T> (Props = primitive value stored directly)
     [_value_long] BIGINT NULL,
-    [_value_string] NVARCHAR(MAX) NULL,
+    [_value_string] NVARCHAR(450) NULL,  -- identifiers/external keys (owner decision 2026-09-02): 450*2=900 keeps the index key legal, same width as _name; long text belongs in _note
     [_value_guid] UNIQUEIDENTIFIER NULL,
     [_value_bool] BIT NULL,
     [_value_double] FLOAT NULL,
     [_value_numeric] DECIMAL(38, 18) NULL,
     [_value_datetime] DATETIMEOFFSET NULL,
     [_value_bytes] VARBINARY(MAX) NULL,
+    [_value_unique] NVARCHAR(440) NULL, -- V4: unique key within the scheme (8+880 = 888 < 900); index below
     CONSTRAINT [PK__objects] PRIMARY KEY CLUSTERED ([_id]),
     CONSTRAINT [FK__objects__objects] FOREIGN KEY ([_id_parent]) REFERENCES [_objects]([_id]) ON DELETE NO ACTION,
     CONSTRAINT [FK__objects__schemes] FOREIGN KEY ([_id_scheme]) REFERENCES [_schemes]([_id]) ON DELETE NO ACTION,
@@ -343,6 +350,8 @@ CREATE TABLE [dbo].[_values](
     [_Numeric] DECIMAL(38, 18) NULL,
     [_ListItem] BIGINT NULL,
     [_Object] BIGINT NULL,
+    -- V4: unique-key hash of the typed value (UniqueKeyEncoder) for [RedbUnique] root scalars
+    [_unique] UNIQUEIDENTIFIER NULL,
     -- Fields for relational collections (arrays, dictionaries, JSON/XML documents)
     [_array_parent_id] BIGINT NULL,
     [_array_index] NVARCHAR(430) NULL,  -- Text key for Dictionary (limited: 3*BIGINT + 860 bytes = 884 < 900)
@@ -420,6 +429,8 @@ GO
 -- Structures indexes
 CREATE INDEX [IX__structures__structures] ON [dbo].[_structures]([_id_parent])
 CREATE INDEX [IX__structures__schemes] ON [dbo].[_structures]([_id_scheme])
+-- V4: lookup by the free-form _tags marker; filtered - most structures carry no tags.
+CREATE INDEX [IX__structures__tags] ON [dbo].[_structures]([_tags]) WHERE [_tags] IS NOT NULL
 CREATE INDEX [IX__structures__types] ON [dbo].[_structures]([_id_type])
 CREATE INDEX [IX__structures__lists] ON [dbo].[_structures]([_id_list])
 -- Covering index for ORDER BY queries by structure name
@@ -450,8 +461,12 @@ CREATE INDEX [IX__objects__date_create] ON [dbo].[_objects]([_date_create])
 CREATE INDEX [IX__objects__date_modify] ON [dbo].[_objects]([_date_modify])
 CREATE INDEX [IX__objects__name] ON [dbo].[_objects]([_name])
 CREATE INDEX [IX__objects__hash] ON [dbo].[_objects]([_hash])
--- RedbPrimitive<T> value indexes (without filtered - _value_string is NVARCHAR(MAX))
+-- V4: application-defined object key, unique per scheme; INCLUDE makes the lookup index-only (P6).
+CREATE UNIQUE INDEX [UIX__objects__scheme_unique] ON [dbo].[_objects]([_id_scheme], [_value_unique]) INCLUDE ([_id]) WHERE [_value_unique] IS NOT NULL
+GO
+-- RedbPrimitive<T> value indexes (filtered)
 CREATE INDEX [IX__objects__value_long] ON [dbo].[_objects]([_value_long]) WHERE [_value_long] IS NOT NULL
+CREATE INDEX [IX__objects__value_string] ON [dbo].[_objects]([_value_string]) WHERE [_value_string] IS NOT NULL
 CREATE INDEX [IX__objects__value_guid] ON [dbo].[_objects]([_value_guid]) WHERE [_value_guid] IS NOT NULL
 CREATE INDEX [IX__objects__value_datetime] ON [dbo].[_objects]([_value_datetime]) WHERE [_value_datetime] IS NOT NULL
 CREATE INDEX [IX__objects__value_numeric] ON [dbo].[_objects]([_value_numeric]) WHERE [_value_numeric] IS NOT NULL
@@ -486,11 +501,19 @@ GO
 -- Values indexes
 CREATE INDEX [IX__values__objects] ON [dbo].[_values]([_id_object])
 CREATE INDEX [IX__values__structures] ON [dbo].[_values]([_id_structure])
+-- FK-column indexes: _Object/_ListItem carry foreign keys, and without a leading index every
+-- DELETE of a referenced object or list item scans the whole table for the FK check. Filtered:
+-- reference fields are a small fraction of rows, so the indexes stay nearly empty.
+CREATE INDEX [IX__values__ListItem_not_null] ON [dbo].[_values]([_ListItem]) WHERE [_ListItem] IS NOT NULL
+CREATE INDEX [IX__values__Object_not_null] ON [dbo].[_values]([_Object]) WHERE [_Object] IS NOT NULL
 CREATE INDEX [IX__values__array_parent_id] ON [dbo].[_values]([_array_parent_id])
 CREATE INDEX [IX__values__array_parent_index] ON [dbo].[_values]([_array_parent_id], [_array_index])
 CREATE INDEX [IX__values__array_key] ON [dbo].[_values]([_id_structure], [_array_index]) WHERE [_array_index] IS NOT NULL
 -- Index for nested Dictionary/Array field lookups via _array_parent_id (PRO PVT CTE)
 CREATE INDEX [IX__values__parent_structure] ON [dbo].[_values]([_array_parent_id], [_id_structure]) WHERE [_array_parent_id] IS NOT NULL
+-- V4: uniqueness of [RedbUnique] fields. Covers keyed rows at ANY position (root and S2 nested
+-- scalars; element keys join in S3); INCLUDE makes the key lookup index-only (P6).
+CREATE UNIQUE INDEX [UIX__values__structure_unique] ON [dbo].[_values]([_id_structure], [_unique]) INCLUDE ([_id_object]) WHERE [_unique] IS NOT NULL
 -- Covering index for object-structure lookups with array_index
 CREATE INDEX [IX__values__object_structure_lookup] ON [dbo].[_values](
     [_id_object], [_id_structure], [_array_index]
@@ -564,23 +587,13 @@ END;
 GO
 
 -- =====================================================
--- FULL-TEXT SEARCH FOR STRING VALUES (OPTIONAL)
+-- NO FULL-TEXT INDEX ON _values._String (owner decision 2026-09-02)
 -- =====================================================
-
--- Only create if Full-Text is installed
-IF SERVERPROPERTY('IsFullTextInstalled') = 1
-BEGIN
-    IF NOT EXISTS (SELECT * FROM sys.fulltext_catalogs WHERE name = 'redb_fulltext_catalog')
-        CREATE FULLTEXT CATALOG [redb_fulltext_catalog] AS DEFAULT
-    
-    IF NOT EXISTS (SELECT * FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID('[dbo].[_values]'))
-        CREATE FULLTEXT INDEX ON [dbo].[_values]([_String])
-            KEY INDEX [PK__values]
-            ON [redb_fulltext_catalog]
-            WITH STOPLIST = OFF, CHANGE_TRACKING AUTO
-END
-ELSE
-    PRINT 'WARNING: Full-Text Search is not installed. To install: apt-get install -y mssql-server-fts'
+-- A full-text index accelerates only CONTAINS()/FREETEXT(), which redb never generates: every
+-- string predicate translates to LIKE, and LIKE does not use full-text. The index existed with
+-- CHANGE_TRACKING AUTO - a background reindex on EVERY _values write - and not a single reader.
+-- The upgrade block drops it from existing databases. If a word-search operator ($match) ever
+-- lands, recreate it deliberately with that feature.
 GO
 
 -- Index for non-array values

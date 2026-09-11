@@ -42,7 +42,7 @@ namespace redb.Postgres.Data
         /// <summary>
         /// Bulk insert objects using COPY protocol.
         /// </summary>
-        public async Task BulkInsertObjectsAsync(IEnumerable<RedbObjectRow> objects)
+        public async Task BulkInsertObjectsAsync(IEnumerable<RedbObjectRow> objects, CancellationToken cancellationToken = default)
         {
             var objectsList = objects.ToList();
             if (!objectsList.Any()) return;
@@ -54,7 +54,7 @@ namespace redb.Postgres.Data
                     "COPY _objects (_id, _id_parent, _id_scheme, _name, _id_owner, _id_who_change, " +
                     "_date_create, _date_modify, _date_begin, _date_complete, _key, " +
                     "_value_long, _value_string, _value_guid, _value_bool, _value_double, " +
-                    "_value_numeric, _value_datetime, _value_bytes, _note, _hash) FROM STDIN (FORMAT BINARY)");
+                    "_value_numeric, _value_datetime, _value_bytes, _note, _hash, _value_unique) FROM STDIN (FORMAT BINARY)");
                 
                 foreach (var obj in objectsList)
                 {
@@ -80,16 +80,17 @@ namespace redb.Postgres.Data
                     await WriteNullableAsync(writer, obj.ValueBytes, NpgsqlDbType.Bytea);
                     await WriteNullableAsync(writer, obj.Note, NpgsqlDbType.Text);
                     await WriteNullableAsync(writer, obj.Hash, NpgsqlDbType.Uuid);
+                    await WriteNullableAsync(writer, obj.ValueUnique, NpgsqlDbType.Text);
                 }
                 
-                await writer.CompleteAsync();
+                await writer.CompleteAsync(cancellationToken);
             });
         }
 
         /// <summary>
         /// Bulk insert values using COPY protocol.
         /// </summary>
-        public async Task BulkInsertValuesAsync(IEnumerable<RedbValue> values)
+        public async Task BulkInsertValuesAsync(IEnumerable<RedbValue> values, CancellationToken cancellationToken = default)
         {
             var valuesList = values.ToList();
             if (!valuesList.Any()) return;
@@ -100,7 +101,7 @@ namespace redb.Postgres.Data
                 await using var writer = await conn.BeginBinaryImportAsync(
                     "COPY _values (_id, _id_structure, _id_object, _String, _Long, _Guid, " +
                     "_Double, _DateTimeOffset, _Boolean, _ByteArray, _Numeric, _ListItem, _Object, " +
-                    "_array_parent_id, _array_index) FROM STDIN (FORMAT BINARY)");
+                    "_unique, _array_parent_id, _array_index) FROM STDIN (FORMAT BINARY)");
                 
                 foreach (var val in valuesList)
                 {
@@ -118,11 +119,12 @@ namespace redb.Postgres.Data
                     await WriteNullableAsync(writer, val.Numeric, NpgsqlDbType.Numeric);
                     await WriteNullableAsync(writer, val.ListItem, NpgsqlDbType.Bigint);
                     await WriteNullableAsync(writer, val.Object, NpgsqlDbType.Bigint);
+                    await WriteNullableAsync(writer, val.Unique, NpgsqlDbType.Uuid);
                     await WriteNullableAsync(writer, val.ArrayParentId, NpgsqlDbType.Bigint);
                     await WriteNullableAsync(writer, val.ArrayIndex, NpgsqlDbType.Text);
                 }
                 
-                await writer.CompleteAsync();
+                await writer.CompleteAsync(cancellationToken);
             });
         }
 
@@ -130,7 +132,7 @@ namespace redb.Postgres.Data
         /// Bulk update objects using UPDATE FROM VALUES.
         /// Single round-trip for entire batch instead of N individual UPDATEs.
         /// </summary>
-        public async Task BulkUpdateObjectsAsync(IEnumerable<RedbObjectRow> objects)
+        public async Task BulkUpdateObjectsAsync(IEnumerable<RedbObjectRow> objects, CancellationToken cancellationToken = default)
         {
             var objectsList = objects.ToList();
             if (!objectsList.Any()) return;
@@ -140,14 +142,15 @@ namespace redb.Postgres.Data
             
             foreach (var batch in objectsList.Chunk(batchSize))
             {
-                await ExecuteObjectsUpdateAsync(batch);
+                cancellationToken.ThrowIfCancellationRequested();
+                await ExecuteObjectsUpdateAsync(batch, cancellationToken);
             }
         }
 
         /// <summary>
         /// Execute UPDATE FROM VALUES for a batch of objects.
         /// </summary>
-        private async Task ExecuteObjectsUpdateAsync(RedbObjectRow[] batch)
+        private async Task ExecuteObjectsUpdateAsync(RedbObjectRow[] batch, CancellationToken cancellationToken)
         {
             var sb = new StringBuilder();
             var parameters = new List<object?>();
@@ -171,20 +174,21 @@ namespace redb.Postgres.Data
             sb.AppendLine("    _value_datetime = s._value_datetime,");
             sb.AppendLine("    _value_bytes = s._value_bytes,");
             sb.AppendLine("    _note = s._note,");
-            sb.AppendLine("    _hash = s._hash");
+            sb.AppendLine("    _hash = s._hash,");
+            sb.AppendLine("    _value_unique = s._value_unique");
             sb.AppendLine("FROM (VALUES");
             
             for (int i = 0; i < batch.Length; i++)
             {
                 var obj = batch[i];
-                var offset = i * 20 + 1; // PostgreSQL uses $1, $2, etc.
+                var offset = i * 21 + 1; // PostgreSQL uses $1, $2, etc. 21 columns per row - keep in sync below.
                 
                 if (i > 0) sb.AppendLine(",");
                 sb.Append($"    (${offset}::bigint, ${offset + 1}::bigint, ${offset + 2}::bigint, ${offset + 3}::text, ${offset + 4}::bigint, ");
                 sb.Append($"${offset + 5}::bigint, ${offset + 6}::timestamptz, ${offset + 7}::timestamptz, ${offset + 8}::timestamptz, ");
                 sb.Append($"${offset + 9}::bigint, ${offset + 10}::bigint, ${offset + 11}::text, ${offset + 12}::uuid, ");
                 sb.Append($"${offset + 13}::boolean, ${offset + 14}::double precision, ${offset + 15}::numeric, ");
-                sb.Append($"${offset + 16}::timestamptz, ${offset + 17}::bytea, ${offset + 18}::text, ${offset + 19}::uuid)");
+                sb.Append($"${offset + 16}::timestamptz, ${offset + 17}::bytea, ${offset + 18}::text, ${offset + 19}::uuid, ${offset + 20}::text)");
                 
                 parameters.Add(obj.Id);
                 parameters.Add(obj.IdParent);
@@ -206,23 +210,24 @@ namespace redb.Postgres.Data
                 parameters.Add(obj.ValueBytes);
                 parameters.Add(obj.Note);
                 parameters.Add(obj.Hash);
+                parameters.Add(obj.ValueUnique);
             }
             
             sb.AppendLine();
             sb.AppendLine(") AS s(_id, _id_parent, _id_scheme, _name, _id_owner, _id_who_change,");
             sb.AppendLine("       _date_modify, _date_begin, _date_complete, _key, _value_long, _value_string,");
             sb.AppendLine("       _value_guid, _value_bool, _value_double, _value_numeric, _value_datetime,");
-            sb.AppendLine("       _value_bytes, _note, _hash)");
+            sb.AppendLine("       _value_bytes, _note, _hash, _value_unique)");
             sb.AppendLine("WHERE t._id = s._id");
             
-            await _db.ExecuteAsync(sb.ToString(), parameters.ToArray()!);
+            await _db.ExecuteAsync(sb.ToString(), parameters.ToArray()!, cancellationToken);
         }
 
         /// <summary>
         /// Bulk update values using UPDATE FROM VALUES.
         /// Single round-trip for entire batch instead of N individual UPDATEs.
         /// </summary>
-        public async Task BulkUpdateValuesAsync(IEnumerable<RedbValue> values)
+        public async Task BulkUpdateValuesAsync(IEnumerable<RedbValue> values, CancellationToken cancellationToken = default)
         {
             var valuesList = values.ToList();
             if (!valuesList.Any()) return;
@@ -232,14 +237,15 @@ namespace redb.Postgres.Data
             
             foreach (var batch in valuesList.Chunk(batchSize))
             {
-                await ExecuteValuesUpdateAsync(batch);
+                cancellationToken.ThrowIfCancellationRequested();
+                await ExecuteValuesUpdateAsync(batch, cancellationToken);
             }
         }
         
         /// <summary>
         /// Execute UPDATE FROM VALUES for a batch of values.
         /// </summary>
-        private async Task ExecuteValuesUpdateAsync(RedbValue[] batch)
+        private async Task ExecuteValuesUpdateAsync(RedbValue[] batch, CancellationToken cancellationToken)
         {
             var sb = new StringBuilder();
             var parameters = new List<object?>();
@@ -255,6 +261,7 @@ namespace redb.Postgres.Data
             sb.AppendLine("    _numeric = s._numeric,");
             sb.AppendLine("    _listitem = s._listitem,");
             sb.AppendLine("    _object = s._object,");
+            sb.AppendLine("    _unique = s._unique,");
             sb.AppendLine("    _array_parent_id = s._array_parent_id,");
             sb.AppendLine("    _array_index = s._array_index");
             sb.AppendLine("FROM (VALUES");
@@ -262,13 +269,13 @@ namespace redb.Postgres.Data
             for (int i = 0; i < batch.Length; i++)
             {
                 var val = batch[i];
-                var offset = i * 13 + 1; // PostgreSQL uses $1, $2, etc.
+                var offset = i * 14 + 1; // PostgreSQL uses $1, $2, etc. 14 columns per row - keep in sync with the source list below.
                 
                 if (i > 0) sb.AppendLine(",");
                 sb.Append($"    (${offset}::bigint, ${offset + 1}::text, ${offset + 2}::bigint, ${offset + 3}::uuid, ");
                 sb.Append($"${offset + 4}::double precision, ${offset + 5}::timestamptz, ${offset + 6}::boolean, ");
                 sb.Append($"${offset + 7}::bytea, ${offset + 8}::numeric, ${offset + 9}::bigint, ");
-                sb.Append($"${offset + 10}::bigint, ${offset + 11}::bigint, ${offset + 12}::text)");
+                sb.Append($"${offset + 10}::bigint, ${offset + 11}::uuid, ${offset + 12}::bigint, ${offset + 13}::text)");
                 
                 parameters.Add(val.Id);
                 parameters.Add(val.String);
@@ -281,60 +288,61 @@ namespace redb.Postgres.Data
                 parameters.Add(val.Numeric);
                 parameters.Add(val.ListItem);
                 parameters.Add(val.Object);
+                parameters.Add(val.Unique);
                 parameters.Add(val.ArrayParentId);
                 parameters.Add(val.ArrayIndex);
             }
             
             sb.AppendLine();
             sb.AppendLine(") AS s(_id, _string, _long, _guid, _double, _datetimeoffset, _boolean,");
-            sb.AppendLine("       _bytearray, _numeric, _listitem, _object, _array_parent_id, _array_index)");
+            sb.AppendLine("       _bytearray, _numeric, _listitem, _object, _unique, _array_parent_id, _array_index)");
             sb.AppendLine("WHERE t._id = s._id");
             
-            await _db.ExecuteAsync(sb.ToString(), parameters.ToArray()!);
+            await _db.ExecuteAsync(sb.ToString(), parameters.ToArray()!, cancellationToken);
         }
 
         /// <summary>
         /// Bulk delete objects by IDs.
         /// </summary>
-        public async Task BulkDeleteObjectsAsync(IEnumerable<long> objectIds)
+        public async Task BulkDeleteObjectsAsync(IEnumerable<long> objectIds, CancellationToken cancellationToken = default)
         {
             var ids = objectIds.ToArray();
             if (!ids.Any()) return;
             
-            await _db.ExecuteAsync("DELETE FROM _objects WHERE _id = ANY($1)", ids);
+            await _db.ExecuteAsync("DELETE FROM _objects WHERE _id = ANY($1)", new object[] { ids }, cancellationToken);
         }
 
         /// <summary>
         /// Bulk delete values by IDs.
         /// </summary>
-        public async Task BulkDeleteValuesAsync(IEnumerable<long> valueIds)
+        public async Task BulkDeleteValuesAsync(IEnumerable<long> valueIds, CancellationToken cancellationToken = default)
         {
             var ids = valueIds.ToArray();
             if (!ids.Any()) return;
             
-            await _db.ExecuteAsync("DELETE FROM _values WHERE _id = ANY($1)", ids);
+            await _db.ExecuteAsync("DELETE FROM _values WHERE _id = ANY($1)", new object[] { ids }, cancellationToken);
         }
 
         /// <summary>
         /// Bulk delete values by object IDs.
         /// </summary>
-        public async Task BulkDeleteValuesByObjectIdsAsync(IEnumerable<long> objectIds)
+        public async Task BulkDeleteValuesByObjectIdsAsync(IEnumerable<long> objectIds, CancellationToken cancellationToken = default)
         {
             var ids = objectIds.ToArray();
             if (!ids.Any()) return;
             
-            await _db.ExecuteAsync("DELETE FROM _values WHERE _id_object = ANY($1)", ids);
+            await _db.ExecuteAsync("DELETE FROM _values WHERE _id_object = ANY($1)", new object[] { ids }, cancellationToken);
         }
         
         /// <summary>
         /// Bulk delete values by ListItem IDs.
         /// </summary>
-        public async Task BulkDeleteValuesByListItemIdsAsync(IEnumerable<long> listItemIds)
+        public async Task BulkDeleteValuesByListItemIdsAsync(IEnumerable<long> listItemIds, CancellationToken cancellationToken = default)
         {
             var ids = listItemIds.ToArray();
             if (!ids.Any()) return;
             
-            await _db.ExecuteAsync("DELETE FROM _values WHERE _ListItem = ANY($1)", ids);
+            await _db.ExecuteAsync("DELETE FROM _values WHERE _ListItem = ANY($1)", new object[] { ids }, cancellationToken);
         }
 
         // === HELPER METHODS ===

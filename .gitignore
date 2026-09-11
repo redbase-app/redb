@@ -451,19 +451,6 @@ FodyWeavers.xsd
 # REDB data dumps
 *.redb
 
-# Generated SQLite example/test databases
-redb_examples.db
-redb_examples.db-shm
-redb_examples.db-wal
-
-# Local SQLite runtime databases for redb.Tsak (worker/web local data — not source)
-redb.Tsak/redb.db
-redb.Tsak/redb.db-shm
-redb.Tsak/redb.db-wal
-redb.Tsak/src/redb.Tsak.Worker/redb.db
-redb.Tsak/src/redb.Tsak.Worker/redb.db-shm
-redb.Tsak/src/redb.Tsak.Worker/redb.db-wal
-
 # Production configs with secrets
 deploy/volumes/*/appsettings.Production.json
 # Build artefacts — never in git (the repo must stay self-sufficient, not a binary store).
@@ -494,3 +481,32 @@ TGChatLmm/deploy/local.env
 # Never committed and never shipped — the csproj excludes it from publish, and a leaked
 # context.json once carried live dev passwords into a release artifact (3.6.0).
 redb.Tsak/src/redb.Tsak.Worker/modules/
+
+# ---------------------------------------------------------------------------
+# Generated SQL bundles.
+#
+# redb_init.sql and pvt_bundle.sql are build artifacts: the ConcatenateSql
+# target in redb.Postgres.csproj / redb.MSSql.csproj concatenates the sources
+# under sql/ into them before every build, and they are embedded as resources
+# from there. Tracking them meant a one-line source change arrived as a
+# multi-thousand-line diff, and left an open question on every commit about
+# whether to include the regenerated output. Verified that a clean tree builds:
+# the files are declared as explicit EmbeddedResource paths, so generation
+# happens before the resource is embedded.
+#
+# Edit the sources (sql/*.sql, sql/v2-pvt/*.sql), never these.
+# sql/deprecated/redb_init.sql is NOT generated and stays tracked.
+# ---------------------------------------------------------------------------
+redb.Postgres/sql/redb_init.sql
+redb.Postgres/sql/v2-pvt/pvt_bundle.sql
+redb.MSSql/sql/redb_init.sql
+redb.MSSql/sql/v2-pvt/pvt_bundle.sql
+
+# ---------------------------------------------------------------------------
+# SQLite databases and their WAL/SHM sidecars, anywhere in the tree. Test runs,
+# examples and the dev worker all drop them next to the app; the per-path list
+# above needed a new line for every new location and kept going stale.
+# ---------------------------------------------------------------------------
+*.db
+*.db-wal
+*.db-shm

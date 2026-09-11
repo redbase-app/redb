@@ -19,7 +19,7 @@ public class E152_ArithmeticAddFields : ExampleBase
         var sw = Stopwatch.StartNew();
 
         // Combined scoring: Age * 1000 + Salary > 120000
-        // Example: Age 40, Salary 85000 -> 40*1000 + 85000 = 125000 > 120000 ✓
+        // Example: Age 40, Salary 85000 -> 40*1000 + 85000 = 125000 > 120000
         var query = redb.Query<EmployeeProps>()
             .Where(e => e.Age * 1000 + e.Salary > 120_000m)
             .Take(100);

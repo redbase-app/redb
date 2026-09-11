@@ -4,6 +4,7 @@ using redb.Core.Models.Enums;
 using redb.Core.Models.Permissions;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace redb.Core.Providers
@@ -23,22 +24,26 @@ namespace redb.Core.Providers
         /// <summary>
         /// Check if current user can edit object.
         /// </summary>
-        Task<bool> CanUserEditObject(IRedbObject obj);
+        Task<bool> CanUserEditObject(IRedbObject obj,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if current user can read object.
         /// </summary>
-        Task<bool> CanUserSelectObject(IRedbObject obj);
+        Task<bool> CanUserSelectObject(IRedbObject obj,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if current user can create objects in scheme.
         /// </summary>
-        Task<bool> CanUserInsertScheme(IRedbScheme scheme);
+        Task<bool> CanUserInsertScheme(IRedbScheme scheme,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if current user can delete object.
         /// </summary>
-        Task<bool> CanUserDeleteObject(IRedbObject obj);
+        Task<bool> CanUserDeleteObject(IRedbObject obj,
+        CancellationToken cancellationToken = default);
 
         // ===== OVERLOADS WITH EXPLICIT USER =====
         
@@ -50,59 +55,70 @@ namespace redb.Core.Providers
         /// <summary>
         /// Check if user can edit object.
         /// </summary>
-        Task<bool> CanUserEditObject(IRedbObject obj, IRedbUser user);
+        Task<bool> CanUserEditObject(IRedbObject obj, IRedbUser user,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if user can read object.
         /// </summary>
-        Task<bool> CanUserSelectObject(IRedbObject obj, IRedbUser user);
+        Task<bool> CanUserSelectObject(IRedbObject obj, IRedbUser user,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if user can create objects in scheme.
         /// </summary>
-        Task<bool> CanUserInsertScheme(IRedbScheme scheme, IRedbUser user);
+        Task<bool> CanUserInsertScheme(IRedbScheme scheme, IRedbUser user,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if user can delete object.
         /// </summary>
-        Task<bool> CanUserDeleteObject(IRedbObject obj, IRedbUser user);
+        Task<bool> CanUserDeleteObject(IRedbObject obj, IRedbUser user,
+        CancellationToken cancellationToken = default);
 
         // ===== METHODS WITH REDBOBJECT =====
         
         /// <summary>
         /// Check if current user can edit object.
         /// </summary>
-        Task<bool> CanUserEditObject(RedbObject obj);
+        Task<bool> CanUserEditObject(RedbObject obj,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if current user can read object.
         /// </summary>
-        Task<bool> CanUserSelectObject(RedbObject obj);
+        Task<bool> CanUserSelectObject(RedbObject obj,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if current user can delete object.
         /// </summary>
-        Task<bool> CanUserDeleteObject(RedbObject obj);
+        Task<bool> CanUserDeleteObject(RedbObject obj,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if user can edit object.
         /// </summary>
-        Task<bool> CanUserEditObject(RedbObject obj, IRedbUser user);
+        Task<bool> CanUserEditObject(RedbObject obj, IRedbUser user,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if user can read object.
         /// </summary>
-        Task<bool> CanUserSelectObject(RedbObject obj, IRedbUser user);
+        Task<bool> CanUserSelectObject(RedbObject obj, IRedbUser user,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if user can create objects in object's scheme.
         /// </summary>
-        Task<bool> CanUserInsertScheme(RedbObject obj, IRedbUser user);
+        Task<bool> CanUserInsertScheme(RedbObject obj, IRedbUser user,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Check if user can delete object.
         /// </summary>
-        Task<bool> CanUserDeleteObject(RedbObject obj, IRedbUser user);
+        Task<bool> CanUserDeleteObject(RedbObject obj, IRedbUser user,
+        CancellationToken cancellationToken = default);
 
         // ===== CRUD METHODS FOR PERMISSIONS =====
         
@@ -112,7 +128,9 @@ namespace redb.Core.Providers
         /// <param name="request">Permission data</param>
         /// <param name="currentUser">Current user (for audit)</param>
         /// <returns>Created permission</returns>
-        Task<IRedbPermission> CreatePermissionAsync(PermissionRequest request, IRedbUser? currentUser = null);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbPermission> CreatePermissionAsync(PermissionRequest request, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Update permission.
@@ -121,7 +139,9 @@ namespace redb.Core.Providers
         /// <param name="request">New permission data</param>
         /// <param name="currentUser">Current user (for audit)</param>
         /// <returns>Updated permission</returns>
-        Task<IRedbPermission> UpdatePermissionAsync(IRedbPermission permission, PermissionRequest request, IRedbUser? currentUser = null);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbPermission> UpdatePermissionAsync(IRedbPermission permission, PermissionRequest request, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Delete permission.
@@ -129,7 +149,9 @@ namespace redb.Core.Providers
         /// <param name="permission">Permission to delete</param>
         /// <param name="currentUser">Current user (for audit)</param>
         /// <returns>true if permission deleted</returns>
-        Task<bool> DeletePermissionAsync(IRedbPermission permission, IRedbUser? currentUser = null);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> DeletePermissionAsync(IRedbPermission permission, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
         
         // ===== PERMISSION SEARCH =====
         
@@ -138,28 +160,36 @@ namespace redb.Core.Providers
         /// </summary>
         /// <param name="user">User</param>
         /// <returns>List of user permissions</returns>
-        Task<List<IRedbPermission>> GetPermissionsByUserAsync(IRedbUser user);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<List<IRedbPermission>> GetPermissionsByUserAsync(IRedbUser user,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get role permissions.
         /// </summary>
         /// <param name="role">Role</param>
         /// <returns>List of role permissions</returns>
-        Task<List<IRedbPermission>> GetPermissionsByRoleAsync(IRedbRole role);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<List<IRedbPermission>> GetPermissionsByRoleAsync(IRedbRole role,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get permissions for object.
         /// </summary>
         /// <param name="obj">Object</param>
         /// <returns>List of permissions for object</returns>
-        Task<List<IRedbPermission>> GetPermissionsByObjectAsync(IRedbObject obj);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<List<IRedbPermission>> GetPermissionsByObjectAsync(IRedbObject obj,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get permission by ID.
         /// </summary>
         /// <param name="permissionId">Permission ID</param>
         /// <returns>Permission or null if not found</returns>
-        Task<IRedbPermission?> GetPermissionByIdAsync(long permissionId);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbPermission?> GetPermissionByIdAsync(long permissionId,
+        CancellationToken cancellationToken = default);
         
         // ===== PERMISSION MANAGEMENT =====
         
@@ -171,7 +201,9 @@ namespace redb.Core.Providers
         /// <param name="actions">Permission actions</param>
         /// <param name="currentUser">Current user (for audit)</param>
         /// <returns>true if permission granted</returns>
-        Task<bool> GrantPermissionAsync(IRedbUser user, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> GrantPermissionAsync(IRedbUser user, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Grant permission to role.
@@ -181,7 +213,9 @@ namespace redb.Core.Providers
         /// <param name="actions">Permission actions</param>
         /// <param name="currentUser">Current user (for audit)</param>
         /// <returns>true if permission granted</returns>
-        Task<bool> GrantPermissionAsync(IRedbRole role, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> GrantPermissionAsync(IRedbRole role, IRedbObject obj, PermissionAction actions, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Revoke permission from user.
@@ -190,7 +224,9 @@ namespace redb.Core.Providers
         /// <param name="obj">Object</param>
         /// <param name="currentUser">Current user (for audit)</param>
         /// <returns>true if permission revoked</returns>
-        Task<bool> RevokePermissionAsync(IRedbUser user, IRedbObject obj, IRedbUser? currentUser = null);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> RevokePermissionAsync(IRedbUser user, IRedbObject obj, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Revoke permission from role.
@@ -199,7 +235,9 @@ namespace redb.Core.Providers
         /// <param name="obj">Object</param>
         /// <param name="currentUser">Current user (for audit)</param>
         /// <returns>true if permission revoked</returns>
-        Task<bool> RevokePermissionAsync(IRedbRole role, IRedbObject obj, IRedbUser? currentUser = null);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> RevokePermissionAsync(IRedbRole role, IRedbObject obj, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Revoke all user permissions.
@@ -207,7 +245,9 @@ namespace redb.Core.Providers
         /// <param name="user">User</param>
         /// <param name="currentUser">Current user (for audit)</param>
         /// <returns>Number of revoked permissions</returns>
-        Task<int> RevokeAllUserPermissionsAsync(IRedbUser user, IRedbUser? currentUser = null);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<int> RevokeAllUserPermissionsAsync(IRedbUser user, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Revoke all role permissions.
@@ -215,7 +255,9 @@ namespace redb.Core.Providers
         /// <param name="role">Role</param>
         /// <param name="currentUser">Current user (for audit)</param>
         /// <returns>Number of revoked permissions</returns>
-        Task<int> RevokeAllRolePermissionsAsync(IRedbRole role, IRedbUser? currentUser = null);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<int> RevokeAllRolePermissionsAsync(IRedbRole role, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
         
         // ===== EFFECTIVE PERMISSIONS =====
         
@@ -225,7 +267,9 @@ namespace redb.Core.Providers
         /// <param name="user">User</param>
         /// <param name="obj">Object</param>
         /// <returns>Effective user permissions</returns>
-        Task<EffectivePermissionResult> GetEffectivePermissionsAsync(IRedbUser user, IRedbObject obj);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<EffectivePermissionResult> GetEffectivePermissionsAsync(IRedbUser user, IRedbObject obj,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get effective user permissions for multiple objects (batch).
@@ -233,14 +277,18 @@ namespace redb.Core.Providers
         /// <param name="user">User</param>
         /// <param name="objects">Array of objects</param>
         /// <returns>Dictionary object -> effective permissions</returns>
-        Task<Dictionary<IRedbObject, EffectivePermissionResult>> GetEffectivePermissionsBatchAsync(IRedbUser user, IRedbObject[] objects);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<Dictionary<IRedbObject, EffectivePermissionResult>> GetEffectivePermissionsBatchAsync(IRedbUser user, IRedbObject[] objects,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get all effective user permissions.
         /// </summary>
         /// <param name="user">User</param>
         /// <returns>List of all effective user permissions</returns>
-        Task<List<EffectivePermissionResult>> GetAllEffectivePermissionsAsync(IRedbUser user);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<List<EffectivePermissionResult>> GetAllEffectivePermissionsAsync(IRedbUser user,
+        CancellationToken cancellationToken = default);
         
         // ===== STATISTICS =====
         
@@ -248,29 +296,46 @@ namespace redb.Core.Providers
         /// Get total permission count.
         /// </summary>
         /// <returns>Total number of permissions</returns>
-        Task<int> GetPermissionCountAsync();
+        Task<int> GetPermissionCountAsync(CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get user permission count.
         /// </summary>
         /// <param name="user">User</param>
         /// <returns>Number of user permissions</returns>
-        Task<int> GetUserPermissionCountAsync(IRedbUser user);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<int> GetUserPermissionCountAsync(IRedbUser user,
+        CancellationToken cancellationToken = default);
         
         /// <summary>
         /// Get role permission count.
         /// </summary>
         /// <param name="role">Role</param>
         /// <returns>Number of role permissions</returns>
-        Task<int> GetRolePermissionCountAsync(IRedbRole role);
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<int> GetRolePermissionCountAsync(IRedbRole role,
+        CancellationToken cancellationToken = default);
 
         //=== Low-level access
-        Task<bool> CanUserEditObject(long objectId, long userId);
+        Task<bool> CanUserEditObject(long objectId, long userId,
+        CancellationToken cancellationToken = default);
 
-        Task<bool> CanUserSelectObject(long objectId, long userId);
+        Task<bool> CanUserSelectObject(long objectId, long userId,
+        CancellationToken cancellationToken = default);
 
-        Task<bool> CanUserInsertScheme(long schemeId, long userId);
+        /// <summary>
+        /// Synchronous <see cref="CanUserSelectObject(long, long, CancellationToken)"/> for the
+        /// thread-pool-free lazy path (the sync getter of RedbListItem.Object). The default falls
+        /// back to blocking on the async form; the in-tree base provider overrides with a true
+        /// sync SQL call on the calling thread.
+        /// </summary>
+        bool CanUserSelectObjectSync(long objectId, long userId)
+            => CanUserSelectObject(objectId, userId).ConfigureAwait(false).GetAwaiter().GetResult();
 
-        Task<bool> CanUserDeleteObject(long objectId, long userId);
+        Task<bool> CanUserInsertScheme(long schemeId, long userId,
+        CancellationToken cancellationToken = default);
+
+        Task<bool> CanUserDeleteObject(long objectId, long userId,
+        CancellationToken cancellationToken = default);
     }
 }

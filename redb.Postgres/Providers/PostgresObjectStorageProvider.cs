@@ -27,9 +27,10 @@ namespace redb.Postgres.Providers
             ISchemeSyncProvider schemeSync,
             RedbServiceConfiguration configuration,
             IListProvider? listProvider = null,
-            ILogger? logger = null)
+            ILogger? logger = null,
+            IEnumerable<redb.Core.Interception.IRedbSaveInterceptor>? saveInterceptors = null)
             : base(context, serializer, permissionProvider, securityContext, 
-                   schemeSync, configuration, new PostgreSqlDialect(), listProvider, logger)
+                   schemeSync, configuration, new PostgreSqlDialect(), listProvider, logger, saveInterceptors)
         {
         }
         

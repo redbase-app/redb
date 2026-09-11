@@ -39,7 +39,7 @@ public class FacetFilterBuilder : IFacetFilterBuilder
 
         var filterObject = BuildFilterObject(filter);
         var filterJson = JsonSerializer.Serialize(filterObject, _jsonOptions);
-        
+
         _logger?.LogDebug("LINQ Filter Generated: {FilterJson}", filterJson);
         return filterJson;
     }
@@ -108,11 +108,11 @@ public class FacetFilterBuilder : IFacetFilterBuilder
         {
             return BuildFunctionComparisonFilter(comparison, fieldName);
         }
-        
-        // ✅ FIX: Convert value to correct type based on field schema!
+
+        // FIX: Convert value to correct type based on field schema!
         var originalValue = comparison.Value;
-        
-        // 🎯 NEW: Handle direct ListItem comparison (fallback check)
+
+        // NEW: Handle direct ListItem comparison (fallback check)
         // Main handling happens in parser, but add protection at builder level
         if (originalValue is IRedbListItem listItem)
         {
@@ -128,22 +128,22 @@ public class FacetFilterBuilder : IFacetFilterBuilder
                 fieldName += ".Id";
             }
         }
-        
-        // 🔍 CRITICAL LOGGING: check what type comes in
-        // _logger?.LogInformation($"🔍 BEFORE ConvertValueToFieldType:");
-        // _logger?.LogInformation($"   📋 Property.Type: {comparison.Property.Type.Name}");
-        // _logger?.LogInformation($"   📋 Is DateTime?: {comparison.Property.Type == typeof(DateTime)}");
-        // _logger?.LogInformation($"   📋 Is Nullable<DateTime>?: {comparison.Property.Type == typeof(DateTime?)}");
-        // _logger?.LogInformation($"   📋 Underlying type: {Nullable.GetUnderlyingType(comparison.Property.Type)?.Name ?? "not nullable"}");
-        
+
+        // CRITICAL LOGGING: check what type comes in
+        // _logger?.LogInformation($"BEFORE ConvertValueToFieldType:");
+        // _logger?.LogInformation($"   Property.Type: {comparison.Property.Type.Name}");
+        // _logger?.LogInformation($"   Is DateTime?: {comparison.Property.Type == typeof(DateTime)}");
+        // _logger?.LogInformation($"   Is Nullable<DateTime>?: {comparison.Property.Type == typeof(DateTime?)}");
+        // _logger?.LogInformation($"   Underlying type: {Nullable.GetUnderlyingType(comparison.Property.Type)?.Name ?? "not nullable"}");
+
         var value = ConvertValueToFieldType(originalValue, comparison.Property.Type);
-        
-        // 🔍 DETAILED TYPE CONVERSION LOGGING
-        // _logger?.LogInformation($"🔍 TYPE CONVERSION: Field '{comparison.Property.Name}' (Type: {comparison.Property.Type.Name})");
-        // _logger?.LogInformation($"   📥 Original value: {originalValue} ({originalValue?.GetType().Name ?? "null"})");
-        // _logger?.LogInformation($"   📤 Converted value: {value} ({value?.GetType().Name ?? "null"})");
-        
-        // 🔍 DETAILED LOGGING FOR DateTime/DateTimeOffset
+
+        // DETAILED TYPE CONVERSION LOGGING
+        // _logger?.LogInformation($"TYPE CONVERSION: Field '{comparison.Property.Name}' (Type: {comparison.Property.Type.Name})");
+        // _logger?.LogInformation($"   Original value: {originalValue} ({originalValue?.GetType().Name ?? "null"})");
+        // _logger?.LogInformation($"   Converted value: {value} ({value?.GetType().Name ?? "null"})");
+
+        // DETAILED LOGGING FOR DateTime/DateTimeOffset
         // if (value is DateTime dtValue)
         // {
         //     _logger?.LogInformation($"   ⏰ DateTime.Kind: {dtValue.Kind}, Value: {dtValue:yyyy-MM-dd HH:mm:ss}");
@@ -152,12 +152,12 @@ public class FacetFilterBuilder : IFacetFilterBuilder
         // {
         //     _logger?.LogInformation($"   ⏰ DateTimeOffset: {dtoValue:yyyy-MM-dd HH:mm:ss zzz}, UTC: {dtoValue.UtcDateTime:yyyy-MM-dd HH:mm:ss}");
         // }
-        // _logger?.LogInformation($"   🎯 Operator: {comparison.Operator}");
+        // _logger?.LogInformation($"   Operator: {comparison.Operator}");
 
-        // 🔍 SPECIAL LOGGING FOR EQUALITY
+        // SPECIAL LOGGING FOR EQUALITY
         if (comparison.Operator == ComparisonOperator.Equal)
         {
-            // ✅ FIX JSON SERIALIZATION: For Double types forcibly create decimal number  
+            // FIX JSON SERIALIZATION: For Double types forcibly create decimal number
             var finalValue = value;
             if (comparison.Property.Type == typeof(double) || comparison.Property.Type == typeof(double?))
             {
@@ -168,64 +168,64 @@ public class FacetFilterBuilder : IFacetFilterBuilder
                     _logger?.LogDebug($"FIXED: Forcibly create double string: {finalValue}");
                 }
             }
-            
+
             var result = new Dictionary<string, object>
             {
                 [fieldName] = new Dictionary<string, object?> { ["$eq"] = finalValue }
             };
-            
-            // 🔍 LOG FINAL JSON FILTER  
-            // _logger?.LogInformation($"   📋 Generated filter: {{{fieldName}: {{\"$eq\": {finalValue}}}}}");
+
+            // LOG FINAL JSON FILTER
+            // _logger?.LogInformation($"   Generated filter: {{{fieldName}: {{\"$eq\": {finalValue}}}}}");
             return result;
         }
-        
+
         return comparison.Operator switch
         {
-            ComparisonOperator.NotEqual => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$ne"] = value } 
+            ComparisonOperator.NotEqual => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$ne"] = value }
             },
-            ComparisonOperator.GreaterThan => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$gt"] = value } 
+            ComparisonOperator.GreaterThan => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$gt"] = value }
             },
-            ComparisonOperator.GreaterThanOrEqual => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$gte"] = value } 
+            ComparisonOperator.GreaterThanOrEqual => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$gte"] = value }
             },
-            ComparisonOperator.LessThan => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$lt"] = value } 
+            ComparisonOperator.LessThan => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$lt"] = value }
             },
-            ComparisonOperator.LessThanOrEqual => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$lte"] = value } 
+            ComparisonOperator.LessThanOrEqual => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$lte"] = value }
             },
             ComparisonOperator.Contains => BuildContainsFilter(fieldName, value, false),
             ComparisonOperator.ContainsIgnoreCase => BuildContainsFilter(fieldName, value, true),
-            ComparisonOperator.StartsWith => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$startsWith"] = value } 
+            ComparisonOperator.StartsWith => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$startsWith"] = value }
             },
-            ComparisonOperator.StartsWithIgnoreCase => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$startsWithIgnoreCase"] = value } 
+            ComparisonOperator.StartsWithIgnoreCase => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$startsWithIgnoreCase"] = value }
             },
-            ComparisonOperator.EndsWith => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$endsWith"] = value } 
+            ComparisonOperator.EndsWith => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$endsWith"] = value }
             },
-            ComparisonOperator.EndsWithIgnoreCase => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$endsWithIgnoreCase"] = value } 
+            ComparisonOperator.EndsWithIgnoreCase => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$endsWithIgnoreCase"] = value }
             },
-            
-            // 🎯 NULL SEMANTICS
-            ComparisonOperator.Exists => new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object> { ["$exists"] = value } 
+
+            // NULL SEMANTICS
+            ComparisonOperator.Exists => new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object> { ["$exists"] = value }
             },
-            // 🚀 BASIC ARRAY OPERATORS
+            // BASIC ARRAY OPERATORS
             ComparisonOperator.ArrayContains => BuildArrayFilter(fieldName, "$arrayContains", value),
             ComparisonOperator.ArrayAny => BuildArrayFilter(fieldName, "$arrayAny", true),
             ComparisonOperator.ArrayEmpty => BuildArrayFilter(fieldName, "$arrayEmpty", true),
@@ -234,18 +234,18 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             ComparisonOperator.ArrayCountGte => BuildArrayFilter(fieldName, "$arrayCountGte", value),
             ComparisonOperator.ArrayCountLt => BuildArrayFilter(fieldName, "$arrayCountLt", value),
             ComparisonOperator.ArrayCountLte => BuildArrayFilter(fieldName, "$arrayCountLte", value),
-            
-            // 🎯 POSITIONAL ARRAY OPERATORS
+
+            // POSITIONAL ARRAY OPERATORS
             ComparisonOperator.ArrayAt => BuildArrayFilter(fieldName, "$arrayAt", value),
             ComparisonOperator.ArrayFirst => BuildArrayFilter(fieldName, "$arrayFirst", value),
             ComparisonOperator.ArrayLast => BuildArrayFilter(fieldName, "$arrayLast", value),
-            
-            // 🔍 SEARCH ARRAY OPERATORS
+
+            // SEARCH ARRAY OPERATORS
             ComparisonOperator.ArrayStartsWith => BuildArrayFilter(fieldName, "$arrayStartsWith", value),
             ComparisonOperator.ArrayEndsWith => BuildArrayFilter(fieldName, "$arrayEndsWith", value),
             ComparisonOperator.ArrayMatches => BuildArrayFilter(fieldName, "$arrayMatches", value),
-            
-            // 📈 AGGREGATION ARRAY OPERATORS
+
+            // AGGREGATION ARRAY OPERATORS
             ComparisonOperator.ArraySum => BuildArrayFilter(fieldName, "$arraySum", value),
             ComparisonOperator.ArrayAvg => BuildArrayFilter(fieldName, "$arrayAvg", value),
             ComparisonOperator.ArrayMin => BuildArrayFilter(fieldName, "$arrayMin", value),
@@ -259,13 +259,13 @@ public class FacetFilterBuilder : IFacetFilterBuilder
         return logical.Operator switch
         {
             LogicalOperator.And => BuildAndFilter(logical.Operands),
-            LogicalOperator.Or => new Dictionary<string, object> 
-            { 
-                ["$or"] = logical.Operands.Select(BuildFilterObject).ToArray() 
+            LogicalOperator.Or => new Dictionary<string, object>
+            {
+                ["$or"] = logical.Operands.Select(BuildFilterObject).ToArray()
             },
-            LogicalOperator.Not => new Dictionary<string, object> 
-            { 
-                ["$not"] = BuildFilterObject(logical.Operands.First()) 
+            LogicalOperator.Not => new Dictionary<string, object>
+            {
+                ["$not"] = BuildFilterObject(logical.Operands.First())
             },
             _ => throw new NotSupportedException($"Logical operator {logical.Operator} is not supported")
         };
@@ -280,7 +280,7 @@ public class FacetFilterBuilder : IFacetFilterBuilder
         foreach (var operand in operands)
         {
             var filterObj = BuildFilterObject(operand);
-            
+
             if (filterObj is Dictionary<string, object> dict)
             {
                 foreach (var kvp in dict)
@@ -771,26 +771,26 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     private object BuildNullCheckFilter(NullCheckExpression nullCheck)
     {
         var fieldName = BuildFieldPath(nullCheck.Property);
-        
+
         // Target logic for base fields and EAV fields:
         // - Base fields (_objects): column always exists, check only value -> null directly
         // - EAV fields (Props): record may not exist -> $exists for "field exists" semantics
-        
+
         if (nullCheck.Property.IsBaseField)
         {
             // Base fields: simple null / $ne null
             if (nullCheck.IsNull)
             {
-                return new Dictionary<string, object?> 
-                { 
+                return new Dictionary<string, object?>
+                {
                     [fieldName] = null  // Serialized as field: null
                 };
             }
             else
             {
-                return new Dictionary<string, object> 
-                { 
-                    [fieldName] = new Dictionary<string, object?> { ["$ne"] = null } 
+                return new Dictionary<string, object>
+                {
+                    [fieldName] = new Dictionary<string, object?> { ["$ne"] = null }
                 };
             }
         }
@@ -799,16 +799,16 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             // EAV fields: $exists for record existence semantics
             if (nullCheck.IsNull)
             {
-                return new Dictionary<string, object> 
-                { 
-                    [fieldName] = new Dictionary<string, object> { ["$exists"] = false } 
+                return new Dictionary<string, object>
+                {
+                    [fieldName] = new Dictionary<string, object> { ["$exists"] = false }
                 };
             }
             else
             {
-                return new Dictionary<string, object> 
-                { 
-                    [fieldName] = new Dictionary<string, object?> { ["$ne"] = null } 
+                return new Dictionary<string, object>
+                {
+                    [fieldName] = new Dictionary<string, object?> { ["$ne"] = null }
                 };
             }
         }
@@ -817,46 +817,46 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     private object BuildInFilter(InExpression inExpr)
     {
         var fieldName = BuildFieldPath(inExpr.Property);
-        
-        return new Dictionary<string, object> 
-        { 
-            [fieldName] = new Dictionary<string, object> { ["$in"] = inExpr.Values.ToArray() } 
+
+        return new Dictionary<string, object>
+        {
+            [fieldName] = new Dictionary<string, object> { ["$in"] = inExpr.Values.ToArray() }
         };
     }
 
-    // ===== 🚀 NEW METHODS FOR NEW PARADIGM =====
+    // ===== NEW METHODS FOR NEW PARADIGM =====
 
     /// <summary>
     /// Build field path with Class fields support (Contact.Name, Contacts[].Email)
-    /// 🆕 BUG FIX: For RedbObject base fields use "0$:" prefix 
+    /// BUG FIX: For RedbObject base fields use "0$:" prefix
     /// to distinguish them from Props fields with same names (e.g. name vs Name)
     /// Prefix "0$:" is impossible as identifier in any programming language
     /// </summary>
     private string BuildFieldPath(redb.Core.Query.QueryExpressions.PropertyInfo property)
     {
         var fieldPath = property.Name;
-        
-        // 🚀 RedbObject BASE FIELDS: add "0$:" prefix for explicit identification
+
+        // RedbObject BASE FIELDS: add "0$:" prefix for explicit identification
         // SQL function _build_single_facet_condition recognizes this prefix
         if (property.IsBaseField)
         {
             // Prefix "0$:" + field name (e.g.: "0$:name", "0$:parent_id", "0$:Id")
             return "0$:" + fieldPath;
         }
-        
-        // 🎯 DETERMINE FIELD TYPE FOR CLASS FIELDS
+
+        // DETERMINE FIELD TYPE FOR CLASS FIELDS
         if (IsClassField(property))
         {
             // Class field: Contact.Name, Address.City
             return fieldPath; // Field already contains full path from parser
         }
-        
+
         if (IsClassArrayField(property))
         {
             // Class array: Contacts[].Email, Addresses[].Street
-            return fieldPath; // Field already contains full path from parser  
+            return fieldPath; // Field already contains full path from parser
         }
-        
+
         if (IsCollectionType(property.Type))
         {
             // Regular array: Tags[], Scores[], Categories[]
@@ -865,11 +865,11 @@ public class FacetFilterBuilder : IFacetFilterBuilder
                 return fieldPath + "[]";
             }
         }
-        
+
         // Regular field: Name, Age, Status
         return fieldPath;
     }
-    
+
     /// <summary>
     /// Normalize RedbObject base field names to SQL names
     /// C# names (snake_case/PascalCase) → _objects SQL columns with _ prefix
@@ -896,6 +896,7 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             "value_numeric" or "ValueNumeric" => "_value_numeric",
             "value_datetime" or "ValueDatetime" => "_value_datetime",
             "value_bytes" or "ValueBytes" => "_value_bytes",
+            "value_unique" or "ValueUnique" => "_value_unique",
             // DateTime fields - UNIQUE, definitely base
             "date_create" or "DateCreate" => "_date_create",
             "date_modify" or "DateModify" => "_date_modify",
@@ -912,25 +913,25 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     }
 
     /// <summary>
-    /// 🎯 CLIENT SEMANTICS: Build Contains filter with case-insensitive search support
+    /// CLIENT SEMANTICS: Build Contains filter with case-insensitive search support
     /// Supports: r.Article.Contains(filter, StringComparison.OrdinalIgnoreCase)
     /// </summary>
     private object BuildContainsFilter(string fieldName, object? value, bool ignoreCase)
     {
         if (ignoreCase)
         {
-            // 🚀 CASE-INSENSITIVE SEARCH
-            return new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$containsIgnoreCase"] = value } 
+            // CASE-INSENSITIVE SEARCH
+            return new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$containsIgnoreCase"] = value }
             };
         }
         else
         {
-            // 📝 REGULAR CASE-SENSITIVE SEARCH
-            return new Dictionary<string, object> 
-            { 
-                [fieldName] = new Dictionary<string, object?> { ["$contains"] = value } 
+            // REGULAR CASE-SENSITIVE SEARCH
+            return new Dictionary<string, object>
+            {
+                [fieldName] = new Dictionary<string, object?> { ["$contains"] = value }
             };
         }
     }
@@ -940,27 +941,27 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     /// </summary>
     private object BuildArrayFilter(string fieldName, string operatorName, object? value, bool isNullable = false)
     {
-        // 🔧 FIX DOUBLE BRACKETS - DON'T add "[]" if path already contains "[]"
+        // FIX DOUBLE BRACKETS - DON'T add "[]" if path already contains "[]"
         // Example: "Roles[].Value" already contains [] and doesn't need addition
         var arrayFieldName = fieldName.Contains("[]") ? fieldName : fieldName + "[]";
-        
+
         if (isNullable && value == null)
         {
             // Nullable array - search for array absence
-            return new Dictionary<string, object> 
-            { 
+            return new Dictionary<string, object>
+            {
                 [arrayFieldName] = new Dictionary<string, object> { ["$exists"] = false }
             };
         }
-        
-        return new Dictionary<string, object> 
-        { 
-            [arrayFieldName] = new Dictionary<string, object?> { [operatorName] = value } 
+
+        return new Dictionary<string, object>
+        {
+            [arrayFieldName] = new Dictionary<string, object?> { [operatorName] = value }
         };
     }
 
     /// <summary>
-    /// 🎯 CLIENT SEMANTICS: Build filters for nullable fields
+    /// CLIENT SEMANTICS: Build filters for nullable fields
     /// Supports: r.Auction != null &amp;&amp; r.Auction.Costs &gt; 100
     /// </summary>
     private object BuildNullableFieldFilter(string fieldName, object? value, ComparisonOperator op)
@@ -972,46 +973,46 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             {
                 case ComparisonOperator.Equal:
                     // field == null → field is absent
-                    return new Dictionary<string, object> 
-                    { 
-                        [fieldName] = new Dictionary<string, object> { ["$exists"] = false } 
+                    return new Dictionary<string, object>
+                    {
+                        [fieldName] = new Dictionary<string, object> { ["$exists"] = false }
                     };
-                    
+
                 case ComparisonOperator.NotEqual:
-                    // field != null → field exists with any value  
-                    return new Dictionary<string, object> 
-                    { 
-                        [fieldName] = new Dictionary<string, object> { ["$exists"] = true } 
+                    // field != null → field exists with any value
+                    return new Dictionary<string, object>
+                    {
+                        [fieldName] = new Dictionary<string, object> { ["$exists"] = true }
                     };
-                    
+
                 default:
                     throw new NotSupportedException($"Operator {op} is not supported for nullable field with null value");
             }
         }
-        
+
         // Nullable field with real value - regular logic
         var operatorName = op switch
         {
             ComparisonOperator.Equal => "=",
-            ComparisonOperator.NotEqual => "$ne", 
+            ComparisonOperator.NotEqual => "$ne",
             ComparisonOperator.GreaterThan => "$gt",
             ComparisonOperator.GreaterThanOrEqual => "$gte",
-            ComparisonOperator.LessThan => "$lt", 
+            ComparisonOperator.LessThan => "$lt",
             ComparisonOperator.LessThanOrEqual => "$lte",
             ComparisonOperator.Contains => "$contains",
             ComparisonOperator.StartsWith => "$startsWith",
             ComparisonOperator.EndsWith => "$endsWith",
             _ => throw new NotSupportedException($"Operator {op} is not supported for nullable field")
         };
-        
+
         if (operatorName == "=")
         {
             return new Dictionary<string, object?> { [fieldName] = value };
         }
-        
-        return new Dictionary<string, object> 
-        { 
-            [fieldName] = new Dictionary<string, object?> { [operatorName] = value } 
+
+        return new Dictionary<string, object>
+        {
+            [fieldName] = new Dictionary<string, object?> { [operatorName] = value }
         };
     }
 
@@ -1050,8 +1051,8 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     private bool IsCollectionType(Type type)
     {
         if (type == typeof(string)) return false; // string is not collection for our purposes
-        
-        return type.IsArray || 
+
+        return type.IsArray ||
                (type.IsGenericType && (
                    type.GetGenericTypeDefinition() == typeof(List<>) ||
                    type.GetGenericTypeDefinition() == typeof(IList<>) ||
@@ -1065,7 +1066,7 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     /// </summary>
     private bool IsClassField(redb.Core.Query.QueryExpressions.PropertyInfo property)
     {
-        // Class field is determined by presence of dot in name and absence of [] 
+        // Class field is determined by presence of dot in name and absence of []
         return property.Name.Contains('.') && !property.Name.Contains("[]");
     }
 
@@ -1087,43 +1088,43 @@ public class FacetFilterBuilder : IFacetFilterBuilder
         if (type.IsPrimitive || type == typeof(string) || type == typeof(decimal) ||
             type == typeof(DateTime) || type == typeof(DateTimeOffset) || type == typeof(DateOnly) || type == typeof(TimeOnly) || type == typeof(TimeSpan) || type == typeof(Guid))
             return false;
-            
+
         if (IsNullableType(type))
         {
             var underlyingType = Nullable.GetUnderlyingType(type)!;
             return IsBusinessClass(underlyingType);
         }
-        
+
         if (IsCollectionType(type))
             return false;
-            
+
         // This is business class (Address, Contact, etc.)
         return type.IsClass;
     }
-    
+
     /// <summary>
-    /// ✅ FIX FOR PROBLEM #4: Convert value to correct field type
+    /// FIX FOR PROBLEM #4: Convert value to correct field type
     /// Solves problem when Price (double) is searched as integer value
     /// </summary>
     private object? ConvertValueToFieldType(object? value, Type fieldType)
     {
         if (value == null) return null;
-        
+
         // Remove Nullable wrapper if present
         var targetType = Nullable.GetUnderlyingType(fieldType) ?? fieldType;
-        
-        // 🔧 CRITICAL FIX: Process DateTime/DateTimeOffset BEFORE type checking!
+
+        // CRITICAL FIX: Process DateTime/DateTimeOffset BEFORE type checking!
         // Problem: DateTime without explicit Kind serializes WITHOUT timezone ('2025-11-16T00:00:00')
         // PostgreSQL interprets this as SERVER LOCAL time (not client!)
         // Solution: ALWAYS convert to UTC for explicit zone indication ('2025-11-16T00:00:00Z')
         if (value is DateTime dt && targetType == typeof(DateTime))
         {
-            // ✅ Use centralized converter: DateTime → UTC
+            // Use centralized converter: DateTime → UTC
             // Unspecified is treated as UTC (NOT as Local!)
             return Core.Utils.DateTimeConverter.NormalizeForStorage(dt);
         }
 
-        // 🔧 Zone-less text temporals, BEFORE the "types already match" shortcut below — that
+        // Zone-less text temporals, BEFORE the "types already match" shortcut below — that
         // shortcut would hand a TimeOnly/TimeSpan straight to the JSON writer, whose default form
         // ("12:30:00") differs from the invariant round-trip form the writer stored
         // ("12:30:00.0000000"), and the row became unfindable by its own value. Both ends must
@@ -1143,10 +1144,10 @@ public class FacetFilterBuilder : IFacetFilterBuilder
         // If types already match (NOT DateTime!) - return as is
         if (value.GetType() == targetType)
             return value;
-            
+
         try
         {
-            // ✅ NUMERIC TYPES - main cause of the problem!
+            // NUMERIC TYPES - main cause of the problem!
             if (targetType == typeof(double))
             {
                 return Convert.ToDouble(value);  // 2000 → 2000.0
@@ -1175,23 +1176,23 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             {
                 return Convert.ToByte(value);
             }
-            
-            // ✅ BOOLEAN TYPES
+
+            // BOOLEAN TYPES
             else if (targetType == typeof(bool))
             {
                 return Convert.ToBoolean(value);
             }
 
-            // ✅ DATE-TIME (DateTime processed EARLIER at method start!)
+            // DATE-TIME (DateTime processed EARLIER at method start!)
             else if (targetType == typeof(DateTimeOffset))
             {
-                // 🔧 CORRECT DateTimeOffset HANDLING:
+                // CORRECT DateTimeOffset HANDLING:
                 // DateTimeOffset already contains offset (timezone), therefore:
                 // 1. If value is already DateTimeOffset - use it
                 // 2. If DateTime - create DateTimeOffset explicitly
                 // 3. If string - parse
                 // 4. Convert to UTC for uniformity (PostgreSQL timestamptz stores in UTC)
-                
+
                 DateTimeOffset dtofs;
                 if (value is DateTimeOffset existingOffset)
                 {
@@ -1230,7 +1231,7 @@ public class FacetFilterBuilder : IFacetFilterBuilder
                     dtofs = new DateTimeOffset(Convert.ToDateTime(value));
                     _logger?.LogDebug($"   DateTimeOffset from fallback: {dtofs:yyyy-MM-dd HH:mm:ss zzz}");
                 }
-                
+
                 // Convert to UTC for uniformity with PostgreSQL timestamptz
                 // PostgreSQL stores timestamptz in UTC and compares in UTC
                 var result = dtofs.ToUniversalTime();
@@ -1238,26 +1239,26 @@ public class FacetFilterBuilder : IFacetFilterBuilder
                 return result;
             }
 
-            // ✅ GUID
+            // GUID
             else if (targetType == typeof(Guid))
             {
                 if (value is string guidStr)
                     return Guid.Parse(guidStr);
                 return (Guid)value;
             }
-            
-            // ✅ STRINGS
+
+            // STRINGS
             else if (targetType == typeof(string))
             {
                 return value.ToString();
             }
-            
+
             // For other types return as is
             return value;
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning($"⚠️ Failed to convert value {value} ({value.GetType().Name}) to type {targetType.Name}: {ex.Message}");
+            _logger?.LogWarning($"Failed to convert value {value} ({value.GetType().Name}) to type {targetType.Name}: {ex.Message}");
             return value; // Fallback - return original value
         }
     }

@@ -172,14 +172,23 @@ public static class Program
             aliases: ["--output", "-o"],
             description: "Output file path. If omitted, writes to stdout.");
         schemaCommand.AddOption(schemaOutputOption);
-        
+
+        var schemaUpgradeOption = new Option<bool>(
+            aliases: ["--upgrade"],
+            description: "Export the upgrade script for an EXISTING database (the versioned SQL module) " +
+                         "instead of the full schema. Hand it to the schema owner when the application " +
+                         "is not allowed to apply it itself. Idempotent, safe to re-run. " +
+                         "Not available for sqlite (the database file upgrades itself).");
+        schemaCommand.AddOption(schemaUpgradeOption);
+
         schemaCommand.SetHandler(async (context) =>
         {
             var provider = context.ParseResult.GetValueForOption(providerOption)!;
             var output = context.ParseResult.GetValueForOption(schemaOutputOption);
-            
+            var upgrade = context.ParseResult.GetValueForOption(schemaUpgradeOption);
+
             await Task.CompletedTask;
-            ExportSchemaScript(provider, output);
+            ExportSchemaScript(provider, output, upgrade);
         });
         
         rootCommand.AddCommand(initCommand);
@@ -391,10 +400,11 @@ public static class Program
         }
     }
     
-    private static void ExportSchemaScript(string provider, string? outputPath)
+    private static void ExportSchemaScript(string provider, string? outputPath, bool upgrade = false)
     {
-        var sql = GetEmbeddedSql(provider);
-        
+        var sql = upgrade ? GetEmbeddedUpgradeSql(provider) : GetEmbeddedSql(provider);
+        var kind = upgrade ? "Upgrade" : "Schema";
+
         if (string.IsNullOrEmpty(outputPath))
         {
             Console.Write(sql);
@@ -402,7 +412,35 @@ public static class Program
         else
         {
             File.WriteAllText(outputPath, sql);
-            Console.WriteLine($"Schema script written to {outputPath} ({sql.Length:N0} characters).");
+            Console.WriteLine($"{kind} script written to {outputPath} ({sql.Length:N0} characters).");
         }
+    }
+
+    /// <summary>
+    /// The versioned SQL module bundle — what start-up applies automatically when the connected role
+    /// may, and what the DBA applies by hand when it may not (RedbSchemaOutdatedException names this
+    /// command). Same embedded resource the provider's RedbService reads, so the two texts cannot
+    /// drift.
+    /// </summary>
+    private static string GetEmbeddedUpgradeSql(string providerName)
+    {
+        var (assembly, resourceName) = providerName.ToLowerInvariant() switch
+        {
+            "postgres" or "postgresql" or "pgsql" =>
+                (typeof(redb.Postgres.RedbService).Assembly, "redb.Postgres.sql.v2-pvt.pvt_bundle.sql"),
+            "mssql" or "sqlserver" =>
+                (typeof(redb.MSSql.RedbService).Assembly, "redb.MSSql.sql.v2-pvt.pvt_bundle.sql"),
+            "sqlite" =>
+                throw new ArgumentException(
+                    "SQLite has no upgrade script: the database file belongs to the process and is upgraded on open."),
+            _ => throw new ArgumentException($"Unknown provider: {providerName}")
+        };
+
+        using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException(
+                $"Embedded resource '{resourceName}' not found in {assembly.GetName().Name}.");
+
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 }

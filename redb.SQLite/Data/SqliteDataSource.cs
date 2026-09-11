@@ -15,7 +15,7 @@ namespace redb.SQLite.Data
     ///   - busy_timeout     (so a second writer waits instead of failing with
     ///                       SQLITE_BUSY — SQLite is single-writer)
     /// </summary>
-    public sealed class SqliteDataSource
+    public sealed class SqliteDataSource : IDisposable
     {
         private const int BusyTimeoutMs = 5000;
 
@@ -69,12 +69,45 @@ namespace redb.SQLite.Data
         public static SqliteDataSource Create(string connectionString, bool unicodeCaseFolding)
             => new SqliteDataSource(connectionString) { UnicodeCaseFolding = unicodeCaseFolding };
 
+        /// <summary>V4 (LAZY Л2): also arms the lazy-references connection flag of the native extension.</summary>
+        public static SqliteDataSource Create(string connectionString, bool unicodeCaseFolding, bool lazyReferences)
+            => new SqliteDataSource(connectionString) { UnicodeCaseFolding = unicodeCaseFolding, LazyReferences = lazyReferences };
+
         /// <summary>
         /// When true, every opened connection gets <c>like</c>, <c>lower</c> and <c>upper</c>
         /// replaced by Unicode-aware implementations. Off by default: generated SQL and stock
         /// behaviour stay exactly as they were.
         /// </summary>
         public bool UnicodeCaseFolding { get; private init; }
+
+        /// <summary>V4 (LAZY Л2): arm redb_lazy_refs(1) on every open (the native extension keeps the flag per connection).</summary>
+        public bool LazyReferences { get; private init; }
+
+        // V4 (LAZY Л2): the SQLite counterpart of the PostgreSQL GUC - the extension keeps the
+        // flag in per-connection clientdata; unset means off, so old extensions and the off state
+        // are byte-for-byte the previous behaviour.
+        private void InstallLazyRefs(SqliteConnection conn)
+        {
+            if (!LazyReferences) return;
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT redb_lazy_refs(1)";
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// Releases the connection pool of this data source's connection string. The pools of
+        /// Microsoft.Data.Sqlite are static, keyed by connection string, and a pooled handle keeps
+        /// the database FILE open (locked, on Windows) - so without this, a container that dies
+        /// (test host teardown, a hot-reloaded module) leaves the file locked until process exit.
+        /// The DI registrations are factories, so the container disposes the data source it
+        /// created. ClearPool touches only this connection string; another live container on the
+        /// same string is unaffected beyond refilling the pool on its next open.
+        /// </summary>
+        public void Dispose()
+        {
+            using var probe = new SqliteConnection(ConnectionString);
+            SqliteConnection.ClearPool(probe);
+        }
 
         /// <summary>Open a new pooled connection with REDB pragmas applied.</summary>
         public SqliteConnection OpenConnection()
@@ -85,6 +118,7 @@ namespace redb.SQLite.Data
             ApplyPragmas(conn);
             SqliteCaseFolding.Install(conn, UnicodeCaseFolding);
             EnsureCleanTransactionState(conn);
+            InstallLazyRefs(conn);
             return conn;
         }
 
@@ -97,6 +131,7 @@ namespace redb.SQLite.Data
             await ApplyPragmasAsync(conn);
             SqliteCaseFolding.Install(conn, UnicodeCaseFolding);
             await EnsureCleanTransactionStateAsync(conn);
+            InstallLazyRefs(conn);
             return conn;
         }
 

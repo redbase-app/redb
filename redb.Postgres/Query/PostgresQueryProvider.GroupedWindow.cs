@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using redb.Core.Query.Aggregation;
@@ -38,7 +39,7 @@ public partial class PostgresQueryProvider
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        string? filterJson = null)
+        string? filterJson = null, CancellationToken cancellationToken = default)
     {
         return ExecuteGroupedWindowInternalAsync(
             schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
@@ -52,7 +53,7 @@ public partial class PostgresQueryProvider
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        FilterExpression? filter)
+        FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var filterJson = filter is null ? null : _facetBuilder.BuildFacetFilters(filter);
         return ExecuteGroupedWindowInternalAsync(
@@ -67,7 +68,7 @@ public partial class PostgresQueryProvider
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        string? filterJson = null)
+        string? filterJson = null, CancellationToken cancellationToken = default)
     {
         return await BuildGroupedWindowSqlAsync(
             schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
@@ -81,7 +82,7 @@ public partial class PostgresQueryProvider
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        FilterExpression? filter)
+        FilterExpression? filter, CancellationToken cancellationToken = default)
     {
         var filterJson = filter is null ? null : _facetBuilder.BuildFacetFilters(filter);
         return await BuildGroupedWindowSqlAsync(
@@ -95,12 +96,12 @@ public partial class PostgresQueryProvider
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        string? filterJson)
+        string? filterJson, CancellationToken cancellationToken = default)
     {
         var sql = await BuildGroupedWindowSqlAsync(
             schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
 
-        var jsonArray = await _context.ExecuteScalarAsync<string>(sql);
+        var jsonArray = await _context.ExecuteScalarAsync<string>(sql, System.Array.Empty<object>(), cancellationToken);
         if (string.IsNullOrEmpty(jsonArray))
             return null;
         return JsonDocument.Parse(jsonArray);
@@ -113,7 +114,7 @@ public partial class PostgresQueryProvider
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        string? filterJson)
+        string? filterJson, CancellationToken cancellationToken = default)
     {
         var groupList = groupFields?.ToList() ?? new List<GroupFieldRequest>();
         var aggList = aggregations?.ToList() ?? new List<AggregateRequest>();
@@ -141,7 +142,7 @@ public partial class PostgresQueryProvider
         _logger?.LogDebug("PVT GroupedWindow Build: SchemeId={SchemeId}, GroupBy={GroupBy}, Aggs={Aggs}, Filter={Filter}",
             schemeId, groupByJson, aggregationsJson ?? "null", filterJson ?? "null");
 
-        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, filterParam, groupByJson, aggParam);
+        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, groupByJson, aggParam }, cancellationToken);
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
                 "pvt_build_groupby_sql returned an empty SQL string for scheme " + schemeId + ".");

@@ -99,12 +99,15 @@ CREATE FUNCTION dbo.build_field_json(
     @collection_type BIGINT,
     @max_depth INT,
     @array_index NVARCHAR(430),
-    @parent_value_id BIGINT
+    @parent_value_id BIGINT,
+    @lazy BIT = 0  -- V4 (LAZY Л2): _structures._lazy of this field
 )
 RETURNS NVARCHAR(MAX)
 AS
 BEGIN
     DECLARE @result NVARCHAR(MAX);
+    -- V4 (LAZY Л2): a virtual reference with the session flag on is a stub (depth 0).
+    DECLARE @lazy_depth INT = CASE WHEN @lazy = 1 AND TRY_CAST(CAST(SESSION_CONTEXT(N'redb.lazy_refs') AS NVARCHAR(10)) AS INT) = 1 THEN 0 ELSE @max_depth - 1 END;
     DECLARE @is_array BIT = CASE WHEN @collection_type = -9223372036854775668 THEN 1 ELSE 0 END;
     DECLARE @is_dictionary BIT = CASE WHEN @collection_type = -9223372036854775667 THEN 1 ELSE 0 END;
     
@@ -164,9 +167,13 @@ BEGIN
         IF @type_semantic = '_RObject'
         BEGIN
             -- Array of Object references - recursive call for each
+            -- A reference is always materialised: at the depth boundary get_object_json
+            -- returns the base-fields stub (id, scheme_id, hash, no properties), which is
+            -- what PostgreSQL and SQLite do. Emitting null here instead made the three
+            -- providers disagree on the same data. NULL only when there is no reference.
             SELECT @result = N'[' + ISNULL(STRING_AGG(
-                CASE WHEN v._Object IS NOT NULL AND @max_depth > 0 
-                     THEN dbo.get_object_json(v._Object, @max_depth - 1)
+                CASE WHEN v._Object IS NOT NULL
+                     THEN dbo.get_object_json(v._Object, @lazy_depth)
                      ELSE N'null' END
             , N',') WITHIN GROUP (ORDER BY 
                 CASE WHEN v._array_index LIKE '[0-9]%' AND ISNUMERIC(v._array_index) = 1 
@@ -181,12 +188,17 @@ BEGIN
         BEGIN
             -- Array of Class - recursive properties for each element
             SELECT @result = N'[' + ISNULL(STRING_AGG(
-                dbo.build_properties(@object_id, @scheme_id, @max_depth, @structure_id, v._array_index, v._id)
+                -- "null must be null" (V-1) + R-1: a null element has no _Guid AND no children.
+                -- T-SQL forbids a subquery inside STRING_AGG - the child flag comes from OUTER APPLY.
+                CASE WHEN v._Guid IS NULL AND ch.x IS NULL
+                     THEN N'null'
+                     ELSE dbo.build_properties(@object_id, @scheme_id, @max_depth, @structure_id, v._array_index, v._id) END
             , N',') WITHIN GROUP (ORDER BY 
                 CASE WHEN v._array_index LIKE '[0-9]%' AND ISNUMERIC(v._array_index) = 1 
                      THEN CAST(v._array_index AS INT) ELSE 2147483647 END, v._array_index
             ), N'') + N']'
             FROM _values v
+            OUTER APPLY (SELECT TOP 1 1 AS x FROM _values c WHERE c._array_parent_id = v._id) ch
             WHERE v._id_object = @object_id AND v._id_structure = @structure_id
               AND v._array_index IS NOT NULL
               AND (@base_value_id IS NULL OR v._array_parent_id = @base_value_id);
@@ -210,22 +222,29 @@ BEGIN
                         CASE WHEN v._DateTimeOffset IS NULL THEN N'null' ELSE N'"' + CONVERT(NVARCHAR(50), v._DateTimeOffset, 127) + N'"' END
                     WHEN @db_type = 'Boolean' THEN 
                         CASE WHEN v._Boolean IS NULL THEN N'null' WHEN v._Boolean = 1 THEN N'true' ELSE N'false' END
-                    WHEN @db_type = 'ListItem' THEN 
+                    WHEN @db_type = 'ByteArray' THEN
+                        CASE WHEN v._ByteArray IS NULL THEN N'null' ELSE N'"' + b64.txt + N'"' END
+                    WHEN @db_type = 'ListItem' THEN
                         CASE WHEN v._ListItem IS NULL THEN N'null'
                              ELSE dbo.build_listitem_json(v._ListItem)
                         END
                     ELSE N'null'
                 END
-            , N',') WITHIN GROUP (ORDER BY 
-                CASE WHEN v._array_index LIKE '[0-9]%' AND ISNUMERIC(v._array_index) = 1 
+            , N',') WITHIN GROUP (ORDER BY
+                CASE WHEN v._array_index LIKE '[0-9]%' AND ISNUMERIC(v._array_index) = 1
                      THEN CAST(v._array_index AS INT) ELSE 2147483647 END, v._array_index
             ), N'') + N']'
             FROM _values v
+            -- base64 via FOR XML: measured 5x cheaper than an XML instance's .value() on a 1 MB
+            -- blob (21 ms against 111). "AS [*]" suppresses the element name - without it the
+            -- value arrives wrapped in <_ByteArray>...</_ByteArray> and the JSON is corrupt. The
+            -- subquery cannot sit inside STRING_AGG (Msg 130), hence the APPLY.
+            OUTER APPLY (SELECT txt = (SELECT v._ByteArray AS [*] FOR XML PATH(''), BINARY BASE64)) b64
             WHERE v._id_object = @object_id AND v._id_structure = @structure_id
               AND v._array_index IS NOT NULL
               AND (@base_value_id IS NULL OR v._array_parent_id = @base_value_id);
         END
-        
+
         RETURN @result;
     END
     
@@ -254,7 +273,7 @@ BEGIN
             SELECT @result = N'{' + ISNULL(STRING_AGG(
                 N'"' + dbo.escape_json_string(v._array_index) + N'":' +
                 CASE WHEN v._Object IS NOT NULL AND @max_depth > 0 
-                     THEN dbo.get_object_json(v._Object, @max_depth - 1)
+                     THEN dbo.get_object_json(v._Object, @lazy_depth)
                      ELSE N'null' END
             , N','), N'') + N'}'
             FROM _values v
@@ -267,9 +286,13 @@ BEGIN
             -- Dictionary of Class
             SELECT @result = N'{' + ISNULL(STRING_AGG(
                 N'"' + dbo.escape_json_string(v._array_index) + N'":' +
-                dbo.build_properties(@object_id, @scheme_id, @max_depth, @structure_id, NULL, v._id)
+                -- R-1: no _Guid AND no children.
+                CASE WHEN v._Guid IS NULL AND ch.x IS NULL
+                     THEN N'null'
+                     ELSE dbo.build_properties(@object_id, @scheme_id, @max_depth, @structure_id, NULL, v._id) END
             , N','), N'') + N'}'
             FROM _values v
+            OUTER APPLY (SELECT TOP 1 1 AS x FROM _values c WHERE c._array_parent_id = v._id) ch
             WHERE v._id_object = @object_id AND v._id_structure = @structure_id
               AND v._array_index IS NOT NULL
               AND (@dict_base_id IS NULL OR v._array_parent_id = @dict_base_id);
@@ -294,10 +317,15 @@ BEGIN
                         CASE WHEN v._DateTimeOffset IS NULL THEN N'null' ELSE N'"' + CONVERT(NVARCHAR(50), v._DateTimeOffset, 127) + N'"' END
                     WHEN @db_type = 'Boolean' THEN 
                         CASE WHEN v._Boolean IS NULL THEN N'null' WHEN v._Boolean = 1 THEN N'true' ELSE N'false' END
+                    WHEN @db_type = 'ByteArray' THEN
+                        CASE WHEN v._ByteArray IS NULL THEN N'null' ELSE N'"' + b64.txt + N'"' END
                     ELSE N'null'
                 END
             , N','), N'') + N'}'
             FROM _values v
+            -- See the array branch above: FOR XML is 5x cheaper than the XML instance, "AS [*]"
+            -- keeps the element name out, and STRING_AGG rejects the subquery (Msg 130).
+            OUTER APPLY (SELECT txt = (SELECT v._ByteArray AS [*] FOR XML PATH(''), BINARY BASE64)) b64
             WHERE v._id_object = @object_id AND v._id_structure = @structure_id
               AND v._array_index IS NOT NULL
               AND (@dict_base_id IS NULL OR v._array_parent_id = @dict_base_id);
@@ -311,8 +339,10 @@ BEGIN
     -- =====================================================
     IF @type_semantic = '_RObject'
     BEGIN
-        IF @val_Object IS NOT NULL AND @max_depth > 0
-            RETURN dbo.get_object_json(@val_Object, @max_depth - 1);
+        -- Same rule as the array branch: the depth boundary yields the base-fields stub,
+        -- never null. NULL only when the reference itself is empty.
+        IF @val_Object IS NOT NULL
+            RETURN dbo.get_object_json(@val_Object, @lazy_depth);
         RETURN NULL;
     END
     
@@ -350,6 +380,10 @@ BEGIN
             CASE WHEN @val_DateTimeOffset IS NULL THEN NULL ELSE N'"' + CONVERT(NVARCHAR(50), @val_DateTimeOffset, 127) + N'"' END
         WHEN @db_type = 'Boolean' THEN 
             CASE WHEN @val_Boolean IS NULL THEN NULL WHEN @val_Boolean = 1 THEN N'true' ELSE N'false' END
+        WHEN @db_type = 'ByteArray' THEN 
+            -- FOR XML instead of an XML instance: 101 ms -> 29 ms on a 1 MB blob. "AS [*]" keeps
+            -- the element name out of the value; no aggregate here, so no APPLY is needed.
+            CASE WHEN @val_ByteArray IS NULL THEN NULL ELSE N'"' + (SELECT @val_ByteArray AS [*] FOR XML PATH(''), BINARY BASE64) + N'"' END
         WHEN @db_type = 'ListItem' THEN dbo.build_listitem_json(@val_ListItem)
         ELSE NULL
     END;
@@ -390,7 +424,8 @@ BEGIN
                 dbo.build_field_json(
                     @object_id, c._structure_id, @scheme_id, @parent_structure_id,
                     c._name, c.db_type, c.type_semantic, c._collection_type,
-                    @max_depth, @array_index, @parent_value_id
+                    @max_depth, @array_index, @parent_value_id,
+                    ISNULL(c._lazy, 0)
                 ) AS field_value
             FROM _scheme_metadata_cache c
             WHERE c._scheme_id = @scheme_id
@@ -445,12 +480,16 @@ BEGIN
             N',"key":' + CASE WHEN o._key IS NULL THEN N'null' ELSE CAST(o._key AS NVARCHAR(20)) END +
             N',"value_long":' + CASE WHEN o._value_long IS NULL THEN N'null' ELSE CAST(o._value_long AS NVARCHAR(20)) END +
             N',"value_string":' + CASE WHEN o._value_string IS NULL THEN N'null' ELSE N'"' + dbo.escape_json_string(o._value_string) + N'"' END +
+            N',"value_unique":' + CASE WHEN o._value_unique IS NULL THEN N'null' ELSE N'"' + dbo.escape_json_string(o._value_unique) + N'"' END +
             N',"value_guid":' + CASE WHEN o._value_guid IS NULL THEN N'null' ELSE N'"' + CAST(o._value_guid AS NVARCHAR(50)) + N'"' END +
             N',"note":' + CASE WHEN o._note IS NULL THEN N'null' ELSE N'"' + dbo.escape_json_string(o._note) + N'"' END +
             N',"value_bool":' + CASE WHEN o._value_bool IS NULL THEN N'null' WHEN o._value_bool = 1 THEN N'true' ELSE N'false' END +
             N',"value_double":' + CASE WHEN o._value_double IS NULL THEN N'null' ELSE FORMAT(o._value_double, 'G', 'en-US') END +
             N',"value_numeric":' + CASE WHEN o._value_numeric IS NULL THEN N'null' ELSE REPLACE(CAST(o._value_numeric AS NVARCHAR(50)), N',', N'.') END +
             N',"value_datetime":' + CASE WHEN o._value_datetime IS NULL THEN N'null' ELSE N'"' + CONVERT(NVARCHAR(50), o._value_datetime, 127) + N'"' END +
+            -- Root value_bytes as base64 (the XML trick). Was absent entirely: the column was
+            -- written but reads came back null (bug report BUG_BYTES §3.3, read side).
+            N',"value_bytes":' + CASE WHEN o._value_bytes IS NULL THEN N'null' ELSE N'"' + (SELECT o._value_bytes AS [*] FOR XML PATH(''), BINARY BASE64) + N'"' END +
             N',"hash":' + CASE WHEN o._hash IS NULL THEN N'null' ELSE N'"' + CAST(o._hash AS NVARCHAR(50)) + N'"' END
     FROM _objects o
     INNER JOIN _schemes s ON s._id = o._id_scheme

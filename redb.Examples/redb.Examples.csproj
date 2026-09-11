@@ -15,13 +15,10 @@
 
   <ItemGroup>
     <!-- DIAG: temporarily switched to ProjectReference for diagnostics -->
-    <!-- <PackageReference Include="redb.Core.Pro" Version="1.2.*" /> -->
-    <!-- <PackageReference Include="redb.Postgres.Pro" Version="1.2.*" /> -->
-    <!-- <PackageReference Include="redb.MSSql.Pro" Version="1.2.*" /> -->
-    <PackageReference Include="redb.Core.Pro" Version="3.7.2" />
-    <PackageReference Include="redb.Postgres.Pro" Version="3.7.2" />
-    <PackageReference Include="redb.MSSql.Pro" Version="3.7.2" />
-    <PackageReference Include="redb.SQLite.Pro" Version="3.7.2" />
+    <PackageReference Include="redb.Core.Pro" Version="$(Version)" />
+    <PackageReference Include="redb.Postgres.Pro" Version="$(Version)" />
+    <PackageReference Include="redb.MSSql.Pro" Version="$(Version)" />
+    <PackageReference Include="redb.SQLite.Pro" Version="$(Version)" />
   </ItemGroup>
 
 </Project>

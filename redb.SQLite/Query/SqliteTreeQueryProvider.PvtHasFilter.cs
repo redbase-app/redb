@@ -59,7 +59,7 @@ public partial class SqliteTreeQueryProvider
     /// </summary>
     private async Task<object> ExecutePvtHasDescendantToListAsync<TProps>(
         TreeQueryContext<TProps> context,
-        TreeFilter hasDescendantFilter) where TProps : class, new()
+        TreeFilter hasDescendantFilter, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var descendantIds = await FindIdsViaPvtAsync(hasDescendantFilter, scopeRootIds: null);
         if (descendantIds.Length == 0)
@@ -69,7 +69,7 @@ public partial class SqliteTreeQueryProvider
         var depthLimit = hasDescendantFilter.MaxDepth ?? 50;
         var idsString = string.Join(",", descendantIds.Select(id => id.ToString(CultureInfo.InvariantCulture)));
         var sql = _sql.Query_GetParentIdsFromDescendantsSql(idsString, depthLimit);
-        var parentIdList = await _context.QueryScalarListAsync<long>(sql);
+        var parentIdList = await _context.QueryScalarListAsync<long>(sql, System.Array.Empty<object>(), cancellationToken);
         var parentIds = parentIdList.ToArray();
         if (parentIds.Length == 0)
             return new List<TreeRedbObject<TProps>>();
@@ -95,7 +95,7 @@ public partial class SqliteTreeQueryProvider
     /// via <c>pvt_build_query_sql</c>, then executes it and returns the
     /// matching object ids.
     /// </summary>
-    private async Task<long[]> FindIdsViaPvtAsync(TreeFilter filter, long[]? scopeRootIds)
+    private async Task<long[]> FindIdsViaPvtAsync(TreeFilter filter, long[]? scopeRootIds, CancellationToken cancellationToken = default)
     {
         if (filter.TargetSchemeId is null || filter.TargetSchemeId.Value == 0)
             return Array.Empty<long>();
@@ -126,12 +126,12 @@ public partial class SqliteTreeQueryProvider
             "PVT HasAncestor/Descendant Build: TargetSchemeId={SchemeId}, Mode={Mode}, Scope={Scope}, Cond={Cond}",
             filter.TargetSchemeId.Value, sourceMode, treeIdsLiteral, conditionJson);
 
-        var inner = await _context.ExecuteScalarAsync<string>(invocation, filterParam);
+        var inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam }, cancellationToken);
         if (string.IsNullOrWhiteSpace(inner))
             return Array.Empty<long>();
 
         var idSql = "SELECT _id AS \"Value\" FROM (" + inner + ") sub";
-        var ids = await _context.QueryScalarListAsync<long>(idSql);
+        var ids = await _context.QueryScalarListAsync<long>(idSql, System.Array.Empty<object>(), cancellationToken);
         return ids.ToArray();
     }
 }

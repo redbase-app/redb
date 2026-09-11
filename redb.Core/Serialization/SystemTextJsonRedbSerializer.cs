@@ -17,7 +17,7 @@ namespace redb.Core.Serialization
         /// Set via SetTypeResolver during service initialization.
         /// </summary>
         private static Func<long, Type?>? _typeResolver;
-        
+
         /// <summary>
         /// Set the type resolver function for polymorphic deserialization.
         /// Should be called once during service initialization.
@@ -26,7 +26,7 @@ namespace redb.Core.Serialization
         {
             _typeResolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
         }
-        
+
         /// <summary>
         /// Resolve CLR type by scheme ID using configured resolver.
         /// </summary>
@@ -34,7 +34,7 @@ namespace redb.Core.Serialization
         {
             return _typeResolver?.Invoke(schemeId);
         }
-        
+
         /// <summary>
         /// Public serialization options for use in other components
         /// (e.g., for polymorphic TreeRedbObject deserialization)
@@ -44,15 +44,16 @@ namespace redb.Core.Serialization
             PropertyNameCaseInsensitive = true,
             ReadCommentHandling = JsonCommentHandling.Skip,
             AllowTrailingCommas = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, // ✅ Ignore empty arrays/null/default when serializing
-            Converters = { 
-                new NullToDefaultConverterFactory(), // ✅ null → default(T) for value types (int, long, etc)
-                new ValueTupleDictionaryConverterFactory(), // ✅ Dictionary with ValueTuple/Class keys (Base64)
-                new PolymorphicRedbObjectConverter(), // ✅ Polymorphic IRedbObject deserialization based on scheme_id
-                new PostgresDateTimeOffsetConverter(), // ✅ DateTimeOffset from PostgreSQL timestamptz
-                new PostgresNullableDateTimeOffsetConverter(), // ✅ Nullable DateTimeOffset from PostgreSQL
-                new PostgresInfinityDateTimeConverter(), // ✅ FIX: PostgreSQL "-infinity" support
-                new PostgresInfinityNullableDateTimeConverter(), // ✅ FIX: PostgreSQL "-infinity" support for nullable DateTime
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, // Ignore empty arrays/null/default when serializing
+            Converters = {
+                new NullToDefaultConverterFactory(), // null → default(T) for value types (int, long, etc)
+                new ValueTupleDictionaryConverterFactory(), // Dictionary with ValueTuple/Class keys (Base64)
+                new RedbObjectStubWriteConverterFactory(), // V4 (L.4): writing never triggers lazy loading; a stub writes base fields only
+                new PolymorphicRedbObjectConverter(), // Polymorphic IRedbObject deserialization based on scheme_id
+                new PostgresDateTimeOffsetConverter(), // DateTimeOffset from PostgreSQL timestamptz
+                new PostgresNullableDateTimeOffsetConverter(), // Nullable DateTimeOffset from PostgreSQL
+                new PostgresInfinityDateTimeConverter(), // FIX: PostgreSQL "-infinity" support
+                new PostgresInfinityNullableDateTimeConverter(), // FIX: PostgreSQL "-infinity" support for nullable DateTime
                 new JsonStringEnumConverter(), // Enum as strings support
                 new FlexibleTimeSpanConverter(), // TimeSpan from strings support
                 new FlexibleNullableTimeSpanConverter(), // nullable TimeSpan support
@@ -79,15 +80,15 @@ namespace redb.Core.Serialization
         {
             // Create generic type RedbObject&lt;propsType&gt; via reflection
             var redbObjectType = typeof(RedbObject<>).MakeGenericType(propsType);
-            
+
             // Deserialize JSON to this type
             var deserializedObj = JsonSerializer.Deserialize(json, redbObjectType, Options);
-            
+
             if (deserializedObj == null)
             {
                 throw new InvalidOperationException($"Failed to deserialize get_object_json payload to RedbObject<{propsType.Name}>.");
             }
-            
+
             // Return as IRedbObject
             return (IRedbObject)deserializedObj;
         }
@@ -103,7 +104,7 @@ namespace redb.Core.Serialization
     }
 
     /// <summary>
-    /// ✅ Polymorphic converter for IRedbObject
+    /// Polymorphic converter for IRedbObject
     /// Automatically determines type based on scheme_id from JSON and deserializes to RedbObject&lt;TProps&gt;
     /// Used for nested objects (e.g., RedbListItem.Object)
     /// </summary>
@@ -114,16 +115,16 @@ namespace redb.Core.Serialization
             // 1. Read JSON to JsonElement for analysis
             using var jsonDoc = JsonDocument.ParseValue(ref reader);
             var jsonElement = jsonDoc.RootElement;
-            
+
             // 2. Extract scheme_id to determine type
             if (!jsonElement.TryGetProperty("scheme_id", out var schemeIdProp))
             {
                 // No scheme_id → cannot determine type
                 return null;
             }
-            
+
             var schemeId = schemeIdProp.GetInt64();
-            
+
             // 3. Get real C# type via type resolver
             var propsType = SystemTextJsonRedbSerializer.ResolveType(schemeId);
             if (propsType == null)
@@ -131,12 +132,12 @@ namespace redb.Core.Serialization
                 // Type not registered → skip
                 return null;
             }
-            
+
             // 4. Create RedbObject&lt;TProps&gt; dynamically via reflection
             var redbObjectType = typeof(RedbObject<>).MakeGenericType(propsType);
-            
+
             // 5. Deserialize JSON to concrete type
-            // ⚠️ CRITICAL: Use new JsonSerializerOptions WITHOUT this converter
+            // CRITICAL: Use new JsonSerializerOptions WITHOUT this converter
             // Otherwise infinite recursion occurs with nested IRedbObject
             var optionsWithoutThisConverter = new JsonSerializerOptions(options);
             optionsWithoutThisConverter.Converters.Clear();
@@ -147,12 +148,12 @@ namespace redb.Core.Serialization
                     optionsWithoutThisConverter.Converters.Add(converter);
                 }
             }
-            
+
             var obj = JsonSerializer.Deserialize(jsonElement.GetRawText(), redbObjectType, optionsWithoutThisConverter);
-            
+
             return obj as IRedbObject;
         }
-        
+
         public override void Write(Utf8JsonWriter writer, IRedbObject? value, JsonSerializerOptions options)
         {
             if (value == null)
@@ -160,8 +161,8 @@ namespace redb.Core.Serialization
                 writer.WriteNullValue();
                 return;
             }
-            
-            // ⚠️ IRedbObject serialization may lead to circular references
+
+            // IRedbObject serialization may lead to circular references
             // For safety return null (navigation properties are not serialized)
             writer.WriteNullValue();
         }
@@ -201,13 +202,13 @@ namespace redb.Core.Serialization
         {
             if (reader.TokenType == JsonTokenType.Null)
                 return null;
-                
+
             if (reader.TokenType == JsonTokenType.String)
             {
                 var dateString = reader.GetString();
                 if (string.IsNullOrEmpty(dateString))
                     return null;
-                    
+
                 if (Utils.RedbTemporalFormat.TryParseDateOnly(dateString, out var dateOnly))
                 {
                     return dateOnly;
@@ -258,13 +259,13 @@ namespace redb.Core.Serialization
         {
             if (reader.TokenType == JsonTokenType.Null)
                 return null;
-                
+
             if (reader.TokenType == JsonTokenType.String)
             {
                 var timeString = reader.GetString();
                 if (string.IsNullOrEmpty(timeString))
                     return null;
-                    
+
                 if (Utils.RedbTemporalFormat.TryParseTimeOnly(timeString, out var timeOnly))
                 {
                     return timeOnly;
@@ -316,13 +317,13 @@ namespace redb.Core.Serialization
         {
             if (reader.TokenType == JsonTokenType.Null)
                 return null;
-                
+
             if (reader.TokenType == JsonTokenType.String)
             {
                 var timeString = reader.GetString();
                 if (string.IsNullOrEmpty(timeString))
                     return null;
-                    
+
                 if (Utils.RedbTemporalFormat.TryParseTimeSpan(timeString, out var timeSpan))
                 {
                     return timeSpan;
@@ -341,7 +342,7 @@ namespace redb.Core.Serialization
     }
 
     /// <summary>
-    /// ✅ DateTimeOffset converter for PostgreSQL timestamptz.
+    /// DateTimeOffset converter for PostgreSQL timestamptz.
     /// </summary>
     public class PostgresDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
     {
@@ -350,13 +351,13 @@ namespace redb.Core.Serialization
             if (reader.TokenType == JsonTokenType.String)
             {
                 var stringValue = reader.GetString();
-                
+
                 // PostgreSQL infinity support
                 if (stringValue == "-infinity")
                     return DateTimeOffset.MinValue;
                 if (stringValue == "infinity")
                     return DateTimeOffset.MaxValue;
-                
+
                 // Parse standard ISO8601 with timezone. Invariant culture: the wire form is always
                 // ISO, and the ambient culture must never influence how a stored value is read.
                 if (DateTimeOffset.TryParse(stringValue, System.Globalization.CultureInfo.InvariantCulture,
@@ -365,10 +366,10 @@ namespace redb.Core.Serialization
                     return result.ToUniversalTime();
                 }
             }
-            
+
             if (reader.TokenType == JsonTokenType.Null)
                 throw new JsonException("Cannot convert null to DateTimeOffset");
-            
+
             return JsonSerializer.Deserialize<DateTimeOffset>(ref reader, options);
         }
 
@@ -384,7 +385,7 @@ namespace redb.Core.Serialization
     }
 
     /// <summary>
-    /// ✅ Nullable DateTimeOffset converter for PostgreSQL timestamptz.
+    /// Nullable DateTimeOffset converter for PostgreSQL timestamptz.
     /// </summary>
     public class PostgresNullableDateTimeOffsetConverter : JsonConverter<DateTimeOffset?>
     {
@@ -392,22 +393,22 @@ namespace redb.Core.Serialization
         {
             if (reader.TokenType == JsonTokenType.Null)
                 return null;
-            
+
             if (reader.TokenType == JsonTokenType.String)
             {
                 var stringValue = reader.GetString();
-                
+
                 if (stringValue == "-infinity")
                     return DateTimeOffset.MinValue;
                 if (stringValue == "infinity")
                     return DateTimeOffset.MaxValue;
-                
+
                 if (DateTimeOffset.TryParse(stringValue, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var result))
                 {
                     return result.ToUniversalTime();
                 }
             }
-            
+
             return JsonSerializer.Deserialize<DateTimeOffset?>(ref reader, options);
         }
 
@@ -425,7 +426,7 @@ namespace redb.Core.Serialization
     }
 
     /// <summary>
-    /// ✅ FIX FOR "-infinity" PROBLEM: DateTime converter for handling PostgreSQL "-infinity"
+    /// FIX FOR "-infinity" PROBLEM: DateTime converter for handling PostgreSQL "-infinity"
     /// Solves problem: The JSON value could not be converted to System.DateTime
     /// </summary>
     public class PostgresInfinityDateTimeConverter : JsonConverter<DateTime>
@@ -435,14 +436,14 @@ namespace redb.Core.Serialization
             if (reader.TokenType == JsonTokenType.String)
             {
                 var stringValue = reader.GetString();
-                
-                // ✅ HANDLE PostgreSQL "-infinity"
+
+                // HANDLE PostgreSQL "-infinity"
                 if (stringValue == "-infinity")
                 {
                     return DateTime.MinValue;
                 }
-                
-                // ✅ HANDLE PostgreSQL "infinity"  
+
+                // HANDLE PostgreSQL "infinity"
                 if (stringValue == "infinity")
                 {
                     return DateTime.MaxValue;
@@ -456,16 +457,16 @@ namespace redb.Core.Serialization
                 {
                     return Utils.DateTimeConverter.DenormalizeFromStorage(dateTimeOffset);
                 }
-                
+
                 throw new JsonException($"Cannot parse '{stringValue}' as DateTimeOffset.");
             }
-            
-           
+
+
             if (reader.TokenType == JsonTokenType.Null)
             {
                 throw new JsonException("Cannot convert null to DateTime");
             }
-            
+
             // Try standard deserialization
             var result = JsonSerializer.Deserialize<DateTime>(ref reader, options);
             return result;
@@ -473,7 +474,7 @@ namespace redb.Core.Serialization
 
         public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
         {
-            // ✅ REVERSE CONVERSION: DateTime.MinValue → "-infinity" for PostgreSQL
+            // REVERSE CONVERSION: DateTime.MinValue → "-infinity" for PostgreSQL
             if (value == DateTime.MinValue)
             {
                 writer.WriteStringValue("-infinity");
@@ -491,7 +492,7 @@ namespace redb.Core.Serialization
     }
 
     /// <summary>
-    /// ✅ FIX FOR "-infinity" PROBLEM: Nullable DateTime converter for handling PostgreSQL "-infinity"
+    /// FIX FOR "-infinity" PROBLEM: Nullable DateTime converter for handling PostgreSQL "-infinity"
     /// </summary>
     public class PostgresInfinityNullableDateTimeConverter : JsonConverter<DateTime?>
     {
@@ -501,31 +502,31 @@ namespace redb.Core.Serialization
             {
                 return null;
             }
-            
+
             if (reader.TokenType == JsonTokenType.String)
             {
                 var stringValue = reader.GetString();
-                
-                // ✅ HANDLE PostgreSQL "-infinity"
+
+                // HANDLE PostgreSQL "-infinity"
                 if (stringValue == "-infinity")
                 {
                     return DateTime.MinValue;
                 }
-                
-                // ✅ HANDLE PostgreSQL "infinity"  
+
+                // HANDLE PostgreSQL "infinity"
                 if (stringValue == "infinity")
                 {
                     return DateTime.MaxValue;
                 }
-                
+
                 // Standard DateTime deserialization
                 if (DateTimeOffset.TryParse(stringValue, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var dateTime))
                 {
-                    // ✅ FIXED: Return UTC instead of Local
+                    // FIXED: Return UTC instead of Local
                     return Utils.DateTimeConverter.DenormalizeFromStorage(dateTime);
                 }
             }
-            
+
             // Try standard deserialization
             return JsonSerializer.Deserialize<DateTime?>(ref reader, options);
         }
@@ -537,8 +538,8 @@ namespace redb.Core.Serialization
                 writer.WriteNullValue();
                 return;
             }
-            
-            // ✅ REVERSE CONVERSION: DateTime.MinValue → "-infinity" for PostgreSQL
+
+            // REVERSE CONVERSION: DateTime.MinValue → "-infinity" for PostgreSQL
             if (value.Value == DateTime.MinValue)
             {
                 writer.WriteStringValue("-infinity");
@@ -617,7 +618,27 @@ namespace redb.Core.Serialization
 
         public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
         {
-            JsonSerializer.Serialize(writer, value, options);
+            // Direct writes only. The old body called JsonSerializer.Serialize(writer, value,
+            // options) with the SAME options - which resolve back to this converter: infinite
+            // recursion, StackOverflow, dead process. It lay dormant because the write side of
+            // these options only ever met models whose value-type members were all default
+            // (skipped by WhenWritingDefault before reaching the converter); the first non-zero
+            // int serialized through them (RedbObject.ToString) blew up.
+            if (typeof(T) == typeof(int)) { writer.WriteNumberValue((int)(object)value!); return; }
+            if (typeof(T) == typeof(long)) { writer.WriteNumberValue((long)(object)value!); return; }
+            if (typeof(T) == typeof(short)) { writer.WriteNumberValue((short)(object)value!); return; }
+            if (typeof(T) == typeof(byte)) { writer.WriteNumberValue((byte)(object)value!); return; }
+            if (typeof(T) == typeof(uint)) { writer.WriteNumberValue((uint)(object)value!); return; }
+            if (typeof(T) == typeof(ulong)) { writer.WriteNumberValue((ulong)(object)value!); return; }
+            if (typeof(T) == typeof(ushort)) { writer.WriteNumberValue((ushort)(object)value!); return; }
+            if (typeof(T) == typeof(sbyte)) { writer.WriteNumberValue((sbyte)(object)value!); return; }
+            if (typeof(T) == typeof(float)) { writer.WriteNumberValue((float)(object)value!); return; }
+            if (typeof(T) == typeof(double)) { writer.WriteNumberValue((double)(object)value!); return; }
+            if (typeof(T) == typeof(decimal)) { writer.WriteNumberValue((decimal)(object)value!); return; }
+            if (typeof(T) == typeof(bool)) { writer.WriteBooleanValue((bool)(object)value!); return; }
+            if (typeof(T) == typeof(char)) { writer.WriteStringValue(value!.ToString()); return; }
+
+            throw new JsonException($"Unsupported type {typeof(T).Name}");
         }
     }
 }

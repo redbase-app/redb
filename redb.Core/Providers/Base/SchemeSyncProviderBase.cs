@@ -24,7 +24,7 @@ namespace redb.Core.Providers.Base;
 /// Contains all reflection logic and type mapping which is database-agnostic.
 /// SQL queries are delegated to ISqlDialect.
 /// </summary>
-public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCacheProvider
+public abstract partial class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCacheProvider
 {
     protected readonly IRedbContext Context;
     protected readonly RedbServiceConfiguration Configuration;
@@ -51,9 +51,16 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     /// </summary>
     public GlobalPropsCache PropsCache { get; }
     
-    // Structure tree cache for fast hierarchy access
-    protected static readonly ConcurrentDictionary<long, List<StructureTreeNode>> StructureTreeCache = new();
-    protected static readonly ConcurrentDictionary<(long, long?), List<StructureTreeNode>> SubtreeCache = new();
+    // Structure tree cache for fast hierarchy access. The dictionaries are process-static, so
+    // the key MUST carry the cache domain: scheme ids are per-database facts and collide across
+    // databases (identical seeds), and a bare scheme-id key let one database poison another
+    // service with a foreign structure tree - the save then matched no property names and wrote
+    // ZERO value rows, silently (order-dependent cross-provider corruption, review B-10).
+    protected static readonly ConcurrentDictionary<(string Domain, long SchemeId), List<StructureTreeNode>> StructureTreeCache = new();
+    protected static readonly ConcurrentDictionary<(string Domain, long SchemeId, long? ParentId), List<StructureTreeNode>> SubtreeCache = new();
+
+    private string? _treeCacheDomain;
+    private string TreeCacheDomain => _treeCacheDomain ??= Configuration.GetEffectiveCacheDomain();
     
     // C# type to REDB type mapping cache. Non-concurrent Dictionary, so it is built in a
     // local and published atomically; the lock serializes builders. Parallel scheme syncs
@@ -90,7 +97,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     // === MAIN SYNC METHODS ===
     // ============================================================
 
-    public async Task<IRedbScheme> EnsureSchemeFromTypeAsync<TProps>() where TProps : class
+    public async Task<IRedbScheme> EnsureSchemeFromTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class
     {
         var scheme = await EnsureSchemeFromTypeInternalAsync(typeof(TProps), GetSchemeAliasForType<TProps>());
         // Same authoritative binding as SyncSchemeAsync, so the idempotent "ensure" path (which may
@@ -112,12 +119,15 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     /// behaviour is byte-for-byte the legacy one: FullName, then migrate from the short name, then create.
     /// </para>
     /// </summary>
-    private async Task<IRedbScheme> EnsureSchemeFromTypeInternalAsync(Type type, string? alias = null)
+    private async Task<IRedbScheme> EnsureSchemeFromTypeInternalAsync(Type type, string? alias = null, CancellationToken cancellationToken = default)
     {
         var fullName = type.FullName ?? type.Name;
         var shortName = type.Name;
         var explicitName = GetExplicitSchemeName(type);
         var targetName = explicitName ?? fullName;
+        // V4 (К7): the CLR namespace is the ownership mark of a scheme. Written on every sync,
+        // it gates short-name adoption below — see RedbSchemeNamespaceMismatchException.
+        var nameSpace = type.Namespace;
 
         if (explicitName != null)
         {
@@ -129,7 +139,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
         // 1. Try the target name first.
         var existingScheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
-            Sql.Schemes_SelectByName(), targetName);
+            Sql.Schemes_SelectByName(), new object[] { targetName }, cancellationToken);
 
         if (existingScheme != null)
         {
@@ -147,7 +157,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
                     if (previousName == targetName)
                         continue;
 
-                    var strayId = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), previousName);
+                    var strayId = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), new object[] { previousName }, cancellationToken);
                     if (strayId.HasValue)
                     {
                         throw new RedbSchemeNameTakenException(
@@ -156,6 +166,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
                 }
             }
 
+            await SyncSchemeNameSpaceAsync(type, existingScheme, nameSpace);
             await SyncSchemeAliasAsync(existingScheme, alias);
             return existingScheme;
         }
@@ -172,17 +183,39 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
                 continue;
 
             var legacyScheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
-                Sql.Schemes_SelectByName(), previousName);
+                Sql.Schemes_SelectByName(), new object[] { previousName }, cancellationToken);
 
             if (legacyScheme == null)
                 continue;
+
+            if (previousName == shortName)
+            {
+                // V4 (К7): a short name proves nothing — two unrelated projects both have an
+                // `Order`. The recorded namespace decides: a foreign one is a hard stop before
+                // anything is renamed; NULL is a pre-namespace database and is adopted the legacy
+                // way, but no longer silently.
+                if (legacyScheme.NameSpace == null)
+                {
+                    Logger?.LogWarning(
+                        "Scheme '{SchemeName}' (ID: {SchemeId}) is adopted by type {Type} via its short " +
+                        "name with no recorded namespace (a pre-namespace database). The namespace is " +
+                        "written now; if this scheme actually belongs to another project, restore its " +
+                        "_name_space and rename the scheme back.",
+                        previousName, legacyScheme.Id, type.FullName);
+                }
+                else if (!string.Equals(legacyScheme.NameSpace, nameSpace, StringComparison.Ordinal))
+                {
+                    throw new RedbSchemeNamespaceMismatchException(
+                        type, previousName, legacyScheme.Id, legacyScheme.NameSpace, nameSpace);
+                }
+            }
 
             var hasTransaction = Context.CurrentTransaction != null;
             Logger?.LogInformation(
                 "Renaming scheme '{OldName}' to '{NewName}' (ID: {SchemeId}, InTransaction: {InTx})",
                 previousName, targetName, legacyScheme.Id, hasTransaction);
 
-            var rowsAffected = await Context.ExecuteAsync(Sql.Schemes_UpdateName(), targetName, legacyScheme.Id);
+            var rowsAffected = await Context.ExecuteAsync(Sql.Schemes_UpdateName(), new object[] { targetName, legacyScheme.Id }, cancellationToken);
             if (rowsAffected == 0)
             {
                 Logger?.LogWarning(
@@ -200,6 +233,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             Cache.InvalidateScheme(targetName);
             ClrSchemeTypeIndex.Register(targetName, type);
 
+            await SyncSchemeNameSpaceAsync(type, legacyScheme, nameSpace);
             await SyncSchemeAliasAsync(legacyScheme, alias);
             return legacyScheme;
         }
@@ -211,6 +245,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             Id = newId,
             Name = targetName,
             Alias = alias,
+            NameSpace = nameSpace,
             Type = RedbTypeIds.Class
         };
 
@@ -220,12 +255,13 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         // re-reading is not an option. The dialect suppresses the conflict instead, and the loser
         // simply reads back the winner's row.
         var inserted = await Context.ExecuteAsync(
-            Sql.Schemes_InsertIfAbsent(), newScheme.Id, newScheme.Name, newScheme.Alias, newScheme.Type);
+            Sql.Schemes_InsertIfAbsent(), new object[] { newScheme.Id, newScheme.Name, newScheme.Alias, newScheme.Type,
+            newScheme.NameSpace }, cancellationToken);
 
         if (inserted == 0)
         {
             var winner = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
-                Sql.Schemes_SelectByName(), targetName);
+                Sql.Schemes_SelectByName(), new object[] { targetName }, cancellationToken);
 
             if (winner == null)
             {
@@ -238,6 +274,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
                 "Lost the creation race for scheme '{SchemeName}'; using the existing scheme (ID: {SchemeId})",
                 targetName, winner.Id);
 
+            await SyncSchemeNameSpaceAsync(type, winner, nameSpace);
             await SyncSchemeAliasAsync(winner, alias);
             return winner;
         }
@@ -253,21 +290,49 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     /// mirroring how structure aliases already behave — a value edited by hand in the database is
     /// overwritten, and removing the attribute resets the alias to NULL.
     /// </summary>
-    private async Task SyncSchemeAliasAsync(RedbScheme scheme, string? alias)
+    private async Task SyncSchemeAliasAsync(RedbScheme scheme, string? alias, CancellationToken cancellationToken = default)
     {
         if (scheme.Alias == alias)
             return;
 
-        await Context.ExecuteAsync(Sql.Schemes_UpdateAlias(), (object?)alias ?? DBNull.Value, scheme.Id);
+        await Context.ExecuteAsync(Sql.Schemes_UpdateAlias(), new object[] { (object?)alias ?? DBNull.Value, scheme.Id }, cancellationToken);
         scheme.Alias = alias;
 
         Cache.InvalidateScheme(scheme.Id);
         Cache.InvalidateScheme(scheme.Name);
     }
 
-    public async Task<List<IRedbStructure>> SyncStructuresFromTypeAsync<TProps>(IRedbScheme scheme, bool strictDeleteExtra = true) where TProps : class
+    /// <summary>
+    /// Brings <c>_schemes._name_space</c> in line with the CLR type (V4, К7). The namespace is the
+    /// ownership mark of a scheme: a scheme from a pre-namespace database (NULL) acquires its owner
+    /// on the first synchronisation; a scheme owned by ANOTHER namespace is never taken over on any
+    /// path - the typed <see cref="RedbSchemeNamespaceMismatchException"/> names the way out (move the
+    /// mark when the type moved, or rename one of the two). Owner decision 2026-09-01.
+    /// </summary>
+    private async Task SyncSchemeNameSpaceAsync(Type type, RedbScheme scheme, string? nameSpace, CancellationToken cancellationToken = default)
     {
-        var existingStructures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectByScheme(), scheme.Id);
+        if (scheme.NameSpace == nameSpace)
+            return;
+
+        if (scheme.NameSpace != null)
+        {
+            // К7 (owner decision 2026-09-01): a scheme has ONE owner, on every adoption path - the
+            // explicit name, the FullName match and the creation-race loser included, not only the
+            // short-name fallback. A type moved to another namespace or a second project reusing
+            // the name gets a typed stop with the way out in the message, never a silent takeover.
+            throw new RedbSchemeNamespaceMismatchException(type, scheme.Name, scheme.Id, scheme.NameSpace, nameSpace);
+        }
+
+        await Context.ExecuteAsync(Sql.Schemes_UpdateNameSpace(), new object[] { (object?)nameSpace ?? DBNull.Value, scheme.Id }, cancellationToken);
+        scheme.NameSpace = nameSpace;
+
+        Cache.InvalidateScheme(scheme.Id);
+        Cache.InvalidateScheme(scheme.Name);
+    }
+
+    public async Task<List<IRedbStructure>> SyncStructuresFromTypeAsync<TProps>(IRedbScheme scheme, bool strictDeleteExtra = true, CancellationToken cancellationToken = default) where TProps : class
+    {
+        var existingStructures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectByScheme(), new object[] { scheme.Id }, cancellationToken);
         var structuresToKeep = new List<long>();
 
         await SyncStructuresRecursively(typeof(TProps), scheme.Id, null, existingStructures, structuresToKeep);
@@ -300,42 +365,59 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
                         idsToDelete.Count, scheme.Name, scheme.Id, string.Join(", ", namesToDelete));
                 }
 
-                deletedCount = await Context.ExecuteAsync(Sql.Structures_DeleteByIds(idsToDelete));
+                deletedCount = await Context.ExecuteAsync(Sql.Structures_DeleteByIds(idsToDelete), System.Array.Empty<object>(), cancellationToken);
             }
         }
 
         if (deletedCount > 0 || structuresToKeep.Count > 0)
         {
-            await Context.ExecuteAsync(Sql.Schemes_SyncMetadataCache(), scheme.Id);
+            await Context.ExecuteAsync(Sql.Schemes_SyncMetadataCache(), new object[] { scheme.Id }, cancellationToken);
         }
         
-        var allStructures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeShort(), scheme.Id);
+        var allStructures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeShort(), new object[] { scheme.Id }, cancellationToken);
         if (allStructures.Any())
         {
-            var schemeEntity = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), scheme.Id);
+            var schemeEntity = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), new object[] { scheme.Id }, cancellationToken);
             if (schemeEntity != null)
             {
                 var newSchemeHash = SchemeHashCalculator.ComputeSchemeStructureHash(allStructures);
                 
                 if (schemeEntity.StructureHash != newSchemeHash)
                 {
-                    await Context.ExecuteAsync(Sql.Schemes_UpdateHash(), newSchemeHash, scheme.Id);
+                    await Context.ExecuteAsync(Sql.Schemes_UpdateHash(), new object[] { newSchemeHash, scheme.Id }, cancellationToken);
                     InvalidateStructureTreeCache(scheme.Id);
                     Cache.InvalidateScheme(scheme.Id);
                 }
             }
         }
         
-        var updatedStructures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectByScheme(), scheme.Id);
+        var updatedStructures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectByScheme(), new object[] { scheme.Id }, cancellationToken);
+
+        // V4: keys of a [RedbUnique] structure must be trustworthy before the scheme is handed out -
+        // recompute where the attribute just appeared, the encoder version moved, or a SQL-side
+        // writer left rows unhashed (see SchemeSyncProviderBase.Unique.cs).
+        await EnsureUniqueKeysAsync(scheme, updatedStructures);
+
         return updatedStructures.Cast<IRedbStructure>().ToList();
     }
 
-    public async Task<IRedbScheme> SyncSchemeAsync<TProps>() where TProps : class
+    public async Task<IRedbScheme> SyncSchemeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class
     {
         var attr = GetRedbSchemeAttribute<TProps>();
         var alias = attr?.Alias;
         
         var scheme = await EnsureSchemeFromTypeInternalAsync(typeof(TProps), alias);
+
+        // V4: [RedbTags] on the Props class writes the scheme's free-form marker. WITHOUT the
+        // attribute the column is left untouched - direct writes survive synchronisation.
+        var schemeTags = typeof(TProps).GetCustomAttribute<RedbTagsAttribute>();
+        if (schemeTags != null)
+        {
+            if (schemeTags.Tags is { Length: > 450 })
+                throw new InvalidOperationException(
+                    $"[RedbTags] on '{typeof(TProps).Name}' is {schemeTags.Tags.Length} characters, the limit is 450");
+            await Context.ExecuteAsync(Sql.Schemes_UpdateTags(), new object[] { schemeTags.Tags, scheme.Id }, cancellationToken);
+        }
         // Honor the configured policy. Default value of DefaultStrictDeleteExtra is true,
         // so behavior is unchanged for users on the default config. Users who explicitly
         // set the flag to false (or pick the Development/HighPerformance/Migration presets)
@@ -352,7 +434,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
         // Reload scheme from DB to get current state (including updated hash),
         // attach structures, and cache for subsequent queries
-        var freshScheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), scheme.Id);
+        var freshScheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), new object[] { scheme.Id }, cancellationToken);
         if (freshScheme != null)
         {
             freshScheme.SetStructures(structures.Cast<RedbStructure>().ToList());
@@ -368,9 +450,9 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     // ============================================================
 
     private async Task SyncStructuresRecursively(
-        Type type, long schemeId, long? parentId, 
-        List<RedbStructure> existingStructures, List<long> structuresToKeep, 
-        HashSet<Type>? visitedTypes = null)
+        Type type, long schemeId, long? parentId,
+        List<RedbStructure> existingStructures, List<long> structuresToKeep,
+        HashSet<Type>? visitedTypes = null, bool pathHasCollection = false)
     {
         visitedTypes ??= [];
         if (visitedTypes.Contains(type)) return;
@@ -384,7 +466,9 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         foreach (var property in properties)
         {
             var nullabilityInfo = nullabilityContext.Create(property);
-            var isArray = IsArrayType(property.PropertyType);
+            // V4 (Б1, решение владельца 2026-08-31): byte[] - скаляр в _values._ByteArray, не массив
+            // байтов по строке на элемент. IsArrayType(byte[]) даёт true из-за type.IsArray - исключаем.
+            var isArray = IsArrayType(property.PropertyType) && property.PropertyType != typeof(byte[]);
             var isDictionary = IsDictionaryType(property.PropertyType);
             
             Type baseType;
@@ -421,27 +505,56 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             var aliasAttr = property.GetCustomAttribute<RedbAliasAttribute>();
             var structureAlias = aliasAttr?.Alias;
 
+            // V4 (Л2, L.6): the `virtual` marker (LAZY plan §3.2-3.3). Only a reference -
+            // RedbObject<T> or a collection of them - can be lazy; `virtual` on a scalar or a
+            // nested class means nothing to the builders and is deliberately not recorded.
+            var lazyGetter = property.GetGetMethod();
+            var isReferenceShaped = baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(Models.Entities.RedbObject<>);
+            var isLazy = isReferenceShaped && lazyGetter is { IsVirtual: true, IsFinal: false };
+
             var existingStructure = existingStructures
                 .FirstOrDefault(s => s.Name == structureName && s.IdParent == parentId);
 
             if (existingStructure != null)
             {
-                await UpdateExistingStructure(existingStructure, typeId, typeName, isDictionary, isArray, keyTypeId, structureAlias, isRequired);
+                await UpdateExistingStructure(existingStructure, typeId, typeName, isDictionary, isArray, keyTypeId, structureAlias, isRequired, isLazy);
                 structuresToKeep.Add(existingStructure.Id);
             }
             else
             {
-                var newStructure = await CreateNewStructure(schemeId, parentId, structureName, structureAlias, typeId, isRequired, isDictionary, isArray, keyTypeId, properties.ToList().IndexOf(property));
+                var newStructure = await CreateNewStructure(schemeId, parentId, structureName, structureAlias, typeId, isRequired, isDictionary, isArray, keyTypeId, properties.ToList().IndexOf(property), isLazy);
                 existingStructures.Add(newStructure);
                 structuresToKeep.Add(newStructure.Id);
             }
 
+            // V4: [RedbUnique] - validate placement and keep _structures._unique in step (rejection
+            // happens here, at synchronisation, not at insert).
+            var uniqueTarget = existingStructure
+                ?? existingStructures.Last(s => s.Name == structureName && s.IdParent == parentId);
+            await SyncUniqueFlagAsync(type, property, uniqueTarget, isArray, isDictionary, baseType, pathHasCollection);
+
+            // V4: [RedbTags] writes the free-form marker. WITHOUT the attribute the column is
+            // left untouched, so values written directly by applications survive every sync.
+            var tagsAttribute = property.GetCustomAttribute<RedbTagsAttribute>();
+            if (tagsAttribute != null && uniqueTarget.Tags != tagsAttribute.Tags)
+            {
+                if (tagsAttribute.Tags is { Length: > 450 })
+                    throw new InvalidOperationException(
+                        $"[RedbTags] on '{type.Name}.{property.Name}' is {tagsAttribute.Tags.Length} characters, the limit is 450");
+                await Context.ExecuteAsync(Sql.Structures_UpdateTags(), new object[] { tagsAttribute.Tags, uniqueTarget.Id });
+                uniqueTarget.Tags = tagsAttribute.Tags;
+            }
+
             if (IsBusinessClass(baseType))
             {
-                var currentStructureId = existingStructure?.Id ?? 
+                var currentStructureId = existingStructure?.Id ??
                     existingStructures.Last(s => s.Name == structureName && s.IdParent == parentId).Id;
-                
-                await SyncStructuresRecursively(baseType, schemeId, currentStructureId, existingStructures, structuresToKeep, visitedTypes);
+
+                // S2: a collection anywhere on the path poisons uniqueness for everything below -
+                // the elements of every object share one structure, so a key there would mean one
+                // value across all elements of all objects. Thread the mark down the descent.
+                await SyncStructuresRecursively(baseType, schemeId, currentStructureId, existingStructures, structuresToKeep, visitedTypes,
+                    pathHasCollection || isArray || isDictionary);
             }
         }
         
@@ -450,16 +563,25 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
     private async Task UpdateExistingStructure(
         RedbStructure structure, long typeId, string typeName,
-        bool isDictionary, bool isArray, long? keyTypeId, string? alias, bool isRequired)
+        bool isDictionary, bool isArray, long? keyTypeId, string? alias, bool isRequired, bool isLazy, CancellationToken cancellationToken = default)
     {
-        if (structure.IdType != typeId)
+        if (IsLegacyByteArrayShape(structure, typeId, isArray))
+        {
+            // V4 (Б1): the pre-V4 Array-of-Byte layout of a byte[] property. Assemble the bytes into
+            // the scalar _ByteArray on the base row, drop the element rows, then flip the type - the
+            // generic migration below has no Byte->ByteArray path and must not see this shape.
+            await ConvertByteArrayStorageAsync(structure);
+            await Context.ExecuteAsync(Sql.Structures_UpdateType(), new object[] { typeId, structure.Id }, cancellationToken);
+            structure.IdType = typeId;
+        }
+        else if (structure.IdType != typeId)
         {
             // Order matters and is load-bearing: the migration either moves the values or throws, and
             // only a completed migration is allowed to reach Structures_UpdateType. Switching the type
             // on a failed migration is what turned a bad type change into silently missing values.
             await MigrateStructureTypeInternalAsync(
                 structure.Id, structure.IdType, typeName, structure.Name, structure.IdScheme);
-            await Context.ExecuteAsync(Sql.Structures_UpdateType(), typeId, structure.Id);
+            await Context.ExecuteAsync(Sql.Structures_UpdateType(), new object[] { typeId, structure.Id }, cancellationToken);
             structure.IdType = typeId;
         }
         
@@ -467,32 +589,43 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             : (isArray ? RedbTypeIds.Array : (long?)null);
         if (structure.CollectionType != newCollectionType)
         {
-            await Context.ExecuteAsync(Sql.Structures_UpdateCollectionType(), (object?)newCollectionType ?? DBNull.Value, structure.Id);
+            await Context.ExecuteAsync(Sql.Structures_UpdateCollectionType(), new object[] { (object?)newCollectionType ?? DBNull.Value, structure.Id }, cancellationToken);
             structure.CollectionType = newCollectionType;
         }
         
         if (structure.KeyType != keyTypeId)
         {
-            await Context.ExecuteAsync(Sql.Structures_UpdateKeyType(), (object?)keyTypeId ?? DBNull.Value, structure.Id);
+            await Context.ExecuteAsync(Sql.Structures_UpdateKeyType(), new object[] { (object?)keyTypeId ?? DBNull.Value, structure.Id }, cancellationToken);
             structure.KeyType = keyTypeId;
         }
         
         if (structure.Alias != alias)
         {
-            await Context.ExecuteAsync(Sql.Structures_UpdateAlias(), (object?)alias ?? DBNull.Value, structure.Id);
+            await Context.ExecuteAsync(Sql.Structures_UpdateAlias(), new object[] { (object?)alias ?? DBNull.Value, structure.Id }, cancellationToken);
             structure.Alias = alias;
         }
         
         if (structure.AllowNotNull != isRequired)
         {
-            await Context.ExecuteAsync(Sql.Structures_UpdateAllowNotNull(), isRequired, structure.Id);
+            await Context.ExecuteAsync(Sql.Structures_UpdateAllowNotNull(), new object[] { isRequired, structure.Id }, cancellationToken);
             structure.AllowNotNull = isRequired;
+        }
+
+        // V4 (Л2): the code is the source of truth for the marker, like every structure flag here.
+        if ((structure.Lazy ?? false) != isLazy)
+        {
+            await Context.ExecuteAsync(Sql.Structures_UpdateLazy(), new object[] { isLazy, structure.Id }, cancellationToken);
+            structure.Lazy = isLazy;
+            // The metadata cache mirrors the marker and the hash-diff path will not fire for a
+            // flag restored over a manual edit - resync the scheme cache right here.
+            await Context.ExecuteAsync(Sql.Schemes_SyncMetadataCache(), new object[] { structure.IdScheme }, cancellationToken);
+            Cache.InvalidateScheme(structure.IdScheme);
         }
     }
 
     private async Task<RedbStructure> CreateNewStructure(
         long schemeId, long? parentId, string name, string? alias, long typeId,
-        bool isRequired, bool isDictionary, bool isArray, long? keyTypeId, int order)
+        bool isRequired, bool isDictionary, bool isArray, long? keyTypeId, int order, bool isLazy, CancellationToken cancellationToken = default)
     {
         var newId = await Context.NextObjectIdAsync();
         var structure = new RedbStructure
@@ -506,13 +639,14 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             AllowNotNull = isRequired,
             CollectionType = isDictionary ? RedbTypeIds.Dictionary : (isArray ? RedbTypeIds.Array : null),
             KeyType = keyTypeId,
-            Order = order
+            Order = order,
+            Lazy = isLazy
         };
 
-        await Context.ExecuteAsync(Sql.Structures_Insert(),
-            structure.Id, structure.IdScheme, structure.IdParent, structure.Name,
+        await Context.ExecuteAsync(Sql.Structures_Insert(), new object[] { structure.Id, structure.IdScheme, structure.IdParent, structure.Name,
             structure.Alias, structure.IdType, structure.AllowNotNull,
-            structure.CollectionType, structure.KeyType, structure.Order);
+            structure.CollectionType, structure.KeyType, structure.Order,
+            structure.Lazy }, cancellationToken);
 
         return structure;
     }
@@ -529,7 +663,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     /// </summary>
     protected virtual async Task MigrateStructureTypeInternalAsync(
         long structureId, long oldTypeId, string newTypeName,
-        string? propertyName = null, long? schemeId = null)
+        string? propertyName = null, long? schemeId = null, CancellationToken cancellationToken = default)
     {
         // Resolve by ID. Passing the id into a lookup keyed by NAME is what used to happen here: it
         // matched nothing, fell back to the literal "unknown", and every provider then reported an
@@ -576,13 +710,13 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     /// the whole (tiny, seed-only) <c>_types</c> table. No new dialect method: the id-keyed cache and
     /// <c>Types_SelectAll</c> already exist.
     /// </summary>
-    private async Task<string> ResolveTypeNameByIdAsync(long typeId)
+    private async Task<string> ResolveTypeNameByIdAsync(long typeId, CancellationToken cancellationToken = default)
     {
         var cached = Cache.GetTypeById(typeId);
         if (cached != null)
             return cached.Name;
 
-        var allTypes = (await Context.QueryAsync<RedbTypeInfo>(Sql.Types_SelectAll())).ToList();
+        var allTypes = (await Context.QueryAsync<RedbTypeInfo>(Sql.Types_SelectAll(), System.Array.Empty<object>(), cancellationToken)).ToList();
         Cache.CacheTypesById(allTypes);
 
         var found = allTypes.FirstOrDefault(t => t.Id == typeId);
@@ -599,18 +733,18 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     /// here rather than added to ISqlDialect: it is one portable statement and the parameter form is
     /// the only provider-specific part. COUNT(*) is cast because its natural width differs by engine.
     /// </summary>
-    private async Task<long> CountStructureValuesAsync(long structureId)
+    private async Task<long> CountStructureValuesAsync(long structureId, CancellationToken cancellationToken = default)
     {
         var sql = $"SELECT CAST(COUNT(*) AS BIGINT) FROM _values WHERE _id_structure = {Sql.FormatParameter(1)}";
-        return await Context.ExecuteScalarAsync<long?>(sql, structureId) ?? 0;
+        return await Context.ExecuteScalarAsync<long?>(sql, new object[] { structureId }, cancellationToken) ?? 0;
     }
 
     /// <summary>Best-effort scheme name for an error message; never the reason a call fails.</summary>
-    private async Task<string?> TryResolveSchemeNameAsync(long schemeId)
+    private async Task<string?> TryResolveSchemeNameAsync(long schemeId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), schemeId);
+            var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), new object[] { schemeId }, cancellationToken);
             return scheme?.Name;
         }
         catch
@@ -620,10 +754,10 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     }
 
     /// <inheritdoc />
-    public virtual async Task<TypeMigrationResult> MigrateStructureTypeAsync(long structureId, string oldTypeName, string newTypeName, bool dryRun = false)
+    public virtual async Task<TypeMigrationResult> MigrateStructureTypeAsync(long structureId, string oldTypeName, string newTypeName, bool dryRun = false, CancellationToken cancellationToken = default)
     {
         var result = await Context.QueryFirstOrDefaultAsync<TypeMigrationResult>(
-            Sql.Schemes_MigrateStructureType(), structureId, oldTypeName, newTypeName, dryRun);
+            Sql.Schemes_MigrateStructureType(), new object[] { structureId, oldTypeName, newTypeName, dryRun }, cancellationToken);
         return result ?? new TypeMigrationResult();
     }
 
@@ -631,7 +765,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     // === TYPE MAPPING (platform-agnostic) ===
     // ============================================================
 
-    private async Task<long> GetTypeIdForTypeAsync(Type type)
+    private async Task<long> GetTypeIdForTypeAsync(Type type, CancellationToken cancellationToken = default)
     {
         var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
         var typeName = await MapCSharpTypeToRedbTypeAsync(underlyingType);
@@ -640,7 +774,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         if (cachedId.HasValue)
             return cachedId.Value;
         
-        var typeEntity = await Context.QueryFirstOrDefaultAsync<RedbType>(Sql.Types_SelectByName(), typeName);
+        var typeEntity = await Context.QueryFirstOrDefaultAsync<RedbType>(Sql.Types_SelectByName(), new object[] { typeName }, cancellationToken);
         
         if (typeEntity == null)
             throw new InvalidOperationException($"Type '{typeName}' not found in _types table. Check DB schema.");
@@ -656,6 +790,20 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
 
         if (csharpType.IsGenericType && csharpType.GetGenericTypeDefinition() == typeof(RedbObject<>))
             return "Object";
+
+        // A bare (non-generic) RedbObject / IRedbObject field would fall through to the CLASS
+        // branch and get reflected over its own properties - the framework's service fields in two
+        // casings (id/Id, name/Name...). MSSQL's CI collation then hit UNIQUE IX__structures,
+        // PostgreSQL the reserved-name trigger (23514), and the user saw a driver error naming
+        // neither the field nor the cure (discussion #12, item 6). Refuse loudly instead: a
+        // reference field is declared with its Props type. Generic implementations pass through
+        // IRedbObject<TProps>; this arm catches only the bare shapes.
+        if (typeof(IRedbObject).IsAssignableFrom(csharpType) &&
+            !csharpType.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IRedbObject<>)))
+            throw new InvalidOperationException(
+                $"A field of type '{csharpType.Name}' cannot be stored: a reference field must be " +
+                "declared with its Props type - RedbObject<TProps>. For raw binary payloads use a " +
+                "byte[] property instead.");
 
         if (csharpType == typeof(IRedbListItem) || csharpType == typeof(RedbListItem))
             return "ListItem";
@@ -673,7 +821,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         return "String";
     }
 
-    private async Task InitializeCSharpToRedbTypeMappingAsync()
+    private async Task InitializeCSharpToRedbTypeMappingAsync(CancellationToken cancellationToken = default)
     {
         await _csharpToRedbTypeCacheLock.WaitAsync();
         try
@@ -682,7 +830,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             if (_csharpToRedbTypeCache != null)
                 return;
 
-            var allTypes = await Context.QueryAsync<RedbType>(Sql.Types_SelectAll());
+            var allTypes = await Context.QueryAsync<RedbType>(Sql.Types_SelectAll(), System.Array.Empty<object>(), cancellationToken);
 
             // Build into a LOCAL dictionary and publish it only once fully populated, so
             // concurrent readers in MapCSharpTypeToRedbTypeAsync never observe a half-filled
@@ -854,12 +1002,12 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     // === SCHEME LOOKUP METHODS ===
     // ============================================================
 
-    public async Task<IRedbScheme?> GetSchemeByIdAsync(long schemeId)
+    public async Task<IRedbScheme?> GetSchemeByIdAsync(long schemeId, CancellationToken cancellationToken = default)
     {
         var cachedScheme = Cache.GetScheme(schemeId);
         if (cachedScheme != null)
         {
-            var hashInDb = await Context.ExecuteScalarAsync<Guid?>(Sql.Schemes_SelectHashById(), schemeId);
+            var hashInDb = await Context.ExecuteScalarAsync<Guid?>(Sql.Schemes_SelectHashById(), new object[] { schemeId }, cancellationToken);
             
             if (cachedScheme.StructureHash == hashInDb)
                 return cachedScheme;
@@ -868,17 +1016,17 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             InvalidateStructureTreeCache(schemeId);
         }
         
-        var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), schemeId);
+        var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectById(), new object[] { schemeId }, cancellationToken);
         if (scheme == null)
             return null;
         
-        var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), schemeId);
+        var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), new object[] { schemeId }, cancellationToken);
         scheme.SetStructures(structures);
         
         if (scheme.StructureHash == null && structures.Any())
         {
             var newHash = SchemeHashCalculator.ComputeSchemeStructureHash(structures);
-            await Context.ExecuteAsync(Sql.Schemes_UpdateHash(), newHash, schemeId);
+            await Context.ExecuteAsync(Sql.Schemes_UpdateHash(), new object[] { newHash, schemeId }, cancellationToken);
             scheme.StructureHash = newHash;
         }
         
@@ -886,24 +1034,24 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         return scheme;
     }
     
-    public async Task<IRedbScheme?> GetSchemeByNameAsync(string schemeName)
+    public async Task<IRedbScheme?> GetSchemeByNameAsync(string schemeName, CancellationToken cancellationToken = default)
     {
         var cachedScheme = Cache.GetScheme(schemeName);
         if (cachedScheme != null)
             return cachedScheme;
         
-        var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectByName(), schemeName);
+        var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectByName(), new object[] { schemeName }, cancellationToken);
         if (scheme == null)
             return null;
         
-        var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), scheme.Id);
+        var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), new object[] { scheme.Id }, cancellationToken);
         scheme.SetStructures(structures);
         
         Cache.CacheScheme(scheme);
         return scheme;
     }
 
-    public async Task<IRedbScheme?> GetSchemeByTypeAsync<TProps>() where TProps : class
+    public async Task<IRedbScheme?> GetSchemeByTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class
     {
         var schemeName = GetSchemeNameForType<TProps>();
 
@@ -913,10 +1061,10 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             return cached;
         
         // Load from DB with structures and cache
-        var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectByName(), schemeName);
+        var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectByName(), new object[] { schemeName }, cancellationToken);
         if (scheme != null)
         {
-            var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), scheme.Id);
+            var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), new object[] { scheme.Id }, cancellationToken);
             scheme.SetStructures(structures);
             Cache.CacheScheme(scheme);
         }
@@ -924,7 +1072,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         return scheme;
     }
 
-    public async Task<IRedbScheme?> GetSchemeByTypeAsync(Type type)
+    public async Task<IRedbScheme?> GetSchemeByTypeAsync(Type type, CancellationToken cancellationToken = default)
     {
         var schemeName = GetSchemeNameForType(type);
 
@@ -934,10 +1082,10 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             return cached;
         
         // Load from DB with structures and cache
-        var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectByName(), schemeName);
+        var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(Sql.Schemes_SelectByName(), new object[] { schemeName }, cancellationToken);
         if (scheme != null)
         {
-            var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), scheme.Id);
+            var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), new object[] { scheme.Id }, cancellationToken);
             scheme.SetStructures(structures);
             Cache.CacheScheme(scheme);
         }
@@ -970,44 +1118,44 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         return Cache.GetScheme(schemeName);
     }
 
-    public async Task<IRedbScheme> LoadSchemeByTypeAsync<TProps>() where TProps : class
+    public async Task<IRedbScheme> LoadSchemeByTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class
     {
         var scheme = await GetSchemeByTypeAsync<TProps>();
         return scheme ?? throw new ArgumentException($"Scheme for type '{typeof(TProps).Name}' not found");
     }
 
-    public async Task<IRedbScheme> LoadSchemeByTypeAsync(Type type)
+    public async Task<IRedbScheme> LoadSchemeByTypeAsync(Type type, CancellationToken cancellationToken = default)
     {
         var scheme = await GetSchemeByTypeAsync(type);
         return scheme ?? throw new ArgumentException($"Scheme for type '{type.Name}' not found");
     }
 
-    public async Task<List<IRedbScheme>> GetSchemesAsync()
+    public async Task<List<IRedbScheme>> GetSchemesAsync(CancellationToken cancellationToken = default)
     {
-        var schemes = await Context.QueryAsync<RedbScheme>(Sql.Schemes_SelectAll());
+        var schemes = await Context.QueryAsync<RedbScheme>(Sql.Schemes_SelectAll(), System.Array.Empty<object>(), cancellationToken);
         return schemes.Cast<IRedbScheme>().ToList();
     }
     
-    public Task<List<IRedbStructure>> GetStructuresAsync(IRedbScheme scheme)
+    public Task<List<IRedbStructure>> GetStructuresAsync(IRedbScheme scheme, CancellationToken cancellationToken = default)
         => Task.FromResult(scheme.Structures.ToList());
 
-    public async Task<List<IRedbStructure>> GetStructuresByTypeAsync<TProps>() where TProps : class
+    public async Task<List<IRedbStructure>> GetStructuresByTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class
     {
         var scheme = await GetSchemeByTypeAsync<TProps>();
         if (scheme == null)
             return [];
 
-        var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeShort(), scheme.Id);
+        var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeShort(), new object[] { scheme.Id }, cancellationToken);
         return structures.Cast<IRedbStructure>().ToList();
     }
 
-    public async Task<List<IRedbStructure>> GetStructuresByTypeAsync(Type type)
+    public async Task<List<IRedbStructure>> GetStructuresByTypeAsync(Type type, CancellationToken cancellationToken = default)
     {
         var scheme = await GetSchemeByTypeAsync(type);
         if (scheme == null)
             return [];
 
-        var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeShort(), scheme.Id);
+        var structures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeShort(), new object[] { scheme.Id }, cancellationToken);
         return structures.Cast<IRedbStructure>().ToList();
     }
 
@@ -1015,23 +1163,23 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     // === SCHEME EXISTS METHODS ===
     // ============================================================
 
-    public async Task<bool> SchemeExistsForTypeAsync<TProps>() where TProps : class
+    public async Task<bool> SchemeExistsForTypeAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class
     {
         var schemeName = GetSchemeNameForType<TProps>();
-        var result = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), schemeName);
+        var result = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), new object[] { schemeName }, cancellationToken);
         return result.HasValue;
     }
 
-    public async Task<bool> SchemeExistsForTypeAsync(Type type)
+    public async Task<bool> SchemeExistsForTypeAsync(Type type, CancellationToken cancellationToken = default)
     {
         var schemeName = GetSchemeNameForType(type);
-        var result = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), schemeName);
+        var result = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), new object[] { schemeName }, cancellationToken);
         return result.HasValue;
     }
 
-    public async Task<bool> SchemeExistsByNameAsync(string schemeName)
+    public async Task<bool> SchemeExistsByNameAsync(string schemeName, CancellationToken cancellationToken = default)
     {
-        var result = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), schemeName);
+        var result = await Context.ExecuteScalarAsync<long?>(Sql.Schemes_ExistsByName(), new object[] { schemeName }, cancellationToken);
         return result.HasValue;
     }
 
@@ -1074,14 +1222,14 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     // === OBJECT SCHEME (NON-GENERIC) ===
     // ============================================================
 
-    public async Task<IRedbScheme> EnsureObjectSchemeAsync(string name)
+    public async Task<IRedbScheme> EnsureObjectSchemeAsync(string name, CancellationToken cancellationToken = default)
     {
         var cached = Cache.GetScheme(name);
         if (cached != null)
             return cached;
         
         var existing = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
-            Sql.Schemes_SelectObjectByName(), name, RedbTypeIds.Object);
+            Sql.Schemes_SelectObjectByName(), new object[] { name, RedbTypeIds.Object }, cancellationToken);
         
         if (existing != null)
         {
@@ -1101,12 +1249,12 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         // The dialect suppresses the unique-name conflict so the transaction survives, and the loser
         // reads back the winner's row.
         var inserted = await Context.ExecuteAsync(
-            Sql.Schemes_InsertObjectIfAbsent(), newScheme.Id, newScheme.Name, newScheme.Type);
+            Sql.Schemes_InsertObjectIfAbsent(), new object[] { newScheme.Id, newScheme.Name, newScheme.Type }, cancellationToken);
 
         if (inserted == 0)
         {
             var winner = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
-                Sql.Schemes_SelectObjectByName(), name, RedbTypeIds.Object);
+                Sql.Schemes_SelectObjectByName(), new object[] { name, RedbTypeIds.Object }, cancellationToken);
 
             if (winner == null)
             {
@@ -1128,14 +1276,14 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         return newScheme;
     }
     
-    public async Task<IRedbScheme?> GetObjectSchemeAsync(string name)
+    public async Task<IRedbScheme?> GetObjectSchemeAsync(string name, CancellationToken cancellationToken = default)
     {
         var cached = Cache.GetScheme(name);
         if (cached != null)
             return cached;
         
         var scheme = await Context.QueryFirstOrDefaultAsync<RedbScheme>(
-            Sql.Schemes_SelectObjectByName(), name, RedbTypeIds.Object);
+            Sql.Schemes_SelectObjectByName(), new object[] { name, RedbTypeIds.Object }, cancellationToken);
         
         if (scheme == null)
             return null;
@@ -1164,20 +1312,20 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     public CacheStatistics GetCacheStatistics() => Cache.GetStatistics();
     public void ResetCacheStatistics() => Cache.ResetStatistics();
     
-    public async Task WarmupCacheAsync<TProps>() where TProps : class
+    public async Task WarmupCacheAsync<TProps>(CancellationToken cancellationToken = default) where TProps : class
     {
         await GetSchemeByTypeAsync<TProps>(); // Warmup by loading scheme
     }
     
-    public async Task WarmupCacheAsync(Type[] types)
+    public async Task WarmupCacheAsync(Type[] types, CancellationToken cancellationToken = default)
     {
         foreach (var type in types) await GetSchemeByTypeAsync(type); // Warmup by loading schemes
     }
     
-    public async Task WarmupAllSchemesAsync()
+    public async Task WarmupAllSchemesAsync(CancellationToken cancellationToken = default)
     {
-        var allSchemes = await Context.QueryAsync<RedbScheme>(Sql.Schemes_SelectAll());
-        var allStructures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable());
+        var allSchemes = await Context.QueryAsync<RedbScheme>(Sql.Schemes_SelectAll(), System.Array.Empty<object>(), cancellationToken);
+        var allStructures = await Context.QueryAsync<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), System.Array.Empty<object>(), cancellationToken);
         
         var structuresByScheme = allStructures.GroupBy(s => s.IdScheme).ToDictionary(g => g.Key, g => g.ToList());
         
@@ -1195,7 +1343,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             if (scheme.StructureHash == null && scheme.Structures.Any())
             {
                 scheme.StructureHash = SchemeHashCalculator.ComputeSchemeStructureHash(scheme.StructuresInternal);
-                await Context.ExecuteAsync(Sql.Schemes_UpdateHash(), scheme.StructureHash, scheme.Id);
+                await Context.ExecuteAsync(Sql.Schemes_UpdateHash(), new object[] { scheme.StructureHash, scheme.Id }, cancellationToken);
             }
         }
         
@@ -1227,9 +1375,9 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     // === STRUCTURE TREE METHODS ===
     // ============================================================
 
-    public async Task<List<StructureTreeNode>> GetStructureTreeAsync(long schemeId)
+    public async Task<List<StructureTreeNode>> GetStructureTreeAsync(long schemeId, CancellationToken cancellationToken = default)
     {
-        if (StructureTreeCache.TryGetValue(schemeId, out var cachedTree))
+        if (StructureTreeCache.TryGetValue((TreeCacheDomain, schemeId), out var cachedTree))
             return cachedTree;
         
         var scheme = await GetSchemeByIdAsync(schemeId);
@@ -1237,14 +1385,14 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
             return [];
         
         var tree = StructureTreeBuilder.BuildFromFlat(scheme.Structures.ToList());
-        StructureTreeCache.TryAdd(schemeId, tree);
+        StructureTreeCache.TryAdd((TreeCacheDomain, schemeId), tree);
         
         return tree;
     }
     
-    public async Task<List<StructureTreeNode>> GetSubtreeAsync(long schemeId, long? parentStructureId)
+    public async Task<List<StructureTreeNode>> GetSubtreeAsync(long schemeId, long? parentStructureId, CancellationToken cancellationToken = default)
     {
-        var cacheKey = (schemeId, parentStructureId);
+        var cacheKey = (TreeCacheDomain, schemeId, parentStructureId);
         
         if (SubtreeCache.TryGetValue(cacheKey, out var cachedSubtree))
             return cachedSubtree;
@@ -1267,32 +1415,32 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         return subtree;
     }
     
-    public async Task<List<IRedbStructure>> GetChildrenStructuresAsync(long schemeId, long parentStructureId)
+    public async Task<List<IRedbStructure>> GetChildrenStructuresAsync(long schemeId, long parentStructureId, CancellationToken cancellationToken = default)
     {
         var subtree = await GetSubtreeAsync(schemeId, parentStructureId);
         return subtree.Select(n => n.Structure).ToList();
     }
     
-    public async Task<StructureTreeNode?> FindStructureNodeAsync(long schemeId, long structureId)
+    public async Task<StructureTreeNode?> FindStructureNodeAsync(long schemeId, long structureId, CancellationToken cancellationToken = default)
     {
         var tree = await GetStructureTreeAsync(schemeId);
         var allNodes = StructureTreeBuilder.FlattenTree(tree);
         return allNodes.FirstOrDefault(n => n.Structure.Id == structureId);
     }
     
-    public async Task<StructureTreeNode?> FindStructureByPathAsync(long schemeId, string path)
+    public async Task<StructureTreeNode?> FindStructureByPathAsync(long schemeId, string path, CancellationToken cancellationToken = default)
     {
         var tree = await GetStructureTreeAsync(schemeId);
         return StructureTreeBuilder.FindNodeByPath(tree, path);
     }
     
-    public async Task<string> GetStructureTreeJsonAsync(long schemeId)
+    public async Task<string> GetStructureTreeJsonAsync(long schemeId, CancellationToken cancellationToken = default)
     {
-        var result = await Context.ExecuteJsonAsync(Sql.Schemes_GetStructureTree(), schemeId);
+        var result = await Context.ExecuteJsonAsync(Sql.Schemes_GetStructureTree(), new object[] { schemeId }, cancellationToken);
         return result ?? "[]";
     }
     
-    public async Task<TreeDiagnosticReport> ValidateStructureTreeAsync<TProps>(long schemeId) where TProps : class
+    public async Task<TreeDiagnosticReport> ValidateStructureTreeAsync<TProps>(long schemeId, CancellationToken cancellationToken = default) where TProps : class
     {
         var tree = await GetStructureTreeAsync(schemeId);
         return StructureTreeBuilder.DiagnoseTree(tree, typeof(TProps));
@@ -1300,9 +1448,9 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
     
     public void InvalidateStructureTreeCache(long schemeId)
     {
-        StructureTreeCache.TryRemove(schemeId, out _);
-        
-        var keysToRemove = SubtreeCache.Keys.Where(k => k.Item1 == schemeId).ToList();
+        StructureTreeCache.TryRemove((TreeCacheDomain, schemeId), out _);
+
+        var keysToRemove = SubtreeCache.Keys.Where(k => k.Domain == TreeCacheDomain && k.SchemeId == schemeId).ToList();
         foreach (var key in keysToRemove)
         {
             SubtreeCache.TryRemove(key, out _);
@@ -1318,7 +1466,7 @@ public abstract class SchemeSyncProviderBase : ISchemeSyncProvider, ISchemeCache
         return (treesCount, subtreesCount, memoryEstimate);
     }
     
-    public async Task<bool> HasChildrenStructuresAsync(long schemeId, long structureId)
+    public async Task<bool> HasChildrenStructuresAsync(long schemeId, long structureId, CancellationToken cancellationToken = default)
     {
         var children = await GetSubtreeAsync(schemeId, structureId);
         return children.Count > 0;

@@ -299,6 +299,11 @@ BEGIN
     -- Execute migration
     EXEC sp_executesql @v_conversion_sql, N'@sid BIGINT', @sid = @p0;
     SET @v_success_count = @@ROWCOUNT;
+
+    -- V4 (P3): a SQL-side writer does not know the canonical form - the keys of the touched rows
+    -- are released; scheme synchronisation recomputes them. NULL takes rows OUT of uniqueness.
+    -- AFTER the @@ROWCOUNT capture: the migration's own success count must not measure this UPDATE.
+    UPDATE _values SET _unique = NULL WHERE _id_structure = @p0 AND _unique IS NOT NULL;
     
     -- Return result
     SELECT @v_affected_rows AS affected_rows, 

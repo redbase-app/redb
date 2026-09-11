@@ -49,7 +49,7 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
     }
     
     public async Task<List<TResult>> SelectAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TItem>, TResult>> selector)
+        Expression<Func<IRedbGrouping<TKey, TItem>, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var arrayPath = ExtractArrayPath();
         var groupFields = ParseGroupFields();
@@ -65,9 +65,9 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         var havingJson = BuildHavingJson();
         var jsonResult = _filter != null
             ? await _provider.ExecuteArrayGroupedAggregateAsync(
-                _schemeId, arrayPath, groupFields, aggregations, _filter, havingJson)
+                _schemeId, arrayPath, groupFields, aggregations, _filter, havingJson, cancellationToken: cancellationToken)
             : await _provider.ExecuteArrayGroupedAggregateAsync(
-                _schemeId, arrayPath, groupFields, aggregations, _filterJson, havingJson);
+                _schemeId, arrayPath, groupFields, aggregations, _filterJson, havingJson, cancellationToken: cancellationToken);
         
         if (jsonResult == null) return new List<TResult>();
         return MaterializeResults<TResult>(jsonResult, selector);
@@ -87,10 +87,21 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
                 }
             }
         }
+        // G-1: DTO/MemberInit - ключ ищется и в биндингах.
+        if (selector.Body is MemberInitExpression initExpr)
+        {
+            foreach (var binding in initExpr.Bindings)
+            {
+                if (binding is MemberAssignment ma &&
+                    GroupSelectorMembers.StripConvert(ma.Expression) is MemberExpression kme &&
+                    kme.Member.Name == "Key")
+                    return binding.Member.Name;
+            }
+        }
         return null;
     }
-    
-    public async Task<int> CountAsync()
+
+    public async Task<int> CountAsync(CancellationToken cancellationToken = default)
     {
         var arrayPath = ExtractArrayPath();
         var groupFields = ParseGroupFields();
@@ -99,9 +110,9 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         var havingJson = BuildHavingJson();
         var jsonResult = _filter != null
             ? await _provider.ExecuteArrayGroupedAggregateAsync(
-                _schemeId, arrayPath, groupFields, aggregations, _filter, havingJson)
+                _schemeId, arrayPath, groupFields, aggregations, _filter, havingJson, cancellationToken: cancellationToken)
             : await _provider.ExecuteArrayGroupedAggregateAsync(
-                _schemeId, arrayPath, groupFields, aggregations, _filterJson, havingJson);
+                _schemeId, arrayPath, groupFields, aggregations, _filterJson, havingJson, cancellationToken: cancellationToken);
         
         if (jsonResult == null) return 0;
         return jsonResult.RootElement.GetArrayLength();
@@ -111,7 +122,7 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
     /// Returns SQL string for array GroupBy query.
     /// </summary>
     public Task<string> ToSqlStringAsync<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TItem>, TResult>> selector)
+        Expression<Func<IRedbGrouping<TKey, TItem>, TResult>> selector, CancellationToken cancellationToken = default)
     {
         var arrayPath = ExtractArrayPath();
         var groupFields = ParseGroupFields();
@@ -141,10 +152,16 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         Expression<Func<IRedbGrouping<TKey, TItem>, bool>> predicate)
     {
         if (predicate is null) throw new ArgumentNullException(nameof(predicate));
-        _havingPredicates.Add(predicate);
-        _havingJson = null;
-        return this;
+        // G-4 (ревью 2026-09-03): копирующий строитель - ветвление не заражает соседнюю ветку.
+        var copy = new RedbArrayGroupedQueryable<TKey, TItem, TProps>(
+            _provider, _schemeId, _filterJson, _filter,
+            (Expression<Func<TProps, IEnumerable<TItem>>>)_arraySelector,
+            (Expression<Func<TItem, TKey>>)_keySelector);
+        copy._havingPredicates.AddRange(_havingPredicates);
+        copy._havingPredicates.Add(predicate);
+        return copy;
     }
+
 
     private string? BuildHavingJson()
     {
@@ -237,51 +254,46 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         Expression<Func<IRedbGrouping<TKey, TItem>, TResult>> selector)
     {
         var aggregations = new List<AggregateRequest>();
-        
-        if (selector.Body is NewExpression newExpr)
+        var groupParam = selector.Parameters[0];
+
+        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, "GroupByArray.SelectAsync"))
         {
-            for (int i = 0; i < newExpr.Arguments.Count; i++)
+            var expr = GroupSelectorMembers.StripConvert(rawExpr);
+
+            if (GroupSelectorMembers.IsKeyAccess(expr, groupParam))
+                continue;
+
+            if (expr is MethodCallExpression mc && mc.Method.DeclaringType == typeof(Agg))
             {
-                var arg = newExpr.Arguments[i];
-                var alias = newExpr.Members?[i]?.Name ?? $"agg{i}";
-                
-                // Skip g.Key
-                if (arg is MemberExpression me && me.Member.Name == "Key")
-                    continue;
-                
-                // Agg.Sum(g, x => x.Field), Agg.Count(g)
-                if (arg is MethodCallExpression mc && mc.Method.DeclaringType == typeof(Agg))
+                var funcName = mc.Method.Name;
+                var function = funcName switch
                 {
-                    var funcName = mc.Method.Name;
-                    string fieldPath = "*";
-                    
-                    if (mc.Arguments.Count > 1)
-                    {
-                        fieldPath = ExtractFieldPathFromLambda(mc.Arguments[1]) ?? "*";
-                    }
-                    
-                    var function = funcName switch
-                    {
-                        "Sum" => AggregateFunction.Sum,
-                        "Average" => AggregateFunction.Average,
-                        "Min" => AggregateFunction.Min,
-                        "Max" => AggregateFunction.Max,
-                        "Count" => AggregateFunction.Count,
-                        _ => AggregateFunction.Count
-                    };
-                    
-                    aggregations.Add(new AggregateRequest 
-                    { 
-                        FieldPath = fieldPath, 
-                        Function = function, 
-                        Alias = alias 
-                    });
-                }
+                    "Sum" => AggregateFunction.Sum,
+                    "Average" => AggregateFunction.Average,
+                    "Min" => AggregateFunction.Min,
+                    "Max" => AggregateFunction.Max,
+                    "Count" => AggregateFunction.Count,
+                    _ => throw new NotSupportedException($"Unknown aggregation: {funcName}")
+                };
+
+                string fieldPath = "*";
+                if (mc.Arguments.Count > 1)
+                    fieldPath = ExtractFieldPathFromLambda(mc.Arguments[1]) ?? "*";
+
+                aggregations.Add(new AggregateRequest { FieldPath = fieldPath, Function = function, Alias = name });
+                continue;
             }
+
+            if (!GroupSelectorMembers.ReferencesParameter(expr, groupParam))
+                continue; // клиентское значение - вычислится при материализации
+
+            throw new NotSupportedException(
+                $"GroupByArray.SelectAsync: член '{name}' использует группу, но не является ни g.Key, ни прямым Agg.* вызовом.");
         }
-        
+
         return aggregations;
     }
+
     
     private string? ExtractFieldPathFromLambda(Expression expr)
     {
@@ -319,36 +331,46 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         return parts.Count > 0 ? string.Join(".", parts) : null;
     }
     
-    private List<TResult> MaterializeResults<TResult>(JsonDocument json, Expression selector)
+    private List<TResult> MaterializeResults<TResult>(JsonDocument json, LambdaExpression selector)
     {
         var results = new List<TResult>();
         var root = json.RootElement;
-        
+
         if (root.ValueKind != JsonValueKind.Array) return results;
-        
-        var resultType = typeof(TResult);
-        var ctor = resultType.GetConstructors().FirstOrDefault();
-        
-        foreach (var item in root.EnumerateArray())
+
+        var members = GroupSelectorMembers.Extract(selector, "GroupByArray.SelectAsync");
+        var groupParam = selector.Parameters[0];
+
+        var clientValues = new object?[members.Count];
+        var isClient = new bool[members.Count];
+        for (int i = 0; i < members.Count; i++)
         {
-            if (ctor != null && ctor.GetParameters().Length > 0)
+            if (!GroupSelectorMembers.ReferencesParameter(GroupSelectorMembers.StripConvert(members[i].Expr), groupParam))
             {
-                var args = new List<object?>();
-                foreach (var param in ctor.GetParameters())
-                {
-                    // Case-insensitive property search in JSON
-                    var jsonProp = item.EnumerateObject()
-                        .FirstOrDefault(p => string.Equals(p.Name, param.Name, StringComparison.OrdinalIgnoreCase));
-                    
-                    if (jsonProp.Value.ValueKind != JsonValueKind.Undefined)
-                        args.Add(JsonValueConverter.Convert(jsonProp.Value, param.ParameterType));
-                    else
-                        args.Add(JsonValueConverter.GetDefault(param.ParameterType));
-                }
-                results.Add((TResult)ctor.Invoke(args.ToArray()));
+                isClient[i] = true;
+                clientValues[i] = Expression.Lambda(members[i].Expr).Compile().DynamicInvoke();
             }
         }
-        
+
+        foreach (var item in root.EnumerateArray())
+        {
+            var values = new object?[members.Count];
+            for (int i = 0; i < members.Count; i++)
+            {
+                if (isClient[i]) { values[i] = clientValues[i]; continue; }
+
+                var (name, type, _) = members[i];
+                // Case-insensitive поиск по JSON (сервер алиасует в своём регистре).
+                var jsonProp = item.EnumerateObject()
+                    .FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+                values[i] = jsonProp.Value.ValueKind != JsonValueKind.Undefined
+                    ? JsonValueConverter.Convert(jsonProp.Value, type)
+                    : JsonValueConverter.GetDefault(type);
+            }
+            results.Add(GroupSelectorMembers.Construct<TResult>(selector, values));
+        }
+
         return results;
     }
+
 }

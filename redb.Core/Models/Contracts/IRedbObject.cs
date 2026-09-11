@@ -98,6 +98,7 @@ namespace redb.Core.Models.Contracts
         /// <summary>
         /// Primitive string value (for primitive schemas)
         /// </summary>
+        /// <summary>Identifier / external-key value; contract limit 450 (C#-enforced), long text belongs in Note.</summary>
         string? ValueString { get; set; }
         
         /// <summary>
@@ -129,6 +130,16 @@ namespace redb.Core.Models.Contracts
         /// Primitive byte array value (for primitive schemas)
         /// </summary>
         byte[]? ValueBytes { get; set; }
+
+        /// <summary>
+        /// Application-defined unique key of the object within its scheme (V4, UNIQUE stage 1).
+        /// A plain readable string up to 440 characters; the database enforces uniqueness over
+        /// (_id_scheme, _value_unique). NULL never participates; a soft-deleted object releases its
+        /// key. Composite keys are the application's concatenation with a separator impossible
+        /// inside a component. Compared exactly as the database compares strings - redb neither
+        /// trims nor folds case.
+        /// </summary>
+        string? ValueUnique { get; set; }
 
         // ===== OBJECT STATE =====
         

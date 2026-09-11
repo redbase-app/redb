@@ -22,6 +22,9 @@ namespace redb.SQLite.Data
     public class SqliteKeyGenerator : RedbKeyGeneratorBase
     {
         private readonly SqliteDataSource _dataSource;
+        // The scope's ambient (connection, transaction) accessor for the single-writer bypass;
+        // null (the connection-string constructor, tests) keeps the plain pooled-refill path.
+        private readonly Func<(Microsoft.Data.Sqlite.SqliteConnection Connection, Microsoft.Data.Sqlite.SqliteTransaction Transaction)?>? _ambientAccessor;
 
         // AUTOINCREMENT table whose sqlite_sequence row is the id high-water mark.
         private const string SEQUENCE_TABLE = "_global_identity";
@@ -29,9 +32,11 @@ namespace redb.SQLite.Data
         /// <summary>
         /// Create SQLite key generator.
         /// </summary>
-        public SqliteKeyGenerator(SqliteDataSource dataSource, string? domain = null) : base(domain)
+        public SqliteKeyGenerator(SqliteDataSource dataSource, string? domain = null,
+            Func<(Microsoft.Data.Sqlite.SqliteConnection Connection, Microsoft.Data.Sqlite.SqliteTransaction Transaction)?>? ambientTransactionAccessor = null) : base(domain)
         {
             _dataSource = dataSource;
+            _ambientAccessor = ambientTransactionAccessor;
         }
         
         /// <summary>
@@ -92,6 +97,39 @@ namespace redb.SQLite.Data
             }
 
             // Console.WriteLine($"[Diag-KeyGen] EXIT keys=[{(keys.Count > 0 ? keys[0] : -1)}..{(keys.Count > 0 ? keys[^1] : -1)}] total={sw.ElapsedMilliseconds}ms thread={tid}");
+            return keys;
+        }
+
+        /// <summary>
+        /// The single-writer bypass: the same atomic sequence bump, but on the scope's own
+        /// connection INSIDE its BEGIN IMMEDIATE - the write lock is already ours, so there is
+        /// no waiting and no self-deadlock. The keys deliberately do NOT enter the shared
+        /// cache: a rollback takes the sequence bump back together with the transaction, and
+        /// nobody outside it ever saw these ids - no duplicates on either outcome.
+        /// </summary>
+        protected override async Task<List<long>?> TryGenerateKeysInAmbientTransactionAsync(int count)
+        {
+            if (_ambientAccessor?.Invoke() is not { } ambient)
+                return null;
+
+            await using var cmd = ambient.Connection.CreateCommand();
+            cmd.Transaction = ambient.Transaction;
+            cmd.CommandText =
+                "UPDATE sqlite_sequence SET seq = seq + @n WHERE name = @name RETURNING seq";
+            cmd.Parameters.AddWithValue("@n", count);
+            cmd.Parameters.AddWithValue("@name", SEQUENCE_TABLE);
+            var scalar = await cmd.ExecuteScalarAsync();
+            if (scalar is null || scalar == DBNull.Value)
+            {
+                throw new InvalidOperationException(
+                    $"sqlite_sequence row for '{SEQUENCE_TABLE}' not found. " +
+                    "Ensure the schema (redbSqlite.sql) was applied - it materializes the sequence row.");
+            }
+
+            long top = Convert.ToInt64(scalar);
+            var keys = new List<long>(count);
+            for (long id = top - count + 1; id <= top; id++)
+                keys.Add(id);
             return keys;
         }
     }

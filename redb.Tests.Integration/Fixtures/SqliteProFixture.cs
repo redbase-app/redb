@@ -23,7 +23,14 @@ public sealed class SqliteProFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var config = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build();
-        var cs = config.GetConnectionString("Sqlite")!;   // one shared DB for Free + Pro (collections run sequentially)
+        // Own DB file: the Free and Pro collections run in PARALLEL (the old comment assumed
+        // sequential and was wrong), and SQLite is a single-writer engine - two collections
+        // hammering one file starve each other on the write lock for minutes (gate hang,
+        // 2026-09-09: NextResult lost the non-FIFO lock race to the other collection's stream
+        // of short transactions over and over).
+        var cs = System.Text.RegularExpressions.Regex.Replace(
+            config.GetConnectionString("Sqlite")!,
+            @"Data Sources*=s*[^;]+", "Data Source=redb_tests_sqlite_pro.db");
         var license = config["Redb:License"];
 
         SqliteTestSupport.DeleteDbFiles(cs);
@@ -35,9 +42,8 @@ public sealed class SqliteProFixture : IAsyncLifetime
             options.UseSqlite(cs)
                 .Configure(c =>
                 {
-                    c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert;
+                    c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;
                     c.SkipHashValidationOnCacheCheck = false;
-                    c.EnableLazyLoadingForProps = false;
                     c.EnablePropsCache = false;
                     c.EnablePvtPrefilter = ProTestOptions.PvtPrefilter;
                 });

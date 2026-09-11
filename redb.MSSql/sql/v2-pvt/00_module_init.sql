@@ -3,18 +3,97 @@
 -- =====================================================================
 -- Purpose: PVT-based search engine for REDB free (SQL Server).
 -- Owner  : redb core team. Mirrors redb.Postgres/sql/v2-pvt/.
--- Version: see dbo.pvt_module_version() at the bottom of this file.
+-- Version: see dbo.pvt_module_version() in 99_module_version.sql (applied LAST).
 --
--- This file must be applied FIRST. It performs three things:
+-- This file must be applied FIRST. It performs two things:
 --   1. Verifies that system infrastructure of REDB is in place
---      (core tables; dbo.get_object_json is now module-owned, see step 4).
+--      (core tables; dbo.get_object_json is module-owned, 09_core_object_json.sql).
 --   2. Drops every function this module owns so the module can be
---      redeployed cleanly.
---   3. Creates dbo.pvt_module_version() -- used by the C# client to
---      verify compatibility on InitializeAsync(). No runtime fallback.
+--      redeployed cleanly -- dbo.pvt_module_version included, which is why
+--      the version is recreated LAST, in 99_module_version.sql.
 -- =====================================================================
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
+GO
+
+-- ---------- 0. Schema upgrades (idempotent, run on every redeploy) ----------
+-- DDL for columns added after a database was created. The base DDL in
+-- redbMSSQL.sql stays the source of truth for fresh databases; this block is
+-- the delivery to existing ones (SCHEMA_DELIVERY plan, V4). GO after the
+-- ALTERs is mandatory: a later statement naming a new column will not
+-- compile in the same batch.
+
+-- V4 (UNIQUE stage 2): [RedbUnique] key metadata and the key hash column.
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._structures') AND name = N'_unique')
+    ALTER TABLE [dbo].[_structures] ADD [_unique] BIT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._structures') AND name = N'_unique_version')
+    ALTER TABLE [dbo].[_structures] ADD [_unique_version] BIGINT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'_unique')
+    ALTER TABLE [dbo].[_values] ADD [_unique] UNIQUEIDENTIFIER NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._scheme_metadata_cache') AND name = N'_unique')
+    ALTER TABLE [dbo].[_scheme_metadata_cache] ADD [_unique] BIT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._scheme_metadata_cache') AND name = N'_unique_version')
+    ALTER TABLE [dbo].[_scheme_metadata_cache] ADD [_unique_version] BIGINT NULL;
+-- V4 (LAZY Л2): the lazy-reference marker, read from `virtual` at synchronisation.
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._structures') AND name = N'_lazy')
+    ALTER TABLE [dbo].[_structures] ADD [_lazy] BIT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._scheme_metadata_cache') AND name = N'_lazy')
+    ALTER TABLE [dbo].[_scheme_metadata_cache] ADD [_lazy] BIT NULL;
+
+-- S3 (0.2.13): element-key scope of collection keys, and the free-form _tags marker on
+-- schemes, structures and the metadata cache (future / custom extensions; sync never wipes it).
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._structures') AND name = N'_unique_scope')
+    ALTER TABLE [dbo].[_structures] ADD [_unique_scope] BIGINT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._structures') AND name = N'_tags')
+    ALTER TABLE [dbo].[_structures] ADD [_tags] NVARCHAR(450) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._schemes') AND name = N'_tags')
+    ALTER TABLE [dbo].[_schemes] ADD [_tags] NVARCHAR(450) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._scheme_metadata_cache') AND name = N'_unique_scope')
+    ALTER TABLE [dbo].[_scheme_metadata_cache] ADD [_unique_scope] BIGINT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._scheme_metadata_cache') AND name = N'_tags')
+    ALTER TABLE [dbo].[_scheme_metadata_cache] ADD [_tags] NVARCHAR(450) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._structures') AND name = N'IX__structures__tags')
+    CREATE INDEX [IX__structures__tags] ON [dbo].[_structures]([_tags]) WHERE [_tags] IS NOT NULL;
+UPDATE c SET c.[_unique_scope] = s.[_unique_scope], c.[_tags] = s.[_tags]
+    FROM [dbo].[_scheme_metadata_cache] c JOIN [dbo].[_structures] s ON s.[_id] = c.[_structure_id]
+    WHERE ISNULL(c.[_unique_scope], -1) <> ISNULL(s.[_unique_scope], -1)
+       OR ISNULL(c.[_tags], N'') <> ISNULL(s.[_tags], N'');
+-- V4 (UNIQUE stage 1): the object key column.
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo._objects') AND name = N'_value_unique')
+    ALTER TABLE [dbo].[_objects] ADD [_value_unique] NVARCHAR(440) NULL;
+GO
+-- V4 (LAZY L2): repair caches synced between the column upgrade and the marker write.
+-- Below the GO on purpose: inside the ALTER batch the new column does not compile.
+UPDATE c SET c.[_lazy] = s.[_lazy]
+    FROM [dbo].[_scheme_metadata_cache] c JOIN [dbo].[_structures] s ON s.[_id] = c.[_structure_id]
+    WHERE ISNULL(c.[_lazy], 0) <> ISNULL(s.[_lazy], 0);
+GO
+-- S2 (subtree-unique plan, 0.2.12): the key index covers keyed rows at ANY position now -
+-- nested scalar keys carry _array_parent_id, and the old positional filter kept them OUT of
+-- the index, so their "uniqueness" silently never fired. Recreate on the old predicate.
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values')
+           AND name = N'UIX__values__structure_unique'
+           AND filter_definition LIKE N'%[_]array[_]parent[_]id%')
+    DROP INDEX [UIX__values__structure_unique] ON [dbo].[_values];
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'UIX__values__structure_unique')
+    CREATE UNIQUE INDEX [UIX__values__structure_unique] ON [dbo].[_values]([_id_structure], [_unique])
+        INCLUDE ([_id_object])
+        WHERE [_unique] IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._objects') AND name = N'UIX__objects__scheme_unique')
+    CREATE UNIQUE INDEX [UIX__objects__scheme_unique] ON [dbo].[_objects]([_id_scheme], [_value_unique])
+        INCLUDE ([_id])
+        WHERE [_value_unique] IS NOT NULL;
+GO
+
+-- FK-column indexes of _values (perf, 2026-09-10): _Object/_ListItem carry foreign keys, and
+-- without a leading index every DELETE of a referenced object or list item scans the whole
+-- table for the FK check. Filtered form keeps them nearly empty. NOTE: filtered indexes
+-- require QUOTED_IDENTIFIER ON in the creating session (ADO.NET default; sqlcmd needs -I).
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__ListItem_not_null')
+    CREATE INDEX [IX__values__ListItem_not_null] ON [dbo].[_values]([_ListItem]) WHERE [_ListItem] IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__Object_not_null')
+    CREATE INDEX [IX__values__Object_not_null] ON [dbo].[_values]([_Object]) WHERE [_Object] IS NOT NULL;
 GO
 
 -- ---------- 1. System infrastructure check ------------------------------
@@ -70,76 +149,37 @@ IF LEN(@drop_sql) > 0
     EXEC sp_executesql @drop_sql;
 GO
 
--- ---------- 3. Module version function ---------------------------------
--- semver: bump MAJOR on breaking changes to entry-point signatures or
--- result shape; bump MINOR on additive features; bump PATCH on bug fixes.
-CREATE FUNCTION dbo.pvt_module_version()
-RETURNS nvarchar(50)
-WITH SCHEMABINDING
-AS
+-- =====================================================
+-- V4 (owner decision 2026-09-02): _objects._value_string is an identifier column - NVARCHAR(450),
+-- the index-key width _name already uses; long text belongs in _note or in a Props field.
+-- NVARCHAR(MAX) cannot be an index key at all (Msg 1919), so every filter on the column scanned.
+-- A database holding longer values is REFUSED, loudly: silent truncation is not an option.
+-- =====================================================
+IF EXISTS (SELECT 1 FROM sys.columns
+            WHERE object_id = OBJECT_ID(N'dbo._objects') AND name = N'_value_string' AND max_length = -1)
 BEGIN
-    -- 0.1.2 - 13_pvt_condition.sql: pvt_build_field_condition dict_key
-    --         branch now short-circuits to `_pvt_cte.[FieldName] OP val`
-    --         when called in a post-pivot context (@base_prefix = 'o.'
-    --         or '_pvt_cte.'). The nested-dict CTE already materializes
-    --         the pivot column; emitting an independent EXISTS over
-    --         dbo._values for the outer WHERE duplicated the lookup
-    --         work. Symmetric with PG's pvt_build_field_condition.
-    -- 0.1.1 - narrow-with-nested CTE shape + stable ORDER BY +
-    --         Pro-parity nested-dict pushdown:
-    --         * 12_pvt_cte_builder.sql: each LEFT JOIN nested derived
-    --           table now folds `_id_scheme = X` (+ extra_where +
-    --           tree_filter) into a dp._id_object IN (SELECT _id FROM
-    --           _objects ...) subquery — mirrors PG PRO.
-    --         * narrow-with-nested body skips INNER JOIN _values v
-    --           when @sids = N'' (nested-only): no scalar pivot
-    --           sids, no point in expanding+collapsing _values.
-    --         * 20_pvt_build_query_sql.sql: narrow eligibility now
-    --           allows nested groups; default ORDER BY @base_prefix
-    --           + [_id] when paging is present without ORDER BY.
-    -- 0.1.3 - fix: DISTINCT (@distinct=1) outer ORDER BY referenced the inner
-    --         alias prefix (o./_pvt_cte.) outside the `_dist` wrapper -> "multi-part
-    --         identifier 'o._id' could not be bound" with .Distinct().Take(). Outer
-    --         order now uses the projected [_id] (@order_sql_dist) in all 3 branches.
-    -- 0.1.4 - Soft-delete read-path fix + object-json materializer ownership:
-    --         * The whole object->JSON materializer (dbo.get_object_json plus
-    --           helpers build_properties / build_field_json / build_listitem_json
-    --           / escape_json_string) moved from core (redb_json_objects.sql,
-    --           now deleted) into the module (09_core_object_json.sql) so its
-    --           fixes auto-redeploy to existing databases via the version check
-    --           (full redb_init.sql is not re-run once _schemes exists).
-    --         * dbo.get_object_json now treats soft-deleted objects
-    --           (_id_scheme = -10, @@__deleted) as non-existent: a nested
-    --           _Object reference to a trashed object resolves to NULL instead
-    --           of materializing the tombstone. The _values pointer stays
-    --           intact, so soft-delete remains reversible.
-    -- 0.1.7 - migrate_structure_type joins the module, and its String -> Boolean
-    --         conversion is guarded:
-    --         * 27_migrate_structure_type.sql moved in from sql/. It used to ship
-    --           only in redb_init.sql, applied to fresh databases only, so a fix
-    --           to it never reached an existing one. In the module, the version
-    --           check redeploys it like everything else here.
-    --         * String -> Boolean destroyed unrecognised values: the CASE fell
-    --           through to NULL while the same statement cleared _String, and the
-    --           row counted as a success. It is now predicated on the accepted
-    --           token list, like every other text conversion in that procedure,
-    --           which already used TRY_CAST(...) IS NOT NULL.
-    -- 0.1.6 - Scoped WhereLeaves()/WhereRoots() cross-tree leak fix:
-    --         * 20_pvt_build_query_sql.sql tree_leaves/tree_roots fast-path now
-    --           honours the seed: leaves = childless descendants of the seed root
-    --           (via pvt_is_descendant_of), roots = the seed object itself —
-    --           instead of a whole-scheme scan that ignored @tree_ids. So
-    --           TreeQuery(rootObj).WhereLeaves() returns the leaves of that
-    --           subtree, not every leaf in the scheme.
-    --         * pvt_tree_leaves / pvt_tree_roots (08_pvt_tree_functions.sql) —
-    --           the pvt_build_cte_sql (props-shape) path — seeded the same way.
-    -- 0.1.0 - skeleton: module bootstrap, drop-all, version function.
-    --         Builder functions (pvt_build_query_sql etc.) not implemented yet.
-    RETURN N'0.1.7';
-END;
+    IF EXISTS (SELECT 1 FROM [dbo].[_objects] WHERE LEN([_value_string]) > 450)
+        RAISERROR('redb upgrade: _objects._value_string is being narrowed to NVARCHAR(450) - it is an identifier column, long text belongs in _note or in a Props field. This database holds longer values; move them first (offenders: SELECT _id, LEN(_value_string) FROM _objects WHERE LEN(_value_string) > 450), then start again. Nothing was changed.', 16, 1);
+    ELSE
+        ALTER TABLE [dbo].[_objects] ALTER COLUMN [_value_string] NVARCHAR(450) NULL;
+END
 GO
 
--- ---------- 4. Smoke -----------------------------------------------------
-DECLARE @v nvarchar(50) = dbo.pvt_module_version();
-PRINT N'v2-pvt module init OK, version: ' + @v;
+IF COL_LENGTH('dbo._objects', '_value_string') = 900
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._objects') AND name = N'IX__objects__value_string')
+    CREATE INDEX [IX__objects__value_string] ON [dbo].[_objects]([_value_string]) WHERE [_value_string] IS NOT NULL
 GO
+
+-- =====================================================
+-- Owner decision 2026-09-02: the full-text index on _values._String is dropped. It served no
+-- reader (redb translates every string predicate to LIKE, which never uses full-text) and cost a
+-- background reindex on every _values write (CHANGE_TRACKING AUTO). sys.fulltext_* exist whether
+-- or not Full-Text is installed, so the guards are safe everywhere.
+-- =====================================================
+IF EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'dbo._values'))
+    DROP FULLTEXT INDEX ON [dbo].[_values]
+GO
+IF EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = 'redb_fulltext_catalog')
+    DROP FULLTEXT CATALOG [redb_fulltext_catalog]
+GO
+

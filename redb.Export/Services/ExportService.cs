@@ -301,7 +301,7 @@ public sealed class ExportService
                 CodeString = reader.IsDBNull(11) ? null : reader.GetString(11),
                 CodeGuid = reader.IsDBNull(12) ? null : reader.GetGuid(12),
                 Note = reader.IsDBNull(13) ? null : reader.GetString(13),
-                Hash = reader.IsDBNull(14) ? null : reader.GetGuid(14),
+                Hash = reader.IsDBNull(14) ? null : _provider.GuidFromDb(reader.GetValue(14)),
                 IdConfiguration = reader.IsDBNull(15) ? null : reader.GetInt64(15)
             };
             await writer.WriteLineAsync(JsonSerializer.Serialize<ExportRecord>(record, JsonOptions));
@@ -455,7 +455,7 @@ public sealed class ExportService
                 Name = reader.GetString(2),
                 Alias = reader.IsDBNull(3) ? null : reader.GetString(3),
                 NameSpace = reader.IsDBNull(4) ? null : reader.GetString(4),
-                StructureHash = reader.IsDBNull(5) ? null : reader.GetGuid(5),
+                StructureHash = reader.IsDBNull(5) ? null : _provider.GuidFromDb(reader.GetValue(5)),
                 SchemeType = reader.GetInt64(6)
             };
             await writer.WriteLineAsync(JsonSerializer.Serialize<ExportRecord>(record, JsonOptions));
@@ -477,7 +477,8 @@ public sealed class ExportService
             SELECT _id, _id_parent, _id_scheme, _id_override, _id_type, _id_list,
                    _name, _alias, _order, _readonly, _allow_not_null,
                    _collection_type, _key_type, _is_compress, _store_null,
-                   _default_value, _default_editor
+                   _default_value, _default_editor,
+                   _unique, _unique_version, _lazy
             FROM _structures {filter} ORDER BY _id";
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -501,7 +502,10 @@ public sealed class ExportService
                 IsCompress = reader.IsDBNull(13) ? null : reader.GetBoolean(13),
                 StoreNull = reader.IsDBNull(14) ? null : reader.GetBoolean(14),
                 DefaultValue = reader.IsDBNull(15) ? null : (byte[])reader.GetValue(15),
-                DefaultEditor = reader.IsDBNull(16) ? null : reader.GetString(16)
+                DefaultEditor = reader.IsDBNull(16) ? null : reader.GetString(16),
+                Unique = reader.IsDBNull(17) ? null : reader.GetBoolean(17),
+                UniqueVersion = reader.IsDBNull(18) ? null : reader.GetInt64(18),
+                Lazy = reader.IsDBNull(19) ? null : reader.GetBoolean(19)
             };
             await writer.WriteLineAsync(JsonSerializer.Serialize<ExportRecord>(record, JsonOptions));
             _structuresCount++;
@@ -523,7 +527,7 @@ public sealed class ExportService
                    _date_create, _date_modify, _date_begin, _date_complete,
                    _key, _name, _note, _hash,
                    _value_long, _value_string, _value_guid, _value_bool,
-                   _value_double, _value_numeric, _value_datetime, _value_bytes
+                   _value_double, _value_numeric, _value_datetime, _value_bytes, _value_unique
             FROM _objects {filter} ORDER BY _id";
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -543,7 +547,7 @@ public sealed class ExportService
                 Key = reader.IsDBNull(9) ? null : reader.GetInt64(9),
                 Name = reader.IsDBNull(10) ? null : reader.GetString(10),
                 Note = reader.IsDBNull(11) ? null : reader.GetString(11),
-                Hash = reader.IsDBNull(12) ? null : reader.GetGuid(12),
+                Hash = reader.IsDBNull(12) ? null : _provider.GuidFromDb(reader.GetValue(12)),
                 ValueLong = reader.IsDBNull(13) ? null : reader.GetInt64(13),
                 ValueString = reader.IsDBNull(14) ? null : reader.GetString(14),
                 ValueGuid = reader.IsDBNull(15) ? null : reader.GetGuid(15),
@@ -551,7 +555,8 @@ public sealed class ExportService
                 ValueDouble = reader.IsDBNull(17) ? null : reader.GetDouble(17),
                 ValueNumeric = reader.IsDBNull(18) ? null : reader.GetDecimal(18),
                 ValueDatetime = reader.IsDBNull(19) ? null : reader.GetFieldValue<DateTimeOffset>(19),
-                ValueBytes = reader.IsDBNull(20) ? null : (byte[])reader.GetValue(20)
+                ValueBytes = reader.IsDBNull(20) ? null : (byte[])reader.GetValue(20),
+                ValueUnique = reader.IsDBNull(21) ? null : reader.GetString(21)
             };
             await writer.WriteLineAsync(JsonSerializer.Serialize<ExportRecord>(record, JsonOptions));
             _objectsCount++;
@@ -577,7 +582,7 @@ public sealed class ExportService
             SELECT _id, _id_structure, _id_object,
                    _String, _Long, _Guid, _Double, _DateTimeOffset,
                    _Boolean, _ByteArray, _Numeric, _ListItem, _Object,
-                   _array_parent_id, _array_index
+                   _array_parent_id, _array_index, _unique
             FROM _values {filter} ORDER BY _id";
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -599,7 +604,8 @@ public sealed class ExportService
                 ListItem = reader.IsDBNull(11) ? null : reader.GetInt64(11),
                 Object = reader.IsDBNull(12) ? null : reader.GetInt64(12),
                 ArrayParentId = reader.IsDBNull(13) ? null : reader.GetInt64(13),
-                ArrayIndex = reader.IsDBNull(14) ? null : reader.GetString(14)
+                ArrayIndex = reader.IsDBNull(14) ? null : reader.GetString(14),
+                Unique = reader.IsDBNull(15) ? null : _provider.GuidFromDb(reader.GetValue(15))
             };
             await writer.WriteLineAsync(JsonSerializer.Serialize<ExportRecord>(record, JsonOptions));
             _valuesCount++;
