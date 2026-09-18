@@ -174,4 +174,23 @@ public abstract class CancellationTestsBase : IAsyncLifetime
         else
             count.Should().Be(n, "an uncancelled save must have committed every object");
     }
+
+    /// <summary>
+    /// The token given to <see cref="RedbListItem.GetObjectAsync"/> reaches the load. It was accepted and dropped
+    /// on the way to the query, so a cancelled reader still ran the scheme lookup and the load.
+    /// </summary>
+    [Fact]
+    public async Task PreCancelledListItemObject_ThrowsOce()
+    {
+        var linkedId = await Redb.SaveAsync(TestDataFactory.CreateSimple("ct-probe-item-target", 4m));
+        var list = await Redb.ListProvider.SaveListAsync(RedbList.Create($"ct-probe-list-{Guid.NewGuid():N}", "ct-probe"));
+        var item = await Redb.ListProvider.SaveListItemAsync(
+            new RedbListItem { IdList = list.Id, Value = "linked", IdObject = linkedId });
+
+        using (Redb.BeginAccess())
+        {
+            var act = async () => await item.GetObjectAsync(Cancelled());
+            await act.Should().ThrowAsync<OperationCanceledException>();
+        }
+    }
 }

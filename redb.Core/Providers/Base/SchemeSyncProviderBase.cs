@@ -1033,7 +1033,41 @@ public abstract partial class SchemeSyncProviderBase : ISchemeSyncProvider, ISch
         Cache.CacheScheme(scheme);
         return scheme;
     }
-    
+
+    /// <inheritdoc />
+    public IRedbScheme? GetSchemeById(long schemeId)
+    {
+        // The sequence of GetSchemeByIdAsync, every call synchronous.
+        var cachedScheme = Cache.GetScheme(schemeId);
+        if (cachedScheme != null)
+        {
+            var hashInDb = Context.ExecuteScalar<Guid?>(Sql.Schemes_SelectHashById(), schemeId);
+
+            if (cachedScheme.StructureHash == hashInDb)
+                return cachedScheme;
+
+            Cache.InvalidateScheme(schemeId);
+            InvalidateStructureTreeCache(schemeId);
+        }
+
+        var scheme = Context.QueryFirstOrDefault<RedbScheme>(Sql.Schemes_SelectById(), schemeId);
+        if (scheme == null)
+            return null;
+
+        var structures = Context.Query<RedbStructure>(Sql.Structures_SelectBySchemeCacheable(), schemeId);
+        scheme.SetStructures(structures);
+
+        if (scheme.StructureHash == null && structures.Any())
+        {
+            var newHash = SchemeHashCalculator.ComputeSchemeStructureHash(structures);
+            Context.Execute(Sql.Schemes_UpdateHash(), newHash, schemeId);
+            scheme.StructureHash = newHash;
+        }
+
+        Cache.CacheScheme(scheme);
+        return scheme;
+    }
+
     public async Task<IRedbScheme?> GetSchemeByNameAsync(string schemeName, CancellationToken cancellationToken = default)
     {
         var cachedScheme = Cache.GetScheme(schemeName);

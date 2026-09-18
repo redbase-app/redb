@@ -73,6 +73,10 @@ namespace redb.Core.Serialization
             {
                 throw new InvalidOperationException("Failed to deserialize get_object_json payload to RedbObject<TProps>.");
             }
+            // The root of a get_object_json payload is the object redb loaded: loaded by definition, with or without
+            // Props (a scheme without properties, an object saved with null Props). The converter takes null Props for
+            // "not loaded" - right for the nested references it also reads, wrong for the root.
+            obj._propsLoaded = true;
             return obj;
         }
 
@@ -88,6 +92,9 @@ namespace redb.Core.Serialization
             {
                 throw new InvalidOperationException($"Failed to deserialize get_object_json payload to RedbObject<{propsType.Name}>.");
             }
+
+            // The root is loaded by definition (see Deserialize<TProps>).
+            redbObjectType.GetField("_propsLoaded")?.SetValue(deserializedObj, true);
 
             // Return as IRedbObject
             return (IRedbObject)deserializedObj;

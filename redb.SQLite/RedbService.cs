@@ -30,20 +30,19 @@ public class RedbService : RedbServiceBase
     {
     }
 
-    // === POSTGRESQL-SPECIFIC IMPLEMENTATIONS ===
+    // === SQLITE-SPECIFIC IMPLEMENTATIONS ===
     
     protected override string DatabaseTypeName => "SQLite";
     
     protected override ISqlDialect SqlDialect => _dialect;
     
-    protected override string GetVersionSql => "SELECT version()";
-    
-    protected override string GetDatabaseSizeSql => "SELECT pg_database_size(current_database())";
+    protected override string GetVersionSql => "SELECT sqlite_version()";
+
+    // Bytes, like pg_database_size on PostgreSQL: the pages the database file holds.
+    protected override string GetDatabaseSizeSql => "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()";
     
     protected override string ContextNotRegisteredError => 
         "IRedbContext is not registered in DI container. Add SqliteRedbContext to configuration.";
-    
-    protected override string GetObjectJsonSql() => "SELECT get_object_json($1, $2)::text";
     
     // === PROVIDER FACTORIES ===
     
@@ -333,9 +332,37 @@ public class RedbService : RedbServiceBase
     /// </summary>
     protected override async Task EnsurePvtModuleDeployedAsync()
     {
+        await EnsureNativeExtensionVersionAsync();
         if (_ensuringDatabase) return;
         if (!await TableExistsAsync("_schemes")) return;
         await ApplySchemaUpgradesAsync();
+    }
+
+    /// <summary>
+    /// The SQLite delivery of the module version gate: the loaded native extension must report the version the
+    /// dialect requires. Nothing to apply on a mismatch - the library ships with the package - so it is refused,
+    /// naming the file. Skipped when no extension is configured (the Pro tier compiles its queries in C#).
+    /// </summary>
+    private async Task EnsureNativeExtensionVersionAsync()
+    {
+        var path = SqliteDataSource.NativeExtensionPath;
+        var versionFn = SqlDialect.Query_PvtModuleVersionFunction();
+        var required = SqlDialect.Query_PvtRequiredVersion();
+        if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(versionFn) || string.IsNullOrEmpty(required))
+            return;
+
+        string? deployed;
+        try
+        {
+            deployed = await Context.ExecuteScalarAsync<string>($"SELECT {versionFn}()");
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.Message.Contains("no such function", StringComparison.Ordinal))
+        {
+            // An extension from before the version function: refused below by name.
+            deployed = null;
+        }
+
+        SqliteNativeExtension.EnsureVersion(path, deployed, required);
     }
 
     private bool _ensuringDatabase;

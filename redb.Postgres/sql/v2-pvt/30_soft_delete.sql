@@ -106,41 +106,71 @@ Atomic operation - all or nothing.';
 -- ON DELETE CASCADE handles _values deletion automatically
 -- Updates progress in trash container (_key=deleted, _value_string=status)
 -- After all children deleted, removes the trash container itself
+--
+-- References (_values._Object, a foreign key with no ON DELETE action):
+-- * a reference held by an object that is itself in the trash dies with the purge - the
+--   referencing value row is removed first, so the order containers are purged in never matters;
+-- * an object referenced by a LIVE object is skipped, never deleted and never unlinked (nulling
+--   a live reference would hide the caller's bug inside another object's data). When nothing
+--   but such objects is left, the container is marked 'failed': the background worker stops
+--   claiming it, and the caller learns which references hold it.
 -- =====================================================
 CREATE OR REPLACE FUNCTION purge_trash(
     p_trash_id bigint,
     p_batch_size integer DEFAULT 10
 ) RETURNS TABLE(deleted_count bigint, remaining_count bigint) AS $$
 DECLARE
+    v_batch bigint[];
     v_deleted bigint;
     v_remaining bigint;
 BEGIN
     -- Update status to 'running' if it was 'pending'
-    UPDATE _objects 
+    UPDATE _objects
     SET _value_string = 'running',
         _date_modify = NOW()
     WHERE _id = p_trash_id AND _value_string = 'pending';
-    
-    -- Delete a batch of objects (CASCADE handles _values)
-    WITH to_delete AS (
-        SELECT _id FROM _objects
-        WHERE _id_parent = p_trash_id
+
+    -- The batch: objects of this container that no live object references
+    SELECT COALESCE(array_agg(c._id), ARRAY[]::bigint[]) INTO v_batch
+    FROM (
+        SELECT o._id FROM _objects o
+        WHERE o._id_parent = p_trash_id
+          AND NOT EXISTS (
+              SELECT 1 FROM _values v
+              INNER JOIN _objects r ON r._id = v._id_object
+              WHERE v._Object = o._id AND r._id_scheme <> -10)
         LIMIT p_batch_size
-    )
-    DELETE FROM _objects 
-    WHERE _id IN (SELECT _id FROM to_delete);
-    
+    ) c;
+
+    -- References to the batch held by trashed objects go first. Restricted to trashed holders on
+    -- purpose: a live reference written after the batch was chosen makes the delete below fail
+    -- loudly instead of being removed here.
+    DELETE FROM _values v
+    USING _objects r
+    WHERE v._Object = ANY(v_batch)
+      AND r._id = v._id_object
+      AND r._id_scheme = -10;
+
+    -- Delete the batch (CASCADE handles its own _values)
+    DELETE FROM _objects
+    WHERE _id = ANY(v_batch);
+
     GET DIAGNOSTICS v_deleted = ROW_COUNT;
-    
+
     -- Count remaining objects in this trash
     SELECT COUNT(*) INTO v_remaining
-    FROM _objects 
+    FROM _objects
     WHERE _id_parent = p_trash_id;
-    
-    -- Update progress in trash container
-    UPDATE _objects 
+
+    -- Update progress in trash container. An empty batch while objects remain = every one of them
+    -- is referenced by a live object: 'failed', no longer claimed by the background worker. A batch
+    -- that deleted nothing is another purger's work - the rows went between choosing the batch and
+    -- deleting it - and the container stays 'running': the next batch takes what is left.
+    UPDATE _objects
     SET _key = _key + v_deleted,
-        _value_string = CASE WHEN v_remaining = 0 THEN 'completed' ELSE 'running' END,
+        _value_string = CASE WHEN v_remaining = 0 THEN 'completed'
+                             WHEN cardinality(v_batch) = 0 THEN 'failed'
+                             ELSE 'running' END,
         _date_modify = NOW()
     WHERE _id = p_trash_id;
     
@@ -158,5 +188,7 @@ COMMENT ON FUNCTION purge_trash(bigint, integer) IS
 p_trash_id: ID of the trash container created by mark_for_deletion.
 p_batch_size: Number of objects to delete per call (default 10).
 Returns (deleted_count, remaining_count). When remaining=0, trash container is also deleted.
-Call repeatedly until remaining_count = 0.';
+Objects referenced by live objects are skipped; deleted_count = 0 with remaining_count > 0
+means only such objects are left, and the container is marked failed.
+Call repeatedly until remaining_count = 0 or deleted_count = 0.';
 

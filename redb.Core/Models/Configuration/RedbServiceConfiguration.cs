@@ -208,6 +208,14 @@ namespace redb.Core.Models.Configuration
         public LazyReferenceAccessMode LazyReferenceAccess { get; set; } = LazyReferenceAccessMode.Blocking;
 
         /// <summary>
+        /// What a lazy load - the Props of a reference stub, <c>RedbListItem.Object</c> - does when no live redb scope reads
+        /// it. A data object owns no connection: the load runs on the scope of whoever reads it (owner decision 2026-09-15).
+        /// <c>Refuse</c> (default) throws <see cref="Exceptions.RedbLazyLoadScopeEndedException"/>; <c>FreshScope</c> opens a
+        /// scope and a pooled connection per such load.
+        /// </summary>
+        public LazyLoadWithoutScopeMode LazyLoadWithoutScope { get; set; } = LazyLoadWithoutScopeMode.Refuse;
+
+        /// <summary>
         /// Apply the versioned SQL module (functions and, from V4, schema upgrades) automatically at
         /// start-up when the database reports a different module version than this build requires.
         ///
@@ -255,7 +263,8 @@ namespace redb.Core.Models.Configuration
 
         /// <summary>
         /// Maximum number of objects in Props cache.
-        /// On overflow - simple eviction (remove first)
+        /// On overflow the least recently used tenth is evicted at once; a working set above the limit
+        /// is logged as a warning
         /// </summary>
         private int _propsCacheMaxSize = 10000;
         public int PropsCacheMaxSize 
@@ -467,6 +476,7 @@ namespace redb.Core.Models.Configuration
                 ThrowOnObjectNotFound = ThrowOnObjectNotFound,
                 EnablePropsCache = EnablePropsCache,
                 PreloadListItemLinkedObjects = PreloadListItemLinkedObjects,
+                LazyLoadWithoutScope = LazyLoadWithoutScope,
                 MaintenanceAnalysisLimit = MaintenanceAnalysisLimit,
                 PropsCacheMaxSize = PropsCacheMaxSize,
                 PropsCacheTtl = PropsCacheTtl,

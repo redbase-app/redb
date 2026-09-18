@@ -253,6 +253,21 @@ BEGIN
              + dbo.pvt_b2_expr_sql(@re2, @fields, @obj_alias) + N')';
     END;
 
+    -- $regexReplace: [str, pattern, replacement(, flags)] (Regex.Replace). REGEXP_REPLACE (SQL Server 2025,
+    -- compatibility level 170) replaces every match by default, as .NET does; the 'g' flag the builder
+    -- appends for PostgreSQL is not needed and not passed.
+    IF @nk = N'$regexreplace'
+    BEGIN
+        DECLARE @rr0 NVARCHAR(MAX), @rr1 NVARCHAR(MAX), @rr2 NVARCHAR(MAX);
+        SELECT @rr0 = MIN(CASE WHEN [key] = '0' THEN [value] END),
+               @rr1 = MIN(CASE WHEN [key] = '1' THEN [value] END),
+               @rr2 = MIN(CASE WHEN [key] = '2' THEN [value] END)
+          FROM OPENJSON(@nv);
+        RETURN N'REGEXP_REPLACE(' + dbo.pvt_b2_expr_sql(@rr0, @fields, @obj_alias) + N', '
+             + dbo.pvt_b2_expr_sql(@rr1, @fields, @obj_alias) + N', '
+             + dbo.pvt_b2_expr_sql(@rr2, @fields, @obj_alias) + N')';
+    END;
+
     -- $dateAdd / $dateSub: JSON args = ["unit", date_expr, amount]
     -- T-SQL: DATEADD(unit, [+/-]amount, CAST(date_expr AS DATETIMEOFFSET))
     IF @nk IN (N'$dateadd', N'$datesub')
@@ -609,6 +624,19 @@ BEGIN
                 SET @es_s = COALESCE(JSON_VALUE(@es_s, N'$."$const"'), @es_s);
             SET @piece = dbo.pvt_b2_expr_sql(@es_e, @fields, @obj_alias)
                        + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@es_s)) + N' ESCAPE ''\''';
+        END
+
+        -- ---- B2-expr: $regex / $iregex [expr, pattern] (Regex.IsMatch) --
+        -- REGEXP_LIKE: SQL Server 2025, compatibility level 170; an older server refuses it by name.
+        ELSE IF @lk IN (N'$regex', N'$iregex') AND @t = 4
+        BEGIN
+            DECLARE @rx_e NVARCHAR(MAX), @rx_p NVARCHAR(MAX);
+            SELECT @rx_e = MIN(CASE WHEN [key] = '0' THEN [value] END),
+                   @rx_p = MIN(CASE WHEN [key] = '1' THEN [value] END)
+              FROM OPENJSON(@v);
+            SET @piece = N'REGEXP_LIKE(' + dbo.pvt_b2_expr_sql(@rx_e, @fields, @obj_alias) + N', '
+                       + dbo.pvt_b2_expr_sql(@rx_p, @fields, @obj_alias)
+                       + CASE WHEN @lk = N'$iregex' THEN N', ''i'')' ELSE N')' END;
         END
 
         -- $like: raw LIKE with full pattern from second arg expression

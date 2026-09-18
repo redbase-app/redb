@@ -1250,7 +1250,7 @@ public class MsSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
 
     // Bump together with the literal in redb.MSSql/sql/v2-pvt/00_module_init.sql.
-    public string? Query_PvtRequiredVersion() => "0.2.14";
+    public string? Query_PvtRequiredVersion() => "0.2.18";
 
     // Native PVT projection orchestrator — not supported on MSSql (yet).
     // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these
@@ -1291,6 +1291,20 @@ public class MsSqlDialect : ISqlDialect
     /// </summary>
     public string SoftDelete_PurgeTrash() => 
         "DECLARE @deleted_count BIGINT, @remaining_count BIGINT; EXEC sp_purge_trash @p0, @p1, @deleted_count OUTPUT, @remaining_count OUTPUT; SELECT @deleted_count AS deleted_count, @remaining_count AS remaining_count;";
+
+    /// <summary>
+    /// Objects of a trash container referenced by live objects, with the referencing objects.
+    /// Params: @p0=trashId. Returns: referenced_id, referencing_id (at most 100 pairs).
+    /// </summary>
+    public string SoftDelete_SelectLiveReferrersOfTrash() => """
+        SELECT DISTINCT TOP (100) o.[_id] AS referenced_id, r.[_id] AS referencing_id
+        FROM [dbo].[_objects] o
+        INNER JOIN [dbo].[_values] v ON v.[_Object] = o.[_id]
+        INNER JOIN [dbo].[_objects] r ON r.[_id] = v.[_id_object]
+        WHERE o.[_id_parent] = @p0
+          AND r.[_id_scheme] <> -10
+        ORDER BY referenced_id, referencing_id
+        """;
     
     /// <summary>
     /// Gets deletion progress for a specific trash container.

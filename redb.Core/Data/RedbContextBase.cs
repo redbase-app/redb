@@ -30,7 +30,11 @@ namespace redb.Core.Data
         /// <summary>
         /// Bulk operations.
         /// </summary>
-        public abstract IBulkOperations Bulk { get; }
+        // Reached to write (COPY protocol): the transaction has written.
+        public IBulkOperations Bulk { get { TransactionWrites.Mark(this); return BulkOperations; } }
+
+        /// <summary>The provider's bulk operations.</summary>
+        protected abstract IBulkOperations BulkOperations { get; }
 
         // === CONNECTION SHORTCUTS ===
         
@@ -78,11 +82,11 @@ namespace redb.Core.Data
         /// Execute SQL command (INSERT, UPDATE, DELETE).
         /// </summary>
         public Task<int> ExecuteAsync(string sql, params object[] parameters)
-            => Db.ExecuteAsync(sql, parameters);
+            { TransactionWrites.Mark(this); return Db.ExecuteAsync(sql, parameters); }
 
         /// <inheritdoc />
         public Task<int> ExecuteAsync(string sql, object[] parameters, CancellationToken cancellationToken)
-            => Db.ExecuteAsync(sql, parameters, cancellationToken);
+            { TransactionWrites.Mark(this); return Db.ExecuteAsync(sql, parameters, cancellationToken); }
         
         /// <summary>
         /// Execute SQL returning JSON.

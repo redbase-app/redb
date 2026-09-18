@@ -27,6 +27,12 @@ public class LazyPropsLoader : ILazyPropsLoader
     private readonly RedbServiceConfiguration _config;
     private readonly MsSqlDialect _sql;
     private readonly GlobalPropsCache _propsCache;
+
+    /// <inheritdoc />
+    public string? CacheDomain => _propsCache.Domain;
+
+    /// <inheritdoc />
+    public redb.Core.Data.IRedbContext? ScopeContext => _context;
     private readonly ILogger? _logger;
     
     public LazyPropsLoader(
@@ -103,7 +109,7 @@ public class LazyPropsLoader : ILazyPropsLoader
         // 4. Cache the result
         if (_config.EnablePropsCache && obj.hash.HasValue)
         {
-            _propsCache.Set(obj);
+            redb.Core.Caching.CachePublication.AfterCommit(_context, () => _propsCache.Set(obj));
         }
 
         // Raw access instead of the getter: for an object with properties:null (values wiped by a
@@ -152,6 +158,11 @@ public class LazyPropsLoader : ILazyPropsLoader
                     .ToList();
                 
                 needToLoad = _propsCache.FilterNeedToLoad<TProps>(objectsData, out fromCache);
+
+                // An object without a hash cannot be matched by the cache: it loads from the database, never dropped.
+                foreach (var obj in objects)
+                    if (!obj.hash.HasValue)
+                        needToLoad.Add(obj.id);
                 
                 foreach (var obj in objects)
                 {
@@ -198,7 +209,7 @@ public class LazyPropsLoader : ILazyPropsLoader
                             // Cache
                             if (_config.EnablePropsCache && obj.hash.HasValue)
                             {
-                                _propsCache.Set(obj);
+                                redb.Core.Caching.CachePublication.AfterCommit(_context, () => _propsCache.Set(obj));
                             }
                         }
                         catch
@@ -288,11 +299,12 @@ public class LazyPropsLoader : ILazyPropsLoader
                 {
                     try
                     {
-                        // Get Props type from object's generic parameter
+                        // Get Props type from object's generic parameter (the type or its RedbObject<T> base)
                         var objType = obj.GetType();
-                        if (objType.IsGenericType && objType.GetGenericTypeDefinition() == typeof(RedbObject<>))
+                        var genericObjType = redb.Core.Utils.RedbObjectTypes.GenericOf(objType);
+                        if (genericObjType != null)
                         {
-                            var propsType = objType.GetGenericArguments()[0];
+                            var propsType = genericObjType.GetGenericArguments()[0];
                             var loaded = _serializer.DeserializeDynamic(json, propsType);
                             
                             // Copy Props via reflection

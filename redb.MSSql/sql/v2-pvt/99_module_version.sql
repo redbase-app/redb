@@ -127,6 +127,23 @@ BEGIN
     --           subtree, not every leaf in the scheme.
     --         * pvt_tree_leaves / pvt_tree_roots (08_pvt_tree_functions.sql) —
     --           the pvt_build_cte_sql (props-shape) path — seeded the same way.
+    -- 0.2.18 - Regex.IsMatch / Regex.Replace in filters (2026-09-16): $regex / $iregex compile to
+    --          REGEXP_LIKE, $regexReplace to REGEXP_REPLACE (SQL Server 2025, compatibility level 170).
+    --          The unsupported-top branch turned $regex into 1=1: the filter was dropped and every row
+    --          came back.
+    -- 0.2.17 - arrays and dictionaries of references keep a trashed target as null (2026-09-15):
+    --          STRING_AGG skipped the NULL of the nested get_object_json and dropped the element /
+    --          the key. PostgreSQL, SQLite and Pro already kept null.
+    -- 0.2.16 - list item JSON in the model's shape (2026-09-15): dbo.build_listitem_json writes
+    --          {id, id_list, value, alias, id_object}. It wrote {id, idList, value, alias}: the model
+    --          reads id_list / id_object, so every load lost the list link and the object link.
+    -- 0.2.15 - trash review (2026-09-14): sp_mark_for_deletion and sp_purge_trash run with
+    --          SET XACT_ABORT ON and open their own transaction only when the caller has none -
+    --          a command timeout or cancel inside BEGIN TRANSACTION used to leave it open on the
+    --          session, and every later statement of the scope was rolled back with it.
+    --          sp_purge_trash: a reference held by a trashed object is removed with the purge; an
+    --          object referenced by a live object is skipped, and a container left with nothing
+    --          else is marked 'failed' instead of being retried forever.
     -- 0.2.14 - soft delete resets _objects._hash (full-object hash, 2026-09-11): the trash
     --          move changes parent and key outside the save path; a props-cache copy must not
     --          outlive it.
@@ -141,7 +158,7 @@ BEGIN
     --          (perf finding, 2026-09-10).
     -- 0.1.0 - skeleton: module bootstrap, drop-all, version function.
     --         Builder functions (pvt_build_query_sql etc.) not implemented yet.
-    RETURN N'0.2.14';
+    RETURN N'0.2.18';
 END;
 GO
 

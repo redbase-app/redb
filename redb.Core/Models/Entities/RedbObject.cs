@@ -85,12 +85,26 @@ namespace redb.Core.Models.Entities
                 {
                     if (!_propsLoaded && _lazyLoader != null && id > 0)
                     {
+                        var loader = _lazyLoader;
                         try
                         {
-                            // Synchronous loading from DB
-                            _properties = _lazyLoader.LoadProps<TProps>(id, scheme_id);
+                            // Synchronous loading from DB, on the reader's scope
+                            var loaded = loader.LoadProps<TProps>(id, scheme_id);
+                            // A shared instance (props cache) keeps what a transaction reads while that transaction has
+                            // written nothing - committed state - and forgets it if the transaction rolls back; once the
+                            // transaction has written, it keeps nothing (owner decisions 2026-09-15, 2026-09-17). The
+                            // reader still gets it.
+                            var ambient = loader as AmbientLazyPropsLoader;
+                            if (_isShared && ambient != null && !ambient.ReaderKeepsLoads)
+                                return loaded!;
+                            _properties = loaded;
                             _propsLoaded = true;
                             _lazyLoader = null;
+                            if (_isShared)
+                            {
+                                LazyReferenceInstaller.MarkShared(loaded);
+                                ambient?.OnReaderTransactionCompleted(committed => { if (!committed) Forget(loaded, loader); });
+                            }
                         }
                         catch (Exception ex) when (ex is not Exceptions.RedbSynchronousLazyLoadException and not Exceptions.RedbLazyLoadScopeEndedException)
                         {
@@ -98,6 +112,10 @@ namespace redb.Core.Models.Entities
                                 $"Error during lazy loading Props for object {id}: {ex.Message}", ex);
                         }
                     }
+                    // A reference nothing can load - an id, no properties, no loader - answers null: plain
+                    // System.Text.Json serialization of a graph with hand-made references reads this getter, and an
+                    // exception here would fail every such API response (review after 4.0.0, LazyStubSerializationRepro).
+                    // Saving such a reference is refused instead (RedbUnloadedReferenceException).
                 }
 
                 return _properties!;
@@ -122,6 +140,18 @@ namespace redb.Core.Models.Entities
             return _properties;
         }
 
+        // What a rolled-back transaction loaded into a shared instance is dropped: the next read loads again.
+        private void Forget(TProps? loaded, ILazyPropsLoader loader)
+        {
+            lock (_lazyLoadLock)
+            {
+                if (!_propsLoaded || !ReferenceEquals(_properties, loaded)) return;
+                _properties = null;
+                _propsLoaded = false;
+                _lazyLoader = loader;
+            }
+        }
+
         /// <summary>
         /// Explicit async Props preloading (for eager loading scenarios).
         /// </summary>
@@ -129,9 +159,21 @@ namespace redb.Core.Models.Entities
         {
             if (!_propsLoaded && _lazyLoader != null && id > 0)
             {
-                _properties = await _lazyLoader.LoadPropsAsync<TProps>(id, scheme_id);
+                var loader = _lazyLoader;
+                var loaded = await loader.LoadPropsAsync<TProps>(id, scheme_id);
+                // The rule of the Props getter: kept while the reader's transaction has written nothing, forgotten on its
+                // rollback; what a shared instance keeps is shared too (owner decisions 2026-09-15, 2026-09-17).
+                var ambient = loader as AmbientLazyPropsLoader;
+                if (_isShared && ambient != null && !ambient.ReaderKeepsLoads)
+                    return;
+                _properties = loaded;
                 _propsLoaded = true;
                 _lazyLoader = null;
+                if (_isShared)
+                {
+                    LazyReferenceInstaller.MarkShared(loaded);
+                    ambient?.OnReaderTransactionCompleted(committed => { if (!committed) Forget(loaded, loader); });
+                }
             }
         }
 

@@ -159,6 +159,20 @@ await redb.InitializeAsync();
 await redb.SyncSchemeAsync<EmployeeProps>();
 ```
 
+**The props cache pays off, and only while it fits.** `EnablePropsCache` keeps materialized Props in memory
+and validates a hit by the object hash. Measured on PostgreSQL Pro over 100 000 objects: a warm list of 300
+objects takes 339 ms without the cache and 44 ms with it, a point load 10 ms against 2 ms, and 0.11 ms with
+`SkipHashValidationOnCacheCheck`, which costs no round trip at all.
+
+That speedup lasts only while the cache holds the objects in use. `PropsCacheMaxSize` (10 000 objects by
+default) has to fit the working set: when it does not, every load evicts an object the next load needs, hits
+drop to almost none, and what is left is the cost - memory, and a hash check on every lookup. In production
+this looks like a cache that was fast on the first day and slower than no cache once the data grew. The cache
+says so ("Props cache is full: N least recently used objects evicted within 10s"), and it also reports a slow
+hit check and a run of lookups that find entries and serve none, which is a read model that does not reproduce
+the saved graph and never matches its hash. Raise the size to fit the working set, or leave the cache off for
+that database.
+
 **Free version** — same pattern, just `AddRedb` instead of `AddRedbPro`, no license:
 
 ```csharp
@@ -723,7 +737,7 @@ REDB Pro unlocks compiled query execution, parallel materialization, deep nested
 
 **Pro is free — no license key required.** Just add the `redb.*.Pro` packages and use them. Pro packages are proprietary (closed-source), but free of charge — starting from version 3.3.0 no license is needed. The whole 3.x and 4.x lines are covered, in production, with no request limits; licensing re-enables only at major 5.0, and versions you already run stay free forever.
 
-**Need the Pro sources?** Larger companies that require them — for a security audit, source escrow, or to build in-house — can ask, and we hand them over. Write to [redbase.app/pro](https://redbase.app/pro).
+**Need the Pro sources?** Larger companies that require them — for a security audit, source escrow, or to build in-house — can ask, and we hand them over. Write to [redbase.app](https://redbase.app).
 
 ---
 

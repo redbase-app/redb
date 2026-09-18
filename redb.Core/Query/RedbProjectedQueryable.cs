@@ -468,7 +468,8 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             // _values (все проецируемые поля null), Props приезжает null - а лямбда проекции
             // обязана исполниться. Внутри проекционного пути null-Props означает «пусто», а не
             // «не загружено»: RedbObject тут же выбрасывается, V4-семантика чтения не затронута.
-            if (obj.Props is null)
+            // Raw access: the getter of an object without loaded Props is a lazy load (or nothing, the loader is gone).
+            if (obj.GetPropsDirectly() is null)
                 obj.Props = new TProps();
         }
 

@@ -47,8 +47,9 @@ public abstract class LazyHostTestsBase
             {
                 c.EnablePropsCache = false;
                 c.SkipHashValidationOnCacheCheck = false;
-                // Own cache domain: this process also holds the shared fixtures on the same database.
-                c.CacheDomain = "lazy-host";
+                // Own cache domain per suite: this process also holds the shared fixtures on the same database, and the
+                // hosts of the six suites run in parallel - one database is registered per domain.
+                c.CacheDomain = $"lazy-host-{GetType().Name}";
                 configure(c);
             });
         });
@@ -158,6 +159,9 @@ public abstract class LazyHostTestsBase
         RedbHash.ComputeFor(again).Should().Be(single.hash,
             "a cache entry whose live hash never matches its stored one is a miss for ever");
     }
+
+    // A reference of a cached object read inside a transaction: ReaderConnectionTestsBase (owner decision 2026-09-15 -
+    // the load runs on the reader's connection and the shared instance keeps nothing).
 
     [Fact]
     public async Task ThrowMode_GetterRefuses_AsyncApisStillLoad()
@@ -316,66 +320,104 @@ public abstract class LazyHostTestsBase
         again.Should().BeSameAs(lazyRoot);
         again!.Props.Next!.IsPropsLoaded.Should().BeFalse("the walk must not wake a stub");
     }
+    // A reference of a cached object read in another live scope: ReaderConnectionTestsBase (owner decision 2026-09-15 -
+    // the load runs on the reader's connection, no scope of its own).
+
+    /// <summary>
+    /// The writer keeps its own cached instance - an application-level cache - and touches a reference after its scope
+    /// ended. A data object owns no connection (owner decision 2026-09-15): with no live redb scope reading, the load is
+    /// refused by default and runs in a fresh scope only when the configuration asks for it. Seeding and the writer's scope
+    /// run in this helper, so nothing it resolves stays current for the caller.
+    /// </summary>
+    private async Task<RedbObject<LazyNodeProps>> WritersCachedInstanceAfterItsScopeEndedAsync(ServiceProvider sp, string tag)
+    {
+        long rootId;
+        await using (var seed = sp.CreateAsyncScope())
+        {
+            var redb = seed.ServiceProvider.GetRequiredService<IRedbService>();
+            await redb.InitializeAsync(ensureCreated: true);
+            await redb.SyncSchemeAsync<LazyNodeProps>();
+            await redb.InitializeTypeRegistryAsync();
+            rootId = await SaveChainAsync(redb, tag);
+            ((RedbServiceBase)redb).PropsCache.Instance!.Clear();
+        }
+
+        RedbObject<LazyNodeProps> cachedRoot;
+        await using (var writer = sp.CreateAsyncScope())
+            cachedRoot = (await writer.ServiceProvider.GetRequiredService<IRedbService>().LoadAsync<LazyNodeProps>(rootId, depth: 1))!;
+
+        cachedRoot.Props.Next!.IsPropsLoaded.Should().BeFalse("precondition: the reference is a stub");
+        return cachedRoot;
+    }
+
     [Fact]
-    public async Task CachedObject_ReferencesLoadThroughTheirOwnScope_NotTheOneThatCachedThem()
+    public async Task CachedObject_WriterScopeEnded_ReadRefuses_WithoutALiveScope()
     {
         await using var sp = Build(c => c.EnablePropsCache = true);
-        var boot = sp.GetRequiredService<IRedbService>();
-        await boot.InitializeAsync(ensureCreated: true);
-        await boot.SyncSchemeAsync<LazyNodeProps>();
-        await boot.InitializeTypeRegistryAsync();
-        long rootId;
-        using (var seed = sp.CreateScope())
-        {
-            rootId = await SaveChainAsync(seed.ServiceProvider.GetRequiredService<IRedbService>(), "cached-scope");
-            ((RedbServiceBase)seed.ServiceProvider.GetRequiredService<IRedbService>()).PropsCache.Instance!.Clear();
-        }
-
-        // Scope A loads and thereby caches the root; then it ends.
-        RedbObject<LazyNodeProps> cachedRoot;
-        using (var a = sp.CreateScope())
-            cachedRoot = (await a.ServiceProvider.GetRequiredService<IRedbService>().LoadAsync<LazyNodeProps>(rootId, depth: 1))!;
+        var cachedRoot = await WritersCachedInstanceAfterItsScopeEndedAsync(sp, "writer-ended-refuse");
         var stub = cachedRoot.Props.Next!;
-        stub.IsPropsLoaded.Should().BeFalse();
-        stub._lazyLoader.Should().BeOfType<ScopeFallbackLazyPropsLoader>(
-            "a reference inside a cached object keeps the writer's loader only behind a dead-scope "
-            + "fallback - it can never end up loading through A's disposed connection");
 
-        // Scope B is served the same instance from the cache and touches the reference: the load
-        // runs through a scope of its own, not through A's disposed connection.
-        using (var b = sp.CreateScope())
+        Action read = () => _ = stub.Props;
+        read.Should().Throw<RedbLazyLoadScopeEndedException>(
+            "no live redb scope reads here, and no scope is opened behind the reader's back");
+        stub.IsPropsLoaded.Should().BeFalse("a refusal loads nothing and memoises nothing");
+    }
+
+    [Fact]
+    public async Task CachedObject_WriterScopeEnded_SyncGetter_LoadsInAFreshScope_WhenConfigured()
+    {
+        await using var sp = Build(c =>
         {
-            var again = await b.ServiceProvider.GetRequiredService<IRedbService>().LoadAsync<LazyNodeProps>(rootId, depth: 1);
-            ReferenceEquals(again, cachedRoot).Should().BeTrue("the cache serves the shared instance");
-            again!.Props.Next!.Props.Label.Should().Be("mid-cached-scope");
-            again.Props.Next.Props.Next!.IsPropsLoaded.Should().BeFalse("the reloaded object's own references are stubs again");
-            again.Props.Next.Props.Next._lazyLoader.Should().BeOfType<DetachedLazyPropsLoader>(
-                "what the load attached to the fresh Props is replaced by the detached loader again");
+            c.EnablePropsCache = true;
+            c.LazyLoadWithoutScope = LazyLoadWithoutScopeMode.FreshScope;
+        });
+        var cachedRoot = await WritersCachedInstanceAfterItsScopeEndedAsync(sp, "writer-ended-sync");
+
+        cachedRoot.Props.Next!.Props.Label.Should().Be("mid-writer-ended-sync",
+            "the configuration asks for a fresh scope when no live scope reads");
+    }
+
+    [Fact]
+    public async Task CachedObject_WriterScopeEnded_AsyncLoad_LoadsInAFreshScope_WhenConfigured()
+    {
+        await using var sp = Build(c =>
+        {
+            c.EnablePropsCache = true;
+            c.LazyLoadWithoutScope = LazyLoadWithoutScopeMode.FreshScope;
+        });
+        var cachedRoot = await WritersCachedInstanceAfterItsScopeEndedAsync(sp, "writer-ended-async");
+
+        await cachedRoot.Props.Next!.LoadPropsAsync();
+        cachedRoot.Props.Next.IsPropsLoaded.Should().BeTrue();
+        cachedRoot.Props.Next.Props.Label.Should().Be("mid-writer-ended-async",
+            "the configuration asks for a fresh scope when no live scope reads");
+    }
+
+    /// <summary>Seeds a chain and loads its root in a scope that ends - both in this helper, so nothing stays current.</summary>
+    private async Task<RedbObject<LazyNodeProps>> StubFromAScopeThatEndsAsync(ServiceProvider sp)
+    {
+        long rootId;
+        await using (var seed = sp.CreateAsyncScope())
+        {
+            var boot = seed.ServiceProvider.GetRequiredService<IRedbService>();
+            await boot.InitializeAsync(ensureCreated: true);
+            await boot.SyncSchemeAsync<LazyNodeProps>();
+            await boot.InitializeTypeRegistryAsync();
+            rootId = await SaveChainAsync(boot, "scope-ended");
         }
 
-        // Several scopes touching one cached stub concurrently: one load, everybody gets the data.
-        var leaf = cachedRoot.Props.Next.Props.Next;
-        var labels = new System.Collections.Concurrent.ConcurrentBag<string?>();
-        await Task.WhenAll(Enumerable.Range(0, 4).Select(i => Task.Run(() => labels.Add(leaf.Props?.Label))));
-        labels.Should().HaveCount(4).And.OnlyContain(l => l == "leaf-cached-scope");
+        await using var a = sp.CreateAsyncScope();
+        var root = (await a.ServiceProvider.GetRequiredService<IRedbService>().LoadAsync<LazyNodeProps>(rootId, depth: 1))!;
+        return root.Props.Next!;
     }
 
     [Fact]
     public async Task ScopeEnded_ReferenceNotCached_GetterRefusesLoudly()
     {
         await using var sp = Build(_ => { });
-        var boot = sp.GetRequiredService<IRedbService>();
-        await boot.InitializeAsync(ensureCreated: true);
-        await boot.SyncSchemeAsync<LazyNodeProps>();
-        await boot.InitializeTypeRegistryAsync();
-        var rootId = await SaveChainAsync(boot, "scope-ended");
+        var stub = await StubFromAScopeThatEndsAsync(sp);
 
-        RedbObject<LazyNodeProps> root;
-        using (var a = sp.CreateScope())
-            root = (await a.ServiceProvider.GetRequiredService<IRedbService>().LoadAsync<LazyNodeProps>(rootId, depth: 1))!;
-
-        // The scope that loaded the object is gone; its reference still carries that scope's loader.
-        var stub = root.Props.Next!;
+        // The scope that loaded the object is gone, and no other redb scope reads here.
         Action act = () => _ = stub.Props;
         act.Should().Throw<RedbLazyLoadScopeEndedException>("no resurrected pooled connection, a clear refusal instead")
             .Which.ObjectId.Should().Be(stub.id);
@@ -383,10 +425,10 @@ public abstract class LazyHostTestsBase
         await actAsync.Should().ThrowAsync<RedbLazyLoadScopeEndedException>();
         stub.IsPropsLoaded.Should().BeFalse("a refusal loads nothing and memoises nothing");
 
-        // The way out the message names: load it in a live scope.
-        using var b = sp.CreateScope();
-        (await b.ServiceProvider.GetRequiredService<IRedbService>().LoadAsync<LazyNodeProps>(stub.id, depth: 1))!
-            .Props.Label.Should().Be("mid-scope-ended");
+        // The way out the message names: read it inside a live scope - the very same stub.
+        await using var b = sp.CreateAsyncScope();
+        b.ServiceProvider.GetRequiredService<IRedbService>().Should().NotBeNull("this scope is now current for the reads below");
+        stub.Props.Label.Should().Be("mid-scope-ended");
     }
     /// <summary>A message loop that is busy blocking: whatever is posted to it never runs.</summary>
     private sealed class BlockedUiContext : SynchronizationContext

@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using System.Text.Json.Serialization;
 
 using System.Reflection;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
@@ -31,24 +32,28 @@ namespace redb.Core.Providers.Base
         /// Uses <paramref name="processed"/> to deduplicate objects that are referenced
         /// multiple times in the object tree (e.g. two licenses referencing the same Plan).
         /// </summary>
-        protected async Task CollectAllObjectsRecursively(IRedbObject rootObject, List<IRedbObject> collector, HashSet<long> processed, List<IRedbObject>? referenceStubs = null)
+        protected async Task CollectAllObjectsRecursively(IRedbObject rootObject, List<IRedbObject> collector, HashSet<long> processed, HashSet<object> seen, List<IRedbObject>? referenceStubs = null)
         {
+            // One instance is one object: a new object (id 0, nothing to dedup by) referenced from two places was
+            // collected twice, given an id twice and inserted twice (review after 4.0.0).
+            if (!seen.Add(rootObject))
+                return;
             collector.Add(rootObject);
             ValidateValueUnique(rootObject);
 
             // Track root object ID to prevent re-adding if referenced elsewhere in the tree.
-            // New objects (Id == 0) get IDs assigned later and are not subject to dedup.
+            // New objects (Id == 0) get IDs assigned later and are deduplicated by instance only.
             if (rootObject.Id != 0)
                 processed.Add(rootObject.Id);
 
             var rootProperties = GetPropertiesFromRedbObject(rootObject);
-            await CollectNestedRedbObjectsFromProperties(rootProperties, collector, processed, rootObject.Id, referenceStubs);
+            await CollectNestedRedbObjectsFromProperties(rootProperties, collector, processed, seen, rootObject.Id, referenceStubs);
         }
 
         /// <summary>
         /// Recursive search for IRedbObject in object Props
         /// </summary>
-        private async Task CollectNestedRedbObjectsFromProperties(object? properties, List<IRedbObject> collector, HashSet<long> processed, long parentId, List<IRedbObject>? referenceStubs)
+        private async Task CollectNestedRedbObjectsFromProperties(object? properties, List<IRedbObject> collector, HashSet<long> processed, HashSet<object> seen, long parentId, List<IRedbObject>? referenceStubs)
         {
             if (properties == null) return;
 
@@ -88,14 +93,14 @@ namespace redb.Core.Providers.Base
                     // Dedup: skip objects already collected (same RedbObject referenced
                     // from multiple properties, e.g. two LicenseInfo entries pointing
                     // to the same Plan). New objects (Id == 0) always collected.
-                    if (redbObj.Id != 0 && !processed.Add(redbObj.Id))
+                    if (!seen.Add(redbObj) || (redbObj.Id != 0 && !processed.Add(redbObj.Id)))
                         continue;
 
                     collector.Add(redbObj);
                     ValidateValueUnique(redbObj);
 
                     var nestedProperties = GetPropertiesFromRedbObject(redbObj);
-                    await CollectNestedRedbObjectsFromProperties(nestedProperties, collector, processed, redbObj.Id, referenceStubs);
+                    await CollectNestedRedbObjectsFromProperties(nestedProperties, collector, processed, seen, redbObj.Id, referenceStubs);
                 }
                 // IRedbObject array
                 else if (value is IEnumerable enumerable && IsRedbObjectArrayType(value.GetType()))
@@ -115,14 +120,14 @@ namespace redb.Core.Providers.Base
                                 }
 
                             // Dedup: same object referenced from multiple array elements
-                            if (redbObj.Id != 0 && !processed.Add(redbObj.Id))
+                            if (!seen.Add(redbObj) || (redbObj.Id != 0 && !processed.Add(redbObj.Id)))
                                 continue;
 
                             collector.Add(redbObj);
                             ValidateValueUnique(redbObj);
 
                             var arrayElementProperties = GetPropertiesFromRedbObject(redbObj);
-                            await CollectNestedRedbObjectsFromProperties(arrayElementProperties, collector, processed, redbObj.Id, referenceStubs);
+                            await CollectNestedRedbObjectsFromProperties(arrayElementProperties, collector, processed, seen, redbObj.Id, referenceStubs);
                         }
                     }
                 }
@@ -148,14 +153,14 @@ namespace redb.Core.Providers.Base
                                     }
 
                                 // Dedup: same object referenced from multiple dict entries
-                                if (redbObj.Id != 0 && !processed.Add(redbObj.Id))
+                                if (!seen.Add(redbObj) || (redbObj.Id != 0 && !processed.Add(redbObj.Id)))
                                     continue;
 
                                 collector.Add(redbObj);
                                 ValidateValueUnique(redbObj);
 
                                 var nestedProperties = GetPropertiesFromRedbObject(redbObj);
-                                await CollectNestedRedbObjectsFromProperties(nestedProperties, collector, processed, redbObj.Id, referenceStubs);
+                                await CollectNestedRedbObjectsFromProperties(nestedProperties, collector, processed, seen, redbObj.Id, referenceStubs);
                             }
                         }
                     }
@@ -163,7 +168,7 @@ namespace redb.Core.Providers.Base
                 // Recursion into business classes
                 else if (IsBusinessClassType(value.GetType()))
                 {
-                    await CollectNestedRedbObjectsFromProperties(value, collector, processed, parentId, referenceStubs);
+                    await CollectNestedRedbObjectsFromProperties(value, collector, processed, seen, parentId, referenceStubs);
                 }
                 // Recursion into business class arrays
                 else if (value is IEnumerable businessEnumerable && !IsStringType(value.GetType()))
@@ -172,9 +177,77 @@ namespace redb.Core.Providers.Base
                     {
                         if (item != null && IsBusinessClassType(item.GetType()))
                         {
-                            await CollectNestedRedbObjectsFromProperties(item, collector, processed, parentId, referenceStubs);
+                            await CollectNestedRedbObjectsFromProperties(item, collector, processed, seen, parentId, referenceStubs);
                         }
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Hashes every collected object after the objects it references. A parent hashes "id:hash" of every
+        /// reference, so a reference hashed after its parent leaves the parent with the reference's stale or empty
+        /// hash - stored for ever, a props-cache miss on every load. The collector is pre-order and collects a
+        /// target shared by two parents once, under the first: reversing its order put the second parent before
+        /// the target (review after 4.0.0). Post-order over the graph, each instance once.
+        /// </summary>
+        private static void RecomputeHashesPostOrder(IEnumerable<IRedbObject> objects)
+        {
+            var done = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            foreach (var obj in objects)
+                RecomputeHashDeep(obj, done);
+        }
+
+        private static void RecomputeHashDeep(IRedbObject obj, HashSet<object> done)
+        {
+            if (!done.Add(obj))
+                return;
+            ForEachDirectReference(GetPropertiesFromRedbObject(obj), child =>
+            {
+                // A stub carries the hash the parent needs; there is nothing loaded to hash.
+                if (!IsUnloadedReference(child))
+                    RecomputeHashDeep(child, done);
+            });
+            RecomputeHash(obj);
+        }
+
+        /// <summary>
+        /// The objects a Props instance references directly - single, in a collection, as dictionary values, and
+        /// through nested business classes - the walk of <see cref="CollectNestedRedbObjectsFromProperties"/>.
+        /// </summary>
+        private static void ForEachDirectReference(object? properties, Action<IRedbObject> visit)
+        {
+            if (properties == null) return;
+
+            foreach (var property in properties.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.ShouldIgnoreForRedb() || property.GetIndexParameters().Length > 0)
+                    continue;
+                var value = property.GetValue(properties);
+                if (value == null) continue;
+
+                if (IsRedbObjectType(value.GetType()))
+                    visit((IRedbObject)value);
+                else if (value is IEnumerable enumerable && IsRedbObjectArrayType(value.GetType()))
+                {
+                    foreach (var item in enumerable)
+                        if (item != null && IsRedbObjectType(item.GetType()))
+                            visit((IRedbObject)item);
+                }
+                else if (IsDictionaryWithRedbObjectValue(value.GetType()))
+                {
+                    if (value.GetType().GetProperty("Values")?.GetValue(value) is IEnumerable values)
+                        foreach (var item in values)
+                            if (item != null && IsRedbObjectType(item.GetType()))
+                                visit((IRedbObject)item);
+                }
+                else if (IsBusinessClassType(value.GetType()))
+                    ForEachDirectReference(value, visit);
+                else if (value is IEnumerable businessEnumerable && !IsStringType(value.GetType()))
+                {
+                    foreach (var item in businessEnumerable)
+                        if (item != null && IsBusinessClassType(item.GetType()))
+                            ForEachDirectReference(item, visit);
                 }
             }
         }
@@ -187,6 +260,21 @@ namespace redb.Core.Providers.Base
         /// </summary>
         private static bool IsUnloadedReference(IRedbObject obj)
             => obj.Id != 0 && obj is RedbObject typed && !typed.IsPropsLoaded;
+
+        /// <summary>
+        /// A reference whose properties were never loaded names another object; saving it would save whatever a fresh
+        /// load returns, and the caller's edits - made on an instance the getter did not keep (a shared instance inside a
+        /// transaction) - would be lost silently (review after 4.0.0). The collector skips such references inside a
+        /// graph; saved directly, they are refused.
+        /// </summary>
+        private static void RefuseUnloadedReference(IRedbObject obj)
+        {
+            // A stub redb attached a lazy loader to (a depth boundary, a cache), still unloaded. An object without a
+            // loader and without loaded Props is the caller's own - a scheme without properties, Props set to null - and
+            // is saved as it is.
+            if (IsUnloadedReference(obj) && obj.GetType().GetField("_lazyLoader")?.GetValue(obj) != null)
+                throw new Exceptions.RedbUnloadedReferenceException(obj.Id, obj.SchemeId);
+        }
 
         /// <summary>
         /// The 440-character limit of _objects._value_unique, enforced in C# so every provider
@@ -206,13 +294,23 @@ namespace redb.Core.Providers.Base
                 throw new Exceptions.RedbValueStringTooLongException(obj.Id, obj.ValueString.Length);
         }
 
+        // Answered once per type: every predicate below reflects over the interfaces of the type, and the save asked
+        // them for every property of every object (review after 4.0.0).
+        private static readonly ConcurrentDictionary<Type, bool> RedbObjectTypeByType = new();
+        private static readonly ConcurrentDictionary<Type, bool> RedbObjectArrayTypeByType = new();
+        private static readonly ConcurrentDictionary<Type, bool> DictionaryWithRedbObjectValueByType = new();
+        private static readonly ConcurrentDictionary<Type, bool> BusinessClassTypeByType = new();
+
         /// <summary>
         /// IRedbObject type check
         /// </summary>
         private static bool IsRedbObjectType(Type type)
+            => RedbObjectTypeByType.GetOrAdd(type, static t => IsRedbObjectTypeCore(t));
+
+        private static bool IsRedbObjectTypeCore(Type type)
         {
-            // Direct check for RedbObject<T>
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(RedbObject<>))
+            // RedbObject<T> itself or anything derived from it (TreeRedbObject<T>)
+            if (Utils.RedbObjectTypes.GenericOf(type) != null)
                 return true;
 
             // Check interfaces for IRedbObject<T>
@@ -222,18 +320,33 @@ namespace redb.Core.Providers.Base
         }
 
         /// <summary>
-        /// Checking IRedbObject array
+        /// A collection of IRedbObject: an array, or any generic IEnumerable&lt;T&gt; (List, IList, ...) whose element
+        /// is one. Only arrays used to count (props cache review, 2026-09-15): the collector skipped the elements of a
+        /// List - references by id got no hash, so the parent never matched its loaded hash; a new object was never
+        /// saved (foreign key failure); an edit to a loaded one was lost.
         /// </summary>
         private static bool IsRedbObjectArrayType(Type type)
+            => RedbObjectArrayTypeByType.GetOrAdd(type, static t => IsRedbObjectArrayTypeCore(t));
+
+        private static bool IsRedbObjectArrayTypeCore(Type type)
         {
-            if (!type.IsArray) return false;
-            return IsRedbObjectType(type.GetElementType()!);
+            if (type.IsArray)
+                return IsRedbObjectType(type.GetElementType()!);
+            if (type == typeof(string))
+                return false;
+            var sequence = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+                ? type
+                : type.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+            return sequence != null && IsRedbObjectType(sequence.GetGenericArguments()[0]);
         }
 
         /// <summary>
         /// Checking Dictionary with IRedbObject values
         /// </summary>
         private static bool IsDictionaryWithRedbObjectValue(Type type)
+            => DictionaryWithRedbObjectValueByType.GetOrAdd(type, static t => IsDictionaryWithRedbObjectValueCore(t));
+
+        private static bool IsDictionaryWithRedbObjectValueCore(Type type)
         {
             if (!type.IsGenericType) return false;
             var genericDef = type.GetGenericTypeDefinition();
@@ -426,8 +539,8 @@ namespace redb.Core.Providers.Base
                     continue;
                 }
 
-                // Skip RedbObject<TProps> with Props=null - no _values records
-                if (objType.IsGenericType && objType.GetGenericTypeDefinition() == typeof(RedbObject<>))
+                // Skip RedbObject<TProps> (or a TreeRedbObject<TProps>) with Props=null - no _values records
+                if (Utils.RedbObjectTypes.GenericOf(objType) != null)
                 {
                     var propsProperty = objType.GetProperty("Props");
                     var propsValue = propsProperty?.GetValue(obj);
@@ -534,6 +647,9 @@ namespace redb.Core.Providers.Base
         /// Check if the type is a business class (not a primitive or an array)
         /// </summary>
         private static bool IsBusinessClassType(Type type)
+            => BusinessClassTypeByType.GetOrAdd(type, static t => IsBusinessClassTypeCore(t));
+
+        private static bool IsBusinessClassTypeCore(Type type)
         {
             // Primitives and strings are not business classes
             if (type.IsPrimitive || type == typeof(string) || type == typeof(decimal) || type == typeof(DateTime) || type == typeof(DateTimeOffset) || type == typeof(TimeOnly) || type == typeof(DateOnly) || type == typeof(TimeSpan) || type == typeof(Guid))

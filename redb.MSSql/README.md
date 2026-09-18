@@ -11,7 +11,7 @@ SQL Server provider for **RedBase (REDB)** — Entity Database for .NET.
 - Tree queries with recursive CTEs
 - Schema initialization (`redbMSSQL.sql`)
 - Full LINQ-to-SQL translation
-- Depends on `redb.Core` and `Microsoft.Data.SqlClient`
+- Depends on `redb.Core` and `Microsoft.Data.SqlClient` 7.0.3
 
 ## Requirements
 

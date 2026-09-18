@@ -392,10 +392,32 @@ public class GlobalMetadataCache
     /// </summary>
     public async Task<Type?> ResolveClrTypeAsync(long schemeId, ISchemeSyncProvider schemeProvider)
     {
-        var sync = GetClrType(schemeId);
-        if (sync != null) return sync;
+        var type = GetClrType(schemeId);
+        if (type != null || IsSchemeKnown(schemeId))
+            return type;
+        return RememberClrType(schemeId, await schemeProvider.GetSchemeByIdAsync(schemeId));
+    }
 
-        var scheme = await schemeProvider.GetSchemeByIdAsync(schemeId);
+    /// <summary>
+    /// Synchronous <see cref="ResolveClrTypeAsync"/> for the thread-pool-free load path: the cold lookup loads the
+    /// scheme through <see cref="ISchemeSyncProvider.GetSchemeById"/> on the calling thread.
+    /// </summary>
+    public Type? ResolveClrType(long schemeId, ISchemeSyncProvider schemeProvider)
+    {
+        var type = GetClrType(schemeId);
+        if (type != null || IsSchemeKnown(schemeId))
+            return type;
+        return RememberClrType(schemeId, schemeProvider.GetSchemeById(schemeId));
+    }
+
+    // A scheme this domain holds and the type index does not answer to is a scheme with no CLR type: the index is
+    // asked again on every lookup and heals itself when an assembly loads, so the provider is not asked again.
+    // Asking it loaded the scheme on every read of a list item's object of such a scheme.
+    private bool IsSchemeKnown(long schemeId) => GetCache().SchemeById.ContainsKey(schemeId);
+
+    // The cold half of both forms: cache the loaded scheme in this domain and map its CLR type.
+    private Type? RememberClrType(long schemeId, IRedbScheme? scheme)
+    {
         if (scheme == null) return null;
         CacheScheme(scheme);   // populate this domain's scheme cache so future sync lookups hit
 

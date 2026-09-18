@@ -92,7 +92,7 @@ public static class PostgresOptionsExtensions
         services.AddScoped<ILazyPropsLoader, LazyPropsLoader>();
         services.AddScoped<IQueryableProvider, PostgresQueryableProvider>();
         services.AddScoped<ITreeProvider, PostgresTreeProvider>();
-        services.AddScoped<IListProvider, PostgresListProvider>();
+        services.AddScoped<IListProvider>(sp => sp.GetRequiredService<IRedbService>().ListProvider); // one per scope: the service's own
         services.AddScoped<IValidationProvider, PostgresValidationProvider>();
         
         // Background deletion service (singleton + hosted service)

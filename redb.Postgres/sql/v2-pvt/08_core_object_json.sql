@@ -23,6 +23,9 @@ DROP FUNCTION IF EXISTS build_hierarchical_properties_optimized(bigint, bigint, 
 DROP FUNCTION IF EXISTS build_hierarchical_properties_optimized(bigint, bigint, bigint, _values[], integer, text, bigint);
 
 -- ===== HELPER: Build ListItem JSON (DRY - used in multiple places) =====
+-- The model's keys (RedbListItem: id, id_list, value, alias, id_object). The linked object travels as its
+-- id; until 0.7.11 it was built in full under "object", a key the deserializer ignores, and the item was
+-- written as "idList" without "id_object". max_depth stays for the callers.
 CREATE OR REPLACE FUNCTION build_listitem_jsonb(
     listitem_id bigint,
     max_depth integer DEFAULT 10
@@ -38,14 +41,10 @@ BEGIN
     
     RETURN (SELECT jsonb_build_object(
         'id', li._id,
-        'idList', li._id_list,
+        'id_list', li._id_list,
         'value', li._value,
         'alias', li._alias,
-        'object', CASE 
-            WHEN li._id_object IS NOT NULL THEN
-                get_object_json(li._id_object, GREATEST(0, max_depth - 1))
-            ELSE NULL 
-        END
+        'id_object', li._id_object
     )
     FROM _list_items li
     WHERE li._id = listitem_id);

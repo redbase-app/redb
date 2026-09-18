@@ -87,7 +87,7 @@ public static class MsSqlOptionsExtensions
         services.AddScoped<ILazyPropsLoader, LazyPropsLoader>();
         services.AddScoped<IQueryableProvider, MssqlQueryableProvider>();
         services.AddScoped<ITreeProvider, MssqlTreeProvider>();
-        services.AddScoped<IListProvider, MssqlListProvider>();
+        services.AddScoped<IListProvider>(sp => sp.GetRequiredService<IRedbService>().ListProvider); // one per scope: the service's own
         services.AddScoped<IValidationProvider, MssqlValidationProvider>();
         
         // Background deletion service (singleton + hosted service)

@@ -68,6 +68,8 @@ GO
 -- =====================================================
 -- HELPER: Build ListItem JSON (DRY - used in multiple places)
 -- =====================================================
+-- The model's keys (RedbListItem: id, id_list, value, alias, id_object). Until 0.2.16 the item was written
+-- as "idList" without "id_object", and every load lost the list link and the object link.
 CREATE FUNCTION dbo.build_listitem_json(@listitem_id BIGINT)
 RETURNS NVARCHAR(MAX)
 AS
@@ -75,11 +77,13 @@ BEGIN
     IF @listitem_id IS NULL RETURN NULL;
     
     RETURN (SELECT N'{"id":' + CAST(li._id AS NVARCHAR(20)) + 
-                   N',"idList":' + CAST(li._id_list AS NVARCHAR(20)) + 
+                   N',"id_list":' + CAST(li._id_list AS NVARCHAR(20)) + 
                    N',"value":' + CASE WHEN li._value IS NULL THEN N'null' 
                                        ELSE N'"' + dbo.escape_json_string(li._value) + N'"' END +
                    N',"alias":' + CASE WHEN li._alias IS NULL THEN N'null' 
                                        ELSE N'"' + dbo.escape_json_string(li._alias) + N'"' END +
+                   N',"id_object":' + CASE WHEN li._id_object IS NULL THEN N'null'
+                                           ELSE CAST(li._id_object AS NVARCHAR(20)) END +
                    N'}'
             FROM _list_items li WHERE li._id = @listitem_id);
 END
@@ -171,9 +175,11 @@ BEGIN
             -- returns the base-fields stub (id, scheme_id, hash, no properties), which is
             -- what PostgreSQL and SQLite do. Emitting null here instead made the three
             -- providers disagree on the same data. NULL only when there is no reference.
+            -- A target in the trash makes get_object_json return NULL, and STRING_AGG skips NULL:
+            -- the ISNULL keeps it as null in its place (0.2.17), same in the dictionary branch.
             SELECT @result = N'[' + ISNULL(STRING_AGG(
                 CASE WHEN v._Object IS NOT NULL
-                     THEN dbo.get_object_json(v._Object, @lazy_depth)
+                     THEN ISNULL(dbo.get_object_json(v._Object, @lazy_depth), N'null')
                      ELSE N'null' END
             , N',') WITHIN GROUP (ORDER BY 
                 CASE WHEN v._array_index LIKE '[0-9]%' AND ISNUMERIC(v._array_index) = 1 
@@ -273,7 +279,7 @@ BEGIN
             SELECT @result = N'{' + ISNULL(STRING_AGG(
                 N'"' + dbo.escape_json_string(v._array_index) + N'":' +
                 CASE WHEN v._Object IS NOT NULL AND @max_depth > 0 
-                     THEN dbo.get_object_json(v._Object, @lazy_depth)
+                     THEN ISNULL(dbo.get_object_json(v._Object, @lazy_depth), N'null')
                      ELSE N'null' END
             , N','), N'') + N'}'
             FROM _values v

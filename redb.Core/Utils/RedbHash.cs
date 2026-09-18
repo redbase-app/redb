@@ -164,63 +164,53 @@ namespace redb.Core.Utils
         }
 
         /// <summary>
-        /// Safe property value retrieval with exception handling.
-        /// FIX: Recursively hashes nested objects and arrays!
+        /// The canon of one property value; recursively hashes nested objects and arrays. A getter's exception is not
+        /// caught (owner decision 2026-09-15): an empty string standing in for it made the hash describe data the
+        /// object does not have, and the save does not catch that getter either.
         /// </summary>
         private static string SafeGetValue(PropertyInfo property, object obj)
         {
-            try
-            {
-                var value = property.GetValue(obj);
-                if (value == null)
-                    return "";
-
-                var type = value.GetType();
-
-                // Decimal: normalize to strip trailing zeros (6450.000 == 6450.000000000000000000)
-                if (type == typeof(decimal))
-                    return ((decimal)value).ToString("G29");
-
-                // Primitives and simple types - just ToString
-                if (IsPrimitiveOrSimple(type))
-                    return value.ToString() ?? "";
-
-
-                // V4 (L.2, LAZY plan §4.1): a nested RedbObject is a REFERENCE. The parent hashes
-                // the reference's own persisted hash instead of walking its Props: walking would
-                // (a) trigger lazy loading of the whole graph from inside a hash computation and
-                // (b) make the eager and the lazy hash of the same parent differ (a stub carries
-                // no Props). The hash field is present on stub and full object alike.
-                if (value is IRedbObject nestedRef)
-                    return $"{nestedRef.Id}:{nestedRef.Hash?.ToString("N")}"; // id = identity, hash = content-at-write
-
-                // O-1/B-3 (owner's verdict): _values stores the dictionary item IDENTIFIER, and the
-                // hash canon is the id ONLY. ListItem content lives its own life (extension objects);
-                // hashing the content would move the owner's hash whenever a value in _list_items
-                // is renamed.
-                if (value is IRedbListItem listItemRef)
-                    return listItemRef.Id.ToString();
-                // Dictionaries — hash by CONTENT, order-independent. A Dictionary is an UNORDERED set of
-                // key/value pairs: {a:1,b:2} equals {b:2,a:1}, so equal maps must hash equally. .NET does
-                // not guarantee enumeration order (and it changes after removals), and the same logical
-                // map is rebuilt in a different order when materialized from _values than when first
-                // created — hashing it in enumeration order desynchronizes _objects._hash vs the cache.
-                // Canonicalize by sorting "key=valueHash" pairs before hashing.
-                if (value is System.Collections.IDictionary dictionary)
-                    return FormatDictionaryCanon(dictionary);
-
-                // Arrays and collections - hash each element (ORDER MATTERS here — lists/arrays are ordered)
-                if (value is System.Collections.IEnumerable enumerable && type != typeof(string))
-                    return FormatEnumerableCanon(enumerable);
-
-                // Nested object (business class) - recursively hash!
-                var nestedHash = ComputeForObject(value);
-                return nestedHash?.ToString("N") ?? "";
-            }
-            catch
-            {
+            var value = property.GetValue(obj);
+            if (value == null)
                 return "";
-            }
+
+            var type = value.GetType();
+
+            // Primitives and simple types: the invariant canon (culture-free, milliseconds for temporal values)
+            if (IsPrimitiveOrSimple(type))
+                return ScalarCanon(value);
+
+
+            // V4 (L.2, LAZY plan §4.1): a nested RedbObject is a REFERENCE. The parent hashes
+            // the reference's own persisted hash instead of walking its Props: walking would
+            // (a) trigger lazy loading of the whole graph from inside a hash computation and
+            // (b) make the eager and the lazy hash of the same parent differ (a stub carries
+            // no Props). The hash field is present on stub and full object alike.
+            if (value is IRedbObject nestedRef)
+                return $"{nestedRef.Id}:{nestedRef.Hash?.ToString("N")}"; // id = identity, hash = content-at-write
+
+            // O-1/B-3 (owner's verdict): _values stores the dictionary item IDENTIFIER, and the
+            // hash canon is the id ONLY. ListItem content lives its own life (extension objects);
+            // hashing the content would move the owner's hash whenever a value in _list_items
+            // is renamed.
+            if (value is IRedbListItem listItemRef)
+                return listItemRef.Id.ToString();
+            // Dictionaries — hash by CONTENT, order-independent. A Dictionary is an UNORDERED set of
+            // key/value pairs: {a:1,b:2} equals {b:2,a:1}, so equal maps must hash equally. .NET does
+            // not guarantee enumeration order (and it changes after removals), and the same logical
+            // map is rebuilt in a different order when materialized from _values than when first
+            // created — hashing it in enumeration order desynchronizes _objects._hash vs the cache.
+            // Canonicalize by sorting "key=valueHash" pairs before hashing.
+            if (value is System.Collections.IDictionary dictionary)
+                return FormatDictionaryCanon(dictionary);
+
+            // Arrays and collections - hash each element (ORDER MATTERS here — lists/arrays are ordered)
+            if (value is System.Collections.IEnumerable enumerable && type != typeof(string))
+                return FormatEnumerableCanon(enumerable);
+
+            // Nested object (business class) - recursively hash!
+            var nestedHash = ComputeForObject(value);
+            return nestedHash?.ToString("N") ?? "";
         }
 
         /// <summary>
@@ -233,14 +223,14 @@ namespace redb.Core.Utils
             var entries = new System.Collections.Generic.List<string>(dictionary.Count);
             foreach (System.Collections.DictionaryEntry entry in dictionary)
             {
-                var keyStr = entry.Key?.ToString() ?? "null";
+                var keyStr = entry.Key == null ? "null"
+                    : IsPrimitiveOrSimple(entry.Key.GetType()) ? ScalarCanon(entry.Key)
+                    : entry.Key.ToString() ?? "null";
                 string valStr;
                 if (entry.Value == null)
                     valStr = "null";
-                else if (entry.Value is decimal decVal)
-                    valStr = decVal.ToString("G29");
                 else if (IsPrimitiveOrSimple(entry.Value.GetType()))
-                    valStr = entry.Value.ToString() ?? "";
+                    valStr = ScalarCanon(entry.Value);
                 else if (entry.Value is IRedbObject dictRef)
                     valStr = $"{dictRef.Id}:{dictRef.Hash?.ToString("N")}"; // V4 (L.2): reference by its hash
                 else if (entry.Value is IRedbListItem dictListItem)
@@ -266,13 +256,9 @@ namespace redb.Core.Utils
                 {
                     elementHashes.Add("null");
                 }
-                else if (item is decimal dec)
-                {
-                    elementHashes.Add(dec.ToString("G29"));
-                }
                 else if (IsPrimitiveOrSimple(item.GetType()))
                 {
-                    elementHashes.Add(item.ToString() ?? "");
+                    elementHashes.Add(ScalarCanon(item));
                 }
                 else if (item is IRedbObject itemRef)
                 {
@@ -291,6 +277,50 @@ namespace redb.Core.Utils
             }
             return $"[{string.Join(",", elementHashes)}]";
         }
+
+        /// <summary>
+        /// The canon of a primitive or simple value. Invariant: the process culture never takes part (a decimal
+        /// separator or a date format of one node must not move the hash on another), and a temporal value is
+        /// canonicalised in UTC at MILLISECOND precision - the precision every database keeps (SQLite stores an
+        /// OLE date, truncated to milliseconds by .NET; PostgreSQL keeps microseconds; SQL Server 100 ns), so the
+        /// hash the save stores is the hash the reloaded object recomputes. A change below one millisecond is
+        /// not a change: the databases do not keep it. A DateTime hashes by its clock reading whatever its Kind,
+        /// exactly as it is stored (DateTimeConverter.NormalizeForStorage stamps Kind=Utc without converting).
+        /// Before this canon the values went through ToString(): sub-second digits were lost, so a save under
+        /// ChangeTracking skipped a temporal property changed within the same second (BR-11, 2026-09-16).
+        /// </summary>
+        private static string ScalarCanon(object value)
+        {
+            var inv = CultureInfo.InvariantCulture;
+            switch (value)
+            {
+                case decimal d:
+                    // Strip trailing zeros (6450.000 == 6450.000000000000000000)
+                    return d.ToString("G29", inv);
+                case double d:
+                    return d.ToString("R", inv);
+                case float f:
+                    return f.ToString("R", inv);
+                case DateTimeOffset dto:
+                    return TemporalCanon(dto.UtcTicks);
+                case DateTime dt:
+                    return TemporalCanon(dt.Ticks);
+                case DateOnly day:
+                    return day.ToString("yyyy-MM-dd", inv);
+                case TimeOnly time:
+                    return new TimeOnly(time.Ticks - time.Ticks % TimeSpan.TicksPerMillisecond).ToString("HH:mm:ss.fff", inv);
+                case TimeSpan span:
+                    return span.ToString("c", inv);
+                case IFormattable formattable:
+                    return formattable.ToString(null, inv);
+                default:
+                    return value.ToString() ?? "";
+            }
+        }
+
+        private static string TemporalCanon(long ticks)
+            => new DateTime(ticks - ticks % TimeSpan.TicksPerMillisecond, DateTimeKind.Unspecified)
+                .ToString("yyyy-MM-ddTHH:mm:ss.fff", CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Checks if type is primitive or simple (does not require recursion).

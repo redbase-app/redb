@@ -460,6 +460,10 @@ deploy/volumes/*/appsettings.Production.json
 # They were tracked before and rewrote themselves on every build: redb.Identity.Core.Module.tpkg
 # alone landed in 64 commits (~1.9 MB each), bloating history for zero benefit.
 *.tpkg
+# Тот же класс и та же папка: pack-tpkg.ps1 копирует сюда redb.Identity/context.json, а релизный
+# прогон оставляет его санитизированным. Файл скакал между dev- и санитизированным видом из релиза
+# в релиз и шумел в diff. Источник истины — redb.Identity/context.json, он остаётся в git.
+redb.Identity/scripts/output/context.json
 
 # Release staging: signed archives + manifests, all reproducible from source.
 redb.Route/publish/output/
@@ -472,6 +476,11 @@ nupkg/
 
 # Личный срез состояния TGChatLmm — пишется для владельца, не часть проектной документации.
 TGChatLmm/build/STATUS.md
+
+# Снимки заморозки инициации (InitiationFreezeTests): сырые ответы и рассуждения модели на
+# протокол автора. Читаются глазами, отобранная пара кладётся в data/prompts руками; сами
+# снимки — черновики прогона и в репозиторий не едут.
+TGChatLmm/build/initiation-freeze/
 
 # Секреты тестового контура — по машине, никогда не в репозиторий.
 # Образец с пустыми значениями лежит рядом: TGChatLmm/deploy/local.env.example
@@ -502,6 +511,8 @@ redb.Postgres/sql/v2-pvt/pvt_bundle.sql
 redb.MSSql/sql/redb_init.sql
 redb.MSSql/sql/v2-pvt/pvt_bundle.sql
 
+# Слова автора со стенда (копия сеансов, вне git по правилу канала)
+TGChatLmm/unconfirmed/bench-sessions-*/
 # ---------------------------------------------------------------------------
 # SQLite databases and their WAL/SHM sidecars, anywhere in the tree. Test runs,
 # examples and the dev worker all drop them next to the app; the per-path list

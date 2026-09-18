@@ -42,8 +42,17 @@ class Program
         var services = new ServiceCollection();
         ConfigureServices(services);
 
-        var provider = services.BuildServiceProvider();
-        var redb = provider.GetRequiredService<IRedbService>();
+        await using var provider = services.BuildServiceProvider();
+
+        // One scope per unit of work. An IRedbService is one connection: a service kept for the life of the process
+
+        // cannot serve parallel flows (a web request, a job, a message handler each resolve their own from a scope).
+
+        // A console does its work in one flow, so the scope here only shows the shape that carries over to hosts.
+
+        await using var scope = provider.CreateAsyncScope();
+
+        var redb = scope.ServiceProvider.GetRequiredService<IRedbService>();
 
         // Get DB type and platform key
         var ctxName = redb.Context.GetType().Name;

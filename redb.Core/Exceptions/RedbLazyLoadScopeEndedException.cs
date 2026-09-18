@@ -3,27 +3,41 @@ using System;
 namespace redb.Core.Exceptions;
 
 /// <summary>
-/// Thrown when the <c>Props</c> of an unloaded reference are asked for after the redb scope that
-/// loaded it has ended: the reference still carries that scope's loader, whose context (one
-/// connection) is disposed. Before this, the loader quietly took a fresh pooled connection nobody
-/// would ever return. Objects served from the props cache never hit this - the cache hands their
-/// references a loader that opens its own scope per load (V4, review).
+/// Thrown when a lazy load - the <c>Props</c> of an unloaded reference, <c>RedbListItem.Object</c> - finds no live redb
+/// scope to run on. A data object owns no connection: the load runs on the scope of whoever reads it (owner decision
+/// 2026-09-15). Here none reads: the scope that loaded the object has ended, or the code runs outside any scope - a
+/// background task, a static cache, a UI event handler. Before, the load quietly took a fresh scope and pooled connection
+/// per read.
 /// </summary>
 public class RedbLazyLoadScopeEndedException : InvalidOperationException
 {
-    /// <summary>Id of the object whose Props were asked for.</summary>
+    private const string WaysOut =
+        " Read it inside a live scope: resolve IRedbService from a scope, or wrap the block in " +
+        "using (redb.BeginAccess()) { ... } (UI event handlers, background work). Or load it explicitly while a scope " +
+        "is alive - redb.LoadAsync(id), redb.LoadReferencesAsync(parent, p => p.Reference), redb.LoadLinkedObjectsAsync(items), " +
+        "a larger depth - or set RedbServiceConfiguration.LazyLoadWithoutScope = FreshScope to open a scope per load.";
+
+    /// <summary>Id of the object whose Props (or which, behind a list item) were asked for.</summary>
     public long ObjectId { get; }
 
-    /// <summary>Scheme of that object.</summary>
+    /// <summary>Scheme of that object; 0 when the load came from a list item and the scheme is not known yet.</summary>
     public long SchemeId { get; }
 
     public RedbLazyLoadScopeEndedException(long objectId, long schemeId)
-        : base($"Object {objectId} (scheme {schemeId}) is an unloaded reference and the redb scope that loaded it " +
-               "has ended (its context is disposed). Load it inside a live scope - redb.LoadAsync(id), " +
-               "redb.LoadReferencesAsync(parent, p => p.Reference) - or load the parent with a larger depth " +
-               "while the scope is alive.")
+        : base($"Object {objectId} (scheme {schemeId}) is an unloaded reference and no live redb scope reads it here." + WaysOut)
     {
         ObjectId = objectId;
         SchemeId = schemeId;
     }
+
+    private RedbLazyLoadScopeEndedException(string message, long objectId)
+        : base(message)
+    {
+        ObjectId = objectId;
+    }
+
+    /// <summary>A list item's linked object asked for with no live redb scope.</summary>
+    public static RedbLazyLoadScopeEndedException ForListItem(long listItemId, long objectId)
+        => new($"The object {objectId} linked to list item {listItemId} is loaded lazily and no live redb scope reads it here." + WaysOut,
+            objectId);
 }

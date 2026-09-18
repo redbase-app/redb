@@ -13,6 +13,15 @@ namespace redb.SQLite.Data
     {
         private readonly SqliteTransaction _transaction;
         private readonly Action _onDispose;
+        private bool _completionReported;
+
+        // Reports the outcome once to the callbacks registered for this transaction (cache publication after commit).
+        private void Complete(bool committed)
+        {
+            if (_completionReported) return;
+            _completionReported = true;
+            redb.Core.Data.TransactionCompletion.Completed(this, committed);
+        }
         private bool _disposed = false;
         
         /// <summary>
@@ -64,6 +73,7 @@ namespace redb.SQLite.Data
                 // Speculatively rollback so the pooled SqliteConnection returns clean.
                 // Both errors are visible via [Diag-TX-LIFECYCLE] so the source is traceable.
                 // Console.WriteLine($"[Diag-TX-LIFECYCLE] CommitAsync FAILED: {ex.GetType().Name}: {ex.Message}. Attempting speculative rollback.");
+                Complete(committed: false);
                 try { await _transaction.RollbackAsync(); }
                 catch (Exception rbEx)
                 {
@@ -73,6 +83,7 @@ namespace redb.SQLite.Data
                 _onDispose();
                 throw;
             }
+            Complete(committed: true);
             IsActive = false;
             // Clear the connection's `_currentTransaction` slot now — any
             // command issued between commit and dispose must NOT bind to this
@@ -88,6 +99,8 @@ namespace redb.SQLite.Data
         {
             if (!IsActive)
                 throw new InvalidOperationException("Transaction is not active. Already committed or rolled back.");
+
+            Complete(committed: false);
 
             try
             {
@@ -114,6 +127,7 @@ namespace redb.SQLite.Data
                 return;
 
             _disposed = true;
+            Complete(committed: false);
 
             // Auto-rollback if still active. The catch CANNOT throw (Dispose contract),
             // so leaks here are mitigated by SqliteDataSource.EnsureCleanTransactionState

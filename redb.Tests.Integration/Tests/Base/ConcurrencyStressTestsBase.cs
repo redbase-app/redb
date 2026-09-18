@@ -19,8 +19,8 @@ namespace redb.Tests.Integration.Tests.Base;
 /// each parallel worker must resolve its OWN <see cref="IRedbService"/> from
 /// a fresh DI scope.
 ///
-/// Free MSSql is excluded because some query paths (array aggregation, HAVING)
-/// are unsupported.
+/// Hosted on PostgreSQL and SQL Server, Free and Pro. Free SQL Server was left out while
+/// array aggregation and HAVING were unsupported there; both hold now.
 /// </summary>
 public abstract class ConcurrencyStressTestsBase
 {

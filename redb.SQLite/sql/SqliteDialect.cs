@@ -1134,37 +1134,19 @@ public class SqliteDialect : ISqlDialect
     /// HasAncestor with tree function (8 params).
     /// </summary>
     public string Query_HasAncestorTreeSql(string functionName) =>
-        $@"WITH search_result AS (
-            SELECT result->>'objects' as objects_json
-            FROM {functionName}($1, $2, $3, NULL, 0, NULL, $4, 10) as result
-        )
-        SELECT jsonb_array_elements(objects_json)->>'id' as ""Value""
-        FROM search_result
-        WHERE objects_json IS NOT NULL AND objects_json != 'null'";
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (has_ancestor over " + functionName + ")");
 
     /// <summary>
     /// HasAncestor with normal function (6 params).
     /// </summary>
     public string Query_HasAncestorNormalSql(string functionName) =>
-        $@"WITH search_result AS (
-            SELECT result->>'objects' as objects_json
-            FROM {functionName}($1, $2, NULL, 0, NULL, 10) as result
-        )
-        SELECT jsonb_array_elements(objects_json)->>'id' as ""Value""
-        FROM search_result
-        WHERE objects_json IS NOT NULL AND objects_json != 'null'";
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (has_ancestor over " + functionName + ")");
 
     /// <summary>
     /// HasDescendant with normal function (6 params).
     /// </summary>
     public string Query_HasDescendantSql(string functionName) =>
-        $@"WITH search_result AS (
-            SELECT result->>'objects' as objects_json
-            FROM {functionName}($1, $2, NULL, 0, NULL, 10) as result
-        )
-        SELECT jsonb_array_elements(objects_json)->>'id' as ""Value""
-        FROM search_result
-        WHERE objects_json IS NOT NULL AND objects_json != 'null'";
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (has_descendant over " + functionName + ")");
 
     /// <summary>
     /// SQLite: WITH RECURSIVE for traversing ancestors.
@@ -1272,11 +1254,13 @@ public class SqliteDialect : ISqlDialect
     public string? Query_WrapPvtWithExists(string innerSql) =>
         $"SELECT EXISTS(SELECT 1 FROM (\n{innerSql}\n) t)";
 
-    // Version probe disabled for now (enabled once extension auto-loading is
-    // wired into SqliteRedbConnection); v2-pvt is gated solely on the build fn.
-    public string? Query_PvtModuleVersionFunction() => null;
+    // The v2-pvt module of SQLite is the native extension (redbsqlite.dll/.so/.dylib), versioned by
+    // PVT_MODULE_VERSION in native/src/redb_pvt.c. The Free service asks this function at
+    // initialization and refuses an extension of another version (SqliteNativeExtension) - the base
+    // gate would try to apply a SQL bundle, and there is none. Bump both on every change of the C code.
+    public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
-    public string? Query_PvtRequiredVersion() => null;
+    public string? Query_PvtRequiredVersion() => "0.6.6";
 
     public string? Query_BuildPvtProjectionSqlFunction() => null;
 
@@ -1295,15 +1279,16 @@ public class SqliteDialect : ISqlDialect
     /// container (scheme -10). Native SQLite (no server function, Core untouched):
     /// the trash id is allocated from the AUTOINCREMENT _global_identity and read via
     /// last_insert_rowid() — per-connection, so it stays stable across the statements
-    /// regardless of concurrent writers. Wrapped in a SAVEPOINT (atomic; works whether
-    /// or not the context is already in a transaction). The final SELECT is last (Core's
-    /// QueryAsync reads only the first result set, and last_insert_rowid survives RELEASE).
+    /// regardless of concurrent writers. The batch opens no transaction of its own: the provider
+    /// runs it inside one (ExecuteAtomicAsync, joining the caller's), whose owner rolls back a
+    /// failure between the statements. A SAVEPOINT in the text itself became a transaction
+    /// nobody owned when a statement after it failed - pooled with the database write lock.
+    /// The final SELECT is last (Core's QueryAsync reads only the first result set).
     /// Params: $1=objectIds (array -> JSON), $2=userId, $3=trashParentId (nullable).
     /// Returns: trash_id, marked_count.
     /// </summary>
     public string SoftDelete_MarkForDeletion() =>
         """
-        SAVEPOINT redb_sd;
         INSERT INTO _global_identity DEFAULT VALUES;
         INSERT INTO _objects (_id, _id_scheme, _id_parent, _id_owner, _id_who_change, _name, _value_long, _key, _value_string)
         VALUES (last_insert_rowid(), -10, $3, $2, $2,
@@ -1327,7 +1312,6 @@ public class SqliteDialect : ISqlDialect
         WHERE _unique IS NOT NULL
           AND _id_object IN (SELECT _id FROM _objects WHERE _id_parent = last_insert_rowid() AND _id_scheme = -10);
         DELETE FROM _global_identity WHERE _id = last_insert_rowid();
-        RELEASE redb_sd;
         SELECT last_insert_rowid() AS trash_id,
                (SELECT _value_long FROM _objects WHERE _id = last_insert_rowid()) AS marked_count;
         """;
@@ -1339,21 +1323,72 @@ public class SqliteDialect : ISqlDialect
     /// container's _value_double so the final SELECT can return it (changes() can't be
     /// read after the progress UPDATE). The empty container is left as a 'completed'
     /// marker (scheme -10, invisible to normal queries) — PG deletes it; cosmetic.
+    /// <para>
+    /// References (_values._Object, a foreign key with no ON DELETE action): a reference held by
+    /// a trashed object is removed with the batch, so the order containers are purged in never
+    /// matters; an object referenced by a live object is skipped - never deleted, never unlinked.
+    /// When only such objects are left the container is marked 'failed' and the background
+    /// worker stops claiming it. The batch is chosen twice by the same ordered predicate - the
+    /// reference removal in between touches no live holder, so both picks are the same rows.
+    /// </para>
+    /// <para>
+    /// No transaction in the text (see <see cref="SoftDelete_MarkForDeletion"/>): the provider runs
+    /// the batch inside one.
+    /// </para>
     /// Params: $1=trashId, $2=batchSize. Returns: deleted_count, remaining_count.
     /// </summary>
+    /// <summary>
+    /// The purge statement above ends with the result row, so the finished container outlived every
+    /// purge on SQLite while PostgreSQL and MSSQL remove it in the function. Params: $1=trashId.
+    /// </summary>
+    public string? SoftDelete_DeleteCompletedTrashContainer() => """
+        DELETE FROM _objects
+        WHERE _id = $1 AND _id_scheme = -10
+          AND NOT EXISTS (SELECT 1 FROM _objects WHERE _id_parent = $1)
+        """;
+
     public string SoftDelete_PurgeTrash() =>
         """
-        SAVEPOINT redb_pt;
         UPDATE _objects SET _value_string = 'running', _date_modify = strftime('%Y-%m-%dT%H:%M:%fZ','now')
         WHERE _id = $1 AND _value_string = 'pending';
-        DELETE FROM _objects WHERE _id IN (SELECT _id FROM _objects WHERE _id_parent = $1 LIMIT $2);
+        DELETE FROM _values
+        WHERE _Object IN (
+                SELECT o._id FROM _objects o
+                WHERE o._id_parent = $1
+                  AND NOT EXISTS (SELECT 1 FROM _values lv JOIN _objects r ON r._id = lv._id_object
+                                  WHERE lv._Object = o._id AND r._id_scheme <> -10)
+                ORDER BY o._id LIMIT $2)
+          AND EXISTS (SELECT 1 FROM _objects h WHERE h._id = _values._id_object AND h._id_scheme = -10);
+        DELETE FROM _objects
+        WHERE _id IN (
+                SELECT o._id FROM _objects o
+                WHERE o._id_parent = $1
+                  AND NOT EXISTS (SELECT 1 FROM _values lv JOIN _objects r ON r._id = lv._id_object
+                                  WHERE lv._Object = o._id AND r._id_scheme <> -10)
+                ORDER BY o._id LIMIT $2);
         UPDATE _objects SET _value_double = changes(), _key = _key + changes(),
-               _value_string = CASE WHEN (SELECT COUNT(*) FROM _objects WHERE _id_parent = $1) = 0 THEN 'completed' ELSE 'running' END,
+               _value_string = CASE WHEN (SELECT COUNT(*) FROM _objects WHERE _id_parent = $1) = 0 THEN 'completed'
+                                    WHEN changes() = 0 THEN 'failed'
+                                    ELSE 'running' END,
                _date_modify = strftime('%Y-%m-%dT%H:%M:%fZ','now')
         WHERE _id = $1;
-        RELEASE redb_pt;
         SELECT (SELECT CAST(_value_double AS INTEGER) FROM _objects WHERE _id = $1) AS deleted_count,
                (SELECT COUNT(*) FROM _objects WHERE _id_parent = $1) AS remaining_count;
+        """;
+
+    /// <summary>
+    /// Objects of a trash container referenced by live objects, with the referencing objects.
+    /// Params: $1=trashId. Returns: referenced_id, referencing_id (at most 100 pairs).
+    /// </summary>
+    public string SoftDelete_SelectLiveReferrersOfTrash() => """
+        SELECT DISTINCT o._id AS referenced_id, r._id AS referencing_id
+        FROM _objects o
+        INNER JOIN _values v ON v._Object = o._id
+        INNER JOIN _objects r ON r._id = v._id_object
+        WHERE o._id_parent = $1
+          AND r._id_scheme <> -10
+        ORDER BY 1, 2
+        LIMIT 100
         """;
 
     /// <summary>

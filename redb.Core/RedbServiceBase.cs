@@ -222,43 +222,132 @@ public abstract class RedbServiceBase : IRedbService
         _treeProvider = CreateTreeProvider(_context, _objectStorage, _permissionProvider, 
             _serializer, _securityContext, _schemeSync, _configuration, _logger);
         
-        // RedbListItem.Object resolution. Items this scope hands out load their object through
-        // this scope while it lives and through a fresh scope once it is gone; the process-wide
-        // fallback (items nobody materialized) only ever borrows a fresh scope. Neither delegate
-        // keeps a scoped context alive or reachable after its scope has ended.
-        _scopeFactory = serviceProvider.GetService<IServiceScopeFactory>();
-        _listProvider.LinkedObjectLoader = LoadLinkedObjectAsync;
-        _listProvider.LinkedObjectSyncLoader = LoadLinkedObjectSync;
+        // A data object owns no connection (owner decision 2026-09-15, plan docs/V4/PROPS_CACHE_PROD_AND_TAILS_PLAN.md
+        // §4.1): RedbListItem.Object and the Props of reference stubs load on the live scope of whoever reads them. This
+        // service becomes current for the flow that resolved it, and registers its database for the loads that find no
+        // live scope (refused by default, a fresh scope by explicit option). The per-item and process-wide loader
+        // delegates it installed before opened a fresh scope and pooled connection per read.
         _listProvider.LinkedObjectsBatchLoader = LoadLinkedObjectsBatchAsync;
-        // Outside a DI container there is no root factory to borrow from: the fallback then goes
-        // through this service while it lives and fails loudly (never re-opens) once it is disposed.
-        RedbListItem.SetGlobalObjectLoader(_scopeFactory != null
-            ? LoadLinkedObjectDetachedAsync
-            : LoadLinkedObjectAsync);
-        RedbListItem.SetGlobalSyncObjectLoader(_scopeFactory != null
-            ? LoadLinkedObjectDetachedSync
-            : LoadLinkedObjectSync);
+        ScopeFactory = serviceProvider.GetService<IServiceScopeFactory>();
+        RedbDomainRegistry.Register(_cacheDomain, ScopeFactory, _configuration, _logger);
+        // A service of the root provider is captive: it lives as long as the process, and the frame it enters below is
+        // inherited by every flow. It lends lazy loads its scope factory, never its one connection (RedbDomainRegistry.
+        // InScopeOf) - parallel lazy loads of shared instances collided on that connection (review after 4.0.0).
+        IsCaptive = ScopeFactory != null && RedbServiceProviders.IsRoot(serviceProvider);
 
-        var lazyPropsLoader = CreateLazyPropsLoader(_context, _schemeSync, _serializer,
+        LazyPropsLoader = CreateLazyPropsLoader(_context, _schemeSync, _serializer,
             _configuration, _cacheDomain, _listProvider, _logger);
 
         _queryProvider = CreateQueryableProvider(_context, _serializer, _schemeSync,
-            _securityContext, lazyPropsLoader, _configuration, _cacheDomain, _logger);
+            _securityContext, LazyPropsLoader, _configuration, _cacheDomain, _logger);
         _validationProvider = CreateValidationProvider(_context, _logger);
+
+        SelfReference = new WeakReference<RedbServiceBase>(this);
+        ServicesByContext.AddOrUpdate(_context, this);
+        RedbAmbientScope.Enter(this);
     }
 
-    // === RedbListItem.Object loading ===
+    // === Lazy loads on the reader's scope ===
 
-    // Root-level scope factory (a singleton in every MS DI container), captured instead of the
-    // scoped context. Null only when the service was constructed outside a DI container.
-    private readonly IServiceScopeFactory? _scopeFactory;
+    // Context (one scope, one connection) -> the service of that scope: how a scope-bound loader names the origin of the
+    // instances it materializes. Weak both ways: an ended scope leaves nothing behind.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IRedbContext, RedbServiceBase> ServicesByContext = new();
+
+    /// <summary>The service whose scope owns <paramref name="context"/>; null for an unknown context.</summary>
+    internal static RedbServiceBase? ServiceOf(IRedbContext? context)
+        => context != null && ServicesByContext.TryGetValue(context, out var service) ? service : null;
+
+    /// <summary>A weak reference to this service, shared by every instance it is the origin of.</summary>
+    internal WeakReference<RedbServiceBase> SelfReference { get; }
 
     /// <summary>
-    /// Per-item loader: the object behind a list item this scope materialized. Same connection and
-    /// transaction as the caller while this scope is alive; a fresh scope once it has ended, so an
-    /// item cached across requests never reaches a disposed context (which would re-open a physical
-    /// connection nobody could return to the pool).
+    /// This service's own lazy Props loader, bound to its context. Reference stubs never carry it: they carry the
+    /// scope-free loader of this database, which calls the loader of whichever live service reads them.
     /// </summary>
+    protected internal ILazyPropsLoader LazyPropsLoader { get; protected set; } = null!;
+
+    /// <summary>Whether this service's scope has ended (its context is disposed): it no longer answers lazy loads.</summary>
+    internal bool IsScopeEnded => _context.IsDisposed;
+
+    /// <summary>The service was resolved from the root provider of its container (see <see cref="RedbServiceProviders"/>).</summary>
+    internal bool IsCaptive { get; }
+
+    /// <summary>
+    /// Whether a lazy load resolved to this reader runs in a fresh scope of its container instead of on its connection: a
+    /// captive service outside a transaction. Inside its transaction the connection is the transaction, and the load is
+    /// part of it - it reads what the transaction wrote, as it did before.
+    /// </summary>
+    internal bool LendsScope => IsCaptive && !_context.IsInTransaction;
+
+    /// <summary>The logger of this service; null when the host registered none.</summary>
+    internal ILogger? Logger => _logger;
+
+    /// <summary>The scope factory of the container that resolved this service; null outside DI.</summary>
+    internal IServiceScopeFactory? ScopeFactory { get; }
+
+    /// <summary>
+    /// The captive service this scope was lent to for one load (<see cref="RedbDomainRegistry.InScopeOf{T}"/>); null for a
+    /// scope of its own.
+    /// </summary>
+    internal RedbServiceBase? LentTo { get; set; }
+
+    /// <summary>
+    /// The service that instances materialized by this one name as their origin: itself, or the captive service it was lent
+    /// to. A lent scope ends with its load, while what it loaded lives on with the captive reader - the stubs under it
+    /// load through a lent scope of their own.
+    /// </summary>
+    internal RedbServiceBase AsOrigin => LentTo ?? this;
+
+    // === A scope of this service's container (IRedbScopeSource) ===
+
+    /// <inheritdoc />
+    public bool CanCreateScope => ScopeFactory != null;
+
+    /// <inheritdoc />
+    public RedbScope CreateScope()
+    {
+        if (ScopeFactory == null)
+            throw new InvalidOperationException(
+                "This IRedbService was built without a DI container (its provider has no IServiceScopeFactory), so it " +
+                "cannot open a scope of its own. Resolve services from a container to get one per unit of work.");
+        var scope = ScopeFactory.CreateAsyncScope();
+        RedbScope? opened = null;
+        try
+        {
+            var service = scope.ServiceProvider.GetRequiredService<IRedbService>();
+            if (!string.Equals(service.CacheDomain, CacheDomain, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    $"A scope of this service's container resolves IRedbService for database '{service.CacheDomain}', not " +
+                    $"'{CacheDomain}': the container registers IRedbService differently per resolution. A scope opened from " +
+                    "a service must read that service's database; register one IRedbService per container.");
+            opened = new RedbScope(service, scope);
+            return opened;
+        }
+        finally
+        {
+            if (opened == null)
+                scope.Dispose();
+        }
+    }
+
+    /// <inheritdoc />
+    public IDisposable BeginAccess() => RedbAmbientScope.Push(this);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<long, IRedbObject>> LoadLinkedObjectsAsync(
+        IEnumerable<RedbListItem> items, CancellationToken cancellationToken = default)
+    {
+        var pending = items.Where(i => !i.IsObjectLoaded && i.IdObject.HasValue).ToList();
+        if (pending.Count == 0)
+            return new Dictionary<long, IRedbObject>();
+
+        var byId = await LoadLinkedObjectsBatchAsync(pending.Select(i => i.IdObject!.Value).Distinct().ToList(), cancellationToken);
+        foreach (var item in pending)
+            if (byId.TryGetValue(item.IdObject!.Value, out var obj))
+                item.Publish(obj, _context);
+        return byId;
+    }
+
     /// <summary>
     /// Batch resolver behind the list hand-out preload: one polymorphic load for all linked
     /// objects of a list. Depth 10 - the SAME depth the lazy getter path uses (LoadTypedAsync),
@@ -276,74 +365,26 @@ public abstract class RedbServiceBase : IRedbService
         return byId;
     }
 
-    private async Task<IRedbObject?> LoadLinkedObjectAsync(long objectId)
-    {
-        if (_context.IsDisposed)
-            return await LoadLinkedObjectDetachedAsync(objectId);
-        try
-        {
-            return await LoadLinkedObjectCoreAsync(this, objectId);
-        }
-        catch (ObjectDisposedException)
-        {
-            // The scope began tearing down between the check above and the command entering
-            // the connection gate (tsum garage report: HTTP ReleaseScopes vs a SEDA-side
-            // loader). The gate refuses cleanly; the item is loaded through a fresh scope.
-            return await LoadLinkedObjectDetachedAsync(objectId);
-        }
-    }
-
     /// <summary>
-    /// Loads through a fresh scope borrowed from the root container and released right after.
-    /// This is also the process-wide fallback installed by <see cref="RedbListItem.SetGlobalObjectLoader"/>.
+    /// The object behind a list item, loaded on this service's connection - the scope of whoever reads the item. A scope
+    /// that tears down meanwhile refuses the command (ObjectDisposedException); nothing falls back to another scope.
     /// </summary>
-    private async Task<IRedbObject?> LoadLinkedObjectDetachedAsync(long objectId)
-    {
-        if (_scopeFactory == null)
-            throw new ObjectDisposedException(GetType().Name,
-                "The scope that materialized this list item has ended and no root IServiceScopeFactory " +
-                "is available to borrow a fresh one. Load the object explicitly from a live IRedbService " +
-                "using RedbListItem.IdObject.");
+    internal Task<IRedbObject?> LoadLinkedObjectAsync(long objectId, CancellationToken cancellationToken)
+        => LoadLinkedObjectCoreAsync(this, objectId, cancellationToken);
 
-        // Diagnostics (tsum pool incident, 2026-09-09): every borrow here is a pooled
-        // connection taken OUTSIDE the caller"s scope. The counter names a storm while it
-        // happens; Debug level adds the stack that tells WHO keeps touching lazy objects
-        // past their scope.
-        var borrows = System.Threading.Interlocked.Increment(ref _activeDetachedBorrows);
-        try
-        {
-            if (borrows == DetachedBorrowStormThreshold)
-                _logger?.LogWarning(
-                    "Detached list-item loads: {Count} scopes borrowed concurrently - some code path " +
-                    "touches lazy Object on items that outlived their scope. Enable Debug logging on " +
-                    "this category for call stacks.", borrows);
-            if (_logger?.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug) == true)
-                _logger.LogDebug("Detached list-item load of object {ObjectId} (concurrent borrows: {Count}) at: {Stack}",
-                    objectId, borrows, Environment.StackTrace);
-
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            var service = scope.ServiceProvider.GetRequiredService<IRedbService>();
-            return await LoadLinkedObjectCoreAsync(service, objectId).ConfigureAwait(false);
-        }
-        finally
-        {
-            System.Threading.Interlocked.Decrement(ref _activeDetachedBorrows);
-        }
-    }
-
-    private static int _activeDetachedBorrows;
-    private const int DetachedBorrowStormThreshold = 20;
-
-    private static async Task<IRedbObject?> LoadLinkedObjectCoreAsync(IRedbService service, long objectId)
+    private static async Task<IRedbObject?> LoadLinkedObjectCoreAsync(IRedbService service, long objectId, CancellationToken cancellationToken)
     {
         var dialect = (service as RedbServiceBase)?.SqlDialect;
         var schemeId = dialect != null
-            ? await service.Context.ExecuteScalarAsync<long>(dialect.ObjectStorage_SelectSchemeIdByObjectId(), objectId)
+            ? await service.Context.ExecuteScalarAsync<long>(
+                dialect.ObjectStorage_SelectSchemeIdByObjectId(), new object[] { objectId }, cancellationToken)
             : 0;
         if (schemeId == 0)
             return null;
 
-        var propsType = service.Cache.GetClrType(schemeId);
+        // A scheme this node has never cached (a fresh process, another cluster node) is resolved by
+        // its id; the cache-only lookup fell through to the untyped get_object_json path below.
+        var propsType = await service.Cache.ResolveClrTypeAsync(schemeId, service);
         if (propsType != null)
         {
             // The generic method is our own, so its shape is under our control: the previous
@@ -352,19 +393,20 @@ public abstract class RedbServiceBase : IRedbService
             var load = typeof(RedbServiceBase)
                 .GetMethod(nameof(LoadTypedAsync), BindingFlags.NonPublic | BindingFlags.Static)!
                 .MakeGenericMethod(propsType);
-            return await (Task<IRedbObject?>)load.Invoke(null, new object[] { service, objectId })!;
+            return await (Task<IRedbObject?>)load.Invoke(null, new object[] { service, objectId, cancellationToken })!;
         }
 
         if (service is not RedbServiceBase typed)
             return null;
 
-        var json = await service.Context.ExecuteJsonAsync(typed.GetObjectJsonSql(), objectId, 10);
+        var json = await service.Context.ExecuteJsonAsync(
+            typed.SqlDialect.ObjectStorage_GetObjectJson(), new object[] { objectId, 10 }, cancellationToken);
         return string.IsNullOrEmpty(json) ? null : typed._serializer.DeserializeDynamic(json, typeof(object));
     }
 
-    private static async Task<IRedbObject?> LoadTypedAsync<TProps>(IObjectStorageProvider storage, long objectId)
+    private static async Task<IRedbObject?> LoadTypedAsync<TProps>(IObjectStorageProvider storage, long objectId, CancellationToken cancellationToken)
         where TProps : class, new()
-        => await storage.LoadAsync<TProps>(objectId, 10);
+        => await storage.LoadAsync<TProps>(objectId, 10, cancellationToken);
 
     // === Synchronous twins (thread-pool-free lazy path) ===
     // The sync getter of RedbListItem.Object prefers these: the whole load - scheme lookup,
@@ -372,51 +414,8 @@ public abstract class RedbServiceBase : IRedbService
     // ADO.NET, so a saturated thread pool cannot slow or deadlock a touch of Object. Mirrors of
     // the async chain above, same depth, same diagnostics.
 
-    private IRedbObject? LoadLinkedObjectSync(long objectId)
-    {
-        if (_context.IsDisposed)
-            return LoadLinkedObjectDetachedSync(objectId);
-        try
-        {
-            return LoadLinkedObjectCoreSync(this, objectId);
-        }
-        catch (ObjectDisposedException)
-        {
-            // Same race as the async twin: teardown began after the check - fall back to a
-            // fresh scope instead of surfacing the refused command.
-            return LoadLinkedObjectDetachedSync(objectId);
-        }
-    }
-
-    private IRedbObject? LoadLinkedObjectDetachedSync(long objectId)
-    {
-        if (_scopeFactory == null)
-            throw new ObjectDisposedException(GetType().Name,
-                "The scope that materialized this list item has ended and no root IServiceScopeFactory " +
-                "is available to borrow a fresh one. Load the object explicitly from a live IRedbService " +
-                "using RedbListItem.IdObject.");
-
-        var borrows = System.Threading.Interlocked.Increment(ref _activeDetachedBorrows);
-        try
-        {
-            if (borrows == DetachedBorrowStormThreshold)
-                _logger?.LogWarning(
-                    "Detached list-item loads: {Count} scopes borrowed concurrently - some code path " +
-                    "touches lazy Object on items that outlived their scope. Enable Debug logging on " +
-                    "this category for call stacks.", borrows);
-            if (_logger?.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug) == true)
-                _logger.LogDebug("Detached list-item load of object {ObjectId} (concurrent borrows: {Count}) at: {Stack}",
-                    objectId, borrows, Environment.StackTrace);
-
-            using var scope = _scopeFactory.CreateScope();
-            var service = scope.ServiceProvider.GetRequiredService<IRedbService>();
-            return LoadLinkedObjectCoreSync(service, objectId);
-        }
-        finally
-        {
-            System.Threading.Interlocked.Decrement(ref _activeDetachedBorrows);
-        }
-    }
+    /// <summary>Synchronous twin of <see cref="LoadLinkedObjectAsync"/>, on the calling thread down to ADO.NET.</summary>
+    internal IRedbObject? LoadLinkedObjectSync(long objectId) => LoadLinkedObjectCoreSync(this, objectId);
 
     private static IRedbObject? LoadLinkedObjectCoreSync(IRedbService service, long objectId)
     {
@@ -427,7 +426,8 @@ public abstract class RedbServiceBase : IRedbService
         if (schemeId == 0)
             return null;
 
-        var propsType = service.Cache.GetClrType(schemeId);
+        // Same cold resolution as the async twin, on the calling thread.
+        var propsType = service.Cache.ResolveClrType(schemeId, service);
         if (propsType != null)
         {
             // Same reflection shape as the async twin (and the same lesson: our own method, found
@@ -441,7 +441,7 @@ public abstract class RedbServiceBase : IRedbService
         if (service is not RedbServiceBase typed)
             return null;
 
-        var json = service.Context.ExecuteJson(typed.GetObjectJsonSql(), objectId, 10);
+        var json = service.Context.ExecuteJson(typed.SqlDialect.ObjectStorage_GetObjectJson(), objectId, 10);
         return string.IsNullOrEmpty(json) ? null : typed._serializer.DeserializeDynamic(json, typeof(object));
     }
 
@@ -449,11 +449,6 @@ public abstract class RedbServiceBase : IRedbService
         where TProps : class, new()
         => storage.Load<TProps>(objectId, 10);
     
-    /// <summary>
-    /// Get SQL for loading object as JSON. Each DB provider must supply its own syntax.
-    /// </summary>
-    protected abstract string GetObjectJsonSql();
-
     /// <summary>
     /// Get tree provider for extended scenarios.
     /// </summary>
@@ -530,6 +525,9 @@ public abstract class RedbServiceBase : IRedbService
     
     public Task<IRedbScheme?> GetSchemeByIdAsync(long schemeId, CancellationToken cancellationToken = default)
         => _schemeSync.GetSchemeByIdAsync(schemeId, cancellationToken);
+
+    public IRedbScheme? GetSchemeById(long schemeId)
+        => _schemeSync.GetSchemeById(schemeId);
     
     public Task<IRedbScheme?> GetSchemeByNameAsync(string schemeName, CancellationToken cancellationToken = default)
         => _schemeSync.GetSchemeByNameAsync(schemeName, cancellationToken);
@@ -1248,26 +1246,16 @@ public abstract class RedbServiceBase : IRedbService
     private void InitializePropsCache()
     {
         if (!_configuration.EnablePropsCache) return;
-        
-        var userConfigService = _serviceProvider.GetService(typeof(Configuration.IUserConfigurationService)) 
-            as Configuration.IUserConfigurationService;
-        
+
+        // The cache lives for the process: nothing scoped (a user, a configuration service) is captured into it.
+        // Its logger is how a production host learns that the cache is too small or its hits are slow.
         var cache = new Caching.MemoryRedbObjectCache(
             maxSize: _configuration.PropsCacheMaxSize,
             ttl: _configuration.PropsCacheTtl,
-            getUserIdFunc: () => GetEffectiveUserId(),
-            getQuotaFunc: userConfigService != null 
-                ? async (userId) => 
-                {
-                    var config = await userConfigService.GetEffectiveConfigurationAsync(userId);
-                    return config.PropsCacheSize;
-                }
-                : null);
+            logger: _serviceProvider.GetService<ILoggerFactory>()?.CreateLogger(typeof(Caching.MemoryRedbObjectCache).FullName!));
         
-        // V4 (review): the props cache hands cached references a loader with its own scope per load.
-        _schemeSync.PropsCache.Initialize(cache,
-            _serviceProvider.GetService(typeof(Microsoft.Extensions.DependencyInjection.IServiceScopeFactory))
-                as Microsoft.Extensions.DependencyInjection.IServiceScopeFactory);
+        // A cached graph carries nothing scope-bound: its stubs load on the reader's scope (owner decision 2026-09-15).
+        _schemeSync.PropsCache.Initialize(cache);
     }
     
     /// <summary>

@@ -342,6 +342,12 @@ public abstract class TreeProviderBase : ITreeProvider
         
         if (rowsAffected == 0)
             throw new ArgumentException($"Object {objectId} not found");
+
+        // The move bypasses the save path: the database drops the object's hash (Tree_UpdateParent) and the cached copy
+        // goes with it - under SkipHashValidationOnCacheCheck a load never asks the database and would keep answering
+        // with the old parent until the entry expired.
+        if (Configuration.EnablePropsCache && SchemeSyncProvider.PropsCache.Instance != null)
+            SchemeSyncProvider.PropsCache.Remove(objectId);
     }
 
     protected virtual async Task<long> CreateChildWithUserAsync<TProps>(

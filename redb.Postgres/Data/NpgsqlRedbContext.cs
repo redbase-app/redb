@@ -27,7 +27,7 @@ namespace redb.Postgres.Data
         /// <summary>
         /// Bulk operations (COPY protocol).
         /// </summary>
-        public override IBulkOperations Bulk => _bulkOperations;
+        protected override IBulkOperations BulkOperations => _bulkOperations;
         
         /// <summary>
         /// Npgsql data source (for direct access if needed).
@@ -43,7 +43,7 @@ namespace redb.Postgres.Data
             DataSource = dataSource;
             _connection = new NpgsqlRedbConnection(dataSource);
             var domain = redb.Core.Models.Configuration.RedbServiceConfiguration.ComputeCacheDomain(dataSource.ConnectionString);
-            _keyGenerator = new NpgsqlKeyGenerator(dataSource, domain);
+            _keyGenerator = new NpgsqlKeyGenerator(dataSource, domain, scopeConnection: () => _connection);
             _bulkOperations = new NpgsqlBulkOperations(_connection);
         }
         

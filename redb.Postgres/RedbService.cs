@@ -42,8 +42,6 @@ public class RedbService : RedbServiceBase
     protected override string ContextNotRegisteredError => 
         "IRedbContext is not registered in DI container. Add NpgsqlRedbContext to configuration.";
     
-    protected override string GetObjectJsonSql() => "SELECT get_object_json($1, $2)::text";
-    
     // === PROVIDER FACTORIES ===
     
     protected override ISchemeSyncProvider CreateSchemeSyncProvider(

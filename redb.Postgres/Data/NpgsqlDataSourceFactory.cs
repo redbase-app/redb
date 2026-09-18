@@ -41,6 +41,15 @@ namespace redb.Postgres.Data
         private static readonly ConditionalWeakTable<NpgsqlDataSource, SessionSettings> Registry = new();
 
         /// <summary>
+        /// The session settings registered for <paramref name="dataSource"/> as text: part of the signature under which a
+        /// connection an ambient transaction holds is shared.
+        /// </summary>
+        internal static string SessionSettingsText(NpgsqlDataSource dataSource)
+            => Registry.TryGetValue(dataSource, out var settings)
+                ? $"collation={settings.Collation};lazy_refs={(settings.LazyReferences ? 1 : 0)}"
+                : "collation=;lazy_refs=0";
+
+        /// <summary>
         /// Creates a data source. With <paramref name="stringCollation"/> null and
         /// <paramref name="lazyReferences"/> false this is <see cref="NpgsqlDataSource.Create(string)"/>
         /// and nothing else.

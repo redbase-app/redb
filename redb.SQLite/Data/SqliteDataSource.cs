@@ -117,6 +117,7 @@ namespace redb.SQLite.Data
             LoadNativeExtension(conn);
             ApplyPragmas(conn);
             SqliteCaseFolding.Install(conn, UnicodeCaseFolding);
+            SqliteRegexFunctions.Install(conn);
             EnsureCleanTransactionState(conn);
             InstallLazyRefs(conn);
             return conn;
@@ -130,6 +131,7 @@ namespace redb.SQLite.Data
             LoadNativeExtension(conn);
             await ApplyPragmasAsync(conn);
             SqliteCaseFolding.Install(conn, UnicodeCaseFolding);
+            SqliteRegexFunctions.Install(conn);
             await EnsureCleanTransactionStateAsync(conn);
             InstallLazyRefs(conn);
             return conn;

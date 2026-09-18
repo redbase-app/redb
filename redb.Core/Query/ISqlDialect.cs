@@ -1502,7 +1502,25 @@ public interface ISqlDialect
     /// MSSQL: EXEC sp_purge_trash @p0, @p1 (with OUTPUT params)
     /// </summary>
     string SoftDelete_PurgeTrash();
-    
+
+    /// <summary>
+    /// SQL that removes a trash container once it holds no objects, for a dialect whose
+    /// <see cref="SoftDelete_PurgeTrash"/> cannot do it itself - SQLite, where the result row must be
+    /// the last statement of the batch and there is no variable to keep it in. Null when the purge
+    /// statement removes the container (PostgreSQL, MSSQL). Runs after the last batch.
+    /// Params: $1=trashId
+    /// </summary>
+    string? SoftDelete_DeleteCompletedTrashContainer() => null;
+
+    /// <summary>
+    /// SQL query listing the objects of a trash container that live objects (scheme other than -10)
+    /// still reference through a <c>_values._Object</c> row, paired with the referencing objects.
+    /// Used to report a purge that ended 'failed'.
+    /// Params: $1=trashId
+    /// Returns: referenced_id, referencing_id (at most 100 pairs, ordered)
+    /// </summary>
+    string SoftDelete_SelectLiveReferrersOfTrash();
+
     /// <summary>
     /// SQL query to get deletion progress for a specific trash container.
     /// Reads progress from trash object fields: _value_long=total, _key=deleted, _value_string=status.

@@ -199,10 +199,14 @@ static sqlite3_stmt *findValueRow(sqlite3 *db, sqlite3_int64 struct_id, sqlite3_
   return 0;
 }
 
-/* Append a ListItem JSON object. Returns 1 if appended, 0 if not found. */
+/* Append a ListItem JSON object. Returns 1 if appended, 0 if not found.
+** The model's keys (RedbListItem: id, id_list, value, alias, id_object): the linked object travels as
+** its id. It was once built in full under "object", a key the deserializer ignores, and the item was
+** written as "idList" without "id_object". max_depth stays for the callers. */
 static int buildListItem(sqlite3 *db, sqlite3_int64 li_id, int max_depth,
                          sqlite3_str *out){
   sqlite3_stmt *st = 0;
+  (void)max_depth;
   sqlite3_prepare_v2(db,
       "SELECT _id,_id_list,_value,_alias,_id_object FROM _list_items WHERE _id=?1",
       -1, &st, 0);
@@ -211,22 +215,16 @@ static int buildListItem(sqlite3 *db, sqlite3_int64 li_id, int max_depth,
   if(sqlite3_step(st) != SQLITE_ROW){ sqlite3_finalize(st); return 0; }
 
   sqlite3_str_appendf(out, "{\"id\":%lld", (long long)sqlite3_column_int64(st, 0));
-  sqlite3_str_appendf(out, ",\"idList\":%lld", (long long)sqlite3_column_int64(st, 1));
+  sqlite3_str_appendf(out, ",\"id_list\":%lld", (long long)sqlite3_column_int64(st, 1));
   sqlite3_str_appendall(out, ",\"value\":");
   if(sqlite3_column_type(st, 2) == SQLITE_NULL) sqlite3_str_append(out, "null", 4);
   else appendTextCol(out, st, 2);
   sqlite3_str_appendall(out, ",\"alias\":");
   if(sqlite3_column_type(st, 3) == SQLITE_NULL) sqlite3_str_append(out, "null", 4);
   else appendTextCol(out, st, 3);
-  sqlite3_str_appendall(out, ",\"object\":");
-  if(sqlite3_column_type(st, 4) == SQLITE_NULL){
-    sqlite3_str_append(out, "null", 4);
-  }else{
-    int d = max_depth - 1; if(d < 0) d = 0;
-    char *child = redbObjectJson(db, sqlite3_column_int64(st, 4), d);
-    if(child){ sqlite3_str_append(out, child, (int)strlen(child)); sqlite3_free(child); }
-    else sqlite3_str_append(out, "null", 4);
-  }
+  sqlite3_str_appendall(out, ",\"id_object\":");
+  if(sqlite3_column_type(st, 4) == SQLITE_NULL) sqlite3_str_append(out, "null", 4);
+  else sqlite3_str_appendf(out, "%lld", (long long)sqlite3_column_int64(st, 4));
   sqlite3_str_appendchar(out, 1, '}');
   sqlite3_finalize(st);
   return 1;

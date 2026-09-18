@@ -97,7 +97,7 @@ public static class SqliteOptionsExtensions
         services.AddScoped<ILazyPropsLoader, LazyPropsLoader>();
         services.AddScoped<IQueryableProvider, SqliteQueryableProvider>();
         services.AddScoped<ITreeProvider, SqliteTreeProvider>();
-        services.AddScoped<IListProvider, SqliteListProvider>();
+        services.AddScoped<IListProvider>(sp => sp.GetRequiredService<IRedbService>().ListProvider); // one per scope: the service's own
         services.AddScoped<IValidationProvider, SqliteValidationProvider>();
         
         // Background deletion service (singleton + hosted service)

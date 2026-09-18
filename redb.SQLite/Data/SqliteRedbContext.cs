@@ -27,7 +27,7 @@ namespace redb.SQLite.Data
         /// <summary>
         /// Bulk operations (COPY protocol).
         /// </summary>
-        public override IBulkOperations Bulk => _bulkOperations;
+        protected override IBulkOperations BulkOperations => _bulkOperations;
         
         /// <summary>
         /// Sqlite data source (for direct access if needed).

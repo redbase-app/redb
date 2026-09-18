@@ -58,7 +58,7 @@ public class RedbSchemaOutdatedException : Exception
             $"The {provider} database schema is outdated: deployed module version is " +
             $"'{deployed ?? "<none>"}', this build requires '{required}', and {reason}. " +
             "Nothing was changed. Have the schema owner apply the upgrade script: export it with " +
-            "IRedbService.GetUpgradeScript() or `redb schema upgrade-script --provider <name>`, then " +
+            "IRedbService.GetUpgradeScript() or `redb schema --upgrade --provider <name>`, then " +
             "run it with psql / sqlcmd. The script is idempotent and safe to re-run.";
     }
 }

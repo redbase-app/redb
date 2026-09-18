@@ -13,26 +13,10 @@ namespace redb.Core.Providers
     public interface IListProvider
     {
         /// <summary>
-        /// Loader attached to every <see cref="RedbListItem"/> this provider hands out, so that
-        /// <see cref="RedbListItem.Object"/> resolves through the scope that materialized the item
-        /// (or a fresh one once that scope is gone) instead of a process-wide delegate. Set by the
-        /// owning <see cref="IRedbService"/>; <c>null</c> leaves items on the process-wide fallback.
-        /// </summary>
-        Func<long, Task<IRedbObject?>>? LinkedObjectLoader { get => null; set { } }
-
-        /// <summary>
-        /// Synchronous twin of <see cref="LinkedObjectLoader"/> for the thread-pool-free lazy
-        /// path: the sync getter of <see cref="RedbListItem.Object"/> prefers it, running the
-        /// whole load on the calling thread down to ADO.NET (no thread-pool continuations, so a
-        /// saturated pool cannot slow or deadlock the getter). <c>null</c> leaves the sync getter
-        /// on the blocking-over-async fallback.
-        /// </summary>
-        Func<long, IRedbObject?>? LinkedObjectSyncLoader { get => null; set { } }
-
-        /// <summary>
-        /// Batch form of <see cref="LinkedObjectLoader"/>: resolves many linked objects in one
-        /// round-trip for the hand-out preload (<c>PreloadListItemLinkedObjects</c>). Returns
-        /// only the objects that exist; a missing id simply stays lazy on its item.
+        /// Resolves many linked objects in one round-trip on the owning service's connection, for the hand-out preload
+        /// (<c>PreloadListItemLinkedObjects</c>). Returns only the objects that exist; a missing id simply stays lazy on
+        /// its item. Set by the owning <see cref="IRedbService"/>. A single <see cref="RedbListItem.Object"/> loads on the
+        /// live scope of whoever reads it - the provider attaches no loader to items (owner decision 2026-09-15).
         /// </summary>
         Func<IReadOnlyCollection<long>, CancellationToken, Task<IReadOnlyDictionary<long, IRedbObject>>>? LinkedObjectsBatchLoader { get => null; set { } }
 

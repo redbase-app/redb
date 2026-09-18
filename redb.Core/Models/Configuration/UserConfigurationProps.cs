@@ -15,9 +15,13 @@ namespace redb.Core.Models.Configuration
         // === CACHE QUOTAS ===
         
         /// <summary>
-        /// User object cache quota (number of objects)
-        /// null = use value from higher configuration
+        /// Not applied: the props cache has one process-wide limit,
+        /// <see cref="RedbServiceConfiguration.PropsCacheMaxSize"/>, and no quota per user. The value is
+        /// still stored with the configuration object, and no longer merged into
+        /// <see cref="EffectiveUserConfiguration"/>.
         /// </summary>
+        [Obsolete("Not applied: the props cache has one process-wide limit, RedbServiceConfiguration.PropsCacheMaxSize. " +
+                  "The value is stored but no longer merged into the effective configuration.")]
         public int? PropsCacheSize { get; set; }
         
         /// <summary>

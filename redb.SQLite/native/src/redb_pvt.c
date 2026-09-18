@@ -31,8 +31,11 @@ SQLITE_EXTENSION_INIT3
 #include "redb_pvt.h"
 #include <string.h>
 
+/* Checked by redb.SQLite at initialization against SqliteDialect.Query_PvtRequiredVersion():
+ * bump both on every change of this module.
+ * 0.6.6 - $regex / $iregex / $regexreplace (2026-09-16); the version gate itself. */
 #ifndef PVT_MODULE_VERSION
-#define PVT_MODULE_VERSION "0.6.5"
+#define PVT_MODULE_VERSION "0.6.6"
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -1092,7 +1095,8 @@ char *pvtBuildWhereFromJson(sqlite3 *db, const char *filter, const char *fields,
             !strcmp(kl,"$in")||!strcmp(kl,"$nin")||!strcmp(kl,"$between")||
             !strcmp(kl,"$null")||!strcmp(kl,"$notnull")||!strcmp(kl,"$isnull")||!strcmp(kl,"$exists")||
             !strcmp(kl,"$contains")||!strcmp(kl,"$startswith")||!strcmp(kl,"$endswith")||
-            !strcmp(kl,"$containsignorecase")||!strcmp(kl,"$startswithignorecase")||!strcmp(kl,"$endswithignorecase")){
+            !strcmp(kl,"$containsignorecase")||!strcmp(kl,"$startswithignorecase")||!strcmp(kl,"$endswithignorecase")||
+            !strcmp(kl,"$regex")||!strcmp(kl,"$iregex")){
       /* filter-level expression-form predicate (operands carry $field/$const). */
       frag = pvtBuildExprPredicate(db, k, v, fields, base_prefix);
       if(!frag) err = 1;
@@ -1633,7 +1637,8 @@ void pvtSplitFilter(sqlite3 *db, const char *filter, const char *fields,
                       !strcmp(lk,"$in")||!strcmp(lk,"$nin")||!strcmp(lk,"$between")||
                       !strcmp(lk,"$null")||!strcmp(lk,"$notnull")||!strcmp(lk,"$isnull")||!strcmp(lk,"$exists")||
                       !strcmp(lk,"$contains")||!strcmp(lk,"$startswith")||!strcmp(lk,"$endswith")||
-                      !strcmp(lk,"$containsignorecase")||!strcmp(lk,"$startswithignorecase")||!strcmp(lk,"$endswithignorecase");
+                      !strcmp(lk,"$containsignorecase")||!strcmp(lk,"$startswithignorecase")||!strcmp(lk,"$endswithignorecase")||
+                      !strcmp(lk,"$regex")||!strcmp(lk,"$iregex");
     if(is_expr || is_exprform){
       /* push iff every $field inside resolves to a base column. */
       if(pvtExprIsBaseOnly(db, v0, fields)){
@@ -2070,6 +2075,12 @@ char *pvtBuildScalarExpr(sqlite3 *db, const char *node, const char *fields, cons
     if(is_arr && alen==3){ char *a=pvtArg(db,node,argpath,1,0,fields,prefix),*f=pvtArg(db,node,argpath,1,1,fields,prefix),*r=pvtArg(db,node,argpath,1,2,fields,prefix);
       if(a&&f&&r) res = sqlite3_mprintf("REPLACE(%s, %s, %s)", a, f, r); sqlite3_free(a);sqlite3_free(f);sqlite3_free(r); }
   }
+  else if(!strcmp(opl,"$regexreplace")){
+    /* Regex.Replace: redb_regexp_replace (.NET Regex.Replace, registered by the provider on every connection)
+    ** replaces every match; the 'g' flag the builder appends for PostgreSQL is not needed. */
+    if(is_arr && (alen==3||alen==4)){ char *a=pvtArg(db,node,argpath,1,0,fields,prefix),*f=pvtArg(db,node,argpath,1,1,fields,prefix),*r=pvtArg(db,node,argpath,1,2,fields,prefix);
+      if(a&&f&&r) res = sqlite3_mprintf("redb_regexp_replace(%s, %s, %s)", a, f, r); sqlite3_free(a);sqlite3_free(f);sqlite3_free(r); }
+  }
   else if(!strcmp(opl,"$now")||!strcmp(opl,"$utcnow")){ res = sqlite3_mprintf("datetime('now')"); }
   else if(!strcmp(opl,"$today")){ res = sqlite3_mprintf("date('now')"); }
   else if(!strcmp(opl,"$if")){
@@ -2164,8 +2175,7 @@ char *pvtBuildScalarExpr(sqlite3 *db, const char *node, const char *fields, cons
       sqlite3_free(unit); sqlite3_free(a); sqlite3_free(b);
     }
   }
-  /* $regexReplace / $regex / $iregex / $fts: PG-only (regex engine SQLite lacks);
-     MSSql v2-pvt skips these too -> legitimately unsupported on this backend. */
+  /* $fts: PG-only. $regexReplace is above, $regex / $iregex in pvtBuildExprPredicate. */
 
   sqlite3_free(op); sqlite3_free(argpath);
   return res;
@@ -2219,7 +2229,17 @@ static char *pvtBuildExprPredicate(sqlite3 *db, const char *op, const char *args
     }
     sqlite3_free(l); sqlite3_free(pat); return r;
   }
-  if(!strcmp(opl,"$regex")||!strcmp(opl,"$iregex")||!strcmp(opl,"$notregex")||!strcmp(opl,"$inotregex")||!strcmp(opl,"$fts")) return 0; /* TODO */
+  /* Regex.IsMatch: SQLite has no regular expressions; the provider registers redb_regexp / redb_regexp_i
+  ** (.NET Regex) on every connection it opens. A host that loads this extension without them gets
+  ** "no such function" - loud, never a dropped filter. */
+  if(!strcmp(opl,"$regex")||!strcmp(opl,"$iregex")){
+    if(pvtJsonArrayLen(db,args,"$")!=2) return 0;
+    char *l=pvtScalarNode(db,args,"$[0]",fields,prefix),*p=pvtScalarNode(db,args,"$[1]",fields,prefix);
+    char *r=0;
+    if(l&&p) r=sqlite3_mprintf("%s(%s, %s)", !strcmp(opl,"$iregex")?"redb_regexp_i":"redb_regexp", l, p);
+    sqlite3_free(l); sqlite3_free(p); return r;
+  }
+  if(!strcmp(opl,"$notregex")||!strcmp(opl,"$inotregex")||!strcmp(opl,"$fts")) return 0; /* not emitted by the .NET builder */
 
   /* binary infix */
   if(pvtJsonArrayLen(db,args,"$")!=2) return 0;

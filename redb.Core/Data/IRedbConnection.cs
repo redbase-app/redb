@@ -98,6 +98,14 @@ namespace redb.Core.Data
         string? ExecuteJson(string sql, params object[] parameters)
             => ExecuteJsonAsync(sql, parameters).ConfigureAwait(false).GetAwaiter().GetResult();
 
+        /// <summary>Synchronous <see cref="QueryAsync{T}(string, object[])"/>: runs on the calling thread down to ADO.NET.</summary>
+        List<T> Query<T>(string sql, params object[] parameters) where T : new()
+            => QueryAsync<T>(sql, parameters).ConfigureAwait(false).GetAwaiter().GetResult();
+
+        /// <summary>Synchronous <see cref="ExecuteAsync(string, object[])"/>: runs on the calling thread down to ADO.NET.</summary>
+        int Execute(string sql, params object[] parameters)
+            => ExecuteAsync(sql, parameters).ConfigureAwait(false).GetAwaiter().GetResult();
+
         /// <summary>
         /// Execute SQL query and return list of scalar values (first column only).
         /// Use for simple queries like SELECT _id FROM ... that return single column.

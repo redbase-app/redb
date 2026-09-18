@@ -13,6 +13,15 @@ namespace redb.Postgres.Data
     {
         private readonly NpgsqlTransaction _transaction;
         private readonly Action _onDispose;
+        private bool _completionReported;
+
+        // Reports the outcome once to the callbacks registered for this transaction (cache publication after commit).
+        private void Complete(bool committed)
+        {
+            if (_completionReported) return;
+            _completionReported = true;
+            redb.Core.Data.TransactionCompletion.Completed(this, committed);
+        }
         private bool _disposed = false;
         
         /// <summary>
@@ -68,6 +77,7 @@ namespace redb.Postgres.Data
                 // exception. Both attempts are logged via [Diag-TX-LIFECYCLE-PG] so a
                 // failure shape never goes silent.
                 // Console.WriteLine($"[Diag-TX-LIFECYCLE-PG] CommitAsync FAILED: {ex.GetType().Name}: {ex.Message}. Attempting speculative rollback.");
+                Complete(committed: false);
                 try { await _transaction.RollbackAsync(); }
                 catch (Exception rbEx)
                 {
@@ -77,6 +87,7 @@ namespace redb.Postgres.Data
                 _onDispose();
                 throw;
             }
+            Complete(committed: true);
             IsActive = false;
             // Clear the connection's `_currentTransaction` slot now so commands
             // issued between commit and dispose run against the autocommit
@@ -93,6 +104,8 @@ namespace redb.Postgres.Data
         {
             if (!IsActive)
                 throw new InvalidOperationException("Transaction is not active. Already committed or rolled back.");
+
+            Complete(committed: false);
 
             try
             {
@@ -130,6 +143,7 @@ namespace redb.Postgres.Data
                 return;
 
             _disposed = true;
+            Complete(committed: false);
 
             // Auto-rollback if still active
             if (IsActive)

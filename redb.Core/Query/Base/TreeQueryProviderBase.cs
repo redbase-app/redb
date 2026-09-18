@@ -1166,6 +1166,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             value_numeric = source.value_numeric,
             value_datetime = source.value_datetime,
             value_bytes = source.value_bytes,
+            value_unique = source.value_unique,
             name = source.name,
             note = source.note,
             hash = source.hash

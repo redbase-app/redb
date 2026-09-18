@@ -157,6 +157,66 @@ public abstract class TemporalRoundTripTestsBase
         loaded.Props.When.Should().Be(new DateTime(2026, 8, 23, 14, 0, 0, DateTimeKind.Utc));
     }
 
+    /// <summary>
+    /// The edges of the CLR types come back as themselves: <see cref="DateTime.MinValue"/>,
+    /// <see cref="DateTimeOffset.MinValue"/> and <see cref="DateOnly.MinValue"/> are what a model that never
+    /// set them carries. SQLite encoded a datetime through the OLE automation date, whose zero stands for
+    /// MinValue: a default date came back as 1899-12-30.
+    /// </summary>
+    [Fact]
+    public async Task RoundTrip_TemporalMinValues_ComeBackAsThemselves()
+    {
+        var id = await Redb.SaveAsync(new RedbObject<TemporalRoundTripProps>
+        {
+            name = $"temporal-min-{Guid.NewGuid():N}",
+            Props = new TemporalRoundTripProps
+            {
+                When = DateTime.MinValue, Moment = DateTimeOffset.MinValue, Day = DateOnly.MinValue,
+                Clock = TimeOnly.MinValue, Span = TimeSpan.Zero, Label = "min"
+            }
+        });
+
+        var loaded = (await Redb.LoadAsync<TemporalRoundTripProps>(id))!;
+
+        loaded.Props.When.Should().Be(DateTime.MinValue);
+        loaded.Props.Moment.Should().Be(DateTimeOffset.MinValue);
+        loaded.Props.Day.Should().Be(DateOnly.MinValue);
+        loaded.Props.Clock.Should().Be(TimeOnly.MinValue);
+        loaded.Props.Span.Should().Be(TimeSpan.Zero);
+    }
+
+    /// <summary>
+    /// A time of day before 1899-12-30 is kept, and the row is found by the value it was written from. The OLE
+    /// automation date encodes a day before its epoch as sign and magnitude, not as a linear count: through it
+    /// 1850-05-03 12:34 moved a day on the way in and again on the way out, and a filter built from the same value
+    /// compared against a day that was never stored.
+    /// </summary>
+    [Fact]
+    public async Task RoundTrip_TimeOfDayBefore1900_IsKept_AndFoundByItsValue()
+    {
+        var label = $"pre1900-{Guid.NewGuid():N}";
+        var reading = new DateTime(1850, 5, 3, 12, 34, 56, DateTimeKind.Unspecified);
+        var id = await Redb.SaveAsync(new RedbObject<TemporalRoundTripProps>
+        {
+            name = label,
+            Props = new TemporalRoundTripProps
+            {
+                When = reading, Moment = new DateTimeOffset(reading, Offset), Day = new DateOnly(1850, 5, 3),
+                Clock = new TimeOnly(12, 34, 56), Span = TimeSpan.Zero, Label = label
+            }
+        });
+
+        var loaded = (await Redb.LoadAsync<TemporalRoundTripProps>(id))!;
+        loaded.Props.When.Should().Be(reading);
+        loaded.Props.Moment.UtcDateTime.Should().Be(new DateTimeOffset(reading, Offset).UtcDateTime);
+        loaded.Props.Day.Should().Be(new DateOnly(1850, 5, 3));
+
+        var found = await Redb.Query<TemporalRoundTripProps>()
+            .Where(t => t.Label == label && t.When == reading)
+            .Take(5).ToListAsync();
+        found.Should().ContainSingle().Which.id.Should().Be(id);
+    }
+
     // =====================================================================
     // Comparison: DateTime
     // =====================================================================

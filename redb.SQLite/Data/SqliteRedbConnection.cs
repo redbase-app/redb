@@ -23,8 +23,78 @@ namespace redb.SQLite.Data
         private readonly SqliteDataSource _dataSource;
         private SqliteConnection? _connection;
         private SqliteRedbTransaction? _currentTransaction;
+        // The current command's hold on the ambient transaction's connection; released with the command.
+        private AmbientLease? _ambientLease;
+        // Identity of the database in AmbientConnectionRegistry (computed on first use).
+        private string? _databaseKey;
         private bool _disposed = false;
         public bool IsDisposed => _disposed;
+
+        /// <summary>
+        /// One command: this wrapper's gate and, inside an ambient transaction, the lease on the
+        /// transaction's connection taken by <see cref="GetOpenConnectionAsync"/> - both released when the
+        /// command ends.
+        /// </summary>
+        private readonly struct CommandScope : IDisposable
+        {
+            private readonly SqliteRedbConnection _owner;
+            private readonly CommandGate.Releaser _releaser;
+
+            public CommandScope(SqliteRedbConnection owner, CommandGate.Releaser releaser)
+            {
+                _owner = owner;
+                _releaser = releaser;
+            }
+
+            public void Dispose()
+            {
+                var lease = _owner._ambientLease;
+                _owner._ambientLease = null;
+                try
+                {
+                    lease?.Dispose();
+                }
+                finally
+                {
+                    _releaser.Dispose();
+                }
+            }
+        }
+
+        /// <summary>The database file: two connection strings reaching the same file share one key.</summary>
+        private string DatabaseKey => _databaseKey ??= DatabaseKeyOf(_dataSource.ConnectionString);
+
+        private string? _sessionSignature;
+        // This configuration in AmbientConnectionRegistry: the cache domain of the connection string plus the
+        // per-connection settings. The file is the database key; the transaction's connection to it is shared only
+        // when they match.
+        private string SessionSignature => _sessionSignature ??=
+            redb.Core.Models.Configuration.RedbServiceConfiguration.ComputeCacheDomain(_dataSource.ConnectionString)
+            + $"|case_folding={(_dataSource.UnicodeCaseFolding ? 1 : 0)};lazy_refs={(_dataSource.LazyReferences ? 1 : 0)}";
+
+        private static string DatabaseKeyOf(string connectionString)
+        {
+            var dataSource = new SqliteConnectionStringBuilder(connectionString).DataSource;
+            var isFile = !string.IsNullOrEmpty(dataSource)
+                         && dataSource != ":memory:"
+                         && !dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase);
+            return "sqlite|" + (isFile ? System.IO.Path.GetFullPath(dataSource) : connectionString);
+        }
+
+        /// <summary>Opens the connection an ambient transaction holds (pragmas and extension applied by the data source).</summary>
+        private async Task<System.Data.Common.DbConnection> OpenAmbientAsync(CancellationToken cancellationToken)
+            => await _dataSource.OpenConnectionAsync();
+
+        /// <summary>Synchronous <see cref="OpenAmbientAsync"/>.</summary>
+        private System.Data.Common.DbConnection OpenAmbient() => _dataSource.OpenConnection();
+
+        /// <summary>
+        /// Microsoft.Data.Sqlite never takes part in System.Transactions, so redb begins the transaction the
+        /// scope commits or rolls back. BEGIN IMMEDIATE takes the single write lock up front, as every
+        /// explicit redb transaction on SQLite does; it is held until the scope ends (owner decision P4).
+        /// </summary>
+        private static System.Data.Common.DbTransaction BeginAmbientTransaction(System.Data.Common.DbConnection connection)
+            => ((SqliteConnection)connection).BeginTransaction(deferred: false);
 
         // Fail-fast concurrency guard. This connection holds ONE persistent SqliteConnection reused for all
         // Commands and teardown share ONE exclusion (CommandGate, tsum garage report
@@ -34,7 +104,7 @@ namespace redb.SQLite.Data
         // loader falls back to a detached scope); DisposeAsync WAITS for the in-flight
         // command instead of closing under it.
         private readonly CommandGate _gate = new(nameof(SqliteRedbConnection));
-        private CommandGate.Releaser EnterCommand() => _gate.Enter();
+        private CommandScope EnterCommand() => new(this, _gate.Enter());
 
         // ── [Diag-TXLOCK] process-wide BeginTransaction tracker ────────────
         //
@@ -66,17 +136,21 @@ namespace redb.SQLite.Data
         public IRedbTransaction? CurrentTransaction => _currentTransaction;
 
         /// <summary>
-        /// The scope's live connection and explicit transaction for the key generator's
-        /// ambient bypass (see SqliteKeyGenerator), or null when no explicit transaction is
-        /// active. An ambient TransactionScope is not reported here on purpose - the bypass
-        /// only targets the BEGIN IMMEDIATE self-deadlock, and the scope is single-threaded
-        /// by the one-scope-one-save contract.
+        /// The connection and transaction that hold the write lock for this scope, for the key
+        /// generator's bypass (see SqliteKeyGenerator): the scope's explicit transaction, or - inside a
+        /// TransactionScope - the transaction redb began on the transaction's connection. Null when
+        /// neither exists. A refill on a separate connection would wait for that very lock.
         /// </summary>
         internal (Microsoft.Data.Sqlite.SqliteConnection Connection, Microsoft.Data.Sqlite.SqliteTransaction Transaction)? TryGetAmbientTransaction()
         {
             var tx = _currentTransaction;
             if (_connection != null && tx is { IsActive: true })
                 return (_connection, tx.SqliteTransaction);
+            if (Transaction.Current is { } ambient)
+            {
+                var entry = AmbientConnectionRegistry.GetOrOpen(ambient, DatabaseKey, SessionSignature, OpenAmbient, BeginAmbientTransaction);
+                return ((SqliteConnection)entry.Connection, (Microsoft.Data.Sqlite.SqliteTransaction)entry.OwnTransaction!);
+            }
             return null;
         }
         
@@ -117,9 +191,13 @@ namespace redb.SQLite.Data
         /// </summary>
         public async Task<System.Data.Common.DbConnection> GetUnderlyingConnectionAsync(CancellationToken cancellationToken = default)
         {
+            // Outside a command: no lease, which would hold the transaction connection's gate past the command
+            // and stall the end of the transaction.
+            if (!_disposed && _currentTransaction is not { IsActive: true } && Transaction.Current is { } ambient)
+                return (await AmbientConnectionRegistry.GetOrOpenAsync(ambient, DatabaseKey, SessionSignature, OpenAmbientAsync, BeginAmbientTransaction, cancellationToken)).Connection;
             return await GetOpenConnectionAsync(cancellationToken);
         }
-        
+
         private async Task<SqliteConnection> GetOpenConnectionAsync(CancellationToken cancellationToken = default)
         {
             // Dispose nulls _connection; without this check a call after Dispose would open a NEW
@@ -128,6 +206,16 @@ namespace redb.SQLite.Data
                 throw new ObjectDisposedException(nameof(SqliteRedbConnection),
                     "The scope that owned this connection has ended. Resolve a fresh scoped IRedbService " +
                     "instead of reusing one from a finished scope or exchange.");
+
+            // Inside an ambient transaction the TRANSACTION holds the connection (AmbientConnectionRegistry)
+            // and redb's own transaction on it: the driver cannot enlist, and a second connection would wait
+            // for the write lock that transaction holds. An explicit transaction of this wrapper keeps its own.
+            if (_currentTransaction is not { IsActive: true } && Transaction.Current is { } ambient)
+            {
+                _ambientLease ??= await AmbientConnectionRegistry.AcquireAsync(ambient, DatabaseKey, SessionSignature, OpenAmbientAsync, BeginAmbientTransaction, cancellationToken);
+                return (SqliteConnection)_ambientLease.Entry.Connection;
+            }
+
             if (_connection == null)
             {
                 _connection = await _dataSource.OpenConnectionAsync();
@@ -156,6 +244,11 @@ namespace redb.SQLite.Data
             if (_currentTransaction != null && _currentTransaction.IsActive)
             {
                 cmd.Transaction = _currentTransaction.SqliteTransaction;
+            }
+            else if (_ambientLease?.Entry.OwnTransaction is SqliteTransaction ambientTransaction)
+            {
+                // Inside a TransactionScope: bind to the transaction redb began on the transaction's connection.
+                cmd.Transaction = ambientTransaction;
             }
             
             // Add parameters NAMED to match the converted $1,$2,... placeholders
@@ -220,6 +313,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<List<T>> QueryCoreAsync<T>(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             
@@ -245,6 +351,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryFirstOrDefaultCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<T?> QueryFirstOrDefaultCoreAsync<T>(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken) where T : class, new()
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             
@@ -268,6 +387,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteScalarCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<T?> ExecuteScalarCoreAsync<T>(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             var result = await cmd.ExecuteScalarAsync(cancellationToken);
             
@@ -275,6 +407,58 @@ namespace redb.SQLite.Data
                 return default;
 
             return ConvertScalar<T>(result);
+        }
+
+        // === ORPHAN TRANSACTION HYGIENE ===
+
+        private const string OrphanRollbackFailureKey = "redb.OrphanTransactionRollbackFailure";
+
+        /// <summary>
+        /// A command that failed can leave behind a transaction its own SQL text opened: a root
+        /// SAVEPOINT or BEGIN, some writes, then an error before RELEASE or COMMIT. This wrapper does
+        /// not own that transaction, and Microsoft.Data.Sqlite pools the handle as it is - the pool
+        /// clears it only when that very handle is handed out again, so its write lock stalls every
+        /// writer of the database meanwhile, and the scope itself cannot start a transaction. It is
+        /// rolled back here before the failure leaves, unless a transaction of this wrapper or an
+        /// ambient one owns the connection (its owner ends it). The original exception always
+        /// propagates; a rollback that fails as well is attached to it instead of replacing it.
+        /// </summary>
+        private void RollbackOrphanTransaction(SqliteConnection conn, Exception failure)
+        {
+            if (_currentTransaction is { IsActive: true } || Transaction.Current != null)
+                return;
+            if (conn.State != System.Data.ConnectionState.Open || SQLitePCL.raw.sqlite3_get_autocommit(conn.Handle) != 0)
+                return;
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "ROLLBACK";
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception rollbackFailure)
+            {
+                failure.Data[OrphanRollbackFailureKey] = rollbackFailure.Message;
+            }
+        }
+
+        /// <summary>
+        /// The last line for a handle about to return to the pool inside a transaction nobody owns -
+        /// a path that reached the physical connection without the per-command guard. Pooled as it is,
+        /// its write lock would stall every writer until the pool happened to hand it out again.
+        /// An ambient transaction still in flight owns the handle and ends it itself. A failing
+        /// rollback propagates, like any other dispose fault here.
+        /// </summary>
+        private static void ReleaseOrphanTransactionBeforePooling(SqliteConnection conn)
+        {
+            // The connection's own state first: Transaction.Current throws between Complete() and Dispose() of
+            // a TransactionScope, and disposing a scope's services in that window is legal.
+            if (conn.State != System.Data.ConnectionState.Open || SQLitePCL.raw.sqlite3_get_autocommit(conn.Handle) != 0)
+                return;
+            if (Transaction.Current != null)
+                return;
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ROLLBACK";
+            cmd.ExecuteNonQuery();
         }
 
         // === SYNCHRONOUS COUNTERPARTS (thread-pool-free lazy path) ===
@@ -289,6 +473,14 @@ namespace redb.SQLite.Data
                 throw new ObjectDisposedException(nameof(SqliteRedbConnection),
                     "The scope that owned this connection has ended. Resolve a fresh scoped IRedbService " +
                     "instead of reusing one from a finished scope or exchange.");
+
+            // Same ambient-transaction rule as the async twin.
+            if (_currentTransaction is not { IsActive: true } && Transaction.Current is { } ambient)
+            {
+                _ambientLease ??= AmbientConnectionRegistry.Acquire(ambient, DatabaseKey, SessionSignature, OpenAmbient, BeginAmbientTransaction);
+                return (SqliteConnection)_ambientLease.Entry.Connection;
+            }
+
             if (_connection == null)
             {
                 _connection = _dataSource.OpenConnection();
@@ -305,9 +497,67 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = GetOpenConnection();
+            try
+            {
+                return QueryFirstOrDefaultCore<T>(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private T? QueryFirstOrDefaultCore<T>(SqliteConnection conn, string sql, object[] parameters) where T : class, new()
+        {
             using var cmd = CreateCommand(conn, sql, parameters);
             using var reader = cmd.ExecuteReader();
             return reader.Read() ? new RedbRowMapper<T>().MapRow(reader) : null;
+        }
+
+        /// <inheritdoc />
+        public List<T> Query<T>(string sql, params object[] parameters) where T : new()
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            try
+            {
+                return QueryCore<T>(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private List<T> QueryCore<T>(SqliteConnection conn, string sql, object[] parameters) where T : new()
+        {
+            using var cmd = CreateCommand(conn, sql, parameters);
+            using var reader = cmd.ExecuteReader();
+
+            var results = new List<T>();
+            var mapper = new RedbRowMapper<T>();
+            while (reader.Read())
+                results.Add(mapper.MapRow(reader));
+            return results;
+        }
+
+        /// <inheritdoc />
+        public int Execute(string sql, params object[] parameters)
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            try
+            {
+                using var cmd = CreateCommand(conn, sql, parameters);
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
         }
 
         /// <inheritdoc />
@@ -315,6 +565,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = GetOpenConnection();
+            try
+            {
+                return ExecuteScalarCore<T>(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private T? ExecuteScalarCore<T>(SqliteConnection conn, string sql, object[] parameters)
+        {
             using var cmd = CreateCommand(conn, sql, parameters);
             var result = cmd.ExecuteScalar();
             if (result == null || result == DBNull.Value)
@@ -327,6 +590,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = GetOpenConnection();
+            try
+            {
+                return ExecuteJsonCore(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private string? ExecuteJsonCore(SqliteConnection conn, string sql, object[] parameters)
+        {
             using var cmd = CreateCommand(conn, sql, parameters);
             var result = cmd.ExecuteScalar();
             return result == null || result == DBNull.Value ? null : result.ToString();
@@ -382,6 +658,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<int> ExecuteCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             return await cmd.ExecuteNonQueryAsync(cancellationToken);
         }
@@ -398,6 +687,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryScalarListCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<List<T>> QueryScalarListCoreAsync<T>(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             
@@ -717,6 +1019,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteJsonCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<string?> ExecuteJsonCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             var result = await cmd.ExecuteScalarAsync(cancellationToken);
             
@@ -737,6 +1052,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteJsonListCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<List<string>> ExecuteJsonListCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             
@@ -769,6 +1097,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryRowsAsJsonCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<string> QueryRowsAsJsonCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
 
@@ -795,6 +1136,19 @@ namespace redb.SQLite.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryFirstRowAsJsonCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<string?> QueryFirstRowAsJsonCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
 
@@ -845,7 +1199,10 @@ namespace redb.SQLite.Data
                 var conn = _connection;
                 _connection = null;
                 if (conn != null)
-                    await conn.DisposeAsync();
+                {
+                    try { ReleaseOrphanTransactionBeforePooling(conn); }
+                    finally { await conn.DisposeAsync(); }
+                }
             }
         }
         
@@ -868,7 +1225,11 @@ namespace redb.SQLite.Data
                 _currentTransaction = null;
                 var conn = _connection;
                 _connection = null;
-                conn?.Dispose();
+                if (conn != null)
+                {
+                    try { ReleaseOrphanTransactionBeforePooling(conn); }
+                    finally { conn.Dispose(); }
+                }
             }
         }
         

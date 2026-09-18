@@ -19,6 +19,436 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.1] — 2026-09-18
+### Added
+- `IRedbScopeSource`, implemented by every `IRedbService`: `CreateScope()` opens a scope of the container the
+  service came from and hands over its service of the same database; the holder disposes the scope.
+  `CanCreateScope` says whether there is a container. For code that holds one service and needs one per unit
+  of work (redb.Route calls outside an exchange). A container whose scopes resolve another database is refused.
+- `IRedbService.BeginAccess()`: makes a service the scope lazy loads run on, for a block (UI event
+  handlers, callbacks outside the flow that resolved the service). See "Lazy loads run on the reader's
+  scope" under Fixed.
+- `IRedbService.LoadLinkedObjectsAsync(items)`: loads the linked objects of many list items in one
+  batch on the service's connection and publishes them on the items.
+- `RedbServiceConfiguration.LazyLoadWithoutScope` (`Refuse` by default, or `FreshScope`): what a lazy
+  load does when no live redb scope reads it.
+- `ILazyPropsLoader.CacheDomain` (a default interface member): the database a scope-bound loader reads.
+- The native SQLite extension is versioned like the PostgreSQL and SQL Server modules: `InitializeAsync`
+  asks the loaded `redbsqlite` library for `pvt_module_version()` and refuses a build of another version,
+  naming the file (`SqliteDialect.Query_PvtRequiredVersion()`, now 0.6.6). A stale library next to the
+  application loaded silently and answered in an old shape.
+
+### Fixed
+- The README of the `redb.Templates` package described the options of an older template: `--db` without
+  `sqlite`, and defaults of PostgreSQL and Free. The template defaults to SQLite and Pro; the README now says so
+  and lists what the generated app does.
+- `RedbSchemaOutdatedException` named a command the `redb` tool does not have (`redb schema upgrade-script`).
+  It now names `redb schema --upgrade --provider <name>`.
+- **Work inside a `TransactionScope` now belongs to that transaction on MSSQL, PostgreSQL and SQLite**
+  (a redb.Route `.Transacted()` block among others). Inside a scope redb used to write past the
+  transaction or fail:
+  - MSSQL: a speculative `ROLLBACK` sent right after a connection opened detached it from the scope.
+    Raw SQL through `redb.Context` autocommitted and survived an abandoned scope, and `SaveAsync`
+    failed with "Cannot issue SAVE TRANSACTION when there is no active transaction".
+  - PostgreSQL: a connection opened before the scope stayed out of it (`25P01 SAVEPOINT can only be
+    used in transaction blocks`), and a second connection (the key generator, another DI scope)
+    aborted the commit (`55000 prepared transactions are disabled`).
+  - SQLite: the driver never takes part in `System.Transactions`, so everything autocommitted
+    without an error.
+
+  Now the transaction holds the connection. Every redb connection wrapper of the same database, in
+  every DI scope, runs its commands on one connection per ambient transaction
+  (`AmbientConnectionRegistry`). MSSQL and PostgreSQL open it inside the transaction and enlist. On
+  SQLite redb runs `BEGIN IMMEDIATE` on it and commits or rolls it back with the scope, so the
+  database write lock is held until the scope ends. Inside a scope the key generators take keys on
+  that connection (a rollback leaves a gap in the sequence, never a duplicate), and the background
+  key refill no longer inherits the caller's transaction. A lazy load runs on the reader's scope and
+  so inside its transaction; only a load opened by `LazyLoadWithoutScope = FreshScope` reads committed
+  state outside it. The speculative `ROLLBACK` is gone: the SqlClient pool resets a returned session itself.
+
+  Behaviour to know:
+  - Parallel branches in one transaction are not supported. Two commands at the same time on the
+    transaction's connection (dependent clones, a parallel split) are refused with
+    `InvalidOperationException`. Run the branches sequentially, or give each branch a transaction of
+    its own.
+  - A command after the transaction ended (rolled back because a branch failed, or timed out) is
+    refused; it never runs outside the transaction.
+  - An explicit redb transaction begun before the scope keeps its own connection, and
+    `BeginTransactionAsync` inside a scope is still refused.
+  - Two redb configurations of the same database that differ in connection parameters or session
+    settings (lazy references, collation, case folding) do not share a transaction's connection: the
+    first command of the second one is refused with `InvalidOperationException`, instead of running on
+    a connection set up with the other configuration's settings. A connector with its own connection
+    (for example redb.Route's `sql:`) to the same database in the same transaction is a second
+    connection: SQL Server refuses it, PostgreSQL aborts the commit, SQLite writes outside the
+    transaction. Raw SQL that belongs to the transaction goes through `redb.Context`.
+  - Stores that resolve a DI scope of their own now take part in the caller's `TransactionScope`.
+- **SQLite: disposing scoped services between `TransactionScope.Complete()` and `Dispose()`** no
+  longer throws "The current TransactionScope is already complete".
+- **`DeadlockRetryHelper` no longer retries inside an ambient `TransactionScope`.** A deadlock victim's
+  transaction is already rolled back by the server (SQL Server 1205, PostgreSQL 40P01), so running the
+  command again inside it failed with a second error (`25P02`, an aborted transaction) that replaced the
+  deadlock itself. Inside an ambient transaction the original deadlock now leaves at once and the unit of
+  work (a route's retry, the caller) runs the whole transaction again. Outside one, and under
+  `TransactionScopeOption.Suppress`, the retry works as before.
+- **Loading an object no longer loads the objects behind its list items.** `RedbListItem.Object` is
+  lazy: reading it is a database load. Several walks over a loaded graph read every property of the
+  list items they met, so each linked list item (`IdObject` set) in Props cost a load of its object
+  that nobody asked for, and on Pro SQLite the load failed ("Error lazy loading Object for ListItem").
+  The walks were Pro loads of Props with references (substituting the loaded references, nulling
+  references to deleted objects, completing lazy reference stubs) and the props-cache check for
+  unsaved edits in nested objects on every cache hit (Free and Pro, point, bulk and sync loads). A
+  list item is now a leaf for every such walk, in one rule shared by all of them
+  (`LazyReferenceInstaller.IsWalkLeaf`). Reading `Object` explicitly loads it as before.
+- **Pro: the synchronous `Load<T>` builds the same object as `LoadAsync`, on the calling thread.** It
+  used to fall back to the Free in-database JSON builder (`get_object_json`): on Pro SQLite, which has no
+  such function, `Load<T>` and a first read of `RedbListItem.Object` failed ("no such function"; hidden
+  whenever a Free SQLite registration in the same process had loaded the native extension), and on Pro
+  MSSQL/PostgreSQL the result differed from the async load (list items lost their `IdObject`). The
+  synchronous Props getter of a lazy reference stub ran its load through `Task.Run`, holding a
+  thread-pool thread per touch on top of the blocked caller. Both now run the Pro materializer itself,
+  with every database call synchronous on the calling thread: no `Task.Run`, no `Parallel.ForEach`, and
+  a load that would go asynchronous is refused instead of blocked on. New synchronous members:
+  `IRedbConnection`/`IRedbContext` `Query<T>` and `Execute`, `ISchemeSyncProvider.GetSchemeById`,
+  `GlobalMetadataCache.ResolveClrType`.
+- **Free: list items in Props keep `IdList` and `IdObject`.** The in-database JSON builders (PostgreSQL
+  module 0.7.11, MSSQL module 0.2.16, SQLite native extension) wrote a list item with the key `idList`
+  and without `id_object`, while the model reads `id_list` and `id_object`. Every Free load returned the
+  list items in Props with `IdList = 0` and `IdObject = null`, so `RedbListItem.Object` had nothing to
+  load. PostgreSQL and SQLite also built the whole linked object for every such item, under a key the
+  deserializer ignores.
+
+  Behaviour to know: the raw object JSON (`LoadJsonAsync`, a direct `get_object_json` call) now writes a
+  list item as `{"id", "id_list", "value", "alias", "id_object"}`. `idList` is renamed and the nested
+  `object` is gone; load the linked object by `id_object`. The SQLite extension must be the rebuilt one.
+- **MSSQL Free: a reference to an object in the trash stays in its collection as null** (module 0.2.17).
+  An array of references lost that element (`[kept, gone]` loaded as `[kept]`, shifting every index after
+  it) and a dictionary of references lost the key, because the aggregate skipped the NULL returned for
+  the trashed target. PostgreSQL, SQLite and Pro already returned `null` in its place; MSSQL now does too.
+- **A list item's linked object loads typed on a node that has not cached its scheme yet.** On a fresh
+  process or another cluster node, `RedbListItem.Object` and `GetObjectAsync` took the CLR type from the
+  metadata cache only and, on a miss, returned an untyped `RedbObject<object>` built by
+  `get_object_json` (on Pro SQLite, which has no such function, the load failed). The scheme is now
+  resolved by its id, as the hand-out preload already did. `RedbServiceBase` implements
+  `ISchemeSyncProvider.GetSchemeById`.
+- **SQLite Free: a list item's linked object of a scheme without a CLR type loads.** The untyped load sent
+  the PostgreSQL text of the `get_object_json` call, `::text` cast included, and SQLite failed to parse
+  it. The linked-object loaders now take that SQL from the provider's dialect, like every other load.
+- **Loads no longer read `[RedbIgnore]` properties or swallow a getter's exception.** The walks over a
+  loaded graph (lazy-loader installation, the props-cache collector and its check for unsaved edits, the
+  Pro reference substitution, the lazy reference stub collection) read every public property, including
+  `[RedbIgnore]` ones, and ignored whatever a getter threw; the Props hash wrote an empty string for such
+  a property. They now walk the property set the scheme and the save use: public, not an indexer, not
+  `[RedbIgnore]`.
+
+  Behaviour to know: a getter of a stored property that throws now fails the load and the hash, as it
+  already failed the save. Mark a computed property that is not data with `[RedbIgnore]`.
+- **A failed command no longer leaves a transaction behind on its connection** (trash review).
+  When the SQL text of a command opened a transaction itself and then failed (a `SAVEPOINT` or
+  `BEGIN` followed by an error, or a command timeout or cancel inside `BEGIN TRANSACTION`),
+  nothing ever ended that transaction. On SQLite the pooled handle kept the database write lock,
+  and every writer waited out its busy timeout ("database is locked") until the pool happened to
+  hand that handle out again. On MSSQL the scope's later statements ran inside it and were rolled
+  back with it: a save reported success and its row was gone. On PostgreSQL every later command of
+  the scope failed with 25P02. The PostgreSQL, MSSQL and SQLite connection wrappers now roll such a
+  transaction back before the exception leaves, unless a transaction of the wrapper or an ambient
+  `TransactionScope` owns the connection; the original exception always propagates. SQLite also
+  rolls back an unowned transaction before a handle returns to the pool.
+- **Soft delete on MSSQL: `sp_mark_for_deletion` and `sp_purge_trash` run with
+  `SET XACT_ABORT ON`** and open a transaction only when the caller has none (module 0.2.15). A
+  timeout inside the mark used to leave `@@TRANCOUNT = 1` on the session. On SQLite the mark and
+  purge batches no longer open a savepoint in their own text. On every provider the mark and each
+  purge batch run inside one transaction, joining the caller's.
+- **Purging a trash container whose objects are referenced** (PostgreSQL module 0.7.10, MSSQL
+  module 0.2.15, SQLite dialect). A `RedbObject<T>` reference is a foreign key with no ON DELETE
+  action, so a single referenced object failed the whole batch, the container stayed `running`
+  and the background worker retried it every 30 minutes, forever. Now a reference held by an
+  object that is itself in the trash is removed together with the purge, whatever order the
+  containers are purged in. An object referenced by a live object is skipped and its reference is
+  never nulled; everything else is purged, the container is marked `failed` (no longer claimed
+  automatically), and `PurgeTrashAsync` throws the new `RedbObjectReferencedException` naming the
+  referenced and the referencing objects. Remove or re-point those references, then purge the
+  container again.
+- **Background deletion worker:** a claim that fails no longer ends the poll cycle for every
+  container after it, the scan and each claim use short scopes of their own, and a container that
+  ends `failed` is logged as a warning and not retried.
+- **An empty database is named as such at start-up.** `InitializeAsync()` without
+  `ensureCreated: true` on a database that has no redb schema used to fail on the first
+  start-up query with a raw driver error (`relation "_structures" does not exist`, `Cannot find
+  the object "dbo._structures"`, `no such table: _schemes`) that said nothing about how to
+  proceed. It now throws `RedbSchemaMissingException`, whose message names the two ways out -
+  `InitializeAsync(ensureCreated: true)` / `RedbServiceConfiguration.EnsureCreated = true`, or
+  the script from `GetSchemaScript()` for the schema owner - and reminds that an unexpectedly
+  empty database is usually a wrong connection string. Schema creation stays opt-in by design.
+  Pinned on all three providers against a throwaway empty database.
+- **Props cache under load.** With `EnablePropsCache` a busy process slowed down several times while its
+  idle database connections grew. Three causes:
+  - Every cache hit checked the object hash and walked the object's loaded graph under one process-wide
+    lock, so concurrent loads waited for each other with their connections open. The check now runs
+    outside the lock.
+  - An insert into a full cache sorted all entries under the write lock to evict one of them. A full cache
+    now evicts the least recently used tenth of `PropsCacheMaxSize` at once, without sorting.
+  - An object cached again kept the lifetime of its first insert: once `PropsCacheTtl` had passed, an
+    object reloaded periodically missed on every load. A re-cached object now starts a new lifetime, and an
+    expired entry is dropped when it is read.
+
+  The service now passes its logger to the cache. The cache warns, at most once per 10 seconds, when the
+  objects in use do not fit `PropsCacheMaxSize`, when checking a hit takes 50 ms or more, and when 100
+  lookups find a live entry and serve none (typically a read model that does not reproduce the saved
+  graph). The detached list-item load warning now counts loads per 10 seconds (200) instead of concurrent
+  loads (20): loads that run one at a time drain the connection pool as well.
+
+  Behaviour to know: the props cache no longer applies per-user quotas.
+  `UserConfigurationProps.PropsCacheSize` is still stored and merged, but it does not limit the cache; the
+  only limit is `PropsCacheMaxSize`.
+
+- **SQLite: `dbVersion`, `GetDbVersionAsync()` and `dbSize` work.** The SQLite service sent the PostgreSQL
+  text (`version()`, `pg_database_size(current_database())`) and failed with "no such function". It now
+  returns `sqlite_version()` and the database file size in bytes (`page_count * page_size`), Free and Pro.
+- **`dbSize` is in bytes on every provider.** The contract said megabytes; PostgreSQL returned bytes and
+  MSSQL kilobytes. The contract now says bytes, and MSSQL multiplies its 8 KB pages by 8192.
+
+  Behaviour to know: on MSSQL `dbSize` is now 1024 times larger than before.
+- **A list of references, `List<RedbObject<T>>`, is saved the way an array of them is.** The save
+  recognised arrays only and skipped the elements of a list:
+  - a new object in the list was never saved, and the parent's save failed on the foreign key;
+  - an edit to a loaded object in the list was silently lost when the parent was saved;
+  - a reference by id got no hash, so the parent's stored hash never matched the loaded one and the
+    object missed the props cache on every load.
+
+  Any generic collection of `RedbObject` elements now counts, like an array. `AddNewObjectsAsync` also
+  resolves the hashes of references by id before hashing, as `SaveAsync` does: the objects it created
+  with references missed the props cache for the same reason.
+
+  Behaviour to know: saving a parent now saves the loaded objects in its lists too, as it already did
+  for arrays and single references.
+- **Lazy loads run on the reader's scope: no hidden connections.** `RedbListItem.Object` and the Props
+  of a reference stub used to open a fresh DI scope, and with it a pooled connection, for every read
+  wherever the item or stub carried no loader of the right scope. That covered every list item
+  materialized by Pro (the Pro service took a second `IListProvider` instance from DI, one without
+  loaders) or from Free JSON, every reference inside an object served from the props cache, and every
+  read after the loading scope ended. A data object now owns no connection: such a load runs on the live
+  redb scope of whoever reads it (the scope that resolved `IRedbService` in the current flow, or a block
+  in `using (redb.BeginAccess())`), on that scope's connection and transaction. Where no scope is current
+  for the reader (a test fixture, a service kept in a field, a UI event handler), the scope that
+  materialized the object or item answers, as long as it lives. An instance shared by a cache (the props
+  cache, the list cache) is never bound to that scope, and neither is anything it loads or already carries.
+
+  Behaviour to know:
+  - When no scope is current for the reader and the materializing scope has ended, or when a shared
+    instance of a cache is read with no scope current, the read throws
+    `RedbLazyLoadScopeEndedException`, which names the ways out.
+    `RedbServiceConfiguration.LazyLoadWithoutScope = FreshScope` opens a scope per such load instead, with
+    a rate warning.
+  - Code that reads objects from a cache outside the flow that resolved the service (UI event handlers in
+    Blazor Server, WebAssembly, MAUI; callbacks) wraps those reads in `using (redb.BeginAccess())`.
+  - An object from the props cache, or an item from the list cache, read inside a transaction sees that
+    transaction's data and does not keep it, because the write behind it may roll back. Before, the read
+    went to a separate connection and saw committed state.
+  - Two reads of lazy data at the same time on one scope are refused, like any two concurrent commands
+    on a scope.
+  - An `IListProvider` injected from DI is now the service's own `ListProvider`.
+- **A service resolved from the root provider lends lazy loads a fresh scope, not its connection.** Such
+  a captive service (`provider.GetRequiredService<IRedbService>()` in a Program.cs, a service kept for the
+  life of the process) is the reader for every flow that touches an object of the props cache or a list
+  of the list cache, and parallel lazy loads of those instances all ran on its one connection: the second
+  was refused as a concurrent command. Outside a transaction such a load now runs on a service of a fresh
+  scope of the same container, on a pooled connection; what it reads is committed state, which a shared
+  instance keeps. Inside the captive service's transaction the connection is the transaction, and a lazy
+  load stays on it and reads what the transaction wrote, as before. A high rate of such loads is reported,
+  as for `LazyLoadWithoutScope = FreshScope`. What a lent scope materializes belongs to the captive reader:
+  the stubs under it name the captive service as their origin, not the scope that ended with the load, so
+  they load the same way. `RedbServiceProviders.IsRoot(serviceProvider)` tells the root
+  provider of a Microsoft DI container from a scope's.
+- **Pro honours the Props depth of a query.** `WithPropsDepth(n)` on `Query<T>()` and `TreeQuery<T>()` was
+  ignored by the Pro providers of all three databases: Props loaded to `DefaultMaxTreeDepth`, so references
+  meant to stay stubs came back loaded, with the whole graph behind them.
+- **Tree nodes keep `ValueUnique`.** Tree queries on Free returned nodes whose `ValueUnique` was null: the
+  conversion of an object to a tree node dropped the key, and on PostgreSQL and SQL Server the tree query did
+  not even select the column.
+- **A reference without a hash loads its Props.** A reference built in code (`new RedbObject<T> { id = ... }`)
+  passed to `LoadReferencesAsync` stayed without Props on Free while the props cache was on: the cache had no
+  hash to match it by, and the object was dropped from the load. On Pro the same reference got empty Props
+  marked as loaded, because Props are assembled by scheme and the reference carried none; its scheme is now
+  read from the database.
+- **`Regex.IsMatch` and `Regex.Replace` in filters on SQL Server and SQLite.** On SQL Server, Free and Pro,
+  `Regex.IsMatch` was dropped from the query without a word and every row came back; `Regex.Replace` matched
+  nothing on Free and was refused on Pro. They now translate to `REGEXP_LIKE` and `REGEXP_REPLACE`. On SQLite
+  both failed: the Pro builder emitted PostgreSQL operators, and the Free extension refused them. The provider
+  now registers `redb_regexp`, `redb_regexp_i` and `redb_regexp_replace` (.NET `Regex`) on every connection it
+  opens, and both editions use them.
+
+  Behaviour to know:
+  - SQL Server needs version 2025 with compatibility level 170 for these functions; an older server refuses
+    such a query by the function name. The SQL Server module version is 0.2.18.
+  - A pattern runs on the engine of the database: POSIX on PostgreSQL, RE2 on SQL Server, .NET on SQLite.
+  - The SQLite Free extension must be rebuilt for every platform.
+- **A tree node is served from the props cache.** An object saved as `TreeRedbObject<T>` - every
+  `CreateChildAsync`, every tree node saved directly - stored a header-only hash: the save recognised the
+  exact generic type `RedbObject<>` and nothing derived from it, so the hash the loaded object recomputes
+  (header and Props) never matched the stored one and every cache probe of such an object was a miss. The
+  same test kept a tree node out of the cache after its save and out of the scheme auto-detection.
+
+  Behaviour to know: a node saved before this fix carries the old hash until its next save; until then it
+  loads from the database as before, and the next save stores the hash the cache matches.
+- **A moved object is not served from the props cache with its old parent.** `MoveObjectAsync` updates the
+  parent outside the save path and drops the object's hash in the database, but left the cached copy in
+  place; with `SkipHashValidationOnCacheCheck` a load never asks the database and answered with the old
+  parent until the entry expired.
+- **Loading objects by a list of ids asks the database once, not once per id, and uses the props cache under
+  `SkipHashValidationOnCacheCheck`.** The batch used to issue one `SELECT id, hash, scheme` per id before
+  the cache probe, and with the flag it skipped the cache altogether and rematerialized every object. One
+  query now resolves the hashes and schemes of the whole batch, in both modes. This is the road of the
+  list-item preload and of `LoadLinkedObjectsAsync`.
+- **The object hash sees sub-second changes and does not depend on the process culture.** The canon of a
+  Props value was `ToString()`: a `DateTime` or `DateTimeOffset` lost its sub-second digits, and a `double`,
+  `decimal`, `DateOnly` or `TimeOnly` took the decimal separator and date format of the current culture.
+  Under the ChangeTracking save an object whose hash equals the stored one is not written, so a temporal
+  property changed within the same second - a heartbeat, a "last seen" - was silently lost; and two nodes
+  with different cultures hashed one object differently. The canon is now invariant: temporal values in
+  UTC at millisecond precision (the precision every database keeps), numbers in the invariant culture.
+  A `DateTime` hashes by its clock reading whatever its `Kind`, exactly as it is stored.
+
+  Behaviour to know: the hash of every object with temporal or floating-point Props changes once. The
+  first save of such an object after the upgrade runs the full diff (the ChangeTracking shortcut does
+  not apply) and stores the new hash; the first props-cache probe of it misses. A change below one
+  millisecond is not a change: the databases do not keep it.
+- **SQLite: dates before 1899-12-30 and the temporal `MinValue`s round-trip.** The REAL Julian day of a
+  `DateTime`, `DateTimeOffset` or `DateOnly` was computed through the OLE automation date (`ToOADate`),
+  which is not linear: its zero stands for `DateTime.MinValue`, so a default date came back as
+  1899-12-30, and a day before its epoch is encoded as sign and magnitude, so any time of day before
+  1899-12-30 moved by a day - on the way in through the Pro writer and every filter value, and on the way
+  out for rows the native extension wrote through SQLite's own `julianday()`. The day count is now linear
+  in the tick count, truncated to the millisecond; for every instant from 1899-12-30 on it is bit for bit
+  the number stored before, so existing rows and equality filters keep matching.
+- **PostgreSQL: a trash purge no longer fails the container when another purger deleted its batch.**
+  `purge_trash` marked the container 'failed' when a batch deleted nothing while objects remained, reading
+  it as "every remaining object is referenced by a live object". A batch chosen here and deleted meanwhile
+  by a concurrent purger - the background worker beside a caller's `PurgeTrashAsync`, another node -
+  failed the container with nothing blocking it, the worker stopped claiming it, and the caller got
+  `RedbObjectReferencedException` naming no referrer. 'failed' now means an empty batch; a batch that
+  deleted nothing leaves the container 'running', and the purge goes on with the next one. PostgreSQL
+  module 0.7.12, applied by `InitializeAsync` like every module upgrade. SQL Server counts the batch it
+  chose and SQLite chooses and deletes under the write lock, so neither saw the race.
+- **SQLite: a finished trash container is removed.** PostgreSQL and SQL Server remove the container in
+  the purge function once it holds no objects; the SQLite purge statement ends with its result row and
+  could not, so every completed container stayed in `_objects` for good, and `GetDeletionProgressAsync`
+  kept answering 'completed' for it where the other providers answer null. The purge now removes it
+  after the last batch.
+- `RedbListItem.GetObjectAsync(cancellationToken)`: the token reaches the load. It was accepted and dropped
+  on the way to the query, so a cancelled reader still ran the scheme lookup and the load.
+- A scheme without a CLR type is resolved once per cache domain. Reading the object behind a list item of
+  such a scheme loaded the scheme again on every read: a list of 200 items was 200 scheme queries.
+- The props cache no longer takes a process-wide lock on every hit for the "found but never served"
+  diagnostic; its counters are lock-free like the other diagnostics.
+- Two hosts of one database that differ in `RedbServiceConfiguration.LazyLoadWithoutScope` are reported
+  with a warning, once per database. The registration of the most recently constructed service wins, so
+  which policy a lazy load with no live scope got depended on which host constructed a service last.
+- **An edit made inside a transaction on the lazy reference of a loaded object is saved; the caches
+  publish committed state only.** A props-cache Set marked the loaded graph shared at once, and a shared
+  instance does not keep what one transaction saw - so inside a transaction the writer's own loaded object
+  never kept its lazy references: `root.Props.Next.Props.Label = ...; SaveAsync(root.Props.Next)` saved a
+  fresh reload and the edit was lost, and every read of `item.Object` of a cached list was a query. A Set
+  inside a transaction (an explicit redb transaction or an ambient `TransactionScope`) now waits for its
+  commit; until then the instances are the reader's own, and what a rolled-back transaction loaded never
+  reaches the cache. Behaviour to know: inside one transaction the same object loaded twice is materialized
+  twice - the cache answers only after the commit.
+- **A saved object served from the cache loads its hand-made references.** The save cached the caller's
+  graph as it was, and a reference written as `new RedbObject<T> { id = x }` carried no loader: a load
+  served from the cache returned that very stub, and its `Props` came back null - no query, no exception.
+  The save now gives the stubs of the saved graph the loader of its database before caching, as a load
+  does.
+- **A saved graph that is not a tree hashes references before their parents; a new object referenced
+  twice is saved once.** A parent's hash carries "id:hash" of every reference, and the save hashed in the
+  reverse of a pre-order walk that collects a target shared by two parents once, under the first: the
+  second parent stored the target's stale hash for ever - a props-cache miss on every load. The same walk
+  never deduplicated a new object: one instance referenced from two places was collected twice, given an
+  id twice and inserted twice.
+- The connection of an ambient transaction opens under a lock per transaction and database. One
+  process-wide lock held the first open of every other transaction, on every database, behind a SQLite
+  `BEGIN IMMEDIATE` waiting for its write lock.
+- The save answers "is this a reference / a collection of references / a business class" once per type
+  instead of reflecting over the type's interfaces for every property of every object, and caching a
+  loaded graph no longer walks every nested object's subtree again to mark it shared - the root's Set
+  marked the whole graph.
+- **Saving a reference whose properties were never loaded is refused with
+  `RedbUnloadedReferenceException`.** `SaveAsync(root.Props.Next)` where `Next` is a stub whose lazy load
+  the getter did not keep (a shared instance inside a transaction), or a hand-written
+  `new RedbObject<T> { id = x }`, saved whatever a fresh load returned - the caller's edits were lost
+  silently - and cached the unloaded stub, whose validation on the next load was a lazy load inside the
+  cache probe: a deadlock with the load that probes. The exception names the ways out: load the object
+  (`redb.LoadAsync(id)`, `redb.LoadReferencesAsync(parent, p => p.Reference)`), edit and save the loaded
+  one. Reading the `Props` of such a reference still answers null: plain System.Text.Json serialization
+  of a graph reads the getter, and an exception there would fail every API response carrying a hand-made
+  reference. A saved graph gives its hand-made references their loader, with or without the props cache.
+  An object without Props - a scheme with no properties (a flag, a counter: the object lives in its base
+  fields), an object saved with `Props = null` - is a loaded object, not a reference: what redb materializes
+  as a root (`LoadAsync`, a query, a tree) is loaded by definition, on every provider; the refusal applies to
+  a stub redb attached a lazy loader to (a depth boundary, a cache) that is still unloaded.
+- The props cache never holds or serves an unloaded instance: a save caches loaded objects only, and a
+  cache hit whose instance has no loaded Props is not served.
+- **A shared instance keeps what a transaction loads while the transaction has written nothing, and
+  forgets it if the transaction rolls back.** The rule "a shared instance does not keep what one
+  transaction saw" guarded a narrow hazard - a transaction's own uncommitted write read back through a
+  shared parent - at the price of the writer's edits in every ordinary flow: an object served from the
+  cache, or loaded before the transaction, edited through its lazy reference inside the transaction
+  (`root.Props.Next.Props.Label = ...; SaveAsync(root.Props.Next)`) saved a fresh reload. While the
+  transaction has written nothing, what its connection reads is committed state, so the shared instance
+  keeps it - stubs and list items alike - and drops it if the transaction ends without a commit. Once the
+  transaction has written (a save, a delete, a tree move, a raw `Context.ExecuteAsync`, a bulk operation,
+  a soft delete or purge), what it reads may be its own uncommitted work: the shared instance keeps nothing
+  of it, and saving such a stub is refused with `RedbUnloadedReferenceException` instead of writing a
+  fresh reload.
+
+### Changed
+- The `redb-console` template and `redb.Examples` resolve `IRedbService` from a scope (`provider.CreateAsyncScope()`)
+  instead of from the container root: one service is one connection, and a scope per unit of work is the shape
+  that carries over to hosts with many flows. A console works either way.
+- **`Microsoft.Data.SqlClient` 7.0.3** (was 5.2.2) in `redb.MSSql` and `redb.Export`; `redb.MSSql.Pro`
+  gets it through `redb.MSSql`. The 7.0 line supports .NET 8 and newer and ships `net8.0` and `net9.0`
+  builds (`net10.0` uses the `net9.0` one). redb.Route, redb.Tsak and redb.Identity build and test on the
+  same driver version.
+
+  Behaviour to know:
+  - Microsoft Entra ID authentication (`Authentication=Active Directory ...` in the connection string)
+    is no longer in the driver package. An application that uses it adds
+    `Microsoft.Data.SqlClient.Extensions.Azure`. The driver no longer brings `Azure.Core`, `Azure.Identity`
+    and `Microsoft.Identity.Client`. redb does not use Entra ID itself.
+  - The driver lines 5.x and 6.x are no longer supported. An application that pins
+    `Microsoft.Data.SqlClient` below 7.0.3 gets a NU1605 package downgrade error and has to raise the pin.
+  - The driver needs `Microsoft.IdentityModel.*` and `System.IdentityModel.Tokens.Jwt` 8.16.0 or newer.
+    A lower pin of those packages in an application is a NU1605 downgrade as well. `redb.Licensing` references
+    `System.IdentityModel.Tokens.Jwt` 8.16.0 (was 8.0.0), so `redb.Core.Pro`, `redb.Postgres.Pro` and
+    `redb.SQLite.Pro` bring the same version without `redb.MSSql` in the graph.
+- `UserConfigurationProps.PropsCacheSize` is obsolete and no longer merged into
+  `EffectiveUserConfiguration`: the props cache has one process-wide limit,
+  `RedbServiceConfiguration.PropsCacheMaxSize`, and no quota per user. The value is still stored with the
+  configuration object; `EffectiveUserConfiguration.PropsCacheSize` reports the process limit for every
+  user, sys included.
+- `RedbLazyLoadScopeEndedException`: the list item form is `ForListItem(listItemId, objectId)`; the
+  three-argument constructor with its `fromListItem` flag is gone.
+- `ObjectStorageProviderBase.CollectAllObjectsRecursively` (protected) takes the set of instances already
+  collected, next to the set of ids.
+- New public helpers: `TransactionCompletion` (a provider transaction reports its outcome once; callbacks
+  registered for it run with whether it committed), `CachePublication.AfterCommit` (runs a publication
+  now or once the context's transaction commits).
+
+### Removed
+- `RedbListItem.SetGlobalObjectLoader`, `SetGlobalSyncObjectLoader`, `IsObjectLoaderAvailable`,
+  `AttachObjectLoader`, `AttachSyncObjectLoader` and `HasObjectLoader`; `IListProvider.LinkedObjectLoader`
+  and `LinkedObjectSyncLoader`; `DetachedLazyPropsLoader` and `ScopeFallbackLazyPropsLoader`; the scope
+  factory parameter of `GlobalPropsCache.Initialize`. These bound items and stubs to one scope, or opened
+  a fresh scope per load to make up for it (see "Lazy loads run on the reader's scope" above).
+- `MemoryRedbObjectCache` constructor parameters `getUserIdFunc` and `getQuotaFunc`, its method
+  `GetUserStatistics()` and the class `UserCacheStats`: the props cache has no per-user quotas any more
+  (see "Props cache under load" above). The quota lookup ran synchronously on every insert, through a
+  configuration service taken from the scope that initialized redb, and its failures were swallowed.
+- Unreachable PostgreSQL SQL in the SQLite and Pro builders. `SqliteDialect.Query_HasAncestorTreeSql`,
+  `Query_HasAncestorNormalSql` and `Query_HasDescendantSql` now refuse with `NotSupportedException`, like the
+  other search functions SQLite does not have. The Pro SQL builders no longer translate `ArrayAny`,
+  `ArrayEmpty` and the `ArrayCount…` comparisons, which no LINQ parser produces; such a comparison is refused
+  instead of compiling to SQL (on SQLite, to PostgreSQL SQL).
+
 ## [4.0.0] — 2026-09-12
 
 ### Added
@@ -159,15 +589,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SQL texts normalized to a single column-alias contract.
 
 ### Fixed
-- **An empty database is named as such at start-up.** `InitializeAsync()` without
-  `ensureCreated: true` on a database that has no redb schema used to fail on the first
-  start-up query with a raw driver error (`relation "_structures" does not exist`, `Cannot find
-  the object "dbo._structures"`, `no such table: _schemes`) that said nothing about how to
-  proceed. It now throws `RedbSchemaMissingException`, whose message names the two ways out -
-  `InitializeAsync(ensureCreated: true)` / `RedbServiceConfiguration.EnsureCreated = true`, or
-  the script from `GetSchemaScript()` for the schema owner - and reminds that an unexpectedly
-  empty database is usually a wrong connection string. Schema creation stays opt-in by design.
-  Pinned on all three providers against a throwaway empty database.
 - **`_hash` covers the whole object, and a props-cache hit no longer serves a stale header**
   (cluster review, 2026-09-11). `_hash` used to cover Props only; the header - `name`, `note`,
   `value_*`, `value_unique`, parent, owner, `date_begin/complete` - was written on every save

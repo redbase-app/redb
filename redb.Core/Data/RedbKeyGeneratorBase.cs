@@ -54,15 +54,18 @@ namespace redb.Core.Data
         protected abstract Task<List<long>> GenerateKeysAsync(int count);
 
         /// <summary>
-        /// Provider hook for the single-writer trap (SQLite): when the calling scope already
-        /// holds a write transaction (BEGIN IMMEDIATE), a refill on a SEPARATE connection
-        /// deadlocks against it - the refill waits for the file's only write lock, the lock
-        /// holder waits for the refill, and only busy_timeout unwinds the pair. A provider that
-        /// can allocate keys on the scope's own connection INSIDE that transaction returns them
-        /// here, bypassing the shared cache: on rollback the sequence bump is taken back with
-        /// the transaction, and these ids were never visible outside it - no duplicates either
-        /// way. Default: null (PostgreSQL/MSSQL sequences live outside transactions, the trap
-        /// does not exist there).
+        /// Provider hook for a refill that must not use a SEPARATE connection, bypassing the shared cache:
+        /// <list type="bullet">
+        ///   <item>SQLite single-writer trap: when the calling scope already holds a write transaction
+        ///   (BEGIN IMMEDIATE), a refill on another connection waits for the file's only write lock while
+        ///   the lock holder waits for the refill. Keys come from the scope's transaction instead; a
+        ///   rollback takes the sequence bump back, and those ids were never visible outside it.</item>
+        ///   <item>MSSQL and PostgreSQL inside a TransactionScope: another connection would be a second
+        ///   connection in the transaction (a distributed transaction). Keys come through the scope's
+        ///   wrapper on the transaction's connection; sequences are not transactional, so a rollback leaves
+        ///   a gap, never a duplicate (plan docs/V4/AMBIENT_TRANSACTION_PLAN.md).</item>
+        /// </list>
+        /// Default: null - the refill uses its own connection.
         /// </summary>
         protected virtual Task<List<long>?> TryGenerateKeysInAmbientTransactionAsync(int count)
             => Task.FromResult<List<long>?>(null);
@@ -124,7 +127,7 @@ namespace redb.Core.Data
                 if (currentCount <= threshold && !cache.IsRefilling)
                 {
                     // Fire-and-forget: background thread with separate connection
-                    _ = Task.Run(async () => await RefillCacheBackgroundAsync());
+                    StartBackgroundRefill();
                 }
                 
                 return key;
@@ -166,7 +169,7 @@ namespace redb.Core.Data
                     
                     if (currentCount <= threshold && !cache.IsRefilling)
                     {
-                        _ = Task.Run(async () => await RefillCacheBackgroundAsync());
+                        StartBackgroundRefill();
                     }
                 }
                 else
@@ -190,7 +193,20 @@ namespace redb.Core.Data
         }
 
         // === CACHE REFILL ===
-        
+
+        /// <summary>
+        /// Starts the background refill WITHOUT the caller's ExecutionContext. An ambient TransactionScope of the
+        /// caller would otherwise flow into it: the refill would open its connection inside the caller's
+        /// transaction (a second connection - a distributed transaction) or after that scope completed.
+        /// </summary>
+        private void StartBackgroundRefill()
+        {
+            using (System.Threading.ExecutionContext.SuppressFlow())
+            {
+                _ = Task.Run(async () => await RefillCacheBackgroundAsync());
+            }
+        }
+
         /// <summary>
         /// Background refill - runs in separate thread with separate DB connection.
         /// Called when cache is below threshold but not empty.

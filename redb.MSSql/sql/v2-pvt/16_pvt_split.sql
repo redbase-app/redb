@@ -320,7 +320,7 @@ BEGIN
     -- what runs in the outer Shape A path -- no duplicate compiler.
     IF @k_lower IN (
         N'$eq', N'$ne', N'$lt', N'$lte', N'$gt', N'$gte',
-        N'$like', N'$ilike',
+        N'$like', N'$ilike', N'$regex', N'$iregex',
         N'$in', N'$nin', N'$between',
         N'$null', N'$notnull',
         N'$contains', N'$startswith', N'$endswith'

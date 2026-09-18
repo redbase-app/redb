@@ -2,23 +2,23 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using redb.Core;
+using redb.Core.Exceptions;
 using redb.Core.Extensions;
+using redb.Core.Models.Configuration;
 using redb.Core.Models.Entities;
 using redb.SQLite.Pro.Extensions;
 
 namespace redb.Tests.Integration.Tests.Sqlite;
 
 /// <summary>
-/// The thread-pool-free sync path of <see cref="RedbListItem.Object"/> end to end: the list
-/// provider attaches a synchronous loader alongside the async one, the getter prefers it, and
-/// the whole load - scheme lookup, permission check, get_object_json, deserialization - runs on
-/// the calling thread down to ADO.NET. A saturated thread pool can no longer slow or deadlock a
-/// lazy touch (the old blocking-over-async fallback parked a thread waiting for pool-scheduled
-/// continuations). Preload is OFF here so every touch really exercises the lazy chain.
+/// The thread-pool-free sync path of <see cref="RedbListItem.Object"/> end to end: the getter runs the
+/// whole load - scheme lookup, permission check, get_object_json, deserialization - on the calling
+/// thread down to ADO.NET, on the reader's scope. A saturated thread pool can no longer slow or
+/// deadlock a lazy touch. Preload is OFF here so every touch really exercises the lazy chain.
 /// </summary>
 public class SqliteListItemSyncGetterTests
 {
-    private static ServiceProvider Build()
+    private static ServiceProvider Build(Action<RedbServiceConfiguration>? configure = null)
     {
         var cs = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build()
             .GetConnectionString("Sqlite")!
@@ -32,6 +32,7 @@ public class SqliteListItemSyncGetterTests
             {
                 c.PreloadListItemLinkedObjects = false;
                 c.CacheDomain = "listitem-syncgetter";
+                configure?.Invoke(c);
             });
         });
         return services.BuildServiceProvider();
@@ -69,8 +70,6 @@ public class SqliteListItemSyncGetterTests
         items.Should().HaveCount(2);
         items.Should().OnlyContain(i => !i.IsObjectLoaded, "preload is off - the items stay lazy");
 
-        // The getter prefers the attached sync loader (pinned by the unit tests), so this touch
-        // runs the full load - scheme lookup, get_object_json, deserialize - on this thread.
         foreach (var item in items)
         {
             var obj = item.Object;
@@ -80,28 +79,44 @@ public class SqliteListItemSyncGetterTests
         }
     }
 
+    /// <summary>Seeds and hands the items out of a scope that ends - in this helper, so nothing stays current.</summary>
+    private static async Task<List<RedbListItem>> ItemsOfADeadScopeAsync(ServiceProvider sp)
+    {
+        await using var scope = sp.CreateAsyncScope();
+        var redb = scope.ServiceProvider.GetRequiredService<IRedbService>();
+        await redb.InitializeAsync(ensureCreated: true);
+        await redb.SyncSchemeAsync<Models.SimpleProps>();
+        var listId = await SeedListAsync(redb, "dead");
+        return (await redb.ListProvider.GetListItemsAsync(listId)).Where(i => i.IdObject.HasValue).ToList();
+    }
+
     [Fact]
-    public async Task LazyTouch_AfterTheScopeDied_BorrowsAFreshScopeSynchronously()
+    public async Task LazyTouch_AfterTheScopeDied_Refuses()
     {
         await using var sp = Build();
+        var survivors = await ItemsOfADeadScopeAsync(sp);
+        survivors.Should().HaveCount(2);
 
-        List<RedbListItem> survivors;
-        using (var scope = sp.CreateScope())
+        // The scope that handed the items out is gone and no other scope reads here: a clear refusal, never a scope
+        // opened behind the reader's back (owner decision 2026-09-15).
+        foreach (var item in survivors)
         {
-            var redb = scope.ServiceProvider.GetRequiredService<IRedbService>();
-            await redb.InitializeAsync(ensureCreated: true);
-            await redb.SyncSchemeAsync<Models.SimpleProps>();
-            var listId = await SeedListAsync(redb, "dead");
-            survivors = (await redb.ListProvider.GetListItemsAsync(listId))
-                .Where(i => i.IdObject.HasValue).ToList();
+            Action touch = () => _ = item.Object;
+            touch.Should().Throw<RedbLazyLoadScopeEndedException>();
+            item.IsObjectLoaded.Should().BeFalse();
         }
+    }
 
-        // The scope that attached the loaders is gone; the sync path must borrow a fresh scope
-        // from the root container on the calling thread, never touch the dead context.
+    [Fact]
+    public async Task LazyTouch_AfterTheScopeDied_LoadsInAFreshScopeSynchronously_WhenConfigured()
+    {
+        await using var sp = Build(c => c.LazyLoadWithoutScope = LazyLoadWithoutScopeMode.FreshScope);
+        var survivors = await ItemsOfADeadScopeAsync(sp);
+
         foreach (var item in survivors)
         {
             var obj = item.Object;
-            obj.Should().NotBeNull("a surviving item loads through a fresh scope, synchronously");
+            obj.Should().NotBeNull("the option opens a fresh scope for the load, on the calling thread");
             obj!.Name.Should().StartWith("syncget-dead-");
         }
     }

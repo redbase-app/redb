@@ -25,7 +25,7 @@ public class SqlRedbContext : RedbContextBase
     /// <summary>
     /// Bulk operations (SqlBulkCopy).
     /// </summary>
-    public override IBulkOperations Bulk => _bulkOperations;
+    protected override IBulkOperations BulkOperations => _bulkOperations;
     
     /// <summary>
     /// Connection string (for direct access if needed).
@@ -44,7 +44,7 @@ public class SqlRedbContext : RedbContextBase
         ConnectionString = connectionString;
         _connection = new SqlRedbConnection(connectionString, lazyReferences);
         var domain = redb.Core.Models.Configuration.RedbServiceConfiguration.ComputeCacheDomain(connectionString);
-        _keyGenerator = new SqlKeyGenerator(connectionString, domain);
+        _keyGenerator = new SqlKeyGenerator(connectionString, domain, scopeConnection: () => _connection);
         _bulkOperations = new SqlBulkOperations(_connection);
     }
 

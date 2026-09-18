@@ -85,6 +85,12 @@ namespace redb.Core.Models.Entities
         public virtual bool IsPropsLoaded => true;
 
         /// <summary>
+        /// Set by the props cache: this instance is shared by every scope. A lazy load under it runs on the reader's scope
+        /// and, inside the reader's transaction, keeps nothing (owner decision 2026-09-15).
+        /// </summary>
+        internal bool _isShared;
+
+        /// <summary>
         /// Recompute MD5 hash and store in hash field.
         /// For non-generic RedbObject: hash from base value_* fields.
         /// For RedbObject{TProps}: overridden to hash from Props.

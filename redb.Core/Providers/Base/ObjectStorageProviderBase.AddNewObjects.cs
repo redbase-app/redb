@@ -95,13 +95,18 @@ namespace redb.Core.Providers.Base
             var objectsToSave = new List<IRedbObject>();
             var valuesToSave = new List<RedbValue>();
             var processedObjectIds = new HashSet<long>();
+            var seenInstances = new HashSet<object>(ReferenceEqualityComparer.Instance);
 
             // STEP 2: Recursive collection of all objects (main + nested IRedbObject)
 
+            // References by id carry no hash yet: resolve them in one query, as the batch save does. Hashing before
+            // that wrote "id:" for every reference, and the stored hash never matched the loaded one.
+            var referenceStubs = new List<IRedbObject>();
             foreach (var obj in objectsList)
             {
-                await CollectAllObjectsRecursively(obj, objectsToSave, processedObjectIds);
+                await CollectAllObjectsRecursively(obj, objectsToSave, processedObjectIds, seenInstances, referenceStubs);
             }
+            await ResolveReferenceHashesAsync(referenceStubs, cancellationToken);
 
 
             // STEP 3: Assign IDs to all objects without ID (via GetNextKey)
@@ -119,6 +124,11 @@ namespace redb.Core.Providers.Base
 
                 }
             }
+
+            // Hashes are final only once ids and parents are set: a parent hashes "id:hash" of every reference, and
+            // an object created here was still id 0 above. Children before parents across the graph, as the batch
+            // save does.
+            RecomputeHashesPostOrder(objectsToSave);
 
             // STEP 4: Create/verify schemes for all object types
 

@@ -168,6 +168,8 @@ namespace redb.Core.Providers.Base
         {
             var objList = objects.ToList();
             if (objList.Count == 0) return new List<long>();
+            foreach (var obj in objList)
+                RefuseUnloadedReference(obj);
 
             // === PHASE 1: VALIDATION AND PREPARATION (BATCH OPTIMIZATION) ===
 
@@ -227,9 +229,10 @@ namespace redb.Core.Providers.Base
             foreach (var obj in objList.Where(o => o.SchemeId == 0 && _configuration.AutoSyncSchemesOnSave))
             {
                 var objType = obj.GetType();
-                if (objType.IsGenericType && objType.GetGenericTypeDefinition() == typeof(RedbObject<>))
+                var genericObjType = Utils.RedbObjectTypes.GenericOf(objType);
+                if (genericObjType != null)
                 {
-                    var propsType = objType.GetGenericArguments()[0];
+                    var propsType = genericObjType.GetGenericArguments()[0];
 
                     // Check cache
                     if (schemeCache.TryGetValue(propsType, out var cachedSchemeId))
@@ -336,11 +339,12 @@ namespace redb.Core.Providers.Base
             var allObjectsToSave = new List<IRedbObject>();
             var allValuesToSave = new List<RedbValue>();
             var processedObjectIds = new HashSet<long>();
+            var seenInstances = new HashSet<object>(ReferenceEqualityComparer.Instance);
             var referenceStubs = new List<IRedbObject>();
 
             foreach (var obj in objList)
             {
-                await CollectAllObjectsRecursively(obj, allObjectsToSave, processedObjectIds, referenceStubs);
+                await CollectAllObjectsRecursively(obj, allObjectsToSave, processedObjectIds, seenInstances, referenceStubs);
             }
 
             await ResolveReferenceHashesAsync(referenceStubs, cancellationToken);
@@ -379,14 +383,11 @@ namespace redb.Core.Providers.Base
             // V4 (L.2): hashes are final only once ids exist - the parent's hash carries "id:hash" of
             // every reference, so an object created in this save (id 0 until now) would leave "0:"
             // in its parent's persisted hash: unreproducible on reload, a props-cache miss for ever
-            // and a hash shift on the first re-save. Children first, then their parents (the
-            // collector is pre-order); an existing nested object re-saved through its parent gets
-            // its content hash refreshed the same way - its row is rewritten anyway (review).
+            // and a hash shift on the first re-save. Children first, then their parents, across the
+            // graph; an existing nested object re-saved through its parent gets its content hash
+            // refreshed the same way - its row is rewritten anyway (review).
             if (_configuration.AutoRecomputeHash)
-            {
-                for (var i = allObjectsToSave.Count - 1; i >= 0; i--)
-                    RecomputeHash(allObjectsToSave[i]);
-            }
+                RecomputeHashesPostOrder(allObjectsToSave);
             await EnsureSchemesForAllTypes(allObjectsToSave, cancellationToken);
 
             // F1 (CT hash shortcut, perf wave 1): under ChangeTracking, existing objects whose
@@ -481,21 +482,36 @@ namespace redb.Core.Providers.Base
                 }, cancellationToken: cancellationToken);
             }
 
-            // === PHASE 5: CACHE UPDATE ===
+            // === PHASE 5: LOADERS FOR THE SAVED GRAPH, CACHE UPDATE ===
+            // The caller's graph lives on after the save, hand-made references included: their stubs get the loader
+            // of this database, as the load path gives its boundary stubs - a stub without a loader cannot answer its
+            // Props (it answered null from a cache hit, with no query and no exception). With the props cache on, the
+            // graph is published once the transaction commits (CachePublication).
+            // Loaded ones only: an unloaded instance in the cache cannot be validated without a lazy load inside the
+            // probe - which deadlocks with the load that probes.
+            var savedGeneric = allObjectsToSave
+                .Where(o => Utils.RedbObjectTypes.GenericOf(o.GetType()) != null && o is RedbObject { IsPropsLoaded: true })
+                .ToList();
+            if (savedGeneric.Count > 0)
+            {
+                var loader = CreateLazyPropsLoader();
+                foreach (var savedObj in savedGeneric)
+                    Utils.LazyReferenceInstaller.Install(savedObj, loader);
+            }
             if (_configuration.EnablePropsCache && PropsCache.Instance != null)
             {
-                foreach (var savedObj in allObjectsToSave)
+                var toCache = savedGeneric.Where(o => o.Hash.HasValue).ToList();
+                if (toCache.Count > 0)
                 {
-                    if (savedObj.Hash.HasValue)
+                    Caching.CachePublication.AfterCommit(_context, () =>
                     {
-                        var objType = savedObj.GetType();
-                        if (objType.IsGenericType && objType.GetGenericTypeDefinition() == typeof(RedbObject<>))
+                        foreach (var savedObj in toCache)
                         {
-                            var propsType = objType.GetGenericArguments()[0];
+                            var propsType = Utils.RedbObjectTypes.GenericOf(savedObj.GetType())!.GetGenericArguments()[0];
                             var setMethod = typeof(GlobalPropsCache).GetMethod("Set")?.MakeGenericMethod(propsType);
                             setMethod?.Invoke(PropsCache, new[] { savedObj });
                         }
-                    }
+                    });
                 }
             }
 
@@ -531,8 +547,8 @@ namespace redb.Core.Providers.Base
         private static void RecomputeHash(IRedbObject obj)
         {
             var objType = obj.GetType();
-            var isGeneric = objType.IsGenericType &&
-                            objType.GetGenericTypeDefinition() == typeof(RedbObject<>);
+            // The type or a base type: a TreeRedbObject<TProps> hashes its Props like the RedbObject<TProps> it is.
+            var isGeneric = Utils.RedbObjectTypes.GenericOf(objType) != null;
 
             if (isGeneric)
             {

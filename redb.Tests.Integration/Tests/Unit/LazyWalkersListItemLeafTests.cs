@@ -1,4 +1,3 @@
-using redb.Core.Models.Contracts;
 using redb.Core.Models.Entities;
 using redb.Core.Providers;
 using redb.Core.Utils;
@@ -11,6 +10,11 @@ namespace redb.Tests.Integration.Tests.Unit;
 /// every business object - including Object - so materializing anything with list-item fields
 /// fired a synchronous phantom load per item (~150/s on the stand, with not a single explicit
 /// .Object anywhere in the application code).
+/// <para>
+/// No redb scope is live in these tests: a walk that read Object would load nothing and throw instead (a lazy load runs
+/// on the reader's scope, owner decision 2026-09-15), and would leave the item marked loaded under a configured fresh
+/// scope - both are caught below.
+/// </para>
 /// </summary>
 public class LazyWalkersListItemLeafTests
 {
@@ -20,48 +24,80 @@ public class LazyWalkersListItemLeafTests
         public RedbListItem? Status { get; set; }
     }
 
-    private static (RedbObject<PropsWithItem> root, RedbListItem item, Counter loads) Make()
+    private static (RedbObject<PropsWithItem> root, RedbListItem item) Make()
     {
-        var loads = new Counter();
         var item = new RedbListItem { Id = 5, IdList = 1, Value = "status", IdObject = 42 };
-        item.AttachObjectLoader(id =>
-        {
-            loads.Value++;
-            return Task.FromResult<IRedbObject?>(new RedbObject { id = id, name = "phantom" });
-        });
         var root = new RedbObject<PropsWithItem>
         {
             id = 1,
             scheme_id = 100,
             Props = new PropsWithItem { Label = "root", Status = item },
         };
-        return (root, item, loads);
+        return (root, item);
     }
-
-    private sealed class Counter { public int Value; }
 
     [Fact]
     public void LoaderInstall_DoesNotWakeTheItemsObject()
     {
-        var (root, item, loads) = Make();
+        var (root, item) = Make();
 
-        LazyReferenceInstaller.Install(root, new NoopLoader());
+        var install = () => LazyReferenceInstaller.Install(root, new NoopLoader());
 
-        loads.Value.Should().Be(0,
-            "installing lazy loaders is a wiring walk - it must never trigger a database load");
+        install.Should().NotThrow("installing lazy loaders is a wiring walk - it must never read Object");
         item.IsObjectLoaded.Should().BeFalse();
     }
 
     [Fact]
     public void MarkUnloaded_DoesNotWakeTheItemsObject()
     {
-        var (_, item, loads) = Make();
-        var (root, _, _) = Make();
+        var (root, item) = Make();
 
-        LazyReferenceInstaller.MarkUnloadedWherePropsAreNull(root);
+        var mark = () => LazyReferenceInstaller.MarkUnloadedWherePropsAreNull(root);
 
-        loads.Value.Should().Be(0);
+        mark.Should().NotThrow();
         item.IsObjectLoaded.Should().BeFalse();
+    }
+
+    [Fact]
+    public void MarkShared_DoesNotWakeTheItemsObject()
+    {
+        var (root, item) = Make();
+
+        var mark = () => LazyReferenceInstaller.MarkShared(root);
+
+        mark.Should().NotThrow("marking a cached graph shared walks it without reading Object");
+        item.IsObjectLoaded.Should().BeFalse();
+    }
+
+    [Fact]
+    public void MarkShared_SharesTheObjectAnItemAlreadyCarries()
+    {
+        var nestedItem = new RedbListItem { Id = 6, IdList = 1, Value = "nested", IdObject = 43 };
+        var carried = new RedbObject<PropsWithItem>
+        {
+            id = 42,
+            scheme_id = 100,
+            Props = new PropsWithItem { Label = "carried", Status = nestedItem },
+        };
+        var (root, item) = Make();
+        item.Object = carried;
+
+        LazyReferenceInstaller.MarkShared(root);
+
+        IsShared(item).Should().BeTrue("precondition: the item itself is marked");
+        IsShared(carried).Should().BeTrue("the object an item already carries is shared with the item");
+        IsShared(nestedItem).Should().BeTrue("and so is what that object holds");
+    }
+
+    /// <summary>The internal shared mark; the core exposes no internals to tests.</summary>
+    private static bool IsShared(object instance)
+    {
+        for (var type = instance.GetType(); type != null; type = type.BaseType)
+        {
+            var field = type.GetField("_isShared", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (field != null) return (bool)field.GetValue(instance)!;
+        }
+        throw new InvalidOperationException($"{instance.GetType().Name} carries no shared mark");
     }
 
     private sealed class NoopLoader : ILazyPropsLoader

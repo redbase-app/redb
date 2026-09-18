@@ -41,7 +41,6 @@ namespace redb.Core.Configuration
                 Props = new UserConfigurationProps
                 {
                     // Cache quotas (smaller than system)
-                    PropsCacheSize = 1000,
                     ListCacheSize = 500,
                     PropsCacheTtlMinutes = 30,
                     ListCacheTtlMinutes = 5,

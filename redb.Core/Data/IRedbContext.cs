@@ -75,6 +75,14 @@ namespace redb.Core.Data
         string? ExecuteJson(string sql, params object[] parameters)
             => Db.ExecuteJson(sql, parameters);
 
+        /// <summary>Synchronous <see cref="QueryAsync{T}(string, object[])"/> on the calling thread.</summary>
+        List<T> Query<T>(string sql, params object[] parameters) where T : new()
+            => Db.Query<T>(sql, parameters);
+
+        /// <summary>Synchronous <see cref="ExecuteAsync(string, object[])"/> on the calling thread.</summary>
+        int Execute(string sql, params object[] parameters)
+            => Db.Execute(sql, parameters);
+
         /// <summary>
         /// Execute SQL query and return list of scalar values (first column only).
         /// </summary>

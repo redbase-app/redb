@@ -39,7 +39,7 @@ public static class LoadedGraphInspector
         if (node == null) return false;
         var type = node.GetType();
         if (type.IsPrimitive || type.IsValueType || node is string) return false;
-        if (LazyReferenceInstaller.IsLeafCollection(node)) return false;
+        if (LazyReferenceInstaller.IsWalkLeaf(node)) return false; // a list item's Object getter loads on read
         if (!visited.Add(node)) return false;
 
         if (node is RedbObject baseObj && node is IRedbObject redbObj)
@@ -74,9 +74,8 @@ public static class LoadedGraphInspector
         if (type.Namespace?.StartsWith("System", StringComparison.Ordinal) == true) return false;
         foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
-            if (!p.CanRead || p.GetIndexParameters().Length > 0) continue;
-            object? value;
-            try { value = p.GetValue(node); } catch { continue; }
+            if (!LazyReferenceInstaller.IsWalkedProperty(p)) continue;
+            var value = p.GetValue(node);
             if (IsDirty(value, visited)) return true;
         }
         return false;

@@ -19,8 +19,16 @@ public class SqlRedbConnection : IRedbConnection
     private readonly string _connectionString;
     // V4 (LAZY Л2): session flag for the JSON builders, applied on every open of this context's connection.
     private readonly bool _lazyReferences;
+    // Identity of the database in AmbientConnectionRegistry: every wrapper of one database shares the
+    // connection an ambient transaction holds for it.
+    private readonly string _databaseKey;
+    // This configuration in AmbientConnectionRegistry: the cache domain of the connection string plus the session
+    // settings. A connection the transaction already holds for this database is shared only when they match.
+    private readonly string _sessionSignature;
     private SqlConnection? _connection;
     private SqlRedbTransaction? _currentTransaction;
+    // The current command's hold on the ambient transaction's connection; released with the command.
+    private AmbientLease? _ambientLease;
     private bool _disposed;
     public bool IsDisposed => _disposed;
 
@@ -30,7 +38,37 @@ public class SqlRedbConnection : IRedbConnection
     // refused with ObjectDisposedException (the lazy loader falls back to a detached scope);
     // DisposeAsync WAITS for the in-flight command instead of closing under it.
     private readonly CommandGate _gate = new(nameof(SqlRedbConnection));
-    private CommandGate.Releaser EnterCommand() => _gate.Enter();
+    private CommandScope EnterCommand() => new(this, _gate.Enter());
+
+    /// <summary>
+    /// One command: this wrapper's gate and, inside an ambient transaction, the lease on the transaction's
+    /// connection taken by <see cref="GetOpenConnectionAsync"/> - both released when the command ends.
+    /// </summary>
+    private readonly struct CommandScope : IDisposable
+    {
+        private readonly SqlRedbConnection _owner;
+        private readonly CommandGate.Releaser _releaser;
+
+        public CommandScope(SqlRedbConnection owner, CommandGate.Releaser releaser)
+        {
+            _owner = owner;
+            _releaser = releaser;
+        }
+
+        public void Dispose()
+        {
+            var lease = _owner._ambientLease;
+            _owner._ambientLease = null;
+            try
+            {
+                lease?.Dispose();
+            }
+            finally
+            {
+                _releaser.Dispose();
+            }
+        }
+    }
 
     /// <summary>
     /// Connection string.
@@ -61,20 +99,38 @@ public class SqlRedbConnection : IRedbConnection
         
         _connectionString = connectionString;
         _lazyReferences = lazyReferences;
+        _databaseKey = DatabaseKeyOf(connectionString);
+        _sessionSignature = redb.Core.Models.Configuration.RedbServiceConfiguration.ComputeCacheDomain(connectionString)
+            + $"|lazy_refs={(lazyReferences ? 1 : 0)}";
+    }
+
+    /// <summary>Server, database and login: two connection strings reaching the same data share one key.</summary>
+    private static string DatabaseKeyOf(string connectionString)
+    {
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        return $"mssql|{builder.DataSource}|{builder.InitialCatalog}|{builder.UserID}|{builder.IntegratedSecurity}";
     }
 
     // === CONNECTION MANAGEMENT ===
-    
+
     /// <summary>
     /// Get underlying connection (for bulk operations).
     /// This ensures all operations use the same connection and transaction.
     /// </summary>
     public async Task<DbConnection> GetUnderlyingConnectionAsync(CancellationToken cancellationToken = default)
     {
+        // Bulk copy runs between commands: inside an ambient transaction it takes the transaction's
+        // connection without holding the gate a command holds.
+        if (_currentTransaction is not { IsActive: true } && System.Transactions.Transaction.Current is { } ambient)
+        {
+            ThrowIfDisposed();
+            var entry = await AmbientConnectionRegistry.GetOrOpenAsync(ambient, _databaseKey, _sessionSignature, OpenAmbientAsync, null, cancellationToken);
+            return entry.Connection;
+        }
         return await GetOpenConnectionAsync(cancellationToken);
     }
-    
-    private async Task<SqlConnection> GetOpenConnectionAsync(CancellationToken cancellationToken = default)
+
+    private void ThrowIfDisposed()
     {
         // Dispose nulls _connection; without this check a call after Dispose would open a NEW
         // connection on a wrapper whose second Dispose is a no-op, and it would never be closed.
@@ -82,6 +138,21 @@ public class SqlRedbConnection : IRedbConnection
             throw new ObjectDisposedException(nameof(SqlRedbConnection),
                 "The scope that owned this connection has ended. Resolve a fresh scoped IRedbService " +
                 "instead of reusing one from a finished scope or exchange.");
+    }
+
+    private async Task<SqlConnection> GetOpenConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        // Inside an ambient transaction the TRANSACTION holds the connection (AmbientConnectionRegistry):
+        // every scope of this database works through it, and a second open connection would make the
+        // transaction distributed. An explicit transaction of this wrapper keeps its own connection.
+        if (_currentTransaction is not { IsActive: true } && System.Transactions.Transaction.Current is { } ambient)
+        {
+            _ambientLease ??= await AmbientConnectionRegistry.AcquireAsync(ambient, _databaseKey, _sessionSignature, OpenAmbientAsync, null, cancellationToken);
+            return (SqlConnection)_ambientLease.Entry.Connection;
+        }
+
         var wasJustOpened = false;
         if (_connection == null)
         {
@@ -94,53 +165,39 @@ public class SqlRedbConnection : IRedbConnection
             await _connection.OpenAsync();
             wasJustOpened = true;
         }
+        // No speculative ROLLBACK here (plan AMBIENT_TRANSACTION, 2026-09-14): the SqlClient pool resets
+        // the session - an open transaction included - before it hands a connection out again, and a
+        // ROLLBACK on a connection that just enlisted in a TransactionScope would end that transaction.
         if (wasJustOpened)
-            await EnsureCleanTransactionStateAsync(_connection);
-
-        if (wasJustOpened && _lazyReferences)
-        {
-            // V4 (LAZY L2): the session flag dbo.build_field_json reads via SESSION_CONTEXT.
-            using var lazyCmd = _connection.CreateCommand();
-            lazyCmd.CommandText = "EXEC sp_set_session_context @key = N'redb.lazy_refs', @value = 1";
-            await lazyCmd.ExecuteNonQueryAsync();
-        }
+            await ApplySessionSettingsAsync(_connection);
         return _connection;
     }
 
-    /// <summary>
-    /// Defensive pool-poisoning guard, mirror of <c>SqliteDataSource.EnsureCleanTransactionState</c>.
-    /// Microsoft.Data.SqlClient's connection pool returns <see cref="SqlConnection"/> wrappers
-    /// without inspecting the underlying internal connection's transaction state — a prior
-    /// caller that failed to COMMIT or ROLLBACK (e.g. swallowed rollback in a dispose path)
-    /// hands us a connection with <c>_currentTransaction</c> still set. The next
-    /// <see cref="SqlConnection.BeginTransaction()"/> then fails with
-    /// <c>InvalidOperationException: SqlConnection does not support parallel transactions</c>.
-    /// A speculative <c>ROLLBACK</c> clears any leaked tx; "no transaction is active" is the
-    /// normal/clean case and is silently caught (SQL Server error 3903 / 0x0F4F).
-    /// </summary>
-    private static async Task EnsureCleanTransactionStateAsync(SqlConnection conn)
+    /// <summary>Opens the connection an ambient transaction holds; opened inside the scope, SqlClient enlists it.</summary>
+    private async Task<DbConnection> OpenAmbientAsync(CancellationToken cancellationToken)
     {
+        var connection = new SqlConnection(_connectionString);
         try
         {
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "ROLLBACK";
-            // Rollback of a leaked pooled tx must always complete - never under a caller token (§3.4).
-            await cmd.ExecuteNonQueryAsync(CancellationToken.None);
-            // If we reach here, the pooled SqlConnection HAD a leaked tx — log so the
-            // source of the leak is observable.
-            // Console.WriteLine("[Diag-TX-LIFECYCLE-MSSQL] POOL-CLEANUP: rolled back leaked tx on pooled SqlConnection acquire.");
-        }
-        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 3903)
-        {
-            // SQL Server error 3903: "The ROLLBACK TRANSACTION request has no corresponding
-            // BEGIN TRANSACTION." — clean handle, expected case.
+            await connection.OpenAsync(cancellationToken);
+            await ApplySessionSettingsAsync(connection);
+            return connection;
         }
         catch
         {
-            // Any other failure is non-fatal here — we don't want to break connection
-            // acquisition for a defensive measure. The next BeginTransaction will surface
-            // the real error if the state is still bad.
+            await connection.DisposeAsync();
+            throw;
         }
+    }
+
+    private async Task ApplySessionSettingsAsync(SqlConnection connection)
+    {
+        if (!_lazyReferences)
+            return;
+        // V4 (LAZY L2): the session flag dbo.build_field_json reads via SESSION_CONTEXT.
+        using var lazyCmd = connection.CreateCommand();
+        lazyCmd.CommandText = "EXEC sp_set_session_context @key = N'redb.lazy_refs', @value = 1";
+        await lazyCmd.ExecuteNonQueryAsync();
     }
     
     /// <summary>
@@ -242,6 +299,56 @@ public class SqlRedbConnection : IRedbConnection
         }
     }
 
+    // ===== orphan transaction hygiene =====
+
+    private const string OrphanRollbackFailureKey = "redb.OrphanTransactionRollbackFailure";
+
+    /// <summary>
+    /// A command that failed or was cancelled can leave behind a transaction its own SQL text opened:
+    /// BEGIN TRANSACTION without SET XACT_ABORT ON survives an error outside TRY/CATCH, and a client
+    /// cancel or command timeout bypasses CATCH altogether. This wrapper does not own that transaction,
+    /// so nothing would ever end it: every later statement of the scope would run inside it and be
+    /// rolled back with it when the pooled session is reset - a save reporting success, its row gone.
+    /// It is rolled back here before the failure leaves, unless a transaction of this wrapper or an
+    /// ambient one owns the session (its owner ends it). The original exception always propagates; a
+    /// rollback that fails as well is attached to it instead of replacing it.
+    /// </summary>
+    private async Task RollbackOrphanTransactionAsync(SqlConnection conn, Exception failure)
+    {
+        if (_currentTransaction is { IsActive: true } || System.Transactions.Transaction.Current != null
+            || conn.State != ConnectionState.Open)
+            return;
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION";
+            // The failure may be the caller's own cancellation - the rollback must land regardless.
+            await cmd.ExecuteNonQueryAsync(CancellationToken.None);
+        }
+        catch (Exception rollbackFailure)
+        {
+            failure.Data[OrphanRollbackFailureKey] = rollbackFailure.Message;
+        }
+    }
+
+    /// <summary>Synchronous twin of <see cref="RollbackOrphanTransactionAsync"/>.</summary>
+    private void RollbackOrphanTransaction(SqlConnection conn, Exception failure)
+    {
+        if (_currentTransaction is { IsActive: true } || System.Transactions.Transaction.Current != null
+            || conn.State != ConnectionState.Open)
+            return;
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION";
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception rollbackFailure)
+        {
+            failure.Data[OrphanRollbackFailureKey] = rollbackFailure.Message;
+        }
+    }
+
     public Task<List<T>> QueryAsync<T>(string sql, params object[] parameters) where T : new()
         => QueryAsync<T>(sql, parameters, CancellationToken.None);
 
@@ -250,6 +357,19 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = await GetOpenConnectionAsync(cancellationToken);
+        try
+        {
+            return await QueryCoreAsync<T>(conn, sql, parameters, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await RollbackOrphanTransactionAsync(conn, ex);
+            throw;
+        }
+    }
+
+    private async Task<List<T>> QueryCoreAsync<T>(SqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
+    {
         await using var cmd = CreateCommand(conn, sql, parameters);
         await using var reader = await NormalizeCancelAsync(() => cmd.ExecuteReaderAsync(cancellationToken), cancellationToken);
         
@@ -277,6 +397,19 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = await GetOpenConnectionAsync(cancellationToken);
+        try
+        {
+            return await QueryFirstOrDefaultCoreAsync<T>(conn, sql, parameters, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await RollbackOrphanTransactionAsync(conn, ex);
+            throw;
+        }
+    }
+
+    private async Task<T?> QueryFirstOrDefaultCoreAsync<T>(SqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken) where T : class, new()
+    {
         await using var cmd = CreateCommand(conn, sql, parameters);
         await using var reader = await NormalizeCancelAsync(() => cmd.ExecuteReaderAsync(cancellationToken), cancellationToken);
         
@@ -360,6 +493,19 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = await GetOpenConnectionAsync(cancellationToken);
+        try
+        {
+            return await ExecuteScalarCoreAsync<T>(conn, sql, parameters, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await RollbackOrphanTransactionAsync(conn, ex);
+            throw;
+        }
+    }
+
+    private async Task<T?> ExecuteScalarCoreAsync<T>(SqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+    {
         await using var cmd = CreateCommand(conn, sql, parameters);
         var result = await NormalizeCancelAsync(() => cmd.ExecuteScalarAsync(cancellationToken), cancellationToken);
         return CoerceScalar<T>(result);
@@ -391,10 +537,15 @@ public class SqlRedbConnection : IRedbConnection
 
     private SqlConnection GetOpenConnection()
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(SqlRedbConnection),
-                "The scope that owned this connection has ended. Resolve a fresh scoped IRedbService " +
-                "instead of reusing one from a finished scope or exchange.");
+        ThrowIfDisposed();
+
+        // Same ambient-transaction rule as the async twin.
+        if (_currentTransaction is not { IsActive: true } && System.Transactions.Transaction.Current is { } ambient)
+        {
+            _ambientLease ??= AmbientConnectionRegistry.Acquire(ambient, _databaseKey, _sessionSignature, OpenAmbient, null);
+            return (SqlConnection)_ambientLease.Entry.Connection;
+        }
+
         var wasJustOpened = false;
         if (_connection == null)
         {
@@ -408,30 +559,34 @@ public class SqlRedbConnection : IRedbConnection
             wasJustOpened = true;
         }
         if (wasJustOpened)
-        {
-            EnsureCleanTransactionState(_connection);
-            if (_lazyReferences)
-            {
-                using var lazyCmd = _connection.CreateCommand();
-                lazyCmd.CommandText = "EXEC sp_set_session_context @key = N'redb.lazy_refs', @value = 1";
-                lazyCmd.ExecuteNonQuery();
-            }
-        }
+            ApplySessionSettings(_connection);
         return _connection;
     }
 
-    private static void EnsureCleanTransactionState(SqlConnection conn)
+    /// <summary>Synchronous <see cref="OpenAmbientAsync"/>.</summary>
+    private DbConnection OpenAmbient()
     {
+        var connection = new SqlConnection(_connectionString);
         try
         {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "ROLLBACK";
-            cmd.ExecuteNonQuery();
+            connection.Open();
+            ApplySessionSettings(connection);
+            return connection;
         }
-        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 3903)
+        catch
         {
-            // SQL Server error 3903: no corresponding BEGIN TRANSACTION - clean handle, expected.
+            connection.Dispose();
+            throw;
         }
+    }
+
+    private void ApplySessionSettings(SqlConnection connection)
+    {
+        if (!_lazyReferences)
+            return;
+        using var lazyCmd = connection.CreateCommand();
+        lazyCmd.CommandText = "EXEC sp_set_session_context @key = N'redb.lazy_refs', @value = 1";
+        lazyCmd.ExecuteNonQuery();
     }
 
     /// <inheritdoc />
@@ -439,9 +594,67 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = GetOpenConnection();
+        try
+        {
+            return QueryFirstOrDefaultCore<T>(conn, sql, parameters);
+        }
+        catch (Exception ex)
+        {
+            RollbackOrphanTransaction(conn, ex);
+            throw;
+        }
+    }
+
+    private T? QueryFirstOrDefaultCore<T>(SqlConnection conn, string sql, object[] parameters) where T : class, new()
+    {
         using var cmd = CreateCommand(conn, sql, parameters);
         using var reader = cmd.ExecuteReader();
         return reader.Read() ? new SqlRowMapper<T>().MapRow(reader) : null;
+    }
+
+    /// <inheritdoc />
+    public List<T> Query<T>(string sql, params object[] parameters) where T : new()
+    {
+        using var _guard = EnterCommand();
+        var conn = GetOpenConnection();
+        try
+        {
+            return QueryCore<T>(conn, sql, parameters);
+        }
+        catch (Exception ex)
+        {
+            RollbackOrphanTransaction(conn, ex);
+            throw;
+        }
+    }
+
+    private List<T> QueryCore<T>(SqlConnection conn, string sql, object[] parameters) where T : new()
+    {
+        using var cmd = CreateCommand(conn, sql, parameters);
+        using var reader = cmd.ExecuteReader();
+
+        var results = new List<T>();
+        var mapper = new SqlRowMapper<T>();
+        while (reader.Read())
+            results.Add(mapper.MapRow(reader));
+        return results;
+    }
+
+    /// <inheritdoc />
+    public int Execute(string sql, params object[] parameters)
+    {
+        using var _guard = EnterCommand();
+        var conn = GetOpenConnection();
+        try
+        {
+            using var cmd = CreateCommand(conn, sql, parameters);
+            return cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex)
+        {
+            RollbackOrphanTransaction(conn, ex);
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -449,6 +662,19 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = GetOpenConnection();
+        try
+        {
+            return ExecuteScalarCore<T>(conn, sql, parameters);
+        }
+        catch (Exception ex)
+        {
+            RollbackOrphanTransaction(conn, ex);
+            throw;
+        }
+    }
+
+    private T? ExecuteScalarCore<T>(SqlConnection conn, string sql, object[] parameters)
+    {
         using var cmd = CreateCommand(conn, sql, parameters);
         return CoerceScalar<T>(cmd.ExecuteScalar());
     }
@@ -458,6 +684,19 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = GetOpenConnection();
+        try
+        {
+            return ExecuteJsonCore(conn, sql, parameters);
+        }
+        catch (Exception ex)
+        {
+            RollbackOrphanTransaction(conn, ex);
+            throw;
+        }
+    }
+
+    private string? ExecuteJsonCore(SqlConnection conn, string sql, object[] parameters)
+    {
         using var cmd = CreateCommand(conn, sql, parameters);
         var result = cmd.ExecuteScalar();
         return result == null || result == DBNull.Value ? null : result.ToString();
@@ -474,6 +713,19 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = await GetOpenConnectionAsync(cancellationToken);
+        try
+        {
+            return await ExecuteCoreAsync(conn, sql, parameters, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await RollbackOrphanTransactionAsync(conn, ex);
+            throw;
+        }
+    }
+
+    private async Task<int> ExecuteCoreAsync(SqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+    {
         await using var cmd = CreateCommand(conn, sql, parameters);
         return await NormalizeCancelAsync(() => cmd.ExecuteNonQueryAsync(cancellationToken), cancellationToken);
     }
@@ -490,6 +742,19 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = await GetOpenConnectionAsync(cancellationToken);
+        try
+        {
+            return await QueryScalarListCoreAsync<T>(conn, sql, parameters, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await RollbackOrphanTransactionAsync(conn, ex);
+            throw;
+        }
+    }
+
+    private async Task<List<T>> QueryScalarListCoreAsync<T>(SqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+    {
         await using var cmd = CreateCommand(conn, sql, parameters);
         await using var reader = await NormalizeCancelAsync(() => cmd.ExecuteReaderAsync(cancellationToken), cancellationToken);
         
@@ -717,6 +982,19 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = await GetOpenConnectionAsync(cancellationToken);
+        try
+        {
+            return await ExecuteJsonCoreAsync(conn, sql, parameters, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await RollbackOrphanTransactionAsync(conn, ex);
+            throw;
+        }
+    }
+
+    private async Task<string?> ExecuteJsonCoreAsync(SqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+    {
         await using var cmd = CreateCommand(conn, sql, parameters);
         await using var reader = await NormalizeCancelAsync(() => cmd.ExecuteReaderAsync(cancellationToken), cancellationToken);
         
@@ -745,6 +1023,19 @@ public class SqlRedbConnection : IRedbConnection
     {
         using var _guard = EnterCommand();
         var conn = await GetOpenConnectionAsync(cancellationToken);
+        try
+        {
+            return await ExecuteJsonListCoreAsync(conn, sql, parameters, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await RollbackOrphanTransactionAsync(conn, ex);
+            throw;
+        }
+    }
+
+    private async Task<List<string>> ExecuteJsonListCoreAsync(SqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+    {
         await using var cmd = CreateCommand(conn, sql, parameters);
         await using var reader = await NormalizeCancelAsync(() => cmd.ExecuteReaderAsync(cancellationToken), cancellationToken);
         

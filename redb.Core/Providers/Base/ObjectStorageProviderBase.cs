@@ -307,6 +307,16 @@ namespace redb.Core.Providers.Base
         }
 
         /// <summary>
+        /// Synchronous twin of <see cref="LoadEagerAsync{TProps}"/> for the thread-pool-free <see cref="Load{TProps}"/>.
+        /// Open Source: get_object_json. Pro: overrides with its materializer run synchronously.
+        /// </summary>
+        protected virtual RedbObject<TProps>? LoadEager<TProps>(long objectId, int depth) where TProps : class, new()
+        {
+            var json = _context.ExecuteJson(Sql.ObjectStorage_GetObjectJson(), objectId, depth);
+            return MaterializeLoadedJson<TProps>(objectId, json);
+        }
+
+        /// <summary>
         /// The CPU half of an eager load, shared by the async path and the sync (thread-pool-free)
         /// path: deserialize, install lazy loaders, cache.
         /// </summary>
@@ -322,22 +332,22 @@ namespace redb.Core.Providers.Base
             // Deserialize JSON into RedbObject<TProps>
             var loadedObj = _serializer.Deserialize<TProps>(json);
 
-            // V4 (L.3): boundary stubs get their loader - BEFORE the cache Set, so Set sees the
-            // writer's scoped loader on every stub and wraps it with the dead-scope fallback
-            // (a bare stub at Set time would be detached outright and the writer would pay a
-            // fresh scope per touch - tsum, 2026-09-09).
+            // V4 (L.3): boundary stubs get their loader - BEFORE the cache Set, so the Set marks
+            // every stub of the now shared graph and drops its origin: a shared instance loads on
+            // the reader's scope only (owner decision 2026-09-15).
             Utils.LazyReferenceInstaller.Install(loadedObj, CreateLazyPropsLoader());
 
-            // Put main object + ALL nested RedbObject<T> into cache
+            // Put main object + ALL nested RedbObject<T> into cache - once the transaction commits: until then the
+            // graph is the reader's own (CachePublication).
             if (_configuration.EnablePropsCache && PropsCache.Instance != null && loadedObj.hash.HasValue)
             {
-                PropsCache.Set(loadedObj);
-
-                // Recursively cache all nested objects (they are already in memory after deserialization!)
-                if (loadedObj.Props != null)
+                Caching.CachePublication.AfterCommit(_context, () =>
                 {
-                    CacheNestedObjects(loadedObj.Props);
-                }
+                    PropsCache.Set(loadedObj);
+                    // Recursively cache all nested objects (they are already in memory after deserialization!)
+                    if (loadedObj.GetPropsDirectly() is { } props)
+                        CacheNestedObjects(props);
+                });
             }
 
             return loadedObj;
@@ -398,8 +408,7 @@ namespace redb.Core.Providers.Base
                     return cachedObj;
             }
 
-            var json = _context.ExecuteJson(Sql.ObjectStorage_GetObjectJson(), objectId, depth);
-            return MaterializeLoadedJson<TProps>(objectId, json);
+            return LoadEager<TProps>(objectId, depth);
         }
 
         /// <summary>
@@ -429,7 +438,7 @@ namespace redb.Core.Providers.Base
 
             // A list item is a leaf: reading its lazy Object property IS a database load, so the
             // reflective property walk below must never descend into one (stand, 2026-09-09).
-            if (obj is Models.Contracts.IRedbListItem)
+            if (redb.Core.Utils.LazyReferenceInstaller.IsWalkLeaf(obj))
             {
                 return;
             }
@@ -440,18 +449,20 @@ namespace redb.Core.Providers.Base
                 return;
             }
 
-            // If this is RedbObject<T> itself → cache it
-            if (objType.IsGenericType && objType.GetGenericTypeDefinition() == typeof(RedbObject<>))
+            // If this is a RedbObject<T> (or a TreeRedbObject<T>) → cache it
+            var genericObjType = Utils.RedbObjectTypes.GenericOf(objType);
+            if (genericObjType != null)
             {
                 var redbObj = obj as IRedbObject;
                 // V4 (L.3): a reference stub is neither cached nor walked - reading its Props here
                 // would BE the lazy load: synchronous, and for the whole reachable graph (review).
                 if (redbObj != null && redbObj.Hash.HasValue && obj is RedbObject { IsPropsLoaded: true })
                 {
-                    // Dynamically call PropsCache.Set<TProps>(redbObj)
-                    var propsType = objType.GetGenericArguments()[0];
-                    var setMethod = typeof(GlobalPropsCache).GetMethod("Set")?.MakeGenericMethod(propsType);
-                    setMethod?.Invoke(PropsCache, new[] { obj });
+                    // The entry only: the Set of the root marked the whole graph shared already, and a nested Set
+                    // through GlobalPropsCache walked the subtree again for every nested object (review after 4.0.0).
+                    var propsType = genericObjType.GetGenericArguments()[0];
+                    var setMethod = typeof(IRedbObjectCache).GetMethod("Set")?.MakeGenericMethod(propsType);
+                    setMethod?.Invoke(PropsCache.Instance, new[] { obj });
 
                     // Raw Props, never the getter
                     var propsValue = objType.GetMethod("GetPropsDirectly")?.Invoke(obj, null);
@@ -493,10 +504,8 @@ namespace redb.Core.Providers.Base
             var properties = objType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
             foreach (var prop in properties)
             {
-                if (!prop.CanRead) continue;
-
-                // Skip indexers (e.g. Dictionary<K,V>.Item[key]) - they require index parameters
-                if (prop.GetIndexParameters().Length > 0) continue;
+                // The save's property set: not an indexer, not [RedbIgnore].
+                if (!Utils.LazyReferenceInstaller.IsWalkedProperty(prop)) continue;
 
                 var propValue = prop.GetValue(obj);
                 if (propValue != null)
@@ -752,6 +761,8 @@ namespace redb.Core.Providers.Base
         public async Task<DeletionMark> SoftDeleteAsync(IEnumerable<long> objectIds, IRedbUser user, long? trashParentId = null, CancellationToken cancellationToken = default)
         {
             var ids = objectIds.ToArray();
+            // mark_for_deletion writes behind a query: an outer transaction has written from here on.
+            Data.TransactionWrites.Mark(_context);
             if (ids.Length == 0)
                 return new DeletionMark(0, 0);
 
@@ -768,10 +779,14 @@ namespace redb.Core.Providers.Base
                 }
             }
 
-            // Call the SQL function to mark objects for deletion
-            var results = await _context.QueryAsync<MarkForDeletionResult>(
-                Sql.SoftDelete_MarkForDeletion(),
-                new object[] { ids, user.Id, trashParentId! },
+            // Call the SQL function to mark objects for deletion. One transaction around it, joining
+            // the caller's when there is one: the SQLite mark is several statements, and a failure
+            // between them is rolled back by the transaction's owner, never left open on the handle.
+            var results = await _context.ExecuteAtomicAsync(
+                () => _context.QueryAsync<MarkForDeletionResult>(
+                    Sql.SoftDelete_MarkForDeletion(),
+                    new object[] { ids, user.Id, trashParentId! },
+                    cancellationToken),
                 cancellationToken);
 
             var result = results.FirstOrDefault()
@@ -846,6 +861,8 @@ namespace redb.Core.Providers.Base
             var effectiveUser = _securityContext.GetEffectiveUser();
             var deleted = 0;
             var startedAt = DateTimeOffset.UtcNow;
+            // The purge function writes behind a query: an outer transaction has written from here on.
+            Data.TransactionWrites.Mark(_context);
 
             // Unified cancellation semantics (owner decision, 2026-09-08): cancellation is OCE
             // here like everywhere else - the historical soft return is gone. The token gates
@@ -860,15 +877,31 @@ namespace redb.Core.Providers.Base
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // Call purge_trash SQL function
-                    var results = await _context.QueryAsync<PurgeTrashResult>(
-                        Sql.SoftDelete_PurgeTrash(),
-                        new object[] { trashId, batchSize },
+                    // Call purge_trash SQL function - one transaction per batch (see SoftDeleteAsync)
+                    var results = await _context.ExecuteAtomicAsync(
+                        () => _context.QueryAsync<PurgeTrashResult>(
+                            Sql.SoftDelete_PurgeTrash(),
+                            new object[] { trashId, batchSize },
+                            cancellationToken),
                         cancellationToken);
 
                     var result = results.FirstOrDefault();
-                    if (result == null || result.deleted_count == 0)
+                    if (result == null)
                         break;
+                    if (result.deleted_count == 0)
+                    {
+                        if (result.remaining_count == 0)
+                            break;
+                        // Objects remain but none was deleted. Either every one of them is referenced by a
+                        // live object - the batch marked the container 'failed' - or another purger (the
+                        // background worker beside this call, another node) deleted the batch chosen here
+                        // meanwhile: the container stays 'running' and the next batch takes what is left.
+                        var state = await GetDeletionProgressAsync(trashId, cancellationToken);
+                        if (state == null || state.Status != PurgeStatus.Running)
+                            await ThrowTrashReferencedAsync(
+                                trashId, result.remaining_count, deleted, startedAt, effectiveUser.Id, progress, cancellationToken);
+                        continue;
+                    }
 
                     deleted += (int)result.deleted_count;
                     var remaining = (int)result.remaining_count;
@@ -878,7 +911,12 @@ namespace redb.Core.Providers.Base
                         trashId, deleted, remaining, status, startedAt, effectiveUser.Id));
 
                     if (remaining == 0)
+                    {
+                        // A dialect whose purge statement cannot remove the finished container itself (SQLite).
+                        if (Sql.SoftDelete_DeleteCompletedTrashContainer() is { } removeContainer)
+                            await _context.ExecuteAsync(removeContainer, new object[] { trashId }, cancellationToken);
                         break;
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -896,6 +934,37 @@ namespace redb.Core.Providers.Base
             _logger?.LogDebug(
                 "PurgeTrash completed. TrashId={TrashId}, Deleted={Deleted}, User={UserId}",
                 trashId, deleted, effectiveUser.Id);
+        }
+
+        /// <summary>
+        /// A purge that ended with objects no batch may delete: live objects reference them. redb does
+        /// not unlink those references (that would hide the caller's bug inside another object's data),
+        /// so the purge surfaces them - both sides named - after the container was marked 'failed'.
+        /// </summary>
+        private async Task ThrowTrashReferencedAsync(
+            long trashId,
+            long remaining,
+            int deleted,
+            DateTimeOffset startedAt,
+            long userId,
+            IProgress<PurgeProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            var pairs = await _context.QueryAsync<TrashReferrerRow>(
+                Sql.SoftDelete_SelectLiveReferrersOfTrash(), new object[] { trashId }, cancellationToken);
+
+            progress?.Report(new PurgeProgress(
+                trashId, deleted, (int)remaining, PurgeStatus.Failed, startedAt, userId));
+
+            _logger?.LogWarning(
+                "PurgeTrash failed. TrashId={TrashId}, Deleted={Deleted}, Remaining={Remaining}: objects are referenced by live objects",
+                trashId, deleted, remaining);
+
+            throw new RedbObjectReferencedException(
+                trashId,
+                remaining,
+                pairs.Select(p => p.referenced_id).Distinct().ToList(),
+                pairs.Select(p => p.referencing_id).Distinct().ToList());
         }
 
         /// <summary>
@@ -1011,48 +1080,38 @@ namespace redb.Core.Providers.Base
             var idsToLoad = new List<long>();
 
             // === STEP 1: Cache check (if enabled) ===
+            // One query resolves the hash and scheme of every id (the polymorphic load needs the schemes anyway), and
+            // the cache answers by hash. SkipHashValidationOnCacheCheck changes nothing here: it used to switch the
+            // cache off for the batch (every object rematerialized), and without it the batch asked the database once
+            // per id. This is the road of the list-item preload and of LoadLinkedObjectsAsync.
             if (_configuration.EnablePropsCache && PropsCache.Instance != null)
             {
+                var rows = await _context.QueryAsync<RedbObjectRow>(
+                    Sql.ObjectStorage_SelectObjectsByIds(), new object[] { ids.ToArray() }, cancellationToken);
+                var rowById = new Dictionary<long, RedbObjectRow>(rows.Count);
+                foreach (var row in rows)
+                    rowById[row.Id] = row;
+
                 foreach (var id in ids)
                 {
                     IRedbObject? cachedObj = null;
-
-                    if (_configuration.SkipHashValidationOnCacheCheck)
+                    if (rowById.TryGetValue(id, out var row) && row.Hash.HasValue)
                     {
-                        // Fast check without hash - but we need type for GetWithoutHashValidation<T>
-                        // Therefore for polymorphic case we skip cache without hash
-                        idsToLoad.Add(id);
+                        // Get type through AutomaticTypeRegistry
+                        var propsType = Cache.GetClrType(row.IdScheme);
+                        if (propsType != null)
+                        {
+                            // Dynamically call Get<TProps>(id, hash)
+                            var getMethod = typeof(GlobalPropsCache).GetMethod("Get")?.MakeGenericMethod(propsType);
+                            if (getMethod != null)
+                                cachedObj = getMethod.Invoke(PropsCache, new object[] { id, row.Hash.Value }) as IRedbObject;
+                        }
                     }
+
+                    if (cachedObj != null)
+                        result.Add(cachedObj);  // Cache HIT
                     else
-                    {
-                        // Get hash from DB to check cache
-                        var hashInfo = await _context.QueryFirstOrDefaultAsync<RedbObjectRow>(
-                            Sql.ObjectStorage_SelectIdHashScheme(), new object[] { id }, cancellationToken);
-
-                        if (hashInfo != null && hashInfo.Hash.HasValue)
-                        {
-                            // Get type through AutomaticTypeRegistry
-                            var propsType = Cache.GetClrType(hashInfo.IdScheme);
-                            if (propsType != null)
-                            {
-                                // Dynamically call Get<TProps>(id, hash)
-                                var getMethod = typeof(GlobalPropsCache).GetMethod("Get")?.MakeGenericMethod(propsType);
-                                if (getMethod != null)
-                                {
-                                    cachedObj = getMethod.Invoke(PropsCache, new object[] { id, hashInfo.Hash.Value }) as IRedbObject;
-                                }
-                            }
-                        }
-
-                        if (cachedObj != null)
-                        {
-                            result.Add(cachedObj);  // Cache HIT
-                        }
-                        else
-                        {
-                            idsToLoad.Add(id);  // Cache MISS
-                        }
-                    }
+                        idsToLoad.Add(id);      // Cache MISS, or the object does not exist - the load reports that
                 }
             }
             else
@@ -1189,13 +1248,14 @@ namespace redb.Core.Providers.Base
             var lazyLoader = CreateLazyPropsLoader();
             await lazyLoader.LoadPropsForManyAsync(redbObjects, propsDepth: depth);
 
-            // Cache loaded objects
+            // Cache loaded objects - once the transaction commits (CachePublication).
             if (_configuration.EnablePropsCache && PropsCache.Instance != null)
             {
-                foreach (var obj in redbObjects.Where(o => o.hash.HasValue))
+                Caching.CachePublication.AfterCommit(_context, () =>
                 {
-                    PropsCache.Set(obj);
-                }
+                    foreach (var obj in redbObjects.Where(o => o.hash.HasValue))
+                        PropsCache.Set(obj);
+                });
             }
 
             return redbObjects;
@@ -1867,6 +1927,15 @@ namespace redb.Core.Providers.Base
     {
         public long deleted_count { get; set; }
         public long remaining_count { get; set; }
+    }
+
+    /// <summary>
+    /// DTO for the live-referrers-of-trash query: a trashed object and a live object referencing it.
+    /// </summary>
+    internal class TrashReferrerRow
+    {
+        public long referenced_id { get; set; }
+        public long referencing_id { get; set; }
     }
 
     /// <summary>

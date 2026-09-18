@@ -20,6 +20,10 @@ namespace redb.Postgres.Data
         private readonly NpgsqlDataSource _dataSource;
         private NpgsqlConnection? _connection;
         private NpgsqlRedbTransaction? _currentTransaction;
+        // The current command's hold on the ambient transaction's connection; released with the command.
+        private AmbientLease? _ambientLease;
+        // Identity of the database in AmbientConnectionRegistry (computed on first use).
+        private string? _databaseKey;
         private bool _disposed = false;
         public bool IsDisposed => _disposed;
 
@@ -31,7 +35,54 @@ namespace redb.Postgres.Data
         // of racing it with Close/Reset.
         private readonly CommandGate _gate = new(nameof(NpgsqlRedbConnection));
 
-        private CommandGate.Releaser EnterCommand() => _gate.Enter();
+        private CommandScope EnterCommand() => new(this, _gate.Enter());
+
+        /// <summary>
+        /// One command: this wrapper's gate and, inside an ambient transaction, the lease on the
+        /// transaction's connection taken by <see cref="GetOpenConnectionAsync"/> - both released when the
+        /// command ends.
+        /// </summary>
+        private readonly struct CommandScope : IDisposable
+        {
+            private readonly NpgsqlRedbConnection _owner;
+            private readonly CommandGate.Releaser _releaser;
+
+            public CommandScope(NpgsqlRedbConnection owner, CommandGate.Releaser releaser)
+            {
+                _owner = owner;
+                _releaser = releaser;
+            }
+
+            public void Dispose()
+            {
+                var lease = _owner._ambientLease;
+                _owner._ambientLease = null;
+                try
+                {
+                    lease?.Dispose();
+                }
+                finally
+                {
+                    _releaser.Dispose();
+                }
+            }
+        }
+
+        /// <summary>Host, port, database and login: two connection strings reaching the same data share one key.</summary>
+        private string DatabaseKey => _databaseKey ??= DatabaseKeyOf(_dataSource.ConnectionString);
+
+        private string? _sessionSignature;
+        // This configuration in AmbientConnectionRegistry: the cache domain of the connection string plus the session
+        // settings. A connection the transaction already holds for this database is shared only when they match.
+        private string SessionSignature => _sessionSignature ??=
+            redb.Core.Models.Configuration.RedbServiceConfiguration.ComputeCacheDomain(_dataSource.ConnectionString)
+            + "|" + NpgsqlDataSourceFactory.SessionSettingsText(_dataSource);
+
+        private static string DatabaseKeyOf(string connectionString)
+        {
+            var builder = new NpgsqlConnectionStringBuilder(connectionString);
+            return $"pg|{builder.Host}|{builder.Port}|{builder.Database}|{builder.Username}";
+        }
         
         /// <summary>
         /// Connection string.
@@ -91,12 +142,30 @@ namespace redb.Postgres.Data
         /// </summary>
         public async Task<System.Data.Common.DbConnection> GetUnderlyingConnectionAsync(CancellationToken cancellationToken = default)
         {
+            // COPY runs between commands: inside an ambient transaction it takes the transaction's
+            // connection without holding the gate a command holds.
+            if (_currentTransaction is not { IsActive: true } && Transaction.Current is { } ambient)
+            {
+                ThrowIfDisposed();
+                var entry = await AmbientConnectionRegistry.GetOrOpenAsync(ambient, DatabaseKey, SessionSignature, OpenAmbientAsync, null, cancellationToken);
+                return entry.Connection;
+            }
             return await GetOpenConnectionAsync(cancellationToken);
         }
-        
+
         private async Task<NpgsqlConnection> GetOpenConnectionAsync(CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
+
+            // Inside an ambient transaction the TRANSACTION holds the connection (AmbientConnectionRegistry):
+            // every scope of this database works through it, and a second open connection would need a
+            // prepared (two-phase) transaction. An explicit transaction of this wrapper keeps its own connection.
+            if (_currentTransaction is not { IsActive: true } && Transaction.Current is { } ambient)
+            {
+                _ambientLease ??= await AmbientConnectionRegistry.AcquireAsync(ambient, DatabaseKey, SessionSignature, OpenAmbientAsync, null, cancellationToken);
+                return (NpgsqlConnection)_ambientLease.Entry.Connection;
+            }
+
             if (_connection == null)
             {
                 _connection = await _dataSource.OpenConnectionAsync(cancellationToken);
@@ -116,7 +185,39 @@ namespace redb.Postgres.Data
             }
             return _connection;
         }
-        
+
+        /// <summary>Opens the connection an ambient transaction holds; opened inside the scope, Npgsql enlists it.</summary>
+        private async Task<System.Data.Common.DbConnection> OpenAmbientAsync(CancellationToken cancellationToken)
+        {
+            var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+            try
+            {
+                await NpgsqlDataSourceFactory.ApplySessionSettingsAsync(_dataSource, connection);
+                return connection;
+            }
+            catch
+            {
+                await connection.DisposeAsync();
+                throw;
+            }
+        }
+
+        /// <summary>Synchronous <see cref="OpenAmbientAsync"/>.</summary>
+        private System.Data.Common.DbConnection OpenAmbient()
+        {
+            var connection = _dataSource.OpenConnection();
+            try
+            {
+                NpgsqlDataSourceFactory.ApplySessionSettings(_dataSource, connection);
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
+        }
+
         private NpgsqlCommand CreateCommand(NpgsqlConnection connection, string sql, object[] parameters)
         {
             // Convert @p0, @p1 format to PostgreSQL $1, $2 format for cross-platform compatibility
@@ -195,6 +296,19 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await RollbackOrphanTransactionAsync(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<List<T>> QueryCoreAsync<T>(NpgsqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
 
@@ -220,6 +334,19 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryFirstOrDefaultCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await RollbackOrphanTransactionAsync(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<T?> QueryFirstOrDefaultCoreAsync<T>(NpgsqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken) where T : class, new()
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
 
@@ -243,6 +370,19 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteScalarCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await RollbackOrphanTransactionAsync(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<T?> ExecuteScalarCoreAsync<T>(NpgsqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             var result = await cmd.ExecuteScalarAsync(cancellationToken);
             return CoerceScalar<T>(result);
@@ -266,6 +406,55 @@ namespace redb.Postgres.Data
             return (T)Convert.ChangeType(result, targetType);
         }
 
+        // === ORPHAN TRANSACTION HYGIENE ===
+
+        private const string OrphanRollbackFailureKey = "redb.OrphanTransactionRollbackFailure";
+
+        /// <summary>
+        /// A command that failed can leave the session inside a transaction its own SQL text opened
+        /// (a BEGIN in the text, then an error): an aborted transaction block this wrapper does not
+        /// own, in which the scope's every later command and transaction is refused. It is rolled
+        /// back here before the failure leaves, unless a transaction of this wrapper or an ambient
+        /// one owns the session (its owner ends it). ROLLBACK outside a transaction is only a warning
+        /// in PostgreSQL. The original exception always propagates; a rollback that fails as well is
+        /// attached to it instead of replacing it.
+        /// </summary>
+        private async Task RollbackOrphanTransactionAsync(NpgsqlConnection conn, Exception failure)
+        {
+            if (_currentTransaction is { IsActive: true } || Transaction.Current != null
+                || conn.State != System.Data.ConnectionState.Open)
+                return;
+            try
+            {
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = "ROLLBACK";
+                // The failure may be the caller's own cancellation - the rollback must land regardless.
+                await cmd.ExecuteNonQueryAsync(CancellationToken.None);
+            }
+            catch (Exception rollbackFailure)
+            {
+                failure.Data[OrphanRollbackFailureKey] = rollbackFailure.Message;
+            }
+        }
+
+        /// <summary>Synchronous twin of <see cref="RollbackOrphanTransactionAsync"/>.</summary>
+        private void RollbackOrphanTransaction(NpgsqlConnection conn, Exception failure)
+        {
+            if (_currentTransaction is { IsActive: true } || Transaction.Current != null
+                || conn.State != System.Data.ConnectionState.Open)
+                return;
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "ROLLBACK";
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception rollbackFailure)
+            {
+                failure.Data[OrphanRollbackFailureKey] = rollbackFailure.Message;
+            }
+        }
+
         // === SYNCHRONOUS COUNTERPARTS (thread-pool-free lazy path) ===
         // The sync getter of RedbListItem.Object runs the whole load on the calling thread; these
         // are true sync ADO calls - no thread-pool continuation anywhere, so a saturated pool
@@ -275,6 +464,14 @@ namespace redb.Postgres.Data
         private NpgsqlConnection GetOpenConnection()
         {
             ThrowIfDisposed();
+
+            // Same ambient-transaction rule as the async twin.
+            if (_currentTransaction is not { IsActive: true } && Transaction.Current is { } ambient)
+            {
+                _ambientLease ??= AmbientConnectionRegistry.Acquire(ambient, DatabaseKey, SessionSignature, OpenAmbient, null);
+                return (NpgsqlConnection)_ambientLease.Entry.Connection;
+            }
+
             if (_connection == null)
             {
                 _connection = _dataSource.OpenConnection();
@@ -296,6 +493,19 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = GetOpenConnection();
+            try
+            {
+                return QueryFirstOrDefaultCore<T>(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private T? QueryFirstOrDefaultCore<T>(NpgsqlConnection conn, string sql, object[] parameters) where T : class, new()
+        {
             using var cmd = CreateCommand(conn, sql, parameters);
             using var reader = cmd.ExecuteReader();
             return reader.Read() ? new RedbRowMapper<T>().MapRow(reader) : null;
@@ -306,6 +516,19 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = GetOpenConnection();
+            try
+            {
+                return ExecuteScalarCore<T>(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private T? ExecuteScalarCore<T>(NpgsqlConnection conn, string sql, object[] parameters)
+        {
             using var cmd = CreateCommand(conn, sql, parameters);
             return CoerceScalar<T>(cmd.ExecuteScalar());
         }
@@ -315,9 +538,67 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = GetOpenConnection();
+            try
+            {
+                return ExecuteJsonCore(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private string? ExecuteJsonCore(NpgsqlConnection conn, string sql, object[] parameters)
+        {
             using var cmd = CreateCommand(conn, sql, parameters);
             var result = cmd.ExecuteScalar();
             return result == null || result == DBNull.Value ? null : result.ToString();
+        }
+
+        /// <inheritdoc />
+        public List<T> Query<T>(string sql, params object[] parameters) where T : new()
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            try
+            {
+                return QueryCore<T>(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private List<T> QueryCore<T>(NpgsqlConnection conn, string sql, object[] parameters) where T : new()
+        {
+            using var cmd = CreateCommand(conn, sql, parameters);
+            using var reader = cmd.ExecuteReader();
+
+            var results = new List<T>();
+            var mapper = new RedbRowMapper<T>();
+            while (reader.Read())
+                results.Add(mapper.MapRow(reader));
+            return results;
+        }
+
+        /// <inheritdoc />
+        public int Execute(string sql, params object[] parameters)
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            try
+            {
+                using var cmd = CreateCommand(conn, sql, parameters);
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
         }
         
         /// <summary>
@@ -331,6 +612,19 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await RollbackOrphanTransactionAsync(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<int> ExecuteCoreAsync(NpgsqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             return await cmd.ExecuteNonQueryAsync(cancellationToken);
         }
@@ -347,6 +641,19 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryScalarListCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await RollbackOrphanTransactionAsync(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<List<T>> QueryScalarListCoreAsync<T>(NpgsqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
 
@@ -574,6 +881,19 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteJsonCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await RollbackOrphanTransactionAsync(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<string?> ExecuteJsonCoreAsync(NpgsqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             var result = await cmd.ExecuteScalarAsync(cancellationToken);
             
@@ -594,6 +914,19 @@ namespace redb.Postgres.Data
         {
             using var _guard = EnterCommand();
             var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteJsonListCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await RollbackOrphanTransactionAsync(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<List<string>> ExecuteJsonListCoreAsync(NpgsqlConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
             await using var cmd = CreateCommand(conn, sql, parameters);
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
 

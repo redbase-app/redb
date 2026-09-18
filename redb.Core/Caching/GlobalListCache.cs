@@ -205,6 +205,10 @@ namespace redb.Core.Caching
             
             foreach (var item in items)
             {
+                // Shared by every scope from now on, with the object it may already carry: Object loads on the reader's
+                // scope and, inside the reader's transaction, keeps nothing (owner decision 2026-09-15).
+                Utils.LazyReferenceInstaller.MarkShared(item);
+                item._cacheDomain ??= _domain;
                 var itemEntry = new ListCacheEntry<RedbListItem>
                 {
                     Value = item,

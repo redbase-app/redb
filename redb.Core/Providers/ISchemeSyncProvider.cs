@@ -55,6 +55,15 @@ namespace redb.Core.Providers
         /// </summary>
         Task<IRedbScheme?> GetSchemeByIdAsync(long schemeId,
         CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Synchronous <see cref="GetSchemeByIdAsync"/> for the thread-pool-free load path (the synchronous
+        /// <c>Load&lt;T&gt;</c> and lazy getters): every database call runs on the calling thread. There is no
+        /// blocking fallback over the async form - it would bring the thread pool back into exactly that path.
+        /// </summary>
+        IRedbScheme? GetSchemeById(long schemeId)
+            => throw new NotSupportedException(
+                $"{GetType().Name} does not implement the synchronous GetSchemeById that the synchronous load path needs.");
         
         /// <summary>
         /// Get scheme by name.

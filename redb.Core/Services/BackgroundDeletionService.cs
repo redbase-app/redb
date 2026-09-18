@@ -181,10 +181,15 @@ public class BackgroundDeletionService : BackgroundService, IBackgroundDeletionS
     /// </summary>
     private async Task<int> PollAndProcessAsync(CancellationToken ct)
     {
-        await using var scope = _serviceProvider.CreateAsyncScope();
-        var redb = scope.ServiceProvider.GetRequiredService<IRedbService>();
-
-        var tasks = await redb.GetOrphanedDeletionTasksAsync(OrphanTimeoutMinutes).ConfigureAwait(false);
+        // Short scopes: the scan's scope (and its connection) ends before the first purge starts,
+        // and each claim gets its own - no connection of this cycle stays checked out across the
+        // purges, which open their own scopes per batch.
+        List<OrphanedTask> tasks;
+        await using (var scanScope = _serviceProvider.CreateAsyncScope())
+        {
+            var scanRedb = scanScope.ServiceProvider.GetRequiredService<IRedbService>();
+            tasks = await scanRedb.GetOrphanedDeletionTasksAsync(OrphanTimeoutMinutes).ConfigureAwait(false);
+        }
         if (tasks.Count == 0) return 0;
 
         // Cap per cycle so a giant backlog doesn't block shutdown — anything not handled
@@ -197,21 +202,35 @@ public class BackgroundDeletionService : BackgroundService, IBackgroundDeletionS
         {
             if (ct.IsCancellationRequested) break;
 
-            var claimed = await redb.TryClaimOrphanedTaskAsync(task.TrashId, OrphanTimeoutMinutes).ConfigureAwait(false);
-            if (!claimed)
-            {
-                _logger?.LogDebug("Task TrashId={TrashId} already claimed by another worker", task.TrashId);
-                continue;
-            }
-
+            // The claim sits inside the per-task try: one container whose claim fails must not end
+            // the cycle for every container after it.
             try
             {
+                bool claimed;
+                await using (var claimScope = _serviceProvider.CreateAsyncScope())
+                {
+                    var claimRedb = claimScope.ServiceProvider.GetRequiredService<IRedbService>();
+                    claimed = await claimRedb.TryClaimOrphanedTaskAsync(task.TrashId, OrphanTimeoutMinutes).ConfigureAwait(false);
+                }
+                if (!claimed)
+                {
+                    _logger?.LogDebug("Task TrashId={TrashId} already claimed by another worker", task.TrashId);
+                    continue;
+                }
+
                 await ProcessPurgeTask(task.TrashId, task.Total, ct).ConfigureAwait(false);
                 processed++;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
                 break;
+            }
+            catch (redb.Core.Exceptions.RedbObjectReferencedException ex)
+            {
+                // Handled outcome, not a crash: the container is 'failed' and no longer claimed. It
+                // waits for someone to remove the references and purge it again.
+                _logger?.LogWarning(ex, "Purge of TrashId={TrashId} stopped: objects are referenced by live objects; container marked failed", task.TrashId);
+                processed++;
             }
             catch (Exception ex)
             {
@@ -247,6 +266,11 @@ public class BackgroundDeletionService : BackgroundService, IBackgroundDeletionS
             if (progress.Status == PurgeStatus.Completed)
             {
                 _logger?.LogDebug("Purge completed: TrashId={TrashId}", trashId);
+                break;
+            }
+            if (progress.Status == PurgeStatus.Failed)
+            {
+                _logger?.LogDebug("Purge of TrashId={TrashId} already failed; not retried automatically", trashId);
                 break;
             }
 

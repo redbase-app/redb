@@ -24,10 +24,24 @@ namespace redb.Core.Data
     public sealed class CommandGate
     {
         private readonly string _owner;
+        private readonly string? _concurrentUseMessage;
+        private readonly string? _disposedMessage;
         private int _inUse;
         private volatile bool _disposed;
 
         public CommandGate(string ownerName) => _owner = ownerName;
+
+        /// <summary>
+        /// A gate whose refusals carry their own explanation - the connection of an ambient transaction is
+        /// shared by every scope of that transaction and ends with the transaction, so "resolve your own
+        /// IRedbService" and "the scope has ended" are the wrong advice there.
+        /// </summary>
+        public CommandGate(string ownerName, string concurrentUseMessage, string disposedMessage)
+        {
+            _owner = ownerName;
+            _concurrentUseMessage = concurrentUseMessage;
+            _disposedMessage = disposedMessage;
+        }
 
         /// <summary>Teardown has begun (or completed); new commands are refused.</summary>
         public bool IsDisposed => _disposed;
@@ -41,7 +55,7 @@ namespace redb.Core.Data
         {
             ThrowIfDisposed();
             if (Interlocked.CompareExchange(ref _inUse, 1, 0) != 0)
-                throw new InvalidOperationException(
+                throw new InvalidOperationException(_concurrentUseMessage ??
                     $"IRedbService used concurrently: the same {_owner} was entered from two threads. " +
                     "Each exchange/request must resolve its OWN scoped IRedbService (ProcessWithRedb / controller.Redb()) — " +
                     "one instance is a single, non-thread-safe DB connection.");
@@ -58,7 +72,7 @@ namespace redb.Core.Data
         private void ThrowIfDisposed()
         {
             if (_disposed)
-                throw new ObjectDisposedException(_owner,
+                throw new ObjectDisposedException(_owner, _disposedMessage ??
                     "The scope that owned this connection has ended; load through a fresh scope instead.");
         }
 

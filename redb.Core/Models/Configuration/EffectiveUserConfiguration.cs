@@ -13,8 +13,8 @@ namespace redb.Core.Models.Configuration
         // === CACHE QUOTAS ===
         
         /// <summary>
-        /// User object cache quota
-        /// null = no limits (for sys user)
+        /// The props cache limit of the process (<see cref="RedbServiceConfiguration.PropsCacheMaxSize"/>): the
+        /// cache has one limit, not a quota per user, so no user configuration changes this value.
         /// </summary>
         public int? PropsCacheSize { get; set; }
         

@@ -38,12 +38,10 @@ public class RedbService : RedbServiceBase
     protected override string GetVersionSql => "SELECT @@VERSION";
     
     protected override string GetDatabaseSizeSql => 
-        "SELECT SUM(CAST(size AS BIGINT) * 8) FROM sys.database_files";
+        "SELECT SUM(CAST(size AS BIGINT)) * 8192 FROM sys.database_files"; // size counts 8 KB pages; dbSize is bytes
     
     protected override string ContextNotRegisteredError => 
         "IRedbContext is not registered in DI container. Add SqlRedbContext to configuration.";
-    
-    protected override string GetObjectJsonSql() => "SELECT dbo.get_object_json(@p0, @p1)";
     
     // === PROVIDER FACTORIES ===
     

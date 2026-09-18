@@ -1228,7 +1228,7 @@ public class PostgreSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
     // Bump together with the literal in redb.Postgres/sql/v2-pvt/99_module_version.sql.
-    public string? Query_PvtRequiredVersion() => "0.7.9";
+    public string? Query_PvtRequiredVersion() => "0.7.12";
 
     // ============================================================
     // Native PVT projection orchestrator (pvt_build_projection_sql).
@@ -1323,6 +1323,21 @@ public class PostgreSqlDialect : ISqlDialect
     /// </summary>
     public string SoftDelete_PurgeTrash() =>
         "SELECT * FROM purge_trash($1, $2)";
+
+    /// <summary>
+    /// Objects of a trash container referenced by live objects, with the referencing objects.
+    /// Params: $1=trashId (bigint). Returns: referenced_id, referencing_id (at most 100 pairs).
+    /// </summary>
+    public string SoftDelete_SelectLiveReferrersOfTrash() => """
+        SELECT DISTINCT o._id AS referenced_id, r._id AS referencing_id
+        FROM _objects o
+        INNER JOIN _values v ON v._Object = o._id
+        INNER JOIN _objects r ON r._id = v._id_object
+        WHERE o._id_parent = $1
+          AND r._id_scheme <> -10
+        ORDER BY 1, 2
+        LIMIT 100
+        """;
 
     /// <summary>
     /// Gets deletion progress for a specific trash container.

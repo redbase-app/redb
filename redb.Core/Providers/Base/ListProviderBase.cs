@@ -29,12 +29,6 @@ namespace redb.Core.Providers.Base
         protected readonly GlobalListCache ListCache;
 
         /// <inheritdoc />
-        public Func<long, Task<IRedbObject?>>? LinkedObjectLoader { get; set; }
-
-        /// <inheritdoc />
-        public Func<long, IRedbObject?>? LinkedObjectSyncLoader { get; set; }
-
-        /// <inheritdoc />
         public Func<IReadOnlyCollection<long>, CancellationToken, Task<IReadOnlyDictionary<long, IRedbObject>>>? LinkedObjectsBatchLoader { get; set; }
 
         /// <summary>
@@ -58,23 +52,18 @@ namespace redb.Core.Providers.Base
             var byId = await batchLoader(ids, cancellationToken);
             foreach (var item in items)
                 if (!item.IsObjectLoaded && item.IdObject is long id && byId.TryGetValue(id, out var obj))
-                    item.Object = obj;
+                    item.Publish(obj, Context);
         }
 
         /// <summary>
-        /// Binds the items to this provider's loader before they leave it. Items are shared through
-        /// the list cache across scopes, so this runs on every hand-out, cache hit included: the
-        /// scope that most recently asked for the item is the one it resolves its object through.
+        /// Binds the items to this provider's database, and a not-shared item to this scope as its origin, before they leave
+        /// it. The item keeps no loader: <see cref="RedbListItem.Object"/> loads on the scope current for the reader, else on
+        /// the origin while it lives (owner decision 2026-09-15). An item of the list cache is shared and has no origin.
         /// </summary>
         protected List<RedbListItem> Attach(List<RedbListItem> items)
         {
-            var loader = LinkedObjectLoader;
-            var syncLoader = LinkedObjectSyncLoader;
             foreach (var item in items)
-            {
-                if (loader != null) item.AttachObjectLoader(loader);
-                if (syncLoader != null) item.AttachSyncObjectLoader(syncLoader);
-            }
+                Bind(item);
             return items;
         }
 
@@ -82,11 +71,15 @@ namespace redb.Core.Providers.Base
         protected RedbListItem? Attach(RedbListItem? item)
         {
             if (item != null)
-            {
-                if (LinkedObjectLoader is { } loader) item.AttachObjectLoader(loader);
-                if (LinkedObjectSyncLoader is { } syncLoader) item.AttachSyncObjectLoader(syncLoader);
-            }
+                Bind(item);
             return item;
+        }
+
+        private void Bind(RedbListItem item)
+        {
+            item._cacheDomain ??= ListCache.Domain;
+            if (!item._isShared)
+                item._origin ??= RedbServiceBase.ServiceOf(Context)?.AsOrigin.SelfReference;
         }
 
         protected ListProviderBase(
@@ -231,7 +224,8 @@ namespace redb.Core.Providers.Base
             if (items == null)
             {
                 items = await Context.QueryAsync<RedbListItem>(Sql.ListItems_SelectByListId(), new object[] { listId }, cancellationToken);
-                ListCache.CacheListItems(listId, items);
+                // Cached - and so shared - once the transaction commits: until then the items are the reader's own.
+                Caching.CachePublication.AfterCommit(Context, () => ListCache.CacheListItems(listId, items));
             }
             Attach(items);
             await PreloadLinkedObjectsAsync(items, cancellationToken);

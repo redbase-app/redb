@@ -19,7 +19,8 @@ namespace redb.Core
         ITreeProvider,
         IPermissionProvider,
         IQueryableProvider,
-        IValidationProvider
+        IValidationProvider,
+        IRedbScopeSource
     {
         // === DATABASE CONTEXT ===
         
@@ -45,6 +46,23 @@ namespace redb.Core
         /// Provider for list management.
         /// </summary>
         IListProvider ListProvider { get; }
+
+        /// <summary>
+        /// Makes this service the scope lazy loads run on, for the returned block (owner decision 2026-09-15): a data
+        /// object owns no connection, and <c>RedbListItem.Object</c> or the Props of a reference stub load on the live redb
+        /// scope of whoever reads them. A service is current by itself in the flow that resolved it; UI event handlers
+        /// (Blazor Server, WebAssembly, MAUI) and callbacks that run in another execution context wrap their reads in
+        /// <c>using (redb.BeginAccess()) { ... }</c>.
+        /// </summary>
+        IDisposable BeginAccess();
+
+        /// <summary>
+        /// Loads the linked objects of <paramref name="items"/> in one query on this service's connection, publishes them
+        /// on the items and returns them by id. Items already carrying their object and items without a link are skipped;
+        /// an object that does not exist is absent from the result and its item stays lazy.
+        /// </summary>
+        Task<System.Collections.Generic.IReadOnlyDictionary<long, IRedbObject>> LoadLinkedObjectsAsync(
+            System.Collections.Generic.IEnumerable<Models.Entities.RedbListItem> items, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Storage maintenance: planner statistics (<c>AnalyzeAsync</c> after bulk writes) and
@@ -164,7 +182,7 @@ namespace redb.Core
         string dbMigration { get; }
         
         /// <summary>
-        /// Database size in MB (optional).
+        /// Database size in bytes, as the server reports it (optional).
         /// </summary>
         long? dbSize { get; }
 

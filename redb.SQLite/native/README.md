@@ -42,7 +42,8 @@ One file, base name `redbsqlite`, per platform/arch:
 - **CMake ≥ 3.16** and a **C99 compiler**.
   - Windows: Visual Studio Build Tools (Desktop C++ workload) **or** MSYS2 /
     MinGW-w64. Plus CMake.
-  - Linux: `gcc` or `clang` + `cmake` (e.g. `apt install build-essential cmake`).
+  - Linux: `gcc` or `clang` + `cmake` (e.g. `apt install build-essential cmake`). From a Windows host
+    nothing is needed beyond Docker: the toolchain ships in the image built from [Dockerfile](Dockerfile).
   - macOS: Xcode Command Line Tools + `cmake` (`brew install cmake`).
 - Internet access on the **first** configure (CMake fetches the pinned SQLite
   amalgamation for `sqlite3.h` / `sqlite3ext.h`). Override the source with
@@ -72,27 +73,37 @@ Artifact: `build/redbsqlite.dll`.
 
 ### Linux x64 + arm64 → `build-linux-x64/` and `build-linux-arm64/` (Docker, from a Windows/any host)
 
-x64 builds natively; arm64 cross-compiles. **The arm64 cross-compiler needs the arm64 C runtime**
-(`crossbuild-essential-arm64` — a bare `gcc-aarch64-linux-gnu` fails at link with
-`cannot find Scrt1.o / crti.o`).
+x64 builds natively; arm64 cross-compiles. The toolchain lives in an image built from
+[Dockerfile](Dockerfile) — build it once:
 
 ```sh
-docker run --rm -v "/abs/path/to/redb.SQLite/native":/src debian:12 bash -c '
-  set -e; export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq
-  apt-get install -y --no-install-recommends build-essential cmake crossbuild-essential-arm64 ca-certificates
-  # x64 (native cc)
-  cmake -S /src -B /tmp/bx64 -DCMAKE_BUILD_TYPE=Release && cmake --build /tmp/bx64
-  cp /tmp/bx64/redbsqlite.so /src/build-linux-x64/redbsqlite.so
-  # arm64 (cross)
-  cmake -S /src -B /tmp/barm -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc
-  cmake --build /tmp/barm
-  cp /tmp/barm/redbsqlite.so /src/build-linux-arm64/redbsqlite.so'
+docker build -t redb-sqlite-native native/
+```
+
+Then every rebuild is seconds and needs no network:
+
+```sh
+docker run --rm -v "/abs/path/to/redb.SQLite/native":/src redb-sqlite-native bash -c '
+  set -e
+  cmake -S /src -B /src/build-linux-x64   -DCMAKE_BUILD_TYPE=Release && cmake --build /src/build-linux-x64
+  cmake -S /src -B /src/build-linux-arm64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc
+  cmake --build /src/build-linux-arm64'
 ```
 
 > On Windows Git Bash, prefix with `MSYS_NO_PATHCONV=1` and use a forward-slash absolute path for `-v`
-> (`"C:/Work/.../redb.SQLite/native":/src`) so the mount path is not rewritten. First run pulls
-> `debian:12` and ~190 MB of arm64 cross packages — the slow part is `apt`, not the compile.
+> (`"C:/Work/.../redb.SQLite/native":/src`) so the mount path is not rewritten.
+
+The recipe this replaced ran `debian:12` and `apt-get install` inside every build, then threw the
+container away: ~190 MB of toolchain re-downloaded per rebuild, and a release that could not be built
+while a Debian mirror was unreachable. It also configured into `/tmp` inside the container, so the
+fetched SQLite amalgamation went with the container too.
+
+**Mount at `/src` and keep the build dirs.** CMake records in `CMakeCache.txt` the path the cache was
+created under; mounting the same folder elsewhere makes it refuse the cache outright (*"The current
+CMakeCache.txt directory ... is different"*), and stale stamps under `_deps/` then fail the
+amalgamation fetch. Caches made before 2026-09-17 came from a `/work/...` mount and had to be deleted
+once — after that the dirs are reusable and hold the amalgamation, so nothing is downloaded again.
+When a cache does have to be reset: `rm -rf build-linux-*/CMakeCache.txt build-linux-*/CMakeFiles build-linux-*/_deps`.
 
 ### macOS x64/arm64 → `.dylib`
 
@@ -111,6 +122,21 @@ grep -a "depth > 0) AND NOT EXISTS" build-linux-x64/redbsqlite.so
 # 3. Loads + reports version (native-arch host only):
 sqlite3 ":memory:" ".load ./build-linux-x64/redbsqlite.so sqlite3_redb_init" "SELECT redb_version();"
 ```
+
+Run step 3 inside the build image — its `sqlite3` is compiled from the same pinned amalgamation as the
+extension. The Debian package is 3.40.1 and the extension refuses to load below 3.44 (it needs
+`sqlite3_get_clientdata`), so the distro CLI answers with the version guard, not with a verdict on the
+artifact:
+
+```sh
+docker run --rm -v "/abs/path/to/redb.SQLite/native":/src redb-sqlite-native bash -c '
+  file -b /src/build-linux-arm64/redbsqlite.so
+  sqlite3 ":memory:" ".load /src/build-linux-x64/redbsqlite.so sqlite3_redb_init" "SELECT redb_version();"'
+```
+
+Also worth a look after a rebuild: `PVT_MODULE_VERSION` in `src/redb_pvt.c` must equal
+`SqliteDialect.Query_PvtRequiredVersion()` — `RedbService` compares them at initialization, so a stale
+artifact fails the Free path outright rather than misbehaving quietly.
 
 The full functional check is the .NET Free-path integration suite
 (`redb.Tests.Integration`, the `Sqlite*` fixtures), which loads the platform artifact.

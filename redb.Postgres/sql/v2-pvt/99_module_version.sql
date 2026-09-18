@@ -22,6 +22,18 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $BODY$
 BEGIN
+    -- 0.7.12 - purge_trash marks 'failed' on an empty batch, not on a batch that deleted nothing
+    --   (2026-09-16): a batch chosen here and deleted by a concurrent purger meanwhile - the
+    --   background worker beside a caller's PurgeTrashAsync, another node - failed the container with
+    --   nothing blocking it, and the caller got RedbObjectReferencedException naming no referrer.
+    -- 0.7.11 - list item JSON in the model's shape (2026-09-15): build_listitem_jsonb writes
+    --   {id, id_list, value, alias, id_object}. It wrote {id, idList, value, alias, object}: the model
+    --   reads id_list / id_object, so every load lost the list link and the object link of the items,
+    --   and the linked object was built in full for a key the deserializer ignores.
+    -- 0.7.10 - purge_trash and references (trash review, 2026-09-14): a reference held by a trashed
+    --   object is removed with the purge instead of failing it on the foreign key; an object
+    --   referenced by a live object is skipped, and a container left with nothing else is marked
+    --   'failed' instead of being retried forever.
     -- 0.7.9 - soft delete resets _objects._hash (full-object hash, 2026-09-11): the trash move
     --   changes parent and key outside the save path; a props-cache copy must not outlive it.
     -- 0.7.8 - block 0: S3 - _structures._unique_scope (element-key scope), _tags on schemes,
@@ -186,7 +198,7 @@ BEGIN
     --   * `_array_index IS NULL` filter for scalars (NOT `_array_parent_id IS NULL`).
     --   * `0$:` base-field prefix stripping in pvt_normalize_base_field_name.
     --   * full collection / nested / dictionary / ListItem.Value/Alias / array-op support.
-    RETURN '0.7.9';
+    RETURN '0.7.12';
 END;
 $BODY$;
 

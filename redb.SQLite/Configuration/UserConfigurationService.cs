@@ -87,7 +87,6 @@ namespace redb.SQLite.Configuration
             // Step 2: For sys (userId=0) return as is (without limits)
             if (userId == 0)
             {
-                effective.PropsCacheSize = null; // No limits
                 effective.ListCacheSize = null;   // No limits
                 return effective;
             }
@@ -184,17 +183,7 @@ namespace redb.SQLite.Configuration
             string sourceName,
             int priority)
         {
-            if (source.PropsCacheSize.HasValue)
-            {
-                target.PropsCacheSize = source.PropsCacheSize.Value;
-                target.Sources.Add(new ConfigurationSource
-                {
-                    ParameterName = nameof(source.PropsCacheSize),
-                    Source = sourceName,
-                    Priority = priority,
-                    Value = source.PropsCacheSize.Value.ToString()
-                });
-            }
+            // PropsCacheSize is not merged: the props cache has one process-wide limit (obsolete on the props).
             
             if (source.ListCacheSize.HasValue)
             {
