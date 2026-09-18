@@ -5,16 +5,18 @@ This changelog covers the **NuGet-published packages** only:
 
 | Package | Edition |
 |---------|---------|
-| `RedBase.Core` | Free |
-| `RedBase.Postgres` | Free |
-| `RedBase.MSSql` | Free |
-| `RedBase.SQLite` | Free |
-| `RedBase.Export` | Free |
-| `RedBase.Core.Pro` | Pro |
-| `RedBase.Postgres.Pro` | Pro |
-| `RedBase.MSSql.Pro` | Pro |
-| `RedBase.SQLite.Pro` | Pro |
-| `RedBase.CLI` | Tool |
+| `redb.Core` | Free |
+| `redb.Postgres` | Free |
+| `redb.MSSql` | Free |
+| `redb.SQLite` | Free |
+| `redb.Export` | Free |
+| `redb.Core.Pro` | Pro |
+| `redb.Postgres.Pro` | Pro |
+| `redb.MSSql.Pro` | Pro |
+| `redb.SQLite.Pro` | Pro |
+| `redb.Licensing` | Pro |
+| `redb.CLI` | Tool |
+| `redb.Templates` | Tool |
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -1123,7 +1125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SQLite the upgrade path is covered by a test that owns its own file and opens it twice, since the
   shared fixture deletes the database on every run and can only model a new one.
 
-- **An empty `IN` set threw instead of matching nothing (`RedBase.Postgres.Pro`).**
+- **An empty `IN` set threw instead of matching nothing (`redb.Postgres.Pro`).**
   `.Where(x => wanted.Contains(x.Department))` with an empty `wanted` failed with
   `42883: operator does not exist: text = bigint`. An empty `object[]` gives Npgsql no element type
   to infer, so it sent `bigint[]`, and comparing a text column against it is not an operator that
@@ -1131,7 +1133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The set now compiles to `FALSE`, which is what membership in an empty set means. MSSql and SQLite
   survived the same input by accident of their spellings and are unchanged.
 
-- **The PVT prefilter ignored membership and kept only one conjunct (`RedBase.Core.Pro` + all three
+- **The PVT prefilter ignored membership and kept only one conjunct (`redb.Core.Pro` + all three
   Pro providers).** Three separate reasons a production filter got no prefilter at all.
 
   *Membership was not an expressible leaf.* `InExpression` is a node of its own, and the planner only
@@ -1416,7 +1418,7 @@ the unit tests: 1920 of 1920, no failures in either mode. The regression only re
 so a green run on 10.0.8 is the proof that matters.
 
 ### Fixed
-- **`array.Contains` over a nullable array property stopped parsing on .NET 10 (`RedBase.Core`).**
+- **`array.Contains` over a nullable array property stopped parsing on .NET 10 (`redb.Core`).**
   A filter as ordinary as `.Where(x => x.Tags.Contains("urgent"))` threw
   `NotSupportedException: Unsupported Contains expression structure` whenever `Tags` was declared
   `T[]?`, which is what `Nullable enable` gives you for every optional array. Introduced by the move
@@ -1433,7 +1435,7 @@ so a green run on 10.0.8 is the proof that matters.
   providers, and verified separately against six shapes of `Contains`, including both `IN` forms
   over a constant collection.
 
-- **The PVT prefilter refused three shapes it should have accepted (`RedBase.Core.Pro`).**
+- **The PVT prefilter refused three shapes it should have accepted (`redb.Core.Pro`).**
 
   *A disjunction nested inside a conjunction* was never taken as a candidate. The guard exists for a
   real hazard: in `(A OR B) AND C`, where `C` reads a pivot column, the prefilter may already have
@@ -1453,14 +1455,14 @@ so a green run on 10.0.8 is the proof that matters.
   disagreed with the rest of the resolver in casing, which alone would have scored it zero and
   dropped it silently.
 
-- **Leaves were grouped by structure alone when merging a conjunction (`RedBase.Core.Pro`).**
+- **Leaves were grouped by structure alone when merging a conjunction (`redb.Core.Pro`).**
   `Status.Id` and `Status.Value` share a structure id and differ only in column, so a merged branch
   could have spliced a string pattern onto a bigint column. Unreachable before, because every
   accepted field had a one-to-one structure-to-column mapping; reachable the moment `ListItem.Id` was
   let in, which is why it is fixed first. Grouping is now by structure and column together.
 
 ### Added
-- **The prefilter planner explains itself in `ToSqlStringAsync` (`RedBase.Core.Pro` + all three Pro
+- **The prefilter planner explains itself in `ToSqlStringAsync` (`redb.Core.Pro` + all three Pro
   providers).** An applied plan lists its branches with structure, column, operator and score; a
   refusal names the guard that stopped it and what it tripped over:
 
@@ -1527,7 +1529,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 > facade) and new API in `redb.Route` — and new surface cannot ship as a patch. The core packages
 > carry mostly fixes, but the ecosystem moves on one number.
 >
-> **`ExpressionSqlCache` and `CompiledQuery` are gone from `RedBase.Core`.** That is a public API
+> **`ExpressionSqlCache` and `CompiledQuery` are gone from `redb.Core`.** That is a public API
 > removal, which strict SemVer would put in a major. It ships as a minor deliberately: both types were
 > verified dead four ways before removal (see **Removed** below), nothing in REDB referenced them, and
 > a major would flip `LicensePolicy.FreeThroughMajor` and start charging for Pro. A consumer who did
@@ -1595,7 +1597,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 
 ### Added
 - **Covering index on `_objects(_id_parent)` carrying `_hash` — now on all three providers
-  (`RedBase.Postgres`, `RedBase.SQLite`).** MSSQL has had `IX__objects__id_parent` with
+  (`redb.Postgres`, `redb.SQLite`).** MSSQL has had `IX__objects__id_parent` with
   `INCLUDE (_id, _hash, _id_scheme)` for some time; PostgreSQL and SQLite had no equivalent. Their
   nearest index, `IX__objects__parent_scheme_id`, stops at `(_id_parent, _id_scheme, _id)` and does
   not carry `_hash`, so a tree walk that reads the object hash — which is what the transparent cache
@@ -1611,7 +1613,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 
   New databases pick this up from the schema script. Existing ones do not: the initialisation script
   is applied only when the tables are absent, so the index has to be created by hand there.
-- **PVT prefilter — a cutting step before the pivot aggregate (`RedBase.Core.Pro` + all three Pro
+- **PVT prefilter — a cutting step before the pivot aggregate (`redb.Core.Pro` + all three Pro
   providers).** A filter over Props compiled into a condition sitting **above** `GROUP BY`, so by the
   time it was evaluated `_values` had already been read and folded for every object in the scheme.
   No index could apply: the predicate filtered the result of an aggregate, not a column. The practical
@@ -1666,7 +1668,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 
 ### Fixed
 - **Case-insensitive search folded ASCII only, so it did not work for most of the world's text
-  (`RedBase.Core`, `RedBase.Core.Pro`, all three providers).** `Contains(needle,
+  (`redb.Core`, `redb.Core.Pro`, all three providers).** `Contains(needle,
   OrdinalIgnoreCase)` found `HELLO` but not `ПРИВЕТ`, and the same held for Greek, Hungarian, Polish,
   Czech and French. Case folding comes from the database's own rules: on SQLite that is ASCII-only
   unconditionally (`LIKE`, `lower()`, `upper()` and even `COLLATE NOCASE`), on PostgreSQL whenever the
@@ -1689,7 +1691,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   fixed — what the last two do differs per provider, which the test suite now pins per provider rather
   than assuming.
   See COLLATION.md.
-- **Pro discarded the configured SQL dialect (`RedBase.Postgres.Pro`).** `ProRedbService` resolved both
+- **Pro discarded the configured SQL dialect (`redb.Postgres.Pro`).** `ProRedbService` resolved both
   `ISqlDialect` and `ISqlDialectPro` from the container but handed only the base one to
   `ProQueryableProvider`; `ProQueryProvider` then narrowed it with `as ProPostgreSqlDialect`, a base
   instance failed that cast, and the fallback silently constructed `new ProPostgreSqlDialect()` with no
@@ -1697,7 +1699,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   the first, and it vanished on every Pro query while working correctly on Free. The Pro dialect is now
   passed through explicitly and preferred over the base one wherever both are available.
 - **Temporal semantics: `DateTime` keeps its clock reading on every read path, and `DateOnly` works at
-  all (`RedBase.Core`, `RedBase.Core.Pro`, all three providers).**
+  all (`redb.Core`, `redb.Core.Pro`, all three providers).**
   In REDB a `DateTime` carries no time zone: 14:00 written is 14:00 read, on any host. Object
   materialization honoured that; the analytics path did not. `JsonValueConverter` parsed a zoned ISO
   string with the default `DateTimeStyles`, which converts it *into the caller's local zone*, so
@@ -1718,7 +1720,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   An unassigned `DateOnly` also threw on load, because Npgsql writes `DateTime.MinValue` as
   `-infinity` and only the `DateTime` converters recognised that marker.
   See [DATETIME.md](DATETIME.md) for the contract, the precision table and the boundaries left open.
-- **Phantom `_date_delete` base field (`RedBase.Core`, `RedBase.Core.Pro`).** `BaseFieldMapper` and
+- **Phantom `_date_delete` base field (`redb.Core`, `redb.Core.Pro`).** `BaseFieldMapper` and
   `ProSqlBuilderBase` claimed `DateDelete` as a base field and mapped it to `_date_delete`, a column
   present in none of the three DDLs and a leftover of the removed `_deleted_objects` table. Typed
   LINQ could not reach it, but a string-addressed query passed validation and compiled SQL against a
@@ -1734,13 +1736,13 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   Only `_id` was affected; `_id_parent`, `_hash`, `_value_*` and the rest do not collide.
 
 - **`ChangePasswordAsync` threw `UnauthorizedAccessException` on a wrong current password instead of
-  returning `false` (`RedBase.Core`, GitHub #4).** The method is `Task<bool>` documented as "true if
+  returning `false` (`redb.Core`, GitHub #4).** The method is `Task<bool>` documented as "true if
   changed", so a change-password form built against the contract 500'd on the most common user error.
   A wrong current password now returns `false`; precondition failures (null args, disabled/system user)
   still throw. Regression test on all six Free/Pro fixtures.
 
 - **SQLite: any property type change crashed `InitializeAsync` with `no such table:
-  migrate_structure_type` (`RedBase.SQLite`, GitHub #5).** The scheme-sync path runs
+  migrate_structure_type` (`redb.SQLite`, GitHub #5).** The scheme-sync path runs
   `SELECT * FROM migrate_structure_type(...)`, a stored function that only exists on PostgreSQL/SQL
   Server — SQLite has none, and its `redb.SQLite/sql/migrate_structure_type.sql` is a dead PostgreSQL
   copy. `SqliteSchemeSyncProvider` now performs the migration in C#: a type change that keeps the same
@@ -1758,7 +1760,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 
 
 ### Removed
-- **`ExpressionSqlCache` and `CompiledQuery` (`RedBase.Core`).** Both were public types that nothing
+- **`ExpressionSqlCache` and `CompiledQuery` (`redb.Core`).** Both were public types that nothing
   ever used: an SQL-template cache that was never wired into any query path, and the record it
   returned. Verified dead four ways before removal — a repository-wide search found references only
   in its own file, an architecture plan under `docs/` and two documentation pages; the only assembly
@@ -1773,7 +1775,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   section further down the same page.
 
 ### Changed
-- **The prefilter steps aside on SQLite when a limit meets no ordering (`RedBase.SQLite.Pro`).**
+- **The prefilter steps aside on SQLite when a limit meets no ordering (`redb.SQLite.Pro`).**
   Without a prefilter SQLite walks `IX__values__object_structure_lookup`, so rows reach `GROUP BY`
   already ordered by `_id_object`, the aggregate streams, and `LIMIT` stops after the Nth group. A
   multi-branch prefilter makes the planner switch to MULTI-INDEX OR over `IX__values__String_not_null`:
@@ -1812,7 +1814,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   Verified by comparing sorted id sets before and after on all three engines, flat and tree: identical
   everywhere. On SQLite the flat form also ran 28% faster (1209 ms → 865 ms on 100 100 objects).
 
-- **The string value index in SQLite lost its length guard (`RedBase.SQLite`).**
+- **The string value index in SQLite lost its length guard (`redb.SQLite`).**
   `IX__values__String_not_null` carried `AND length(_String) < 2000` alongside `IS NOT NULL`. That guard
   belongs to PostgreSQL, where a btree key over roughly 2700 bytes overflows the page; SQLite has no
   such limit and the condition had been copied across. Its effect there was to make the index unusable:
@@ -1846,7 +1848,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 
 ### Fixed
 - **`SumRedbAsync` / `AverageRedbAsync` threw `InvalidOperationException` on an empty selection
-  (`RedBase.Core`, all providers).** A `SUM`/`AVG` with no matching rows is `NULL` in SQL (an aggregate
+  (`redb.Core`, all providers).** A `SUM`/`AVG` with no matching rows is `NULL` in SQL (an aggregate
   without `GROUP BY` still returns one row), and the result was read straight through
   `JsonElement.GetDecimal`, which requires a `Number` kind and throws on `null`. This path became
   reachable only after 3.5.0 made base-field aggregations honour the filter: before that `WhereRedb(...)`
@@ -1879,9 +1881,9 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 > minor, and a minor may legitimately contain nothing but fixes for the packages that got none —
 > the reverse (shipping new public API as a patch) would not be legitimate.
 >
-> **The whole ecosystem moves together**, as it has since 3.3.3: the core packages (`RedBase.Core`,
-> the three providers Free/Pro, `RedBase.Export`, `RedBase.CLI`, `RedBase.Templates`,
-> `RedBase.Licensing`), all of `redb.Route`, plus `redb.Tsak` and `redb.Identity` — the latter two
+> **The whole ecosystem moves together**, as it has since 3.3.3: the core packages (`redb.Core`,
+> the three providers Free/Pro, `redb.Export`, `redb.CLI`, `redb.Templates`,
+> `redb.Licensing`), all of `redb.Route`, plus `redb.Tsak` and `redb.Identity` — the latter two
 > carry no code changes of their own and are rebuilt onto the new core.
 >
 > **Why they are not left behind on 3.4.0.** Tsak's shared-runtime layer is gated on the **minor**
@@ -1892,7 +1894,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 > their users at all.
 
 ### Fixed
-- **Hashing threw on Blazor WebAssembly, breaking every write (`RedBase.Core`, `RedBase.Core.Pro`).**
+- **Hashing threw on Blazor WebAssembly, breaking every write (`redb.Core`, `redb.Core.Pro`).**
   The browser-wasm runtime ships no MD5 provider, so `MD5.Create()` raised
   `CryptographicException: Cryptography_UnknownHashAlgorithm, MD5` — and since object and scheme hashes
   are computed on every save, `SyncSchemeAsync` and `SaveAsync` failed outright in the browser. All MD5
@@ -1905,13 +1907,13 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   boundary where padding implementations go wrong (54–57, 63–65, 119–120, 127–129 bytes), and random
   buffers. On every non-browser target the executed code path is exactly what it was before.
 
-- **Android apps shipped ~360 KB of unusable Linux binaries in every APK (`RedBase.SQLite`).** The Free
+- **Android apps shipped ~360 KB of unusable Linux binaries in every APK (`redb.SQLite`).** The Free
   tier's native loadable extension was packed into the idiomatic `runtimes/<rid>/native/` layout — but
   the .NET Android SDK harvests every `runtimes/*/native/*.so` and maps it into the APK by architecture,
   so `linux-arm64/redbsqlite.so` landed in `lib/arm64-v8a/` and `linux-x64/redbsqlite.so` in
   `lib/x86_64/`. Besides the dead weight, this raised `XA0141`: Android 16 requires 16 KB page
   alignment, so the app would fail to start there. Affected every Android consumer, including those on
-  `RedBase.SQLite.Pro` (which depends on the Free package).
+  `redb.SQLite.Pro` (which depends on the Free package).
 
   The extension now ships under `buildTransitive/native/<rid>/`, where no platform SDK looks for it, and
   `redb.SQLite.targets` performs the delivery. The targets file previously handled only the
@@ -1920,7 +1922,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   resolution behaves exactly as before on desktop and server.
 
 - **Props cache could serve a stale ("dirty") object mutated in place after it was cached
-  (`RedBase.Core` + all providers).** `MemoryRedbObjectCache` stores a **reference** to the object,
+  (`redb.Core` + all providers).** `MemoryRedbObjectCache` stores a **reference** to the object,
   not a copy. When a caller mutated a loaded object in place *before* saving it, the cache — pointing
   at the same object — instantly reflected the mutation, but its stored hash (fixed at `Set`) did not.
   A subsequent `LoadAsync` saw hash-matches-DB and returned the mutated object as if it were the
@@ -1930,7 +1932,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   state from the DB. Surfaces only with `EnablePropsCache=true` (off by default). No clone/allocation
   on read — just the hash recompute.
 
-- **`RedbHash` was order-dependent for `Dictionary` properties (`RedBase.Core` + all providers).** A
+- **`RedbHash` was order-dependent for `Dictionary` properties (`redb.Core` + all providers).** A
   `Dictionary<K,V>` was hashed in enumeration order, but .NET does not guarantee that order (it also
   changes after removals), and the same logical map is rebuilt in a different order when materialized
   from `_values` than when first created. So one logical object produced **different hashes** on the
@@ -1950,7 +1952,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   method with a filter across all six Free/Pro × Postgres/MSSql/SQLite fixtures — the previous suite had
   zero filtered-`*RedbAsync` coverage, which is why the defect shipped.
 
-- **Integer aggregate results collapsed to 0 on MSSql (`RedBase.Core`, all providers via MSSql).**
+- **Integer aggregate results collapsed to 0 on MSSql (`redb.Core`, all providers via MSSql).**
   MSSql renders `SUM`/`MIN`/`MAX` of a base `bigint` field as `numeric(38,10)`, so `FOR JSON` emits it
   with a zero fraction (`2130762.0000000000`). `JsonValueConverter` read integer targets with
   `TryGetInt64`, which rejects any JSON number carrying a decimal point, and silently fell back to `0` —
@@ -1965,11 +1967,11 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 > **Why 3.4.0 (a minor bump), not 3.3.4.** This release adds features, not just fixes: explicit scheme
 > names (`[RedbScheme(Name = "...")]`), scheme-name validation triggers on MSSql/SQLite, and the new
 > `ThrowOnSchemeMismatch` load-time guard. Under SemVer that is a minor version. The core packages
-> (`RedBase.Core`, the three providers Free/Pro, `RedBase.Export`, `RedBase.CLI`) move together to
+> (`redb.Core`, the three providers Free/Pro, `redb.Export`, `redb.CLI`) move together to
 > **3.4.0**; `redb.Route`, `redb.Tsak` and `redb.Identity` keep their own version lines.
 
 ### Added
-- **Explicit scheme names — `[RedbScheme(Name = "...")]` (`RedBase.Core` + all providers).** Until now
+- **Explicit scheme names — `[RedbScheme(Name = "...")]` (`redb.Core` + all providers).** Until now
   a scheme was always named after the CLR type's `FullName`, and the string in the attribute was only
   a cosmetic `_alias`. A scheme name can now be pinned explicitly, which decouples the database
   identity of a scheme from C# namespace/class refactoring.
@@ -1993,19 +1995,19 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   words; 128 characters max) and are validated in C# before any SQL is issued, so the error names the
   offending type. Human-readable titles belong in `Alias`, which is free-form.
 
-- **Scheme-name validation in MSSql and SQLite (`RedBase.MSSql`, `RedBase.SQLite`).** Both providers
+- **Scheme-name validation in MSSql and SQLite (`redb.MSSql`, `redb.SQLite`).** Both providers
   now carry a `_schemes` name-validation trigger mirroring the PostgreSQL `validate_scheme_name()`
   rule for rule, so a name accepted by one provider is accepted by all three. Applies to
   **newly created databases only** — `EnsureDatabaseAsync` skips initialisation when `_schemes`
   already exists. The C#-level validation covers databases of any age.
 
-- **`RedbServiceConfiguration.ThrowOnSchemeMismatch` (`RedBase.Core`, default `false`).** Chooses how
+- **`RedbServiceConfiguration.ThrowOnSchemeMismatch` (`redb.Core`, default `false`).** Chooses how
   `LoadAsync<TProps>` reacts when the object's scheme does not match `TProps` (see Fixed): `false`
   returns `null` (so a soft-deleted object, scheme `-10`, reads as `null` — what soft-delete callers
   expect); `true` throws `RedbSchemeMismatchException` to surface a genuine type mistake loudly.
 
 ### Changed
-- **The SQLite native extension is renamed `redb` → `redbsqlite` (`RedBase.SQLite`, Free tier).**
+- **The SQLite native extension is renamed `redb` → `redbsqlite` (`redb.SQLite`, Free tier).**
   The package now ships `runtimes/<rid>/native/redbsqlite.{dll,so}` (win-x64, linux-x64, linux-arm64)
   instead of `redb.{dll,so}`. The generic name collided with the managed `redb.*` assemblies and with
   the `redb.*` prune globs a host applies to its own bin directory — a native loadable module was
@@ -2019,7 +2021,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
     point it at `redbsqlite.{dll,so}`. A stale path fails at connection open, not at build.
 
 ### Fixed
-- **Concurrent start-up of several nodes could fail to create a scheme (`RedBase.Core` + all
+- **Concurrent start-up of several nodes could fail to create a scheme (`redb.Core` + all
   providers).** Reproduced in production on a three-node cluster. When several instances started
   against a database that did not yet have a given scheme, all of them missed the lookup and all
   issued `INSERT INTO _schemes`; every instance but one failed with an unhandled `UNIQUE(_name)`
@@ -2032,8 +2034,8 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   read would fail with `25P02`. Both creation paths are covered — typed
   (`EnsureSchemeFromTypeAsync<T>`) and untyped (`EnsureObjectSchemeAsync`).
 
-- **Pro data migrations never ran — on any provider (`RedBase.Core.Pro`, `RedBase.SQLite`,
-  `RedBase.MSSql`).** Four separate defects stacked on top of each other, and the feature had no test
+- **Pro data migrations never ran — on any provider (`redb.Core.Pro`, `redb.SQLite`,
+  `redb.MSSql`).** Four separate defects stacked on top of each other, and the feature had no test
   coverage at all, so none of them had ever surfaced:
 
   1. `MigrationExtensions.CreateExecutor` fetched the DB context by reflection asking for a
@@ -2057,13 +2059,13 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   DDL, since `EnsureDatabaseAsync` skips initialisation when `_schemes` already exists — but no
   database can hold real migration history, because the feature could not complete a single run.
 
-- **A scheme's `_alias` was never updated after creation (`RedBase.Core` + all providers).** It was
+- **A scheme's `_alias` was never updated after creation (`redb.Core` + all providers).** It was
   written once on `INSERT` and then frozen: changing `[RedbScheme("...")]` on a class left the old
   value in the database forever. Structure aliases have always synchronised (`Structures_UpdateAlias`);
   schemes simply had no equivalent. They do now — the attribute is the source of truth, removing it
   resets `_alias` to `NULL`, and a value edited by hand in the database is overwritten on the next sync.
 
-- **`ClrSchemeTypeIndex` pinned hot-reloaded plugin modules in memory (`RedBase.Core`).** The
+- **`ClrSchemeTypeIndex` pinned hot-reloaded plugin modules in memory (`redb.Core`).** The
   process-global `schemeName → Type` index held **strong** `Type` references, and a `Type` keeps its
   `AssemblyLoadContext` alive — so a collectible ALC (Tsak hot-swap) could never be collected, and after
   a reload the stale instance produced a false `RedbSchemeNameConflictException` against the fresh one,
@@ -2071,7 +2073,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   and two instances of the same `FullName` from different ALCs are recognised as a reload, not a name
   clash. Distinct types sharing one explicit `Name` still conflict, by design.
 
-- **`LoadAsync<TProps>` did not verify the loaded object's scheme (`RedBase.Core` + all providers).**
+- **`LoadAsync<TProps>` did not verify the loaded object's scheme (`redb.Core` + all providers).**
   Loading an object of one scheme under an unrelated `TProps` deserialised garbage into the Props and —
   with `EnablePropsCache` — cached it under `objectId`, so a later `GetWithoutHashValidation` kept
   returning the garbage. `LoadAsync<TProps>` now checks the object's `_id_scheme` against the scheme
@@ -2081,13 +2083,13 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   `RedbSchemeMismatchException` on a genuine type mistake. Either way garbage never reaches the cache.
   The untyped `LoadAsync(objectId)` is never affected.
 
-- **Invalid explicit scheme names failed one at a time (`RedBase.Core`).** Auto-sync validates every
+- **Invalid explicit scheme names failed one at a time (`redb.Core`).** Auto-sync validates every
   `[RedbScheme(Name = "...")]` and (by design) refuses to boot on an invalid name — but it stopped at
   the first offender, so a codebase with several had to be fixed one rerun at a time. Names are now all
   validated up front and reported together in a single `AggregateException`.
 
 ### Removed
-- **Dead metadata-cache interface layer (`RedBase.Core`).** `ICompositeMetadataCache`,
+- **Dead metadata-cache interface layer (`redb.Core`).** `ICompositeMetadataCache`,
   `ISchemeMetadataCache`, `IStructureMetadataCache`, `ITypeMetadataCache`, `IStaticMetadataCache` and
   `StaticMetadataCache` — 679 lines across five files that referenced only each other. None was ever
   implemented, none was ever consumed; the live caches are `GlobalMetadataCache` (per cache domain),
@@ -2110,7 +2112,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 > storage, and without the rebuild its users would stay on the broken init below.
 
 ### Fixed
-- **Schema init failed under a non-superuser database owner (`RedBase.Postgres`).** The embedded
+- **Schema init failed under a non-superuser database owner (`redb.Postgres`).** The embedded
   `redb_init.sql` carried a single `ALTER FUNCTION migrate_structure_type(...) OWNER TO postgres;`
   (a leftover from a debugging session — the only `OWNER TO` in the whole script). `EnsureCreated=true` runs
   the script as one batch, so on a least-privilege setup (app user owns the database but is not a
@@ -2126,8 +2128,8 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 ## [3.3.0] — 2026-07-09
 
 ### Added
-- **Fail-fast concurrency guard on the provider connection (`RedBase.Postgres`, `RedBase.MSSql`,
-  `RedBase.SQLite` + `.Pro`).** An `IRedbService` wraps a single, non-thread-safe DB connection
+- **Fail-fast concurrency guard on the provider connection (`redb.Postgres`, `redb.MSSql`,
+  `redb.SQLite` + `.Pro`).** An `IRedbService` wraps a single, non-thread-safe DB connection
   (EF-DbContext model). If the same instance is entered from two threads at once, each provider now
   throws a clear `InvalidOperationException` naming the cause — instead of an opaque driver error
   (*"A command is already in progress"*, *"connection is busy"*, *"another read operation is already
@@ -2135,21 +2137,21 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   correct scoped usage is never affected.
 
 ### Fixed
-- **Query parser: `array.Contains(x)` in `WhereRedb` threw on .NET 9 / C# 13 (`RedBase.Core`).**
+- **Query parser: `array.Contains(x)` in `WhereRedb` threw on .NET 9 / C# 13 (`redb.Core`).**
   A `string[]` (or any array) `.Contains(x)` inside a `WhereRedb(...)` predicate now binds to the
   `ReadOnlySpan` overload (`System.MemoryExtensions.Contains`) rather than `Enumerable.Contains`,
   which the filter parser rejected with `NotSupportedException`. The parser now recognises
   `MemoryExtensions.Contains`, unwraps the array→span conversion, and translates it to the same
   `IN` clause as `Enumerable.Contains` / `List.Contains`. (Refactored the two-arg `Contains`
   translation into a shared `VisitContainsCore`.)
-- **`ComputeHash()` NRE on an object with `Props == null` (`RedBase.Core`).** `RedbHash.ComputeForObject`
+- **`ComputeHash()` NRE on an object with `Props == null` (`redb.Core`).** `RedbHash.ComputeForObject`
   dereferenced the object before a null check, so the generic `ComputeFor<TProps>` path (used by
   `RedbObject<TProps>.ComputeHash()`) threw `NullReferenceException` when `Props` was null — even
   though null Props is a supported case (the reflection-based `ComputeFor(IRedbObject)` already
   returned null, and `ComputeForBaseFields` exists for exactly this). Added the missing guard so the
   generic path returns `null` (→ `Guid.Empty`) consistently, instead of throwing.
-- **Connection-pool leak on transaction/connection dispose (`RedBase.Postgres`, `RedBase.MSSql`,
-  `RedBase.SQLite` + `.Pro`).** Disposing the provider connection could skip returning the physical
+- **Connection-pool leak on transaction/connection dispose (`redb.Postgres`, `redb.MSSql`,
+  `redb.SQLite` + `.Pro`).** Disposing the provider connection could skip returning the physical
   connection to the pool: a throw from the driver's transaction `DisposeAsync()` (possible mid
   error-storm on an already-broken connection) bypassed `_connection` disposal. Because `SaveAsync`
   runs inside an explicit transaction, every write armed this path, so under a burst of failures the
@@ -2162,16 +2164,16 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 ## [3.2.0] — 2026-06-29
 
 ### Added
-- **SQLite provider (new): `RedBase.SQLite` (Free) + `RedBase.SQLite.Pro` (Pro).**
+- **SQLite provider (new): `redb.SQLite` (Free) + `redb.SQLite.Pro` (Pro).**
   RedBase now runs on SQLite — same LINQ API, same 13-table model, same
   `AddRedb(...)` wiring as Postgres/MSSql, with `Data Source=app.db`. The
   provider is swappable at the DI line; the rest of the application is unchanged.
-  - **`RedBase.SQLite.Pro` is pure C#** (query SQL built by `ProSqlBuilder`, props
+  - **`redb.SQLite.Pro` is pure C#** (query SQL built by `ProSqlBuilder`, props
     materialized in C#, no database-side functions), so it runs anywhere
     `Microsoft.Data.Sqlite` runs — including **Blazor WebAssembly** and **mobile
     (MAUI / iOS / Android)**, where a native SQLite extension cannot be loaded. This
     is the embedded/offline/in-browser tier people asked for.
-  - **`RedBase.SQLite` (Free)** hosts the in-DB machinery as a **native C loadable
+  - **`redb.SQLite` (Free)** hosts the in-DB machinery as a **native C loadable
     extension** (`redb.{dll,so,dylib}`) — the SQLite analog of the Postgres/MSSql
     server-side functions. It is the full `v2-pvt` query compiler
     (`pvt_build_query_sql` / `_aggregate_` / `_groupby_` / `_window_` /
@@ -2192,7 +2194,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
     everywhere today. In-memory needs `Mode=Memory;Cache=Shared` + a kept-open connection.
     `NUMERIC` maps to `REAL` (exact-via-`TEXT` is a planned config option).
 - **`IUserProvider.GetUserByEmailAsync(string email)`** — new public API on
-  `RedBase.Core.IUserProvider` for case-insensitive lookup by `_users._email`.
+  `redb.Core.IUserProvider` for case-insensitive lookup by `_users._email`.
   Filters out soft-deleted rows (`_enabled = false`). Email is NOT enforced
   unique at the schema level; the method returns the first active match or
   `null`. Implemented in `UserProviderBase`; `Users_SelectByEmail()` SQL
@@ -2205,7 +2207,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 
 ### Changed
 - **SQLite stores all datetimes as REAL Julian day (UTC) instead of TEXT ISO-8601
-  (`RedBase.SQLite` + `RedBase.SQLite.Pro`).** The previous TEXT storage made range
+  (`redb.SQLite` + `redb.SQLite.Pro`).** The previous TEXT storage made range
   comparisons *lexical*, so a stored `'2024-06-15 13:45:30'` (SQLite space separator)
   never compared correctly against an ISO `'2024-06-15T…'` literal — date-range
   filters, `MinRedbAsync`/`MaxRedbAsync`, `AggregateRedbAsync`, window and group-by
@@ -2222,19 +2224,19 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   **Migration:** SQLite databases created on the old TEXT schema are NOT auto-migrated
   — a fresh database (or a manual column rewrite) is required; mixing a TEXT-schema DB
   with this build yields wrong comparisons. Postgres/MSSql are unaffected.
-- **Datetime analytics decode through a storage-agnostic hook (`RedBase.Core`).**
+- **Datetime analytics decode through a storage-agnostic hook (`redb.Core`).**
   `Min/Max/AggregateRedbAsync`, window and group-by select the raw datetime column
   (bypassing `get_object_json`) and hand the value to core converters
   (`JsonValueConverter`, `AggregateResult.Get<T>`, scalar `Convert.ChangeType`). To
-  let SQLite's numeric Julian round-trip without teaching `RedBase.Core` about Julian
+  let SQLite's numeric Julian round-trip without teaching `redb.Core` about Julian
   days, a nullable `TemporalDecoder.NumericDecoder` extension point was added: when a
   *numeric* value targets a temporal CLR type and a decoder is registered, it is used;
-  otherwise the existing path runs. `RedBase.SQLite`/`.Pro` register
+  otherwise the existing path runs. `redb.SQLite`/`.Pro` register
   `SqliteJulian.FromJulian` at configure time. The hook is null for Postgres/MSSql
   (which never return a number for a temporal column), so their behavior is unchanged.
   Pro reuses the same core converters, so one hook fixes Free and Pro alike.
 - **`BackgroundDeletionService` switched from in-memory channel to DB polling**
-  (`RedBase.Core`). Earlier revisions used a `Channel<PurgeTask>` queue for
+  (`redb.Core`). Earlier revisions used a `Channel<PurgeTask>` queue for
   low-latency wake-up plus a startup-only `RecoverOrphanedTasksAsync` sweep
   for crash recovery — dual-state by design (channel in memory, trash rows in
   DB). Worker force-kills always left a tail of orphaned `'pending'` rows
@@ -2258,7 +2260,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
 
 ### Fixed
 - **Pro no longer calls the Free-only `get_object_json` on the subtree-delete path
-  (`RedBase.Core` + all `.Pro`).** `TreeProviderBase.CollectDescendantIds` (the
+  (`redb.Core` + all `.Pro`).** `TreeProviderBase.CollectDescendantIds` (the
   `DeleteSubtreeAsync` path) lives in the shared base — Pro overrides the polymorphic
   *load* tree methods but not this one — and it used the `Tree_SelectPolymorphicChildren`
   recipe, which embeds `get_object_json`. On PostgreSQL/SQL Server that function exists
@@ -2267,23 +2269,23 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   `no such function: get_object_json`. Fixed by collecting subtree ids through a new
   id-only dialect recipe `Tree_SelectChildrenIds` (`SELECT _id … WHERE _id_parent = …`) —
   lighter for every dialect and tier. Pro source now contains zero `get_object_json` calls.
-- **`DeleteSubtreeAsync` returns the real subtree size (`RedBase.Core`, all dialects).**
+- **`DeleteSubtreeAsync` returns the real subtree size (`redb.Core`, all dialects).**
   It now returns the count of collected objects (self + descendants) instead of the raw
   `DELETE` rows-affected, which under-counts on SQLite where the `_id_parent ON DELETE
   CASCADE` FK removes child rows as a side effect (PostgreSQL/SQL Server have no such
   cascade, so the value is unchanged there).
-- **Boolean keys/projections materialize correctly on SQLite (`RedBase.Core`, shared).**
+- **Boolean keys/projections materialize correctly on SQLite (`redb.Core`, shared).**
   `JsonValueConverter` now accepts a JSON `Number` as a `bool` (nonzero → true): SQLite has
   no native boolean and stores it as `INTEGER` 0/1, so `GroupByArray`/projection columns
   arrived as numbers and always read `false`. PostgreSQL/SQL Server (which emit JSON
   `true`/`false`) are unaffected.
-- **SQLite Free: `DistinctBy(field)` now deduplicates (`RedBase.SQLite`).** The native
+- **SQLite Free: `DistinctBy(field)` now deduplicates (`redb.SQLite`).** The native
   v2-pvt query builder ignored `distinct_on` (SQLite has no `DISTINCT ON`), so
   `DistinctBy` returned every row. Implemented it via `ROW_NUMBER() OVER (PARTITION BY
   <field> ORDER BY o._id)` in a chained `_ranked` CTE (`WHERE _rn = 1`), mirroring
-  `RedBase.SQLite.Pro`. `pvt_build_query_sql` now reads the `distinct_on` argument.
+  `redb.SQLite.Pro`. `pvt_build_query_sql` now reads the `distinct_on` argument.
 - **SQLite Free: a multi-key filter no longer silently drops a `null`/text shorthand
-  leaf (`RedBase.SQLite`).** In `pvtSplitFilter`'s multi-key (implicit-`$and`) path,
+  leaf (`redb.SQLite`).** In `pvtSplitFilter`'s multi-key (implicit-`$and`) path,
   `json_each`'s `value` column loses type for a JSON `null` (and strips quotes from text),
   so a shorthand condition like `{"0$:ParentId": null}` was rebuilt as invalid JSON and
   vanished whenever the filter had more than one key — e.g.
@@ -2291,8 +2293,8 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   rows that *did* have a parent. Each value is now re-encoded as a valid JSON atom
   (type-aware) before the per-key condition is rebuilt.
 - **Polymorphic `LoadAsync(IEnumerable<long>)` no longer silently returns a base,
-  non-generic `RedbObject` for a scheme whose CLR type exists (`RedBase.Core` +
-  `RedBase.Core.Pro`, all dialects, Free and Pro).** The `scheme_id → CLR Type`
+  non-generic `RedbObject` for a scheme whose CLR type exists (`redb.Core` +
+  `redb.Core.Pro`, all dialects, Free and Pro).** The `scheme_id → CLR Type`
   registry was a one-time, **per-cache-domain** snapshot built only by
   `InitializeClrTypeRegistryAsync`, which (a) used a one-shot flag and never
   re-scanned, and (b) split assembly discovery across two sources
@@ -2343,7 +2345,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   polymorphic deserialization for the other database on the serializer path. The Pro
   `ProLazyPropsLoader` nested path is unaffected (it uses its own service's cache).
 - **Soft-deleted objects no longer leak into the materializer through nested
-  `RedbObject` references (`RedBase.Postgres`, `RedBase.MSSql`, `RedBase.SQLite`
+  `RedbObject` references (`redb.Postgres`, `redb.MSSql`, `redb.SQLite`
   + all three `.Pro`).** Soft-delete is an `UPDATE` (move the row under a
   `__TRASH__*` bucket and flip `_id_scheme` to `-10`), not a `DELETE`, so an
   outbound `_values._Object` pointer FROM a surviving object TO a trashed one is
@@ -2368,7 +2370,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   is intentionally left unfiltered so restore/trash-admin flows can still read
   trashed rows.
 - **The object→JSON materializer now auto-redeploys to existing databases on
-  upgrade (`RedBase.Postgres`, `RedBase.MSSql`).** `EnsureDatabaseAsync` skips
+  upgrade (`redb.Postgres`, `redb.MSSql`).** `EnsureDatabaseAsync` skips
   the full `redb_init.sql` once `_schemes` exists, re-applying only the
   versioned `v2-pvt` module — but `get_object_json` and its helpers lived in
   the core init, so a bug fix to them (like the soft-delete fix above) would
@@ -2549,7 +2551,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   `redb.Identity` (W1 / outbound webhook subscriptions). Also documented
   in `redb.Route/CHANGELOG.md`.
 - **`BackgroundDeletionService` drains its queue synchronously on graceful
-  shutdown** (`RedBase.Core`). Previously the host's `StopAsync` only
+  shutdown** (`redb.Core`). Previously the host's `StopAsync` only
   cancelled the read loop — tasks that had been enqueued but not yet
   processed were lost; tasks mid-process left their trash containers in
   `status=running` in the DB. The next startup's `RecoverOrphanedTasksAsync`
@@ -2564,7 +2566,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   hard process kill (`Stop-Process -Force` / SIGKILL) still leaves
   orphans the next startup picks up — same behavior as before.
 - **`PurgeTrash completed` log line dropped from INF to DBG**
-  (`RedBase.Core`). The line fires once per trash container processed by
+  (`redb.Core`). The line fires once per trash container processed by
   `BackgroundDeletionService`. Each high-level DELETE (e.g.
   `redb.Identity` admin/self-service user delete, DCR cleanup, federation
   provider delete) ships its ids as a single call, so almost every
@@ -2572,11 +2574,11 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   `Deleted=1` per item. Worker restarts compound the noise via
   `RecoverOrphanedTasksAsync` draining the accumulated backlog
   one-by-one. Operators who need per-purge visibility now enable DBG
-  for the `RedBase.Core.Providers.Base.ObjectStorageProviderBase`
+  for the `redb.Core.Providers.Base.ObjectStorageProviderBase`
   category.
 - **`UserProviderBase.DeleteUserAsync` and `Users_SoftDelete` SQL recipe no
-  longer mutate `_login`** (`RedBase.Core`, `RedBase.Postgres`, `RedBase.MSSql`,
-  `RedBase.SQLite`).
+  longer mutate `_login`** (`redb.Core`, `redb.Postgres`, `redb.MSSql`,
+  `redb.SQLite`).
   Previously the soft-delete path appended a `_DEL_<timestamp>` suffix to BOTH
   `_login` and `_name`. PostgreSQL's `protect_system_users` trigger correctly
   flagged that as "Cannot change user login" — `_login` is immutable for ALL
@@ -2590,7 +2592,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   DELETE `/me`, both of which previously returned 500 ("Database temporarily
   unavailable" wrapping the trigger violation).
 - **Pro tree loading no longer calls the server-side `get_object_json` function**
-  (`RedBase.Core.Pro`, affects `RedBase.Postgres.Pro` + `RedBase.MSSql.Pro`).
+  (`redb.Core.Pro`, affects `redb.Postgres.Pro` + `redb.MSSql.Pro`).
   `TreeQuery(...).ToTreeListAsync()` / `ToRootListAsync()` pull ancestor nodes via
   `TreeQueryProviderBase.LoadObjectsByIdsAsync` (both the generic and polymorphic
   overloads), which were routing through `get_object_json`. When a Pro lazy
@@ -2601,7 +2603,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   restores the Pro invariant that the Pro engine never depends on database-side
   materialization functions. (Latent across all Pro providers; surfaced while
   bringing up the upcoming SQLite Pro provider.)
-- **GroupBy / Window projection value conversion** (`RedBase.Core`, Free + Pro).
+- **GroupBy / Window projection value conversion** (`redb.Core`, Free + Pro).
   `ConvertJsonValue` (grouped and tree-grouped windowed queryables) now unwraps
   `Nullable<T>` and handles JSON `Number → bool` (a boolean group key serialized
   as `0`/`1` rather than `true`/`false`), `Number → float`, and `String →
@@ -2610,7 +2612,7 @@ spoke up. It stays silent on an incremental build, which is how all of this reac
   'System.Boolean'` when a projection member's type didn't match the JSON
   shape. PostgreSQL was unaffected because it emits native `true`/`false`.
 - **MSSql Free: `DISTINCT` with paging/order no longer fails with "The multi-part
-  identifier 'o._id' could not be bound"** (`RedBase.MSSql`, v2-pvt module
+  identifier 'o._id' could not be bound"** (`redb.MSSql`, v2-pvt module
   `0.1.2 → 0.1.3`). `pvt_build_query_sql` wraps the `@distinct = 1` row-source in a
   derived table (`_dist`) that projects only `[_id]`, but appended the outer
   `ORDER BY` built with the inner alias prefix (`o.` / `_pvt_cte.`), which is not in
