@@ -1047,8 +1047,40 @@ public interface ISqlDialect
     /// </summary>
     string Maintenance_Analyze(int analysisLimit);
 
+    /// <summary>
+    /// Refresh planner statistics of ONE table. The identifier arrives already checked against
+    /// the catalogs by the base provider, and the dialect quotes it itself: an identifier cannot
+    /// be a query parameter, and this one comes from a dashboard.
+    /// </summary>
+    string Maintenance_AnalyzeTable(string? schema, string table, int analysisLimit);
+
+    /// <summary>Does the table exist? Params: table name, then schema (null = the engine's default).</summary>
+    string Maintenance_SelectTableExists();
+
     /// <summary>Index statistics of user tables, normalized to the alias contract above.</summary>
     string Maintenance_SelectIndexStats();
+
+    /// <summary>
+    /// Table statistics, normalized to the TableStatistics alias contract: Schema, Table,
+    /// EstimatedRows, DataSizeBytes, IndexesSizeBytes, DeadRows, LastAnalyze, LastAutoAnalyze,
+    /// LastVacuum, HasStatistics.
+    /// </summary>
+    string Maintenance_SelectTableStats();
+
+    /// <summary>
+    /// The table-stats forms in decreasing capability, tried in order until one runs. SQLite needs
+    /// three: the optional <c>dbstat</c> module may be missing, and <c>sqlite_stat1</c> does not
+    /// exist at all until the first ANALYZE - the state every fresh database starts in, where a
+    /// storage page must report "no statistics" rather than fail (redb.Tsak BR-13, 2026-09-21).
+    /// Engines that can always answer return a single text.
+    /// </summary>
+    System.Collections.Generic.IReadOnlyList<string> Maintenance_SelectTableStatsForms();
+
+    /// <summary>
+    /// The window the usage counters cover: aliases CountersSince and IsReplica, both null where
+    /// the engine keeps no counters.
+    /// </summary>
+    string Maintenance_SelectStatisticsWindow();
 
     /// <summary>
     /// Size-less fallback for engines where the sized form may be unavailable (SQLite without

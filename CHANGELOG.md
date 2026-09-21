@@ -21,6 +21,48 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [4.1.0] — 2026-09-21
+### Added
+- **Storage maintenance reports what a DBA needs, and marks what must never be dropped.** The
+  maintenance facade grew on the request of redb.Tsak (2026-09-21), which builds a "what is going on
+  in the database" page: an operator reads it and hands the findings to a DBA. Read-only by design -
+  VACUUM, REINDEX and counter resets are deliberately not offered, because a button that locks a
+  production table must not be one click away in a dashboard.
+  - `IndexStatistics.Schema`: the schema of the table the index belongs to (null on SQLite). Two
+    tables of the same name in different schemas used to be one indistinguishable row, so any
+    grouping by table lied.
+  - `IndexStatistics.Columns` and `IncludedColumns`: the key columns in index order, and on SQL
+    Server the carried ones separately - without them a covering index is indistinguishable from a
+    composite one, and "which fields is it on?" had no answer.
+  - `IndexStatistics.IsSystemCritical` with `CriticalReason`, plus `IsPrimaryKey`,
+    `IsUniqueConstraint`, `IsClustered`, `BacksForeignKey` and `IsRedbOwned`: an index of the redb
+    schema, or one backing a key or a uniqueness constraint, must survive whatever its usage
+    counters say. Some of them serve uniqueness or a key check and are never scanned, which is
+    exactly how a well-meant cleanup removes them. The reason travels along, so a page can say
+    which of the three it is: redb metadata, redb security, redb data.
+  - `IMaintenanceProvider.GetTableStatsAsync()`: size, row estimate, the size of the table's
+    indexes, when statistics were last refreshed, and on PostgreSQL dead rows and the last vacuum.
+  - `IMaintenanceProvider.GetStatisticsWindowAsync()`: since when the usage counters have been
+    counting (the last statistics reset, or the start of the instance) and whether the node is a
+    replica. Without it "this index served no read" says nothing.
+  - `IMaintenanceProvider.AnalyzeTableAsync(table, schema)`: refreshes the planner statistics of one
+    table instead of the whole database, which runs for minutes on a real one. Every engine supports
+    it, SQLite included. The name is checked against the catalogs and quoted by the dialect: it comes
+    from a dashboard, and an identifier cannot be a query parameter.
+
+### Fixed
+- **`GetTableStatsAsync()` on a SQLite database nobody has analysed yet.** `sqlite_stat1` does not
+  exist until the first ANALYZE, and a statement naming a missing table does not even prepare, so
+  both forms of the query failed - including the size-less one, which named it as well. A fresh
+  database is the state every quick-start image starts in, so a storage page answered an error while
+  the ANALYZE button that would have fixed it sat on that same page (reported by redb.Tsak, 2026-09-21).
+  The dialect now lists the forms of the query in decreasing capability - with `dbstat` and
+  `sqlite_stat1`, with `sqlite_stat1` alone, with `dbstat` alone, with neither - and the first that
+  runs wins. On a database never analysed the answer is what the engine knows: `EstimatedRows` null
+  and `HasStatistics` false, which is exactly what that flag exists to say.
+
 ## [4.0.1] — 2026-09-18
 ### Added
 - `IRedbScopeSource`, implemented by every `IRedbService`: `CreateScope()` opens a scope of the container the

@@ -902,9 +902,27 @@ public class PostgreSqlDialect : ISqlDialect
     // is read defensively via to_jsonb of the row (older servers yield NULL, not an error).
     public string Maintenance_SelectIndexStats() =>
         """
-        SELECT c.relname                                   AS "Table",
+        SELECT i.schemaname                                AS "Schema",
+               c.relname                                   AS "Table",
                i.indexrelname                              AS "Name",
                x.indisunique                               AS "IsUnique",
+               (SELECT string_agg(a.attname, ',' ORDER BY k.ord)
+                  FROM unnest(x.indkey) WITH ORDINALITY AS k(attnum, ord)
+                  JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum
+                 WHERE k.ord <= x.indnkeyatts)             AS "ColumnsCsv",
+               (SELECT string_agg(a.attname, ',' ORDER BY k.ord)
+                  FROM unnest(x.indkey) WITH ORDINALITY AS k(attnum, ord)
+                  JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum
+                 WHERE k.ord > x.indnkeyatts)              AS "IncludedColumnsCsv",
+               x.indisprimary                              AS "IsPrimaryKey",
+               EXISTS (SELECT 1 FROM pg_constraint con
+                        WHERE con.conindid = x.indexrelid AND con.contype IN ('p', 'u', 'x'))
+                                                           AS "IsUniqueConstraint",
+               NULL::boolean                               AS "IsClustered",
+               EXISTS (SELECT 1 FROM pg_constraint fk
+                        WHERE fk.contype = 'f' AND fk.conrelid = x.indrelid
+                          AND fk.conkey <@ x.indkey::smallint[])
+                                                           AS "BacksForeignKey",
                pg_relation_size(i.indexrelid)              AS "SizeBytes",
                GREATEST(ic.reltuples::bigint, 0)           AS "EstimatedRows",
                i.idx_scan                                  AS "Seeks",
@@ -916,6 +934,43 @@ public class PostgreSqlDialect : ISqlDialect
         JOIN pg_class ic ON ic.oid = i.indexrelid
         JOIN pg_index x  ON x.indexrelid = i.indexrelid
         ORDER BY c.relname, i.indexrelname
+        """;
+
+    public string Maintenance_AnalyzeTable(string? schema, string table, int analysisLimit)
+        => $"ANALYZE {QuoteIdentifier(schema ?? "public")}.{QuoteIdentifier(table)}";
+
+    public string Maintenance_SelectTableExists() =>
+        """
+        SELECT count(*) FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relkind IN ('r', 'p') AND c.relname = $1 AND n.nspname = COALESCE($2, 'public')
+        """;
+
+    public string Maintenance_SelectTableStats() =>
+        """
+        SELECT t.schemaname                                        AS "Schema",
+               t.relname                                           AS "Table",
+               GREATEST(c.reltuples::bigint, 0)                    AS "EstimatedRows",
+               pg_table_size(c.oid)                                AS "DataSizeBytes",
+               pg_indexes_size(c.oid)                              AS "IndexesSizeBytes",
+               t.n_dead_tup                                        AS "DeadRows",
+               t.last_analyze                                      AS "LastAnalyze",
+               t.last_autoanalyze                                  AS "LastAutoAnalyze",
+               GREATEST(t.last_vacuum, t.last_autovacuum)          AS "LastVacuum",
+               (t.last_analyze IS NOT NULL OR t.last_autoanalyze IS NOT NULL) AS "HasStatistics"
+        FROM pg_stat_user_tables t
+        JOIN pg_class c ON c.oid = t.relid
+        ORDER BY t.schemaname, t.relname
+        """;
+
+    public System.Collections.Generic.IReadOnlyList<string> Maintenance_SelectTableStatsForms()
+        => new[] { Maintenance_SelectTableStats() };
+
+    public string Maintenance_SelectStatisticsWindow() =>
+        """
+        SELECT COALESCE(pg_stat_get_db_stat_reset_time(oid), pg_postmaster_start_time()) AS "CountersSince",
+               pg_is_in_recovery()                 AS "IsReplica"
+        FROM pg_database WHERE datname = current_database()
         """;
 
     public string Maintenance_SelectIndexStatsNoSize() => Maintenance_SelectIndexStats();

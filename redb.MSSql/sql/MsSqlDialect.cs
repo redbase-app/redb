@@ -908,9 +908,34 @@ public class MsSqlDialect : ISqlDialect
     // not indexes and are excluded.
     public string Maintenance_SelectIndexStats() =>
         """
-        SELECT t.name                                     AS [Table],
+        SELECT SCHEMA_NAME(t.schema_id)                   AS [Schema],
+               t.name                                     AS [Table],
                i.name                                     AS [Name],
                i.is_unique                                AS [IsUnique],
+               (SELECT STRING_AGG(col.name, ',') WITHIN GROUP (ORDER BY ic.key_ordinal)
+                  FROM sys.index_columns ic
+                  JOIN sys.columns col ON col.object_id = ic.object_id AND col.column_id = ic.column_id
+                 WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id
+                   AND ic.is_included_column = 0)         AS [ColumnsCsv],
+               (SELECT STRING_AGG(col.name, ',') WITHIN GROUP (ORDER BY ic.index_column_id)
+                  FROM sys.index_columns ic
+                  JOIN sys.columns col ON col.object_id = ic.object_id AND col.column_id = ic.column_id
+                 WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id
+                   AND ic.is_included_column = 1)         AS [IncludedColumnsCsv],
+               i.is_primary_key                           AS [IsPrimaryKey],
+               i.is_unique_constraint                     AS [IsUniqueConstraint],
+               CAST(CASE WHEN i.type = 1 THEN 1 ELSE 0 END AS bit) AS [IsClustered],
+               CAST(CASE WHEN EXISTS (
+                       SELECT 1 FROM sys.foreign_keys fk
+                       WHERE fk.parent_object_id = i.object_id
+                         AND NOT EXISTS (
+                             SELECT 1 FROM sys.foreign_key_columns fkc
+                             WHERE fkc.constraint_object_id = fk.object_id
+                               AND fkc.parent_column_id NOT IN (
+                                   SELECT ic.column_id FROM sys.index_columns ic
+                                   WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id
+                                     AND ic.is_included_column = 0))
+                   ) THEN 1 ELSE 0 END AS bit)            AS [BacksForeignKey],
                CAST(SUM(a.used_pages) * 8 * 1024 AS bigint) AS [SizeBytes],
                CAST(MAX(p.rows) AS bigint)                AS [EstimatedRows],
                CAST(MAX(u.user_seeks) AS bigint)          AS [Seeks],
@@ -925,8 +950,50 @@ public class MsSqlDialect : ISqlDialect
         LEFT JOIN sys.dm_db_index_usage_stats u
                ON u.object_id = i.object_id AND u.index_id = i.index_id AND u.database_id = DB_ID()
         WHERE i.index_id > 0 AND t.is_ms_shipped = 0
-        GROUP BY t.name, i.name, i.is_unique
+        GROUP BY t.schema_id, t.name, i.name, i.is_unique, i.is_primary_key, i.is_unique_constraint,
+                 i.type, i.object_id, i.index_id
         ORDER BY t.name, i.name
+        """;
+
+    public string Maintenance_AnalyzeTable(string? schema, string table, int analysisLimit)
+        => $"UPDATE STATISTICS {QuoteIdentifier(schema ?? "dbo")}.{QuoteIdentifier(table)}";
+
+    public string Maintenance_SelectTableExists() =>
+        """
+        SELECT COUNT(*) FROM sys.tables t
+        WHERE t.name = @p0 AND SCHEMA_NAME(t.schema_id) = ISNULL(@p1, 'dbo') AND t.is_ms_shipped = 0
+        """;
+
+    public string Maintenance_SelectTableStats() =>
+        """
+        SELECT SCHEMA_NAME(t.schema_id)                   AS [Schema],
+               t.name                                     AS [Table],
+               CAST(SUM(CASE WHEN p.index_id IN (0, 1) THEN p.row_count ELSE 0 END) AS bigint) AS [EstimatedRows],
+               CAST(SUM(CASE WHEN p.index_id IN (0, 1) THEN p.used_page_count ELSE 0 END) * 8 * 1024 AS bigint) AS [DataSizeBytes],
+               CAST(SUM(CASE WHEN p.index_id NOT IN (0, 1) THEN p.used_page_count ELSE 0 END) * 8 * 1024 AS bigint) AS [IndexesSizeBytes],
+               NULL                                       AS [DeadRows],
+               (SELECT MAX(COALESCE(sp.last_updated, STATS_DATE(s.object_id, s.stats_id)))
+                  FROM sys.stats s OUTER APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) sp
+                 WHERE s.object_id = t.object_id) AS [LastAnalyze],
+               NULL                                       AS [LastAutoAnalyze],
+               NULL                                       AS [LastVacuum],
+               CAST(CASE WHEN EXISTS (SELECT 1 FROM sys.stats s WHERE s.object_id = t.object_id)
+                         THEN 1 ELSE 0 END AS bit)        AS [HasStatistics]
+        FROM sys.tables t
+        JOIN sys.dm_db_partition_stats p ON p.object_id = t.object_id
+        WHERE t.is_ms_shipped = 0
+        GROUP BY t.schema_id, t.name, t.object_id
+        ORDER BY t.name
+        """;
+
+    public System.Collections.Generic.IReadOnlyList<string> Maintenance_SelectTableStatsForms()
+        => new[] { Maintenance_SelectTableStats() };
+
+    public string Maintenance_SelectStatisticsWindow() =>
+        """
+        SELECT CAST(sqlserver_start_time AS datetimeoffset) AS [CountersSince],
+               CAST(NULL AS bit)                            AS [IsReplica]
+        FROM sys.dm_os_sys_info
         """;
 
     public string Maintenance_SelectIndexStatsNoSize() => Maintenance_SelectIndexStats();

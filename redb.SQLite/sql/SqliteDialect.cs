@@ -951,9 +951,19 @@ public class SqliteDialect : ISqlDialect
     // hence the size-less fallback below.
     public string Maintenance_SelectIndexStats() =>
         """
-        SELECT m.tbl_name                                   AS "Table",
+        SELECT NULL                                         AS "Schema",
+               m.tbl_name                                   AS "Table",
                m.name                                       AS "Name",
                CASE WHEN il."unique" IS NULL THEN NULL ELSE il."unique" END AS "IsUnique",
+               (SELECT group_concat(name, ',') FROM (SELECT ii.name AS name FROM pragma_index_info(m.name) ii ORDER BY ii.seqno)) AS "ColumnsCsv",
+               NULL                                         AS "IncludedColumnsCsv",
+               CASE WHEN il.origin = 'pk' THEN 1 ELSE 0 END AS "IsPrimaryKey",
+               CASE WHEN il.origin = 'u'  THEN 1 ELSE 0 END AS "IsUniqueConstraint",
+               NULL                                         AS "IsClustered",
+               (SELECT CASE WHEN EXISTS (
+                    SELECT 1 FROM pragma_foreign_key_list(m.tbl_name) fk
+                    WHERE fk."from" IN (SELECT ii2.name FROM pragma_index_info(m.name) ii2)
+                ) THEN 1 ELSE 0 END)                        AS "BacksForeignKey",
                (SELECT SUM(d.pgsize) FROM dbstat d WHERE d.name = m.name) AS "SizeBytes",
                CAST(substr(s.stat, 1, CASE WHEN instr(s.stat, ' ') = 0 THEN length(s.stat) ELSE instr(s.stat, ' ') - 1 END) AS INTEGER) AS "EstimatedRows",
                NULL                                         AS "Seeks",
@@ -968,12 +978,22 @@ public class SqliteDialect : ISqlDialect
         """;
 
     // Maximum-compat fallback: no dbstat (may not be compiled in) and no sqlite_stat1 (does
-    // not exist before the first ANALYZE) - names and uniqueness are always available.
+    // not exist before the first ANALYZE) - names, columns and origin are always available.
     public string Maintenance_SelectIndexStatsNoSize() =>
         """
-        SELECT m.tbl_name                                   AS "Table",
+        SELECT NULL                                         AS "Schema",
+               m.tbl_name                                   AS "Table",
                m.name                                       AS "Name",
                CASE WHEN il."unique" IS NULL THEN NULL ELSE il."unique" END AS "IsUnique",
+               (SELECT group_concat(name, ',') FROM (SELECT ii.name AS name FROM pragma_index_info(m.name) ii ORDER BY ii.seqno)) AS "ColumnsCsv",
+               NULL                                         AS "IncludedColumnsCsv",
+               CASE WHEN il.origin = 'pk' THEN 1 ELSE 0 END AS "IsPrimaryKey",
+               CASE WHEN il.origin = 'u'  THEN 1 ELSE 0 END AS "IsUniqueConstraint",
+               NULL                                         AS "IsClustered",
+               (SELECT CASE WHEN EXISTS (
+                    SELECT 1 FROM pragma_foreign_key_list(m.tbl_name) fk
+                    WHERE fk."from" IN (SELECT ii2.name FROM pragma_index_info(m.name) ii2)
+                ) THEN 1 ELSE 0 END)                        AS "BacksForeignKey",
                NULL                                         AS "SizeBytes",
                NULL                                         AS "EstimatedRows",
                NULL                                         AS "Seeks",
@@ -984,6 +1004,111 @@ public class SqliteDialect : ISqlDialect
         LEFT JOIN pragma_index_list(m.tbl_name) il ON il.name = m.name
         WHERE m.type = 'index' AND m.tbl_name NOT LIKE 'sqlite_%'
         ORDER BY m.tbl_name, m.name
+        """;
+
+    // SQLite takes a single table too ("ANALYZE tbl"), so the facade needs no excuse here. The
+    // sample bound is set the same way as for the whole database.
+    public string Maintenance_AnalyzeTable(string? schema, string table, int analysisLimit)
+        => analysisLimit > 0
+            ? $"PRAGMA analysis_limit={analysisLimit}; ANALYZE {QuoteIdentifier(table)};"
+            : $"ANALYZE {QuoteIdentifier(table)};";
+
+    public string Maintenance_SelectTableExists() =>
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $1 AND ($2 IS NULL OR $2 = 'main')";
+
+    // Rows come from sqlite_stat1 (the row whose idx IS NULL describes the table itself), sizes
+    // from dbstat when it is compiled in. No dates: SQLite records none, so HasStatistics is all
+    // the truth there is.
+    public string Maintenance_SelectTableStats() =>
+        """
+        SELECT NULL                                         AS "Schema",
+               m.name                                       AS "Table",
+               (SELECT CAST(substr(s.stat, 1, CASE WHEN instr(s.stat, ' ') = 0 THEN length(s.stat) ELSE instr(s.stat, ' ') - 1 END) AS INTEGER)
+                  FROM sqlite_stat1 s WHERE s.tbl = m.name ORDER BY (s.idx IS NULL) DESC LIMIT 1) AS "EstimatedRows",
+               (SELECT SUM(d.pgsize) FROM dbstat d WHERE d.name = m.name) AS "DataSizeBytes",
+               (SELECT SUM(d.pgsize) FROM dbstat d
+                 WHERE d.name IN (SELECT i.name FROM sqlite_master i WHERE i.type = 'index' AND i.tbl_name = m.name)) AS "IndexesSizeBytes",
+               NULL                                         AS "DeadRows",
+               NULL                                         AS "LastAnalyze",
+               NULL                                         AS "LastAutoAnalyze",
+               NULL                                         AS "LastVacuum",
+               (SELECT COUNT(*) FROM sqlite_stat1 s WHERE s.tbl = m.name) > 0 AS "HasStatistics"
+        FROM sqlite_master m
+        WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+        ORDER BY m.name
+        """;
+
+    // Same query without dbstat: sizes are the only thing it cannot answer.
+    private string Maintenance_SelectTableStatsNoSize() =>
+        """
+        SELECT NULL                                         AS "Schema",
+               m.name                                       AS "Table",
+               (SELECT CAST(substr(s.stat, 1, CASE WHEN instr(s.stat, ' ') = 0 THEN length(s.stat) ELSE instr(s.stat, ' ') - 1 END) AS INTEGER)
+                  FROM sqlite_stat1 s WHERE s.tbl = m.name ORDER BY (s.idx IS NULL) DESC LIMIT 1) AS "EstimatedRows",
+               NULL                                         AS "DataSizeBytes",
+               NULL                                         AS "IndexesSizeBytes",
+               NULL                                         AS "DeadRows",
+               NULL                                         AS "LastAnalyze",
+               NULL                                         AS "LastAutoAnalyze",
+               NULL                                         AS "LastVacuum",
+               (SELECT COUNT(*) FROM sqlite_stat1 s WHERE s.tbl = m.name) > 0 AS "HasStatistics"
+        FROM sqlite_master m
+        WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+        ORDER BY m.name
+        """;
+
+    // A database nobody has analysed yet: sqlite_stat1 does not exist, and a statement that names
+    // it fails to prepare - which is why neither form above can serve this case. There is no
+    // estimate and no statistics, and that is the answer, not an error.
+    private string Maintenance_SelectTableStatsNoStatistics() =>
+        """
+        SELECT NULL                                         AS "Schema",
+               m.name                                       AS "Table",
+               NULL                                         AS "EstimatedRows",
+               (SELECT SUM(d.pgsize) FROM dbstat d WHERE d.name = m.name) AS "DataSizeBytes",
+               (SELECT SUM(d.pgsize) FROM dbstat d
+                 WHERE d.name IN (SELECT i.name FROM sqlite_master i WHERE i.type = 'index' AND i.tbl_name = m.name)) AS "IndexesSizeBytes",
+               NULL                                         AS "DeadRows",
+               NULL                                         AS "LastAnalyze",
+               NULL                                         AS "LastAutoAnalyze",
+               NULL                                         AS "LastVacuum",
+               0                                            AS "HasStatistics"
+        FROM sqlite_master m
+        WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+        ORDER BY m.name
+        """;
+
+    // Neither dbstat nor sqlite_stat1: names only, everything else honestly null.
+    private string Maintenance_SelectTableStatsBare() =>
+        """
+        SELECT NULL                                         AS "Schema",
+               m.name                                       AS "Table",
+               NULL                                         AS "EstimatedRows",
+               NULL                                         AS "DataSizeBytes",
+               NULL                                         AS "IndexesSizeBytes",
+               NULL                                         AS "DeadRows",
+               NULL                                         AS "LastAnalyze",
+               NULL                                         AS "LastAutoAnalyze",
+               NULL                                         AS "LastVacuum",
+               0                                            AS "HasStatistics"
+        FROM sqlite_master m
+        WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+        ORDER BY m.name
+        """;
+
+    public System.Collections.Generic.IReadOnlyList<string> Maintenance_SelectTableStatsForms()
+        => new[]
+        {
+            Maintenance_SelectTableStats(),           // dbstat + sqlite_stat1
+            Maintenance_SelectTableStatsNoSize(),     // sqlite_stat1 only
+            Maintenance_SelectTableStatsNoStatistics(), // dbstat only - a database never analysed
+            Maintenance_SelectTableStatsBare()        // neither
+        };
+
+    // No usage counters at all, so no window to report - null, not a fabricated timestamp.
+    public string Maintenance_SelectStatisticsWindow() =>
+        """
+        SELECT NULL AS "CountersSince", NULL AS "IsReplica"
         """;
 
     // ============================================================
