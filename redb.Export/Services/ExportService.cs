@@ -443,7 +443,7 @@ public sealed class ExportService
         var filter = schemeIds?.Length > 0
             ? $"WHERE _id IN ({string.Join(",", schemeIds)})"
             : "";
-        cmd.CommandText = $"SELECT _id, _id_parent, _name, _alias, _name_space, _structure_hash, _type FROM _schemes {filter} ORDER BY _id";
+        cmd.CommandText = $"SELECT _id, _id_parent, _name, _alias, _name_space, _structure_hash, _type, _tags FROM _schemes {filter} ORDER BY _id";
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
@@ -456,7 +456,8 @@ public sealed class ExportService
                 Alias = reader.IsDBNull(3) ? null : reader.GetString(3),
                 NameSpace = reader.IsDBNull(4) ? null : reader.GetString(4),
                 StructureHash = reader.IsDBNull(5) ? null : _provider.GuidFromDb(reader.GetValue(5)),
-                SchemeType = reader.GetInt64(6)
+                SchemeType = reader.GetInt64(6),
+                Tags = reader.IsDBNull(7) ? null : reader.GetString(7)
             };
             await writer.WriteLineAsync(JsonSerializer.Serialize<ExportRecord>(record, JsonOptions));
             _schemesCount++;
@@ -478,7 +479,7 @@ public sealed class ExportService
                    _name, _alias, _order, _readonly, _allow_not_null,
                    _collection_type, _key_type, _is_compress, _store_null,
                    _default_value, _default_editor,
-                   _unique, _unique_version, _lazy
+                   _unique, _unique_version, _lazy, _unique_scope, _tags
             FROM _structures {filter} ORDER BY _id";
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -505,7 +506,9 @@ public sealed class ExportService
                 DefaultEditor = reader.IsDBNull(16) ? null : reader.GetString(16),
                 Unique = reader.IsDBNull(17) ? null : reader.GetBoolean(17),
                 UniqueVersion = reader.IsDBNull(18) ? null : reader.GetInt64(18),
-                Lazy = reader.IsDBNull(19) ? null : reader.GetBoolean(19)
+                Lazy = reader.IsDBNull(19) ? null : reader.GetBoolean(19),
+                UniqueScope = reader.IsDBNull(20) ? null : reader.GetInt64(20),
+                Tags = reader.IsDBNull(21) ? null : reader.GetString(21)
             };
             await writer.WriteLineAsync(JsonSerializer.Serialize<ExportRecord>(record, JsonOptions));
             _structuresCount++;

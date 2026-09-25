@@ -212,6 +212,9 @@ public abstract class RedbServiceBase : IRedbService
         // Create providers using abstract factory methods (passing cacheDomain)
         _schemeSync = CreateSchemeSyncProvider(_context, _configuration, _cacheDomain, _logger);
         _permissionProvider = CreatePermissionProvider(_context, _securityContext, _logger);
+        // Permission cache keys carry the database: ids are per database (review 2026-09-24, C-1).
+        if (_permissionProvider is Providers.Base.PermissionProviderBase permissionBase)
+            permissionBase.CacheDomain = _cacheDomain;
         _userProvider = CreateUserProvider(_context, _securityContext, _logger);
         _roleProvider = CreateRoleProvider(_context, _securityContext, _logger);
         _listProvider = CreateListProvider(_context, _configuration, _schemeSync, _logger);

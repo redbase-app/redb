@@ -21,6 +21,73 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.1] — 2026-09-25
+### Fixed
+- **A window frame on Pro reached SQL as `CURRENT ROW` whatever it said.** The core writes the frame as
+  `{type, start:{kind, offset}, end:{kind, offset}}`; the three Pro providers read another shape
+  (`StartType`, `EndType` at the top level) and found none of it, so `Frame.Rows().Preceding(1)` or a
+  frame over the whole partition became `ROWS BETWEEN CURRENT ROW AND CURRENT ROW`: a running sum
+  returned the current row, with no error. The tests passed, because they compared with `>=`, which a
+  one-row frame also satisfies. One compiler in `redb.Core.Pro` now serves PostgreSQL, SQL Server and
+  SQLite, reads the shape the core writes, and refuses a bound it does not understand instead of
+  replacing it with `CURRENT ROW`. The Free providers were not affected.
+- **The permission cache answered for the wrong database.** It is shared by the process and was keyed
+  by user and object only, while ids are per database: two databases hand out the same ids in the same
+  order, and the system admin is id 1 in every one. In a process that serves several databases (Tsak
+  with named instances), a permission worked out in one was served for another - with the default
+  `DefaultCheckPermissionsOnDelete = true`, that decided whether a delete went through. The key now
+  starts with the service's cache domain, and invalidation touches that database's entries only.
+  Other nodes of a cluster still keep an entry until its five-minute lifetime runs out.
+- **redb.Export: an import is one transaction, checks the file is whole, and restores ids correctly.**
+  - On SQL Server the id sequence came back one step behind: the exporter reads the last id handed out,
+    and `RESTART WITH` names the next one, so the first object saved after an import took an id an
+    imported row already had. It now restarts one past it, as PostgreSQL and SQLite already did.
+  - Rows went into the target tables batch by batch as they were read, the constraints and triggers came
+    back only after a successful run, and nothing rolled back: an import that stopped half-way left a
+    half-filled database with its integrity switched off - and, with cleaning, an emptied one. The whole
+    import, cleaning included, now runs in one transaction that commits at the end or rolls back.
+  - A file cut short imported up to the cut and reported success. The footer the exporter writes lists
+    how many rows of each kind it wrote; the import now requires it and compares every count before the
+    commit, so a short or damaged file changes nothing.
+  - `_schemes._tags`, `_structures._tags` and `_structures._unique_scope` were not exported: after a round
+    trip the markers were gone and every collection key fell back to the default scope. They travel now;
+    files written before this change import as before, with those columns empty.
+  - The cleaning step no longer swallows errors: SQL Server decides between TRUNCATE and DELETE from the
+    catalog instead of trying and ignoring the failure, and SQLite skips a table it does not have by
+    looking, not by catching - a lock or a missing permission used to leave a table full and the import
+    went on mixing old and new rows.
+  - `IDataProvider` gained `BeginImportAsync`, `CommitImportAsync` and `AbortImportAsync`.
+- The documentation of `RedbServiceConfiguration.EnablePvtPrefilter` said the prefilter was PostgreSQL only.
+  It is implemented by all three Pro providers - PostgreSQL, SQL Server and SQLite - and has been for
+  several releases; the sentence was left behind when the prefilter reached the other two.
+- **Tree queries and groupings that answered wrong without an error.**
+  - A window frame on a tree query (Pro) was dropped: the tree read the frame in a shape the core does not
+    write, found nothing, and every frame became `ROWS UNBOUNDED PRECEDING` - a sum over the whole tree came
+    back as a running total. The tree now uses the same frame compiler as the flat query.
+  - `TreeQuery(...).GroupByArray(...).Having(...)` without a `Where` lost the HAVING and returned every group.
+  - A composite grouping key with a member that is not a field (`Initial = e.FirstName.Substring(0, 1)`,
+    `Length = c.Value.Length`) was skipped, or read as a field path it is not, and the grouping ran on other
+    keys. Tree, array and tree-window groupings now refuse such a key with `NotSupportedException` naming the
+    member, as the flat grouping already did.
+  - `Having` on a tree grouping changed the grouping itself, so a second query branched from it inherited the
+    first one's condition. It returns a copy now, as the flat grouping does.
+  - `WithMaxDepth` on a tree query dropped the props depth, lazy references, projection and distinct settings
+    set before it. It keeps every setting now.
+- **SQL Server (Free): `GroupBy(...).Having(...)` ignored the HAVING and returned every group.** The provider
+  passed NULL for it and `dbo.pvt_build_groupby_sql` never emitted one. It compiles HAVING now, aggregates
+  through the same builder as the SELECT list; a HAVING shape it does not know makes the call fail instead of
+  being dropped. Tree groupings on SQL Server Free take the same path and are fixed with it. The HAVING test
+  suite now runs on SQL Server Free too - it ran on the other five hosts only, which is how this went unseen.
+- **SQL Server (Free): an array grouping that aggregated one item field twice failed** (`Min(c => c.Value)` and
+  `Max(c => c.Value)` in one select: "Invalid column name 'Value'"). The second aggregate reuses the joined
+  column now.
+- **SQL Server (Free): HAVING of an array grouping on an item field failed, and an unknown HAVING node was
+  dropped.** `GroupByArray(...).Having(g => Agg.Max(g, c => c.Value) == ...)` compiled the field as `[Value]`, a
+  column the query does not have, so SQL Server refused it. A HAVING node the translator did not know became
+  `1=1` and every group came back. The translator now reads item fields through the joined columns (a field
+  only the HAVING aggregates gets its own join) and refuses any shape it does not know.
+- SQL Server module version 0.2.21: the functions are reinstalled on the first start.
+
 ## [4.1.0] — 2026-09-21
 ### Added
 - **Storage maintenance reports what a DBA needs, and marks what must never be dropped.** The

@@ -186,6 +186,9 @@ public sealed class SchemeRecord : ExportRecord
 
     /// <summary>Scheme type discriminator (0 = normal, 1 = primitive, etc.).</summary>
     public long SchemeType { get; init; }
+
+    /// <summary>Free-form marker of the scheme ([RedbTags] or written by an extension); null when unset.</summary>
+    public string? Tags { get; init; }
 }
 
 /// <summary>
@@ -246,6 +249,12 @@ public sealed class StructureRecord : ExportRecord
 
     /// <summary>Whether the reference is lazy (`virtual` in the CLR model, V4).</summary>
     public bool? Lazy { get; init; }
+
+    /// <summary>Element-key scope of a collection key (null = default, 1 = scheme elements, 2 = collection elements).</summary>
+    public long? UniqueScope { get; init; }
+
+    /// <summary>Free-form marker of the field ([RedbTags] or written by an extension); null when unset.</summary>
+    public string? Tags { get; init; }
 
     /// <summary>Serialized default value.</summary>
     public byte[]? DefaultValue { get; init; }

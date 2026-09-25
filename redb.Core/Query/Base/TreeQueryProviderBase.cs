@@ -189,7 +189,9 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var baseProvider = CreateQueryProvider();
-        return await baseProvider.ExecuteArrayGroupedAggregateAsync(schemeId, arrayPath, groupFields, aggregations, filterJson);
+        // TQP-1: the HAVING goes along - this overload used to drop it, so a tree array grouping without a Where
+        // returned every group (with a Where the other overload passed it on).
+        return await baseProvider.ExecuteArrayGroupedAggregateAsync(schemeId, arrayPath, groupFields, aggregations, filterJson, havingJson, cancellationToken);
     }
 
     /// <summary>
@@ -1776,10 +1778,16 @@ public class TreeQueryContext<TProps> : QueryContext<TProps> where TProps : clas
     /// <summary>
     /// Create a copy of tree context
     /// </summary>
-    public new TreeQueryContext<TProps> Clone()
+    public new TreeQueryContext<TProps> Clone() => CloneWithMaxDepth(MaxDepth);
+
+    /// <summary>
+    /// A copy with another depth limit. MaxDepth is init-only, so this is the one place that copies every setting
+    /// (TQB-10: WithMaxDepth used to copy by hand and dropped the props depth, lazy references, projection, distinct).
+    /// </summary>
+    internal TreeQueryContext<TProps> CloneWithMaxDepth(int? maxDepth)
     {
         // FIX: MaxDepth now passed via base constructor
-        var clone = new TreeQueryContext<TProps>(SchemeId, UserId, CheckPermissions, RootObjectId, MaxDepth)
+        var clone = new TreeQueryContext<TProps>(SchemeId, UserId, CheckPermissions, RootObjectId, maxDepth)
         {
             ParentIds = ParentIds,      // SYNC: copy batch array
             Filter = Filter,

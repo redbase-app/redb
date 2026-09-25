@@ -132,22 +132,25 @@ public partial class MssqlQueryProvider
             ? DBNull.Value
             : (object)filterJson!;
         object aggParam = aggregationsJson is null ? DBNull.Value : (object)aggregationsJson;
+        // The HAVING used to be dropped here (NULL was passed), and GroupBy(...).Having(...) returned every group.
+        object havingParam = string.IsNullOrEmpty(havingJson) ? DBNull.Value : (object)havingJson;
 
         // pvt_build_groupby_sql(@scheme_id, @filter, @group_by, @aggs, @having, @order, @limit, @offset, @source_mode)
-        // $1 = filter, $2 = group_by, $3 = aggregations
+        // $1 = filter, $2 = group_by, $3 = aggregations, $4 = having
         var invocation =
             "SELECT dbo.pvt_build_groupby_sql("
             + schemeId.ToString(CultureInfo.InvariantCulture)
-            + ", $1, $2, $3, NULL, NULL, NULL, 0, N'flat')";
+            + ", $1, $2, $3, $4, NULL, NULL, 0, N'flat')";
 
         _logger?.LogDebug(
-            "PVT GroupBy Build (MSSql): SchemeId={SchemeId}, GroupBy={GroupBy}, Aggs={Aggs}, Filter={Filter}",
-            schemeId, groupByJson, aggregationsJson ?? "null", filterJson ?? "null");
+            "PVT GroupBy Build (MSSql): SchemeId={SchemeId}, GroupBy={GroupBy}, Aggs={Aggs}, Filter={Filter}, Having={Having}",
+            schemeId, groupByJson, aggregationsJson ?? "null", filterJson ?? "null", havingJson ?? "null");
 
-        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, groupByJson, aggParam }, cancellationToken);
+        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, groupByJson, aggParam, havingParam }, cancellationToken);
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
-                "dbo.pvt_build_groupby_sql returned an empty SQL string for scheme " + schemeId + ".");
+                "dbo.pvt_build_groupby_sql could not compile this grouping for scheme " + schemeId
+                + (havingJson is null ? "." : " - the HAVING " + havingJson + " has a shape it does not support."));
         return innerSql!;
     }
 

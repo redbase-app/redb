@@ -30,11 +30,26 @@ public abstract class PermissionProviderBase : IPermissionProvider
     protected readonly ISqlDialect Sql;
     protected readonly ILogger? Logger;
 
-    // Permission cache for SQL results
+    // Permission cache for SQL results. Shared by the process, keyed by database first: ids are per database, and two
+    // databases hand out the same user and object ids (the system admin is id 1 in every one), so a key of user and
+    // object alone served one database's permission for another (review 2026-09-24, C-1).
     private static readonly ConcurrentDictionary<string, (UserPermissionResult result, DateTimeOffset cachedAt)> PermissionCache = new();
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(5);
     private static long _cacheRequests;
     private static long _cacheHits;
+
+    // A provider built outside a service has no database name; its entries stay its own rather than guess one.
+    private readonly string _instanceDomain = "instance:" + Guid.NewGuid().ToString("N");
+
+    /// <summary>
+    /// The database this provider reads (the service's cache domain), set by the service that owns it. Part of every
+    /// permission cache key.
+    /// </summary>
+    internal string? CacheDomain { get; set; }
+
+    private string KeyPrefix => (CacheDomain ?? _instanceDomain) + "|";
+
+    private string CacheKey(long userId, long objectId) => $"{KeyPrefix}{userId}_{objectId}";
 
     protected PermissionProviderBase(
         IRedbContext context,
@@ -58,7 +73,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// </summary>
     protected virtual async Task<UserPermissionResult?> GetEffectivePermissionViaSqlAsync(long objectId, long userId, CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"{userId}_{objectId}";
+        var cacheKey = CacheKey(userId, objectId);
         Interlocked.Increment(ref _cacheRequests);
 
         if (PermissionCache.TryGetValue(cacheKey, out var cached))
@@ -88,7 +103,7 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// </summary>
     protected virtual UserPermissionResult? GetEffectivePermissionViaSql(long objectId, long userId)
     {
-        var cacheKey = $"{userId}_{objectId}";
+        var cacheKey = CacheKey(userId, objectId);
         Interlocked.Increment(ref _cacheRequests);
 
         if (PermissionCache.TryGetValue(cacheKey, out var cached))
@@ -126,32 +141,27 @@ public abstract class PermissionProviderBase : IPermissionProvider
     /// <summary>
     /// Invalidate permission cache. Called after permission changes.
     /// </summary>
-    protected static void InvalidatePermissionCache(long? userId = null, long? objectId = null)
+    /// <remarks>
+    /// Only this database's entries: a permission change in one database says nothing about another. Other
+    /// processes (nodes of a cluster) are not reached and keep their entries until <c>CacheLifetime</c> runs out.
+    /// </remarks>
+    protected void InvalidatePermissionCache(long? userId = null, long? objectId = null)
     {
+        var prefix = KeyPrefix;
         if (userId.HasValue && objectId.HasValue)
         {
-            PermissionCache.TryRemove($"{userId}_{objectId}", out _);
+            PermissionCache.TryRemove(CacheKey(userId.Value, objectId.Value), out _);
+            return;
         }
-        else if (userId.HasValue)
-        {
-            var keysToRemove = PermissionCache.Keys
-                .Where(k => k.StartsWith($"{userId}_"))
-                .ToList();
-            foreach (var key in keysToRemove)
-                PermissionCache.TryRemove(key, out _);
-        }
-        else if (objectId.HasValue)
-        {
-            var keysToRemove = PermissionCache.Keys
-                .Where(k => k.EndsWith($"_{objectId}"))
-                .ToList();
-            foreach (var key in keysToRemove)
-                PermissionCache.TryRemove(key, out _);
-        }
-        else
-        {
-            PermissionCache.Clear();
-        }
+
+        var userPrefix = userId.HasValue ? $"{prefix}{userId}_" : prefix;
+        var objectSuffix = objectId.HasValue ? $"_{objectId}" : null;
+        var keysToRemove = PermissionCache.Keys
+            .Where(k => k.StartsWith(userPrefix, StringComparison.Ordinal)
+                        && (objectSuffix == null || k.EndsWith(objectSuffix, StringComparison.Ordinal)))
+            .ToList();
+        foreach (var key in keysToRemove)
+            PermissionCache.TryRemove(key, out _);
     }
 
     /// <summary>

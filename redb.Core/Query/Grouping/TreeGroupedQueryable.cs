@@ -88,9 +88,13 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
         Expression<Func<IRedbGrouping<TKey, TProps>, bool>> predicate)
     {
         if (predicate is null) throw new ArgumentNullException(nameof(predicate));
-        _havingPredicates.Add(predicate);
-        _havingJson = null;
-        return this;
+        // TGR-1 (review 2026-09-24): a copy, as the flat grouping does since G-4. Changing this builder let a
+        // second query branched from the same grouping inherit the first one's condition.
+        var copy = new TreeGroupedQueryable<TKey, TProps>(
+            _treeProvider, _treeContext, _keySelector, _baseFilterJson, _isBaseFieldGrouping);
+        copy._havingPredicates.AddRange(_havingPredicates);
+        copy._havingPredicates.Add(predicate);
+        return copy;
     }
 
     private string? BuildHavingJson()
@@ -148,42 +152,50 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
 
     private void ParseGroupFieldsFromBody(Expression body, List<GroupFieldRequest> result)
     {
+        body = GroupSelectorMembers.StripConvert(body);
         switch (body)
         {
+            // GRP-9 (review 2026-09-24): a key member this parser does not understand is refused, like the flat
+            // grouping does (G-3). It used to be skipped without a word, and the grouping ran on fewer fields.
             case MemberExpression member:
                 var path = ExtractFieldPath(member);
-                if (!string.IsNullOrEmpty(path))
+                if (string.IsNullOrEmpty(path))
+                    throw new NotSupportedException(
+                        $"GroupBy on a tree: the key '{member}' is not a field. Group by a field or an anonymous type of fields.");
+                result.Add(new GroupFieldRequest
                 {
-                    result.Add(new GroupFieldRequest
-                    {
-                        FieldPath = path,
-                        Alias = member.Member.Name,
-                        IsBaseField = _isBaseFieldGrouping
-                    });
-                }
+                    FieldPath = path,
+                    Alias = member.Member.Name,
+                    IsBaseField = _isBaseFieldGrouping
+                });
                 break;
 
             case NewExpression newExpr:
                 for (int i = 0; i < newExpr.Arguments.Count; i++)
                 {
-                    var arg = newExpr.Arguments[i];
+                    var arg = GroupSelectorMembers.StripConvert(newExpr.Arguments[i]);
                     var alias = newExpr.Members?[i].Name ?? $"Key{i}";
 
-                    if (arg is MemberExpression memberArg)
+                    if (arg is not MemberExpression memberArg)
+                        throw new NotSupportedException(
+                            $"GroupBy on a tree: key member '{alias}' is not a field ('{arg}'). Computed keys are not supported.");
+                    var fieldPath = ExtractFieldPath(memberArg);
+                    if (string.IsNullOrEmpty(fieldPath))
+                        throw new NotSupportedException(
+                            $"GroupBy on a tree: key member '{alias}' is not a Props or base field ('{arg}').");
+                    result.Add(new GroupFieldRequest
                     {
-                        var fieldPath = ExtractFieldPath(memberArg);
-                        if (!string.IsNullOrEmpty(fieldPath))
-                        {
-                            result.Add(new GroupFieldRequest
-                            {
-                                FieldPath = fieldPath,
-                                Alias = alias,
-                                IsBaseField = _isBaseFieldGrouping
-                            });
-                        }
-                    }
+                        FieldPath = fieldPath,
+                        Alias = alias,
+                        IsBaseField = _isBaseFieldGrouping
+                    });
                 }
                 break;
+
+            default:
+                throw new NotSupportedException(
+                    "GroupBy on a tree supports a field (x => x.Category) or an anonymous type of fields " +
+                    $"(x => new {{ x.A, x.B }}). A computed key is not supported: '{body}'.");
         }
     }
 

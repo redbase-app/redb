@@ -225,4 +225,68 @@ public abstract class WindowTestsBase
             r.LowestSalary.Should().BeLessThanOrEqualTo(r.Salary);
         });
     }
+
+    // An explicit frame must reach SQL as written. The checks above compare with >= and <=, which a
+    // one-row frame also satisfies, so a frame silently turned into CURRENT ROW passed them (review
+    // 2026-09-24, FRM-1: the Pro providers read another JSON shape than the core writes). The two facts
+    // below compare exact sums, computed from the very rows the query returned.
+
+    [Fact]
+    public async Task Window_FullPartitionFrame_SumsTheWholeDepartment()
+    {
+        await SeedAsync();
+
+        var results = await Redb.Query<EmployeeProps>()
+            .WithWindow(w => w
+                .PartitionBy(e => e.Department)
+                .OrderByDesc(e => e.Salary)
+                .Frame(Frame.Rows().UnboundedPreceding().AndUnboundedFollowing()))
+            .SelectAsync(e => new
+            {
+                e.Props.Department,
+                e.Props.Salary,
+                DeptSum = Win.Sum(e.Props.Salary)
+            });
+
+        results.Should().NotBeEmpty();
+        var totals = results.GroupBy(r => r.Department).ToDictionary(g => g.Key, g => g.Sum(r => r.Salary));
+        results.Should().AllSatisfy(r =>
+            r.DeptSum.Should().BeApproximately(totals[r.Department], 0.01m,
+                "a frame over the whole partition sums every salary of the department, not the current row alone"));
+        totals.Should().Contain(t => results.Count(r => r.Department == t.Key) > 1,
+            "precondition: some department has more than one employee, or a one-row frame could not be told apart");
+    }
+
+    [Fact]
+    public async Task Window_SlidingFrame_SumsThePreviousRowAndThisOne()
+    {
+        await SeedAsync();
+
+        var results = await Redb.Query<EmployeeProps>()
+            .WithWindow(w => w
+                .PartitionBy(e => e.Department)
+                .OrderByDesc(e => e.Salary)
+                .Frame(Frame.Rows().Preceding(1).AndCurrentRow()))
+            .SelectAsync(e => new
+            {
+                e.Props.Department,
+                e.Props.Salary,
+                PairSum = Win.Sum(e.Props.Salary)
+            });
+
+        results.Should().NotBeEmpty();
+        foreach (var department in results.GroupBy(r => r.Department))
+        {
+            // Ties in salary may swap which employee stands where, but not the sequence of salaries, so the
+            // multiset of "this salary plus the one before it" is fixed.
+            var ordered = department.Select(r => r.Salary).OrderByDescending(s => s).ToList();
+            var expected = ordered.Select((s, i) => i == 0 ? s : s + ordered[i - 1]).OrderBy(s => s).ToList();
+            var actual = department.Select(r => r.PairSum).OrderBy(s => s).ToList();
+
+            actual.Should().HaveCount(expected.Count);
+            for (var i = 0; i < expected.Count; i++)
+                actual[i].Should().BeApproximately(expected[i], 0.01m,
+                    $"ROWS BETWEEN 1 PRECEDING AND CURRENT ROW in department '{department.Key}'");
+        }
+    }
 }

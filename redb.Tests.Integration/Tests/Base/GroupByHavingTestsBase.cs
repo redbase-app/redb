@@ -8,13 +8,9 @@ namespace redb.Tests.Integration.Tests.Base;
 /// <summary>
 /// HAVING-clause regression suite for GroupBy and GroupByArray queries.
 ///
-/// Only used by providers that actually support HAVING:
-///   - Free PostgreSQL (PVT v2 module)
-///   - Pro PostgreSQL (inherits PVT)
-///   - Pro MSSql (HavingSqlTranslator over PVT subquery / array LEFT JOINs)
-///
-/// Free MSSql intentionally has no HAVING wiring and throws
-/// NotSupportedException, so it does not derive from this base.
+/// Runs on all six hosts (PostgreSQL, SQL Server, SQLite; Free and Pro). SQL Server Free joined on
+/// 2026-09-24: until then it had no HAVING at all - the provider passed NULL and every group came back -
+/// and the missing wrapper is why nobody saw it.
 ///
 /// The seeded fixture is shared across tests; cleanup is performed once at
 /// fixture init. To stay stable against accumulated rows the assertions use
@@ -218,6 +214,36 @@ public abstract class GroupByHavingTestsBase
             });
 
         results.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GroupByArray_Having_OnAnItemField_FiltersTheGroups()
+    {
+        // The HAVING aggregates an item field the select does not read. SQL Server Free wrote it as
+        // MAX([Value]) - a column the query does not have - and failed.
+        await SeedAsync();
+
+        var results = await Redb.Query<EmployeeProps>()
+            .GroupByArray(e => e.Contacts!, c => c.Type)
+            .Having(g => Agg.Max(g, c => c.Value) == "no-such-contact-value")
+            .SelectAsync(g => new { Type = g.Key, Count = Agg.Count(g) });
+
+        results.Should().BeEmpty("no contact has that value, so no group's maximum equals it");
+    }
+
+    [Fact]
+    public async Task GroupByArray_Having_OnAnItemField_KeepsTheMatchingGroups()
+    {
+        // The same field in the select and in the HAVING: both read one joined column.
+        await SeedAsync();
+
+        var results = await Redb.Query<EmployeeProps>()
+            .GroupByArray(e => e.Contacts!, c => c.Type)
+            .Having(g => Agg.Max(g, c => c.Value) != "no-such-contact-value")
+            .SelectAsync(g => new { Type = g.Key, MaxValue = Agg.Max(g, c => c.Value) });
+
+        results.Select(r => r.Type).Should().Contain(new[] { "email", "phone" });
+        results.Should().AllSatisfy(r => r.MaxValue.Should().NotBeNullOrEmpty());
     }
 
     [Fact]

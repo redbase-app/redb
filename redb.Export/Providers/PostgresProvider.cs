@@ -14,6 +14,35 @@ namespace redb.Export.Providers;
 public sealed class PostgresProvider : IDataProvider
 {
     private NpgsqlConnection? _connection;
+    private NpgsqlTransaction? _transaction;
+
+    /// <inheritdoc />
+    public async Task BeginImportAsync(CancellationToken ct = default)
+    {
+        if (_connection is null) throw new InvalidOperationException("Connection not opened. Call OpenAsync first.");
+        if (_transaction is not null) throw new InvalidOperationException("An import transaction is already open.");
+        // DDL, TRUNCATE and COPY are all transactional on PostgreSQL, and the constraint mode is SET LOCAL:
+        // a rollback leaves nothing behind, not even the relaxed constraints.
+        _transaction = await _connection.BeginTransactionAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task CommitImportAsync(CancellationToken ct = default)
+    {
+        if (_transaction is null) throw new InvalidOperationException("No import transaction is open.");
+        await _transaction.CommitAsync(ct);
+        await _transaction.DisposeAsync();
+        _transaction = null;
+    }
+
+    /// <inheritdoc />
+    public async Task AbortImportAsync()
+    {
+        if (_transaction is null) return;
+        await _transaction.RollbackAsync();
+        await _transaction.DisposeAsync();
+        _transaction = null;
+    }
 
     /// <inheritdoc />
     public string Name => "postgres";
@@ -55,7 +84,7 @@ public sealed class PostgresProvider : IDataProvider
 
         foreach (var table in tables)
         {
-            await using var cmd = new NpgsqlCommand($"TRUNCATE TABLE {table} CASCADE", _connection);
+            await using var cmd = new NpgsqlCommand($"TRUNCATE TABLE {table} CASCADE", _connection, _transaction);
             await cmd.ExecuteNonQueryAsync(ct);
         }
     }
@@ -65,7 +94,7 @@ public sealed class PostgresProvider : IDataProvider
     {
         if (_connection is null) return 0;
 
-        await using var cmd = new NpgsqlCommand("SELECT last_value FROM global_identity", _connection);
+        await using var cmd = new NpgsqlCommand("SELECT last_value FROM global_identity", _connection, _transaction);
         var result = await cmd.ExecuteScalarAsync(ct);
         return Convert.ToInt64(result);
     }
@@ -75,7 +104,7 @@ public sealed class PostgresProvider : IDataProvider
     {
         if (_connection is null) return;
 
-        await using var cmd = new NpgsqlCommand($"SELECT setval('global_identity', {value})", _connection);
+        await using var cmd = new NpgsqlCommand($"SELECT setval('global_identity', {value})", _connection, _transaction);
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
@@ -85,7 +114,7 @@ public sealed class PostgresProvider : IDataProvider
         if (_connection is null) return;
 
         await using var cmd = new NpgsqlCommand(
-            "SET session_replication_role = 'replica'", _connection);
+            "SET LOCAL session_replication_role = 'replica'", _connection, _transaction);
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
@@ -95,7 +124,7 @@ public sealed class PostgresProvider : IDataProvider
         if (_connection is null) return;
 
         await using var cmd = new NpgsqlCommand(
-            "SET session_replication_role = 'origin'", _connection);
+            "SET LOCAL session_replication_role = 'origin'", _connection, _transaction);
         await cmd.ExecuteNonQueryAsync(ct);
     }
 

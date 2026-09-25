@@ -68,14 +68,19 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
     {
         var result = new List<GroupFieldRequest>();
         
-        var body = _keySelector is LambdaExpression lambda ? lambda.Body : _keySelector;
-        
+        var body = GroupSelectorMembers.StripConvert(_keySelector is LambdaExpression lambda ? lambda.Body : _keySelector);
+
+        // GRP-9 (review 2026-09-24): a key member that is not a field is refused. It used to reach SQL as the text
+        // of the expression, as if it were a field path.
         if (body is NewExpression newExpr && newExpr.Members != null)
         {
             for (int i = 0; i < newExpr.Members.Count; i++)
             {
                 var member = newExpr.Members[i];
-                var arg = newExpr.Arguments[i];
+                var arg = GroupSelectorMembers.StripConvert(newExpr.Arguments[i]);
+                if (arg is not MemberExpression)
+                    throw new NotSupportedException(
+                        $"GroupBy on a tree: key member '{member.Name}' is not a field ('{arg}'). Computed keys are not supported.");
                 var fieldPath = ExtractFieldPath(arg);
                 result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = member.Name });
             }
@@ -85,7 +90,13 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
             var fieldPath = ExtractFieldPath(memberExpr);
             result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = memberExpr.Member.Name });
         }
-        
+        else
+        {
+            throw new NotSupportedException(
+                "GroupBy on a tree supports a field (x => x.Category) or an anonymous type of fields " +
+                $"(x => new {{ x.A, x.B }}). A computed key is not supported: '{body}'.");
+        }
+
         return result;
     }
 

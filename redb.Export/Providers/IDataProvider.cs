@@ -48,6 +48,27 @@ public interface IDataProvider : IAsyncDisposable
     /// <param name="value">New sequence value.</param>
     /// <param name="ct">Cancellation token.</param>
     Task SetSequenceValueAsync(long value, CancellationToken ct = default);
+    // Contract of the pair: GetSequenceValueAsync returns the LAST id handed out, and SetSequenceValueAsync(v) makes
+    // the NEXT id handed out v + 1. SQL Server's RESTART WITH names the next value itself, so it restarts at v + 1
+    // (review 2026-09-24: it restarted at v, and the first object saved after an import took an id already in use).
+
+    /// <summary>
+    /// Starts the import transaction. Everything the import writes from here on - cleaning, rows, the
+    /// sequence, the constraint mode - commits or rolls back as one: an import that fails half-way (a broken
+    /// file, a cancelled run, a server error) leaves the database as it was, cleaning included.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    Task BeginImportAsync(CancellationToken ct = default);
+
+    /// <summary>Commits the import transaction and restores the session state the import changed.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    Task CommitImportAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Rolls back whatever the import wrote and restores the session state it changed. Called on every path
+    /// that did not commit; does nothing after a commit.
+    /// </summary>
+    Task AbortImportAsync();
 
     /// <summary>
     /// Disables foreign-key constraints and triggers so that rows can be

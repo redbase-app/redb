@@ -13,6 +13,37 @@ namespace redb.Export.Providers;
 public sealed class MssqlProvider : IDataProvider
 {
     private SqlConnection? _connection;
+    private SqlTransaction? _transaction;
+
+    /// <inheritdoc />
+    public async Task BeginImportAsync(CancellationToken ct = default)
+    {
+        if (_connection is null) throw new InvalidOperationException("Connection not opened. Call OpenAsync first.");
+        if (_transaction is not null) throw new InvalidOperationException("An import transaction is already open.");
+        // NOCHECK / DISABLE TRIGGER, TRUNCATE, SqlBulkCopy and ALTER SEQUENCE all take part in a SQL Server
+        // transaction: a rollback also re-enables what the import disabled.
+        _transaction = (SqlTransaction)await _connection.BeginTransactionAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task CommitImportAsync(CancellationToken ct = default)
+    {
+        if (_transaction is null) throw new InvalidOperationException("No import transaction is open.");
+        await _transaction.CommitAsync(ct);
+        await _transaction.DisposeAsync();
+        _transaction = null;
+    }
+
+    /// <inheritdoc />
+    public async Task AbortImportAsync()
+    {
+        if (_transaction is null) return;
+        // A severe server error may already have rolled the transaction back; its connection then reports none.
+        if (_transaction.Connection is not null)
+            await _transaction.RollbackAsync();
+        await _transaction.DisposeAsync();
+        _transaction = null;
+    }
 
     /// <inheritdoc />
     public string Name => "mssql";
@@ -53,47 +84,44 @@ public sealed class MssqlProvider : IDataProvider
 
         // Disable triggers and FK checks before truncation.
         await using (var cmd = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL'", _connection))
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL'", _connection, _transaction))
         {
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
         await using (var cmd = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? DISABLE TRIGGER ALL'", _connection))
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? DISABLE TRIGGER ALL'", _connection, _transaction))
         {
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
         foreach (var table in tables)
         {
-            try
-            {
-                await using var cmd = new SqlCommand($"TRUNCATE TABLE {table}", _connection);
-                await cmd.ExecuteNonQueryAsync(ct);
-            }
-            catch
-            {
-                try
-                {
-                    await using var cmd = new SqlCommand($"DELETE FROM {table}", _connection);
-                    await cmd.ExecuteNonQueryAsync(ct);
-                }
-                catch
-                {
-                    // Table might not exist; skip.
-                }
-            }
+            // TRUNCATE is refused for a table any foreign key points at, disabled or not, so those are emptied
+            // with DELETE - decided from the catalog, not by trying and swallowing the error: the old empty
+            // catch also swallowed a lock timeout or a missing permission, the table stayed full, and the import
+            // went on to mix old and new rows (review 2026-09-24). Any failure now fails the import, and the
+            // import transaction undoes the cleaning.
+            await using var referenced = new SqlCommand(
+                "SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.foreign_keys WHERE referenced_object_id = OBJECT_ID(@table)) THEN 1 ELSE 0 END",
+                _connection, _transaction);
+            referenced.Parameters.AddWithValue("@table", "dbo." + table);
+            var isReferenced = Convert.ToInt32(await referenced.ExecuteScalarAsync(ct)) == 1;
+
+            await using var cmd = new SqlCommand(
+                isReferenced ? $"DELETE FROM {table}" : $"TRUNCATE TABLE {table}", _connection, _transaction);
+            await cmd.ExecuteNonQueryAsync(ct);
         }
 
         // Re-enable triggers and FK checks.
         await using (var cmd = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? ENABLE TRIGGER ALL'", _connection))
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? ENABLE TRIGGER ALL'", _connection, _transaction))
         {
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
         await using (var cmd = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? CHECK CONSTRAINT ALL'", _connection))
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? CHECK CONSTRAINT ALL'", _connection, _transaction))
         {
             await cmd.ExecuteNonQueryAsync(ct);
         }
@@ -105,7 +133,7 @@ public sealed class MssqlProvider : IDataProvider
         if (_connection is null) return 0;
 
         const string sql = "SELECT CAST(current_value AS BIGINT) FROM sys.sequences WHERE name = 'global_identity'";
-        await using var cmd = new SqlCommand(sql, _connection);
+        await using var cmd = new SqlCommand(sql, _connection, _transaction);
         var result = await cmd.ExecuteScalarAsync(ct);
         return result is null ? 0 : Convert.ToInt64(result);
     }
@@ -115,7 +143,7 @@ public sealed class MssqlProvider : IDataProvider
     {
         if (_connection is null) return;
 
-        await using var cmd = new SqlCommand($"ALTER SEQUENCE global_identity RESTART WITH {value}", _connection);
+        await using var cmd = new SqlCommand($"ALTER SEQUENCE global_identity RESTART WITH {value + 1}", _connection, _transaction);
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
@@ -125,11 +153,11 @@ public sealed class MssqlProvider : IDataProvider
         if (_connection is null) return;
 
         await using var cmd1 = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL'", _connection);
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL'", _connection, _transaction);
         await cmd1.ExecuteNonQueryAsync(ct);
 
         await using var cmd2 = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? DISABLE TRIGGER ALL'", _connection);
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? DISABLE TRIGGER ALL'", _connection, _transaction);
         await cmd2.ExecuteNonQueryAsync(ct);
     }
 
@@ -139,11 +167,11 @@ public sealed class MssqlProvider : IDataProvider
         if (_connection is null) return;
 
         await using var cmd1 = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? ENABLE TRIGGER ALL'", _connection);
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? ENABLE TRIGGER ALL'", _connection, _transaction);
         await cmd1.ExecuteNonQueryAsync(ct);
 
         await using var cmd2 = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL'", _connection);
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL'", _connection, _transaction);
         await cmd2.ExecuteNonQueryAsync(ct);
     }
 
@@ -152,7 +180,7 @@ public sealed class MssqlProvider : IDataProvider
     {
         if (_connection is null || data.Rows.Count == 0) return;
 
-        using var bulkCopy = new SqlBulkCopy(_connection)
+        using var bulkCopy = new SqlBulkCopy(_connection, SqlBulkCopyOptions.Default, _transaction)
         {
             DestinationTableName = tableName,
             BatchSize = 5000,

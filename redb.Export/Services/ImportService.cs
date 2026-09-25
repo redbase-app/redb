@@ -111,156 +111,179 @@ public sealed class ImportService
                 return;
             }
 
-            if (clean)
+            // One transaction for the whole import, cleaning included: a run that stops half-way - a broken or
+            // truncated file, a cancellation, a server error - leaves the database exactly as it found it, with
+            // its constraints on. Before, rows went in batch by batch as read, the constraints came back only on
+            // success, and an import with cleaning that failed left an emptied, half-filled database with its
+            // integrity switched off (review 2026-09-24).
+            await _provider.BeginImportAsync(ct);
+            var committed = false;
+            try
             {
-                Log("Cleaning database...");
-                await _provider.CleanDatabaseAsync(ct);
-                Log("Database cleaned.");
-            }
-
-            await _provider.DisableConstraintsAsync(ct);
-
-            var tables = CreateDataTables();
-            long sequenceValue = 0;
-
-            Log("Importing data (streaming)...");
-
-            string? line;
-            while ((line = await reader.ReadLineAsync(ct)) != null)
-            {
-                var doc = JsonDocument.Parse(line);
-
-                if (!doc.RootElement.TryGetProperty("type", out var typeProp))
+                if (clean)
                 {
-                    if (doc.RootElement.TryGetProperty("sequence_value", out var seqProp))
+                    Log("Cleaning database...");
+                    await _provider.CleanDatabaseAsync(ct);
+                    Log("Database cleaned.");
+                }
+
+                await _provider.DisableConstraintsAsync(ct);
+
+                var tables = CreateDataTables();
+                long sequenceValue = 0;
+                ExportFooter? footer = null;
+
+                Log("Importing data (streaming)...");
+
+                string? line;
+                while ((line = await reader.ReadLineAsync(ct)) != null)
+                {
+                    var doc = JsonDocument.Parse(line);
+
+                    if (!doc.RootElement.TryGetProperty("type", out var typeProp))
                     {
-                        sequenceValue = seqProp.GetInt64();
-                    }
-                    continue;
-                }
-
-                var type = typeProp.GetString();
-
-                if (_currentRecordType != null && _currentRecordType != type)
-                {
-                    await FlushCurrentTableAsync(tables, ct);
-                }
-                _currentRecordType = type;
-
-                switch (type)
-                {
-                    case "type":
-                        AddTypeRow(tables.Types, JsonSerializer.Deserialize<TypeRecord>(line, JsonOptions)!);
-                        tables.TypesTotal++;
-                        if (tables.Types.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_types", tables.Types, ct);
-                        break;
-
-                    case "list":
-                        AddListRow(tables.Lists, JsonSerializer.Deserialize<ListRecord>(line, JsonOptions)!);
-                        tables.ListsTotal++;
-                        if (tables.Lists.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_lists", tables.Lists, ct);
-                        break;
-
-                    case "scheme":
-                        AddSchemeRow(tables.Schemes, JsonSerializer.Deserialize<SchemeRecord>(line, JsonOptions)!);
-                        tables.SchemesTotal++;
-                        if (tables.Schemes.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_schemes", tables.Schemes, ct);
-                        break;
-
-                    case "structure":
-                        AddStructureRow(tables.Structures, JsonSerializer.Deserialize<StructureRecord>(line, JsonOptions)!);
-                        tables.StructuresTotal++;
-                        if (tables.Structures.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_structures", tables.Structures, ct);
-                        break;
-
-                    case "role":
-                        AddRoleRow(tables.Roles, JsonSerializer.Deserialize<RoleRecord>(line, JsonOptions)!);
-                        tables.RolesTotal++;
-                        if (tables.Roles.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_roles", tables.Roles, ct);
-                        break;
-
-                    case "user":
-                        AddUserRow(tables.Users, JsonSerializer.Deserialize<UserRecord>(line, JsonOptions)!);
-                        tables.UsersTotal++;
-                        if (tables.Users.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_users", tables.Users, ct);
-                        break;
-
-                    case "user_role":
-                        AddUserRoleRow(tables.UserRoles, JsonSerializer.Deserialize<UserRoleRecord>(line, JsonOptions)!);
-                        tables.UserRolesTotal++;
-                        if (tables.UserRoles.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_users_roles", tables.UserRoles, ct);
-                        break;
-
-                    case "object":
-                        AddObjectRow(tables.Objects, JsonSerializer.Deserialize<ObjectRecord>(line, JsonOptions)!);
-                        _objectsCount++;
-                        if (tables.Objects.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_objects", tables.Objects, ct);
-                        break;
-
-                    case "list_item":
-                        AddListItemRow(tables.ListItems, JsonSerializer.Deserialize<ListItemRecord>(line, JsonOptions)!);
-                        tables.ListItemsTotal++;
-                        if (tables.ListItems.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_list_items", tables.ListItems, ct);
-                        break;
-
-                    case "permission":
-                        AddPermissionRow(tables.Permissions, JsonSerializer.Deserialize<PermissionRecord>(line, JsonOptions)!);
-                        tables.PermissionsTotal++;
-                        if (tables.Permissions.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_permissions", tables.Permissions, ct);
-                        break;
-
-                    case "value":
-                        AddValueRow(tables.Values, JsonSerializer.Deserialize<ValueRecord>(line, JsonOptions)!);
-                        _valuesCount++;
-                        if (tables.Values.Rows.Count >= _batchSize)
-                            await FlushTableAsync("_values", tables.Values, ct);
-                        break;
-
-                    case "footer":
-                        var footer = JsonSerializer.Deserialize<ExportFooter>(line, JsonOptions);
-                        if (footer?.SequenceValue > 0)
+                        if (doc.RootElement.TryGetProperty("sequence_value", out var seqProp))
                         {
-                            sequenceValue = footer.SequenceValue;
+                            sequenceValue = seqProp.GetInt64();
                         }
-                        break;
+                        continue;
+                    }
+
+                    var type = typeProp.GetString();
+
+                    if (_currentRecordType != null && _currentRecordType != type)
+                    {
+                        await FlushCurrentTableAsync(tables, ct);
+                    }
+                    _currentRecordType = type;
+
+                    switch (type)
+                    {
+                        case "type":
+                            AddTypeRow(tables.Types, JsonSerializer.Deserialize<TypeRecord>(line, JsonOptions)!);
+                            tables.TypesTotal++;
+                            if (tables.Types.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_types", tables.Types, ct);
+                            break;
+
+                        case "list":
+                            AddListRow(tables.Lists, JsonSerializer.Deserialize<ListRecord>(line, JsonOptions)!);
+                            tables.ListsTotal++;
+                            if (tables.Lists.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_lists", tables.Lists, ct);
+                            break;
+
+                        case "scheme":
+                            AddSchemeRow(tables.Schemes, JsonSerializer.Deserialize<SchemeRecord>(line, JsonOptions)!);
+                            tables.SchemesTotal++;
+                            if (tables.Schemes.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_schemes", tables.Schemes, ct);
+                            break;
+
+                        case "structure":
+                            AddStructureRow(tables.Structures, JsonSerializer.Deserialize<StructureRecord>(line, JsonOptions)!);
+                            tables.StructuresTotal++;
+                            if (tables.Structures.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_structures", tables.Structures, ct);
+                            break;
+
+                        case "role":
+                            AddRoleRow(tables.Roles, JsonSerializer.Deserialize<RoleRecord>(line, JsonOptions)!);
+                            tables.RolesTotal++;
+                            if (tables.Roles.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_roles", tables.Roles, ct);
+                            break;
+
+                        case "user":
+                            AddUserRow(tables.Users, JsonSerializer.Deserialize<UserRecord>(line, JsonOptions)!);
+                            tables.UsersTotal++;
+                            if (tables.Users.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_users", tables.Users, ct);
+                            break;
+
+                        case "user_role":
+                            AddUserRoleRow(tables.UserRoles, JsonSerializer.Deserialize<UserRoleRecord>(line, JsonOptions)!);
+                            tables.UserRolesTotal++;
+                            if (tables.UserRoles.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_users_roles", tables.UserRoles, ct);
+                            break;
+
+                        case "object":
+                            AddObjectRow(tables.Objects, JsonSerializer.Deserialize<ObjectRecord>(line, JsonOptions)!);
+                            _objectsCount++;
+                            if (tables.Objects.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_objects", tables.Objects, ct);
+                            break;
+
+                        case "list_item":
+                            AddListItemRow(tables.ListItems, JsonSerializer.Deserialize<ListItemRecord>(line, JsonOptions)!);
+                            tables.ListItemsTotal++;
+                            if (tables.ListItems.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_list_items", tables.ListItems, ct);
+                            break;
+
+                        case "permission":
+                            AddPermissionRow(tables.Permissions, JsonSerializer.Deserialize<PermissionRecord>(line, JsonOptions)!);
+                            tables.PermissionsTotal++;
+                            if (tables.Permissions.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_permissions", tables.Permissions, ct);
+                            break;
+
+                        case "value":
+                            AddValueRow(tables.Values, JsonSerializer.Deserialize<ValueRecord>(line, JsonOptions)!);
+                            _valuesCount++;
+                            if (tables.Values.Rows.Count >= _batchSize)
+                                await FlushTableAsync("_values", tables.Values, ct);
+                            break;
+
+                        case "footer":
+                            footer = JsonSerializer.Deserialize<ExportFooter>(line, JsonOptions);
+                            if (footer?.SequenceValue > 0)
+                            {
+                                sequenceValue = footer.SequenceValue;
+                            }
+                            break;
+                    }
                 }
+
+                await FlushCurrentTableAsync(tables, ct);
+
+                if (_verbose && _lastTable != null)
+                {
+                    _tableRowCounts.TryGetValue(_lastTable, out var lastCount);
+                    Console.WriteLine($"\r  {_lastTable}: {lastCount:N0} rows - done                    ");
+                }
+
+                // The footer is the last line of every export: without it the file was cut short, and with it every
+                // table must have arrived in full. Checked before the commit, so a short file changes nothing.
+                VerifyAgainstFooter(footer, tables);
+
+                await _provider.EnableConstraintsAsync(ct);
+
+                if (sequenceValue > 0)
+                {
+                    Log($"Setting sequence to: {sequenceValue}");
+                    await _provider.SetSequenceValueAsync(sequenceValue, ct);
+                }
+
+                await _provider.CommitImportAsync(ct);
+                committed = true;
+
+                _typesCount = tables.TypesTotal;
+                _listsCount = tables.ListsTotal;
+                _schemesCount = tables.SchemesTotal;
+                _structuresCount = tables.StructuresTotal;
+                _rolesCount = tables.RolesTotal;
+                _usersCount = tables.UsersTotal;
+                _userRolesCount = tables.UserRolesTotal;
+                _listItemsCount = tables.ListItemsTotal;
+                _permissionsCount = tables.PermissionsTotal;
             }
-
-            await FlushCurrentTableAsync(tables, ct);
-
-            if (_verbose && _lastTable != null)
+            finally
             {
-                _tableRowCounts.TryGetValue(_lastTable, out var lastCount);
-                Console.WriteLine($"\r  {_lastTable}: {lastCount:N0} rows - done                    ");
+                if (!committed)
+                    await _provider.AbortImportAsync();
             }
-
-            await _provider.EnableConstraintsAsync(ct);
-
-            if (sequenceValue > 0)
-            {
-                Log($"Setting sequence to: {sequenceValue}");
-                await _provider.SetSequenceValueAsync(sequenceValue, ct);
-            }
-
-            _typesCount = tables.TypesTotal;
-            _listsCount = tables.ListsTotal;
-            _schemesCount = tables.SchemesTotal;
-            _structuresCount = tables.StructuresTotal;
-            _rolesCount = tables.RolesTotal;
-            _usersCount = tables.UsersTotal;
-            _userRolesCount = tables.UserRolesTotal;
-            _listItemsCount = tables.ListItemsTotal;
-            _permissionsCount = tables.PermissionsTotal;
 
             var duration = DateTime.UtcNow - startTime;
 
@@ -286,6 +309,42 @@ public sealed class ImportService
             await dataStream.DisposeAsync();
             archive?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Refuses an import whose file ended before its footer, or whose tables did not all arrive in full. The
+    /// counts in the footer are written by the exporter as it goes; a mismatch means a cut or damaged file.
+    /// </summary>
+    private void VerifyAgainstFooter(ExportFooter? footer, ImportTables tables)
+    {
+        if (footer is null)
+            throw new InvalidOperationException(
+                "The file ends before its footer: it was cut short, or it is not a complete redb export. " +
+                "Nothing was imported; the database is unchanged.");
+
+        var mismatches = new List<string>();
+        void Check(string table, long expected, long actual)
+        {
+            if (expected != actual)
+                mismatches.Add($"{table}: expected {expected:N0}, read {actual:N0}");
+        }
+
+        Check("types", footer.TotalTypes, tables.TypesTotal);
+        Check("roles", footer.TotalRoles, tables.RolesTotal);
+        Check("users", footer.TotalUsers, tables.UsersTotal);
+        Check("user roles", footer.TotalUserRoles, tables.UserRolesTotal);
+        Check("lists", footer.TotalLists, tables.ListsTotal);
+        Check("list items", footer.TotalListItems, tables.ListItemsTotal);
+        Check("schemes", footer.TotalSchemes, tables.SchemesTotal);
+        Check("structures", footer.TotalStructures, tables.StructuresTotal);
+        Check("objects", footer.TotalObjects, _objectsCount);
+        Check("permissions", footer.TotalPermissions, tables.PermissionsTotal);
+        Check("values", footer.TotalValues, _valuesCount);
+
+        if (mismatches.Count > 0)
+            throw new InvalidOperationException(
+                "The file does not hold what its footer lists (" + string.Join("; ", mismatches) + "). " +
+                "Nothing was imported; the database is unchanged.");
     }
 
     private readonly Dictionary<string, long> _tableRowCounts = new();
@@ -452,6 +511,7 @@ public sealed class ImportService
         // uuid-semantic: object, not Guid - SQLite stores it as an RFC-ordered BLOB (GuidToDb).
         dt.Columns.Add("_structure_hash", typeof(object));
         dt.Columns.Add("_type", typeof(long));
+        dt.Columns.Add("_tags", typeof(string));
         return dt;
     }
 
@@ -464,7 +524,8 @@ public sealed class ImportService
             r.Alias ?? (object)DBNull.Value,
             r.NameSpace ?? (object)DBNull.Value,
             GuidDb(r.StructureHash),
-            r.SchemeType
+            r.SchemeType,
+            r.Tags ?? (object)DBNull.Value
         );
     }
 
@@ -491,6 +552,8 @@ public sealed class ImportService
         dt.Columns.Add("_unique", typeof(bool));
         dt.Columns.Add("_unique_version", typeof(long));
         dt.Columns.Add("_lazy", typeof(bool));
+        dt.Columns.Add("_unique_scope", typeof(long));
+        dt.Columns.Add("_tags", typeof(string));
         return dt;
     }
 
@@ -516,7 +579,9 @@ public sealed class ImportService
             r.DefaultEditor ?? (object)DBNull.Value,
             r.Unique ?? (object)DBNull.Value,
             r.UniqueVersion ?? (object)DBNull.Value,
-            r.Lazy ?? (object)DBNull.Value
+            r.Lazy ?? (object)DBNull.Value,
+            r.UniqueScope ?? (object)DBNull.Value,
+            r.Tags ?? (object)DBNull.Value
         );
     }
 

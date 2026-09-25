@@ -738,23 +738,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         if (depth < 1)
             throw new ArgumentException("Max depth must be positive", nameof(depth));
 
-        // Create new context with required MaxDepth (init-only property)
-        var newContext = new TreeQueryContext<TProps>(_treeContext.SchemeId, _treeContext.UserId, _treeContext.CheckPermissions, _treeContext.RootObjectId, depth)
-        {
-            ParentIds = _treeContext.ParentIds,
-            Filter = _treeContext.Filter,
-            Orderings = new List<OrderingExpression>(_treeContext.Orderings),
-            Limit = _treeContext.Limit,
-            Offset = _treeContext.Offset,
-            IsDistinct = _treeContext.IsDistinct,
-            MaxRecursionDepth = _treeContext.MaxRecursionDepth,
-            IsEmpty = _treeContext.IsEmpty
-        };
-
-        // Copy tree filters
-        newContext.TreeFilters = new List<TreeFilter>(_treeContext.TreeFilters);
-
-        return CreateInstance(newContext);
+        return CreateInstance(_treeContext.CloneWithMaxDepth(depth));
     }
 
     /// <summary>

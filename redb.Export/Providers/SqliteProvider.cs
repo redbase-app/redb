@@ -23,6 +23,38 @@ public sealed class SqliteProvider : IDataProvider
     private const string SequenceName = "_global_identity";
 
     private SqliteConnection? _connection;
+    private SqliteTransaction? _transaction;
+
+    /// <inheritdoc />
+    public async Task BeginImportAsync(CancellationToken ct = default)
+    {
+        if (_connection is null) throw new InvalidOperationException("Connection not opened. Call OpenAsync first.");
+        if (_transaction is not null) throw new InvalidOperationException("An import transaction is already open.");
+        // Foreign keys can only be switched outside a transaction, so they go off before it begins and come back
+        // after it ends, whichever way it ends.
+        await ExecuteAsync("PRAGMA foreign_keys = OFF", ct);
+        _transaction = (SqliteTransaction)await _connection.BeginTransactionAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task CommitImportAsync(CancellationToken ct = default)
+    {
+        if (_transaction is null) throw new InvalidOperationException("No import transaction is open.");
+        await _transaction.CommitAsync(ct);
+        await _transaction.DisposeAsync();
+        _transaction = null;
+        await ExecuteAsync("PRAGMA foreign_keys = ON", ct);
+    }
+
+    /// <inheritdoc />
+    public async Task AbortImportAsync()
+    {
+        if (_transaction is null) return;
+        await _transaction.RollbackAsync();
+        await _transaction.DisposeAsync();
+        _transaction = null;
+        await ExecuteAsync("PRAGMA foreign_keys = ON", CancellationToken.None);
+    }
 
     /// <inheritdoc />
     public string Name => "sqlite";
@@ -66,19 +98,19 @@ public sealed class SqliteProvider : IDataProvider
             "_scheme_metadata_cache"
         };
 
-        // FKs off so order-insensitive deletes never trip a constraint.
-        await ExecuteAsync("PRAGMA foreign_keys = OFF", ct);
-
+        // Foreign keys are off for the whole import transaction (BeginImportAsync), so the order of the deletes
+        // does not matter. A table the schema does not have is skipped by the catalog, not by swallowing an
+        // error: the old catch also hid a locked database, and the import went on over a half-cleaned one.
         foreach (var table in tables)
         {
-            try
-            {
-                await ExecuteAsync($"DELETE FROM {table}", ct);
-            }
-            catch (SqliteException)
-            {
-                // Table might not exist (e.g. cache table on an older schema); skip.
-            }
+            await using var exists = _connection.CreateCommand();
+            exists.Transaction = _transaction;
+            exists.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @name";
+            exists.Parameters.AddWithValue("@name", table);
+            if (Convert.ToInt64(await exists.ExecuteScalarAsync(ct)) == 0)
+                continue;
+
+            await ExecuteAsync($"DELETE FROM {table}", ct);
         }
     }
 
@@ -88,6 +120,7 @@ public sealed class SqliteProvider : IDataProvider
         if (_connection is null) return 0;
 
         await using var cmd = _connection.CreateCommand();
+        cmd.Transaction = _transaction;
         cmd.CommandText = "SELECT seq FROM sqlite_sequence WHERE name = @name";
         cmd.Parameters.AddWithValue("@name", SequenceName);
         var result = await cmd.ExecuteScalarAsync(ct);
@@ -101,6 +134,7 @@ public sealed class SqliteProvider : IDataProvider
 
         await using (var update = _connection.CreateCommand())
         {
+            update.Transaction = _transaction;
             update.CommandText = "UPDATE sqlite_sequence SET seq = @value WHERE name = @name";
             update.Parameters.AddWithValue("@value", value);
             update.Parameters.AddWithValue("@name", SequenceName);
@@ -110,6 +144,7 @@ public sealed class SqliteProvider : IDataProvider
 
         // No sqlite_sequence row yet (DB created without materializing it): create it.
         await using var insert = _connection.CreateCommand();
+        insert.Transaction = _transaction;
         insert.CommandText = "INSERT INTO sqlite_sequence (name, seq) VALUES (@name, @value)";
         insert.Parameters.AddWithValue("@name", SequenceName);
         insert.Parameters.AddWithValue("@value", value);
@@ -118,13 +153,13 @@ public sealed class SqliteProvider : IDataProvider
 
     /// <inheritdoc />
     public Task DisableConstraintsAsync(CancellationToken ct = default)
-        // PRAGMA foreign_keys is a no-op inside a transaction; callers invoke this
-        // outside any ambient transaction (ImportService does).
-        => ExecuteAsync("PRAGMA foreign_keys = OFF", ct);
+        // PRAGMA foreign_keys is a no-op inside a transaction. Within an import it was switched off before the
+        // transaction began and comes back on after it ends (BeginImportAsync / CommitImportAsync / AbortImportAsync).
+        => _transaction is not null ? Task.CompletedTask : ExecuteAsync("PRAGMA foreign_keys = OFF", ct);
 
     /// <inheritdoc />
     public Task EnableConstraintsAsync(CancellationToken ct = default)
-        => ExecuteAsync("PRAGMA foreign_keys = ON", ct);
+        => _transaction is not null ? Task.CompletedTask : ExecuteAsync("PRAGMA foreign_keys = ON", ct);
 
     /// <inheritdoc />
     public async Task BulkInsertAsync(string tableName, System.Data.DataTable data, CancellationToken ct = default)
@@ -135,10 +170,13 @@ public sealed class SqliteProvider : IDataProvider
         var columnList = string.Join(", ", columns.Select(c => c.ColumnName));
         var paramList = string.Join(", ", columns.Select((_, i) => $"@p{i}"));
 
-        await using var tx = (SqliteTransaction)await _connection.BeginTransactionAsync(ct);
+        // Inside the import transaction every batch joins it; outside one (a caller of its own) a batch is atomic alone.
+        var ownTransaction = _transaction is null
+            ? (SqliteTransaction)await _connection.BeginTransactionAsync(ct)
+            : null;
 
         await using var cmd = _connection.CreateCommand();
-        cmd.Transaction = tx;
+        cmd.Transaction = _transaction ?? ownTransaction;
         cmd.CommandText = $"INSERT INTO {tableName} ({columnList}) VALUES ({paramList})";
 
         // Create the parameter set once and reuse it across every row (prepared once).
@@ -161,7 +199,11 @@ public sealed class SqliteProvider : IDataProvider
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
-        await tx.CommitAsync(ct);
+        if (ownTransaction is not null)
+        {
+            await ownTransaction.CommitAsync(ct);
+            await ownTransaction.DisposeAsync();
+        }
     }
 
     /// <summary>
@@ -170,6 +212,7 @@ public sealed class SqliteProvider : IDataProvider
     private async Task ExecuteAsync(string sql, CancellationToken ct)
     {
         await using var cmd = _connection!.CreateCommand();
+        cmd.Transaction = _transaction;
         cmd.CommandText = sql;
         await cmd.ExecuteNonQueryAsync(ct);
     }

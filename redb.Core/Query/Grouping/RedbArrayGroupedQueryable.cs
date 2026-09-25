@@ -231,19 +231,33 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
                 // Multiple fields: x => new { x.A, x.B }
                 for (int i = 0; i < newExpr.Arguments.Count; i++)
                 {
-                    var arg = newExpr.Arguments[i];
+                    var arg = GroupSelectorMembers.StripConvert(newExpr.Arguments[i]);
                     var alias = newExpr.Members?[i]?.Name ?? $"Key{i}";
-                    var path = ExtractFieldPath(arg as MemberExpression);
-                    if (!string.IsNullOrEmpty(path))
-                        fields.Add(new GroupFieldRequest { FieldPath = path, Alias = alias });
+                    // GRP-9 (review 2026-09-24): a key member that is not an item field is refused. It used to be
+                    // skipped, or read as a field path it is not, and the grouping ran on other keys without a word.
+                    var path = arg is MemberExpression memberArg && GroupSelectorMembers.IsFieldChain(memberArg)
+                        ? ExtractFieldPath(memberArg)
+                        : null;
+                    if (string.IsNullOrEmpty(path))
+                        throw new NotSupportedException(
+                            $"GroupByArray: key member '{alias}' is not a field of the array item ('{arg}'). Computed keys are not supported.");
+                    fields.Add(new GroupFieldRequest { FieldPath = path, Alias = alias });
                 }
             }
             else if (body is MemberExpression member)
             {
                 // Single field: x => x.Category
-                var path = ExtractFieldPath(member);
-                if (!string.IsNullOrEmpty(path))
-                    fields.Add(new GroupFieldRequest { FieldPath = path, Alias = member.Member.Name });
+                var path = GroupSelectorMembers.IsFieldChain(member) ? ExtractFieldPath(member) : null;
+                if (string.IsNullOrEmpty(path))
+                    throw new NotSupportedException(
+                        $"GroupByArray: the key '{member}' is not a field of the array item. Computed keys are not supported.");
+                fields.Add(new GroupFieldRequest { FieldPath = path, Alias = member.Member.Name });
+            }
+            else
+            {
+                throw new NotSupportedException(
+                    "GroupByArray supports an item field (c => c.Type) or an anonymous type of item fields " +
+                    $"(c => new {{ c.A, c.B }}). A computed key is not supported: '{body}'.");
             }
         }
         

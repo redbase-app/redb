@@ -9,11 +9,11 @@
 -- Base fields carry the "0$:" prefix on the field path; alias is always set.
 --
 -- Aggregation entries: same grammar as file 21 (pvt_build_aggregate_sql).
--- @having:  reserved; not emitted in this slice.
+-- @having:  optional boolean node (HavingPredicateParser grammar), see
+--           pvt_build_groupby_having_expr below; unknown shape -> NULL.
 -- @order:   optional ORDER BY entries (same {field,dir,nulls} grammar as file 15).
 --
 -- NOT in this slice:
---   * HAVING
 --   * narrow shape (always Shape A or Shape C wide)
 --   * pushdown / tree / polymorphic
 --   * $expr group keys
@@ -38,12 +38,131 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
+-- ---------- pvt_having_agg_entries -----------------------------------
+-- Every aggregate node of a HAVING tree, comma-joined (no brackets), so
+-- the orchestrator can feed them to pvt_extend_fields_with_aggs: a field
+-- that only HAVING aggregates must still be pivoted. An aggregate node
+-- ({"$sum":{"$field":"X"}}, {"$count":"*"}) has the shape of an
+-- aggregation entry already.
+CREATE OR ALTER FUNCTION dbo.pvt_having_agg_entries(@node NVARCHAR(MAX))
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    IF @node IS NULL OR ISJSON(@node) = 0 RETURN N'';
+
+    DECLARE @k NVARCHAR(200), @v NVARCHAR(MAX), @t INT;
+    SELECT TOP 1 @k = [key], @v = [value], @t = [type] FROM OPENJSON(@node);
+    IF @k IN (N'$count', N'$sum', N'$avg', N'$min', N'$max') RETURN @node;
+    IF @k = N'$not' RETURN dbo.pvt_having_agg_entries(@v);
+    IF @t <> 4 RETURN N'';
+
+    DECLARE @acc NVARCHAR(MAX) = N'', @child NVARCHAR(MAX), @part NVARCHAR(MAX);
+    DECLARE c CURSOR LOCAL FAST_FORWARD FOR SELECT [value] FROM OPENJSON(@v) WHERE [type] = 5;
+    OPEN c;
+    FETCH NEXT FROM c INTO @child;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @part = dbo.pvt_having_agg_entries(@child);
+        IF @part <> N''
+            SET @acc = CASE WHEN @acc = N'' THEN @part ELSE @acc + N',' + @part END;
+        FETCH NEXT FROM c INTO @child;
+    END;
+    CLOSE c; DEALLOCATE c;
+    RETURN @acc;
+END;
+GO
+
+-- ---------- pvt_build_groupby_having_expr ----------------------------
+-- HAVING node -> T-SQL predicate. The grammar is what
+-- HavingPredicateParser writes:
+--   {"$and":[...]} / {"$or":[...]} / {"$not":{...}}
+--   {"$gt"|"$gte"|"$lt"|"$lte"|"$eq"|"$ne": [<operand>, <operand>]}
+--   <operand> ::= {"$count":"*"} | {"$count"|"$sum"|"$avg"|"$min"|"$max":{"$field":"X"}}
+--               | {"$const": <scalar>}
+-- Aggregates compile through pvt_build_agg_expr, exactly as in the SELECT
+-- list. Anything else returns NULL, and NULL propagates to the whole
+-- query: the orchestrator returns NULL and the caller refuses. A HAVING
+-- this function does not understand is never replaced by 1=1.
+CREATE OR ALTER FUNCTION dbo.pvt_build_groupby_having_expr(
+    @node        NVARCHAR(MAX),
+    @fields      NVARCHAR(MAX),
+    @base_prefix NVARCHAR(20)
+)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    IF @node IS NULL OR ISJSON(@node) = 0 RETURN NULL;
+
+    DECLARE @k NVARCHAR(200), @v NVARCHAR(MAX), @t INT;
+    SELECT TOP 1 @k = [key], @v = [value], @t = [type] FROM OPENJSON(@node);
+    IF @k IS NULL RETURN NULL;
+
+    IF @k = N'$and' OR @k = N'$or'
+    BEGIN
+        IF @t <> 4 RETURN NULL;
+        DECLARE @op NVARCHAR(5) = CASE @k WHEN N'$and' THEN N' AND ' ELSE N' OR ' END;
+        DECLARE @acc NVARCHAR(MAX) = N'', @child NVARCHAR(MAX), @child_t INT, @part NVARCHAR(MAX);
+        DECLARE c CURSOR LOCAL FAST_FORWARD FOR SELECT [value], [type] FROM OPENJSON(@v);
+        OPEN c;
+        FETCH NEXT FROM c INTO @child, @child_t;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            SET @part = CASE WHEN @child_t = 5
+                             THEN dbo.pvt_build_groupby_having_expr(@child, @fields, @base_prefix)
+                             ELSE NULL END;
+            -- NULL + anything is NULL: one unknown child makes the whole node unknown.
+            SET @acc = CASE WHEN @acc = N'' THEN @part ELSE @acc + @op + @part END;
+            FETCH NEXT FROM c INTO @child, @child_t;
+        END;
+        CLOSE c; DEALLOCATE c;
+        IF @acc = N'' RETURN NULL;
+        RETURN N'(' + @acc + N')';
+    END;
+
+    IF @k = N'$not'
+        RETURN CASE WHEN @t = 5
+                    THEN N'NOT (' + dbo.pvt_build_groupby_having_expr(@v, @fields, @base_prefix) + N')'
+                    ELSE NULL END;
+
+    IF @k IN (N'$count', N'$sum', N'$avg', N'$min', N'$max')
+    BEGIN
+        DECLARE @agg NVARCHAR(MAX) = dbo.pvt_build_agg_expr(@node, @fields, @base_prefix);
+        -- pvt_build_agg_expr marks what it cannot compile with a leading comment.
+        IF @agg IS NULL OR LEFT(@agg, 2) = N'/*' RETURN NULL;
+        RETURN @agg;
+    END;
+
+    IF @k = N'$const'
+        RETURN CASE WHEN @t IN (4, 5) THEN NULL ELSE dbo.pvt_jsonb_to_sql_literal(@v, @t) END;
+
+    DECLARE @symbol NVARCHAR(5) = CASE @k
+        WHEN N'$eq'  THEN N' = '
+        WHEN N'$ne'  THEN N' <> '
+        WHEN N'$gt'  THEN N' > '
+        WHEN N'$gte' THEN N' >= '
+        WHEN N'$lt'  THEN N' < '
+        WHEN N'$lte' THEN N' <= '
+        ELSE NULL END;
+    IF @symbol IS NULL OR @t <> 4 RETURN NULL;
+    IF (SELECT COUNT(*) FROM OPENJSON(@v)) <> 2 RETURN NULL;
+
+    DECLARE @lhs NVARCHAR(MAX), @lhs_t INT, @rhs NVARCHAR(MAX), @rhs_t INT;
+    SELECT @lhs = [value], @lhs_t = [type] FROM OPENJSON(@v) WHERE [key] = N'0';
+    SELECT @rhs = [value], @rhs_t = [type] FROM OPENJSON(@v) WHERE [key] = N'1';
+    IF @lhs_t <> 5 OR @rhs_t <> 5 RETURN NULL;
+
+    RETURN N'(' + dbo.pvt_build_groupby_having_expr(@lhs, @fields, @base_prefix)
+         + @symbol
+         + dbo.pvt_build_groupby_having_expr(@rhs, @fields, @base_prefix) + N')';
+END;
+GO
+
 CREATE OR ALTER FUNCTION dbo.pvt_build_groupby_sql(
     @scheme_id    BIGINT,
     @filter       NVARCHAR(MAX),
     @group_by     NVARCHAR(MAX),
     @aggregations NVARCHAR(MAX),
-    @having       NVARCHAR(MAX),   -- reserved; HAVING not emitted in this slice
+    @having       NVARCHAR(MAX),   -- optional; see pvt_build_groupby_having_expr
     @order        NVARCHAR(MAX),
     @limit        INT,
     @offset       INT,
@@ -56,6 +175,7 @@ BEGIN
     IF @group_by IS NULL OR ISJSON(@group_by) = 0 RETURN NULL;
     IF @source_mode IS NULL SET @source_mode = N'flat';
     IF @source_mode <> N'flat' RETURN NULL;
+    IF @having IS NOT NULL AND (ISJSON(@having) = 0 OR @having = N'{}') RETURN NULL;
 
     -- 1. Collect fields: merge group_by + order so that every referenced
     --    field is resolved to kind/column metadata before shape decision.
@@ -71,6 +191,14 @@ BEGIN
     -- Extend fields map with aggregation operand fields (from file 21).
     IF @aggregations IS NOT NULL AND ISJSON(@aggregations) = 1
         SET @fields = dbo.pvt_extend_fields_with_aggs(@scheme_id, @fields, @aggregations);
+
+    -- ... and with the fields only HAVING aggregates, so they are pivoted too.
+    IF @having IS NOT NULL
+    BEGIN
+        DECLARE @having_aggs NVARCHAR(MAX) = dbo.pvt_having_agg_entries(@having);
+        IF @having_aggs <> N''
+            SET @fields = dbo.pvt_extend_fields_with_aggs(@scheme_id, @fields, N'[' + @having_aggs + N']');
+    END;
 
     -- 2. Decide shape: Shape A (pure base) vs Shape B narrow vs Shape C wide.
     --    Mirrors PG/file-20 narrow/wide selection.
@@ -204,8 +332,18 @@ BEGIN
         @filter, @fields,
         CASE WHEN @has_props = 0 OR @narrow = 1 THEN N'o.' ELSE N'_pvt_cte.' END);
 
-    -- 8. Assemble.
-    --    Slice: HAVING not supported (comment preserved for future slice expansion).
+    -- 8. HAVING. Aggregates use the same prefix as the SELECT list. A node the
+    --    translator does not know makes the whole query NULL: the caller refuses.
+    DECLARE @having_sql NVARCHAR(MAX) = N'';
+    IF @having IS NOT NULL
+    BEGIN
+        DECLARE @having_expr NVARCHAR(MAX) =
+            dbo.pvt_build_groupby_having_expr(@having, @fields, @grp_base_prefix);
+        IF @having_expr IS NULL RETURN NULL;
+        SET @having_sql = CHAR(10) + N'HAVING ' + @having_expr;
+    END;
+
+    -- 9. Assemble.
 
     -- Shape A: pure-base, query directly against dbo._objects.
     IF @has_props = 0
@@ -214,6 +352,7 @@ BEGIN
              + CHAR(10) + N'WHERE o.[_id_scheme] = ' + CAST(@scheme_id AS NVARCHAR(40))
              + CASE WHEN @where_sql <> N'1=1' THEN N' AND ' + @where_sql ELSE N'' END
              + CHAR(10) + N'GROUP BY ' + @groupby_parts
+             + @having_sql
              + @order_sql + @paging;
 
     -- Shape B (narrow) / Shape C (wide): props present — wrap pvt_build_cte_sql as derived table.
@@ -233,6 +372,7 @@ BEGIN
                 ELSE N'' END
          + CHAR(10) + N'WHERE ' + @where_sql_c
          + CHAR(10) + N'GROUP BY ' + @groupby_parts
+         + @having_sql
          + @order_sql + @paging;
 END;
 GO

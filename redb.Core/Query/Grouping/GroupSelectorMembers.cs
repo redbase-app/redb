@@ -63,6 +63,26 @@ internal static class GroupSelectorMembers
         return expr;
     }
 
+    /// <summary>
+    /// A member chain that names a stored field: it ends at a parameter, and no member in it belongs to a system type
+    /// (<c>Value.Length</c>, <c>Date.Year</c> are computations, not fields). <c>Nullable&lt;T&gt;</c> members are left
+    /// as they were read before.
+    /// </summary>
+    public static bool IsFieldChain(MemberExpression member)
+    {
+        Expression? current = member;
+        while (current is MemberExpression m)
+        {
+            var declaring = m.Member.DeclaringType;
+            var isNullable = declaring is { IsGenericType: true } && declaring.GetGenericTypeDefinition() == typeof(Nullable<>);
+            var ns = declaring?.Namespace;
+            if (!isNullable && (ns == "System" || (ns != null && ns.StartsWith("System.", StringComparison.Ordinal))))
+                return false;
+            current = StripConvert(m.Expression!);
+        }
+        return current is ParameterExpression;
+    }
+
     /// <summary>Цепочка членов от параметра группы через .Key (g.Key / g.Key.X / g.Key.X.Id).</summary>
     public static bool IsKeyAccess(Expression expr, ParameterExpression groupParam)
     {

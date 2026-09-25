@@ -127,6 +127,18 @@ BEGIN
     --           subtree, not every leaf in the scheme.
     --         * pvt_tree_leaves / pvt_tree_roots (08_pvt_tree_functions.sql) —
     --           the pvt_build_cte_sql (props-shape) path — seeded the same way.
+    -- 0.2.21 - HAVING of the array GroupBy (2026-09-25): pvt_build_array_having_expr reads item fields
+    --          through the joined columns (@cols) and returns NULL for any shape it does not know; the
+    --          orchestrator joins a field only the HAVING aggregates and returns NULL on an unread
+    --          HAVING. It returned 1=1 for an unknown node (the condition was dropped) and wrote an item
+    --          field as [X], a column the query does not have.
+    -- 0.2.20 - tech bump: 0.2.19 reached the test databases before the file-26 fix below.
+    -- 0.2.19 - HAVING in GroupBy (2026-09-24): pvt_build_groupby_sql compiles @having through the
+    --          new pvt_build_groupby_having_expr, aggregates via pvt_build_agg_expr as in the SELECT
+    --          list; an unknown node makes the whole query NULL. @having was reserved and never
+    --          emitted, and the provider passed NULL: GroupBy(...).Having(...) returned every group.
+    --          26: an array-item field aggregated twice (Min(Value) + Max(Value)) reuses the joined
+    --          typed column; the second one named the field as an output alias and failed.
     -- 0.2.18 - Regex.IsMatch / Regex.Replace in filters (2026-09-16): $regex / $iregex compile to
     --          REGEXP_LIKE, $regexReplace to REGEXP_REPLACE (SQL Server 2025, compatibility level 170).
     --          The unsupported-top branch turned $regex into 1=1: the filter was dropped and every row
@@ -158,7 +170,7 @@ BEGIN
     --          (perf finding, 2026-09-10).
     -- 0.1.0 - skeleton: module bootstrap, drop-all, version function.
     --         Builder functions (pvt_build_query_sql etc.) not implemented yet.
-    RETURN N'0.2.18';
+    RETURN N'0.2.21';
 END;
 GO
 

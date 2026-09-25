@@ -125,7 +125,8 @@ namespace redb.Core.Models.Configuration
         /// pivot aggregate runs, so a selective filter stops costing a full scheme scan.
         /// The prefilter is a superset and never changes results; when the planner cannot
         /// analyse a filter it emits nothing and behaviour is identical to disabled.
-        /// Pro only, PostgreSQL only for now. See docs/PVT_PREFILTER_PLAN.md.
+        /// Pro only; implemented by all three Pro providers - PostgreSQL, SQL Server and SQLite. How
+        /// much it saves depends on the engine and the predicate (see docs/PVT_PREFILTER_PLAN.md).
         /// Default is false (opt-in while the feature is being validated).
         /// </summary>
         public bool EnablePvtPrefilter { get; set; } = false;

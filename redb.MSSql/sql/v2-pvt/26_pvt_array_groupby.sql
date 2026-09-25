@@ -13,9 +13,10 @@
 --       @aggregations  NVARCHAR(MAX),   -- optional: JSON array of {field, func, alias}
 --                                       -- func: COUNT/SUM/AVG/MIN/MAX
 --                                       -- field=NULL or "*" with COUNT -> COUNT(*)
---       @having        NVARCHAR(MAX),   -- optional: PVT bool expression over outer aliases
+--       @having        NVARCHAR(MAX),   -- optional: HAVING node (HavingPredicateParser grammar)
 --                                       -- supports $and/$or/$not + $eq/$ne/$gt/$gte/$lt/$lte
---                                       -- with $count/$sum/$avg/$min/$max/$field/$const
+--                                       -- with $count/$sum/$avg/$min/$max over item fields, $const;
+--                                       -- an unknown shape makes the whole result NULL
 --       @source_mode   NVARCHAR(50)     -- 'flat' (others: return NULL)
 --   ) RETURNS NVARCHAR(MAX)
 --
@@ -34,141 +35,111 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 -- ---------------------------------------------------------------------
--- pvt_build_array_having_expr — minimal HAVING translator for array-GROUP-BY.
+-- pvt_build_array_having_expr — HAVING translator for array-GROUP-BY.
 --
--- Translates a PVT bool-expression JSON node into a T-SQL predicate over
--- the outer-query column aliases produced by pvt_build_array_groupby_sql.
--- Used only by pvt_build_array_groupby_sql; not a full pvt_build_bool_expr
--- port (which would require base-fields / FTS / array operators).
+-- Translates the HAVING node HavingPredicateParser writes into a T-SQL
+-- predicate. Item fields are read through @cols, a JSON map
+-- {"<item field>": "<joined typed column>"} built by the orchestrator
+-- (g1.[_String], a2.[_Long]) - the same columns the SELECT list reads.
 --
--- Supported shapes:
---   { "$and": [ ... ] }                        -> (a AND b AND ...)
---   { "$or":  [ ... ] }                        -> (a OR  b OR ...)
---   { "$not": { ... } }                        -> NOT (...)
---   { "$gt": [ <expr>, <expr> ] }              -> (<l> > <r>)
---     and $gte / $lt / $lte / $eq / $ne (=, <>) likewise
---   <expr> ::=
---     { "$count": "*" }                        -> COUNT(*)
---     { "$count": { "$field": "X" } }          -> COUNT([X])
---     { "$sum"|"$avg"|"$min"|"$max": { "$field": "X" } } -> FUNC([X])
---     { "$field": "X" }                        -> [X]   (any outer alias)
---     { "$const": <scalar> }                   -> quoted literal
---     <bare JSON scalar>                       -> quoted literal
+-- Grammar:
+--   { "$and": [ ... ] } / { "$or": [ ... ] } / { "$not": { ... } }
+--   { "$gt"|"$gte"|"$lt"|"$lte"|"$eq"|"$ne": [ <operand>, <operand> ] }
+--   <operand> ::=
+--     { "$count": "*" }                                  -> COUNT(*)
+--     { "$count"|"$sum"|"$avg"|"$min"|"$max": { "$field": "X" } } -> FUNC(<column of X>)
+--     { "$const": <scalar> }                             -> literal
+--
+-- Anything else - an unknown node, a field with no joined column - returns
+-- NULL, and NULL reaches the whole query: the orchestrator returns NULL and
+-- the caller refuses. It used to return 1=1, dropping the condition, and to
+-- write an item field as [X], a column the query does not have.
 -- ---------------------------------------------------------------------
 CREATE OR ALTER FUNCTION dbo.pvt_build_array_having_expr(
-    @node    NVARCHAR(MAX)
+    @node    NVARCHAR(MAX),
+    @cols    NVARCHAR(MAX)
 )
 RETURNS NVARCHAR(MAX)
 AS
 BEGIN
-    IF @node IS NULL RETURN N'NULL';
+    IF @node IS NULL OR ISJSON(@node) = 0 RETURN NULL;
 
-    -- Bare JSON scalar (not an object/array): emit as literal.
-    IF ISJSON(@node) = 0
-    BEGIN
-        DECLARE @lit NVARCHAR(MAX) = @node;
-        IF LEN(@lit) >= 2 AND LEFT(@lit, 1) = N'"' AND RIGHT(@lit, 1) = N'"'
-            RETURN N'N''' + REPLACE(SUBSTRING(@lit, 2, LEN(@lit) - 2), N'''', N'''''') + N'''';
-        RETURN @lit;
-    END;
-
-    -- Detect first key in the object.
     DECLARE @k NVARCHAR(200), @v NVARCHAR(MAX), @t INT;
     SELECT TOP 1 @k = [key], @v = [value], @t = [type] FROM OPENJSON(@node);
-    IF @k IS NULL RETURN N'1=1';
+    IF @k IS NULL RETURN NULL;
 
     -- ---- Logical connectives -----------------------------------------
     IF @k = N'$and' OR @k = N'$or'
     BEGIN
+        IF @t <> 4 RETURN NULL;
         DECLARE @op NVARCHAR(5) = CASE @k WHEN N'$and' THEN N' AND ' ELSE N' OR ' END;
-        DECLARE @acc NVARCHAR(MAX) = N'';
-        DECLARE @child NVARCHAR(MAX);
+        DECLARE @acc NVARCHAR(MAX) = N'', @child NVARCHAR(MAX), @child_t INT, @part NVARCHAR(MAX);
         DECLARE c_l CURSOR LOCAL FAST_FORWARD FOR
-            SELECT [value] FROM OPENJSON(@v);
+            SELECT [value], [type] FROM OPENJSON(@v);
         OPEN c_l;
-        FETCH NEXT FROM c_l INTO @child;
+        FETCH NEXT FROM c_l INTO @child, @child_t;
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            IF @acc <> N'' SET @acc += @op;
-            SET @acc += dbo.pvt_build_array_having_expr(@child);
-            FETCH NEXT FROM c_l INTO @child;
+            SET @part = CASE WHEN @child_t = 5
+                             THEN dbo.pvt_build_array_having_expr(@child, @cols)
+                             ELSE NULL END;
+            -- NULL + anything is NULL: one unknown child makes the whole node unknown.
+            SET @acc = CASE WHEN @acc = N'' THEN @part ELSE @acc + @op + @part END;
+            FETCH NEXT FROM c_l INTO @child, @child_t;
         END;
         CLOSE c_l; DEALLOCATE c_l;
-        IF @acc = N'' RETURN N'1=1';
+        IF @acc = N'' RETURN NULL;
         RETURN N'(' + @acc + N')';
     END;
 
     IF @k = N'$not'
-        RETURN N'NOT (' + dbo.pvt_build_array_having_expr(@v) + N')';
+        RETURN CASE WHEN @t = 5
+                    THEN N'NOT (' + dbo.pvt_build_array_having_expr(@v, @cols) + N')'
+                    ELSE NULL END;
 
-    -- ---- Aggregate / field expressions (leaf operand) ----------------
-    IF @k = N'$count'
-    BEGIN
-        IF @t = 1
-        BEGIN
-            IF @v IS NULL OR @v = N'*' OR @v = N''
-                RETURN N'COUNT(*)';
-            RETURN N'COUNT(' + QUOTENAME(@v) + N')';
-        END;
-        DECLARE @cf NVARCHAR(400) = JSON_VALUE(@v, N'$."$field"');
-        IF @cf IS NOT NULL
-            RETURN N'COUNT(' + QUOTENAME(@cf) + N')';
-        RETURN N'COUNT(*)';
-    END;
-
-    IF @k IN (N'$sum', N'$avg', N'$min', N'$max')
+    -- ---- Aggregates --------------------------------------------------
+    IF @k IN (N'$count', N'$sum', N'$avg', N'$min', N'$max')
     BEGIN
         DECLARE @fn NVARCHAR(10) = CASE @k
-            WHEN N'$sum' THEN N'SUM'
-            WHEN N'$avg' THEN N'AVG'
-            WHEN N'$min' THEN N'MIN'
+            WHEN N'$count' THEN N'COUNT'
+            WHEN N'$sum'   THEN N'SUM'
+            WHEN N'$avg'   THEN N'AVG'
+            WHEN N'$min'   THEN N'MIN'
             ELSE N'MAX'
         END;
+        IF @k = N'$count' AND @t = 1 AND @v = N'*'
+            RETURN N'COUNT(*)';
+        IF @t <> 5 RETURN NULL;
         DECLARE @af NVARCHAR(400) = JSON_VALUE(@v, N'$."$field"');
-        IF @af IS NULL AND @t = 1 SET @af = @v;
-        IF @af IS NULL RETURN N'NULL';
-        RETURN @fn + N'(' + QUOTENAME(@af) + N')';
-    END;
-
-    IF @k = N'$field'
-    BEGIN
-        IF @v IS NULL RETURN N'NULL';
-        RETURN QUOTENAME(@v);
+        IF @af IS NULL OR @cols IS NULL RETURN NULL;
+        DECLARE @col NVARCHAR(200) = JSON_VALUE(@cols, N'$."' + STRING_ESCAPE(@af, 'json') + N'"');
+        IF @col IS NULL RETURN NULL;
+        RETURN @fn + N'(' + @col + N')';
     END;
 
     IF @k = N'$const'
-    BEGIN
-        IF @t IN (2, 3) RETURN @v;            -- number, true/false
-        IF @t = 0 RETURN N'NULL';
-        IF @v IS NULL RETURN N'NULL';
-        RETURN N'N''' + REPLACE(@v, N'''', N'''''') + N'''';
-    END;
+        RETURN CASE WHEN @t IN (4, 5) THEN NULL ELSE dbo.pvt_jsonb_to_sql_literal(@v, @t) END;
 
     -- ---- Comparison operators ----------------------------------------
-    DECLARE @symbol NVARCHAR(5);
-    IF @k = N'$eq'  SET @symbol = N' = ';
-    ELSE IF @k = N'$ne'  SET @symbol = N' <> ';
-    ELSE IF @k = N'$gt'  SET @symbol = N' > ';
-    ELSE IF @k = N'$gte' SET @symbol = N' >= ';
-    ELSE IF @k = N'$lt'  SET @symbol = N' < ';
-    ELSE IF @k = N'$lte' SET @symbol = N' <= ';
+    DECLARE @symbol NVARCHAR(5) = CASE @k
+        WHEN N'$eq'  THEN N' = '
+        WHEN N'$ne'  THEN N' <> '
+        WHEN N'$gt'  THEN N' > '
+        WHEN N'$gte' THEN N' >= '
+        WHEN N'$lt'  THEN N' < '
+        WHEN N'$lte' THEN N' <= '
+        ELSE NULL END;
+    IF @symbol IS NULL OR @t <> 4 RETURN NULL;
+    IF (SELECT COUNT(*) FROM OPENJSON(@v)) <> 2 RETURN NULL;
 
-    IF @symbol IS NOT NULL
-    BEGIN
-        DECLARE @ops TABLE (idx INT IDENTITY, val NVARCHAR(MAX), tt INT);
-        INSERT INTO @ops(val, tt)
-            SELECT [value], [type] FROM OPENJSON(@v);
-        DECLARE @lhs NVARCHAR(MAX), @rhs NVARCHAR(MAX);
-        SELECT @lhs = val FROM @ops WHERE idx = 1;
-        SELECT @rhs = val FROM @ops WHERE idx = 2;
-        RETURN N'(' + dbo.pvt_build_array_having_expr(@lhs)
-             + @symbol
-             + dbo.pvt_build_array_having_expr(@rhs) + N')';
-    END;
+    DECLARE @lhs NVARCHAR(MAX), @lhs_t INT, @rhs NVARCHAR(MAX), @rhs_t INT;
+    SELECT @lhs = [value], @lhs_t = [type] FROM OPENJSON(@v) WHERE [key] = N'0';
+    SELECT @rhs = [value], @rhs_t = [type] FROM OPENJSON(@v) WHERE [key] = N'1';
+    IF @lhs_t <> 5 OR @rhs_t <> 5 RETURN NULL;
 
-    -- Unknown operator: conservative pass-through so we never break
-    -- the whole query. Caller sees no filtering rather than a syntax error.
-    RETURN N'1=1';
+    RETURN N'(' + dbo.pvt_build_array_having_expr(@lhs, @cols)
+         + @symbol
+         + dbo.pvt_build_array_having_expr(@rhs, @cols) + N')';
 END;
 GO
 
@@ -243,7 +214,8 @@ BEGIN
     DECLARE @sel_grp     NVARCHAR(MAX) = N'';
     DECLARE @group_cols  NVARCHAR(MAX) = N'';
     DECLARE @join_idx    INT           = 0;
-    DECLARE @joined_fields TABLE(field_path NVARCHAR(400) PRIMARY KEY);
+    -- Every item field already joined, with the typed column it reads (g1.[_String], a2.[_Long]).
+    DECLARE @joined_fields TABLE(field_path NVARCHAR(400) PRIMARY KEY, col_expr NVARCHAR(200) NOT NULL);
 
     DECLARE c_grp CURSOR LOCAL FAST_FORWARD FOR
         SELECT [value] FROM OPENJSON(@group_by);
@@ -280,7 +252,7 @@ BEGIN
                     IF @group_cols <> N'' SET @group_cols += N', ';
                     SET @group_cols += @ja + N'.[' + @gf_col + N']';
 
-                    INSERT @joined_fields(field_path) VALUES (@gf_path);
+                    INSERT @joined_fields(field_path, col_expr) VALUES (@gf_path, @ja + N'.[' + @gf_col + N']');
                 END;
             END;
         END;
@@ -329,9 +301,13 @@ BEGIN
             BEGIN
                 IF EXISTS(SELECT 1 FROM @joined_fields WHERE field_path = @af_path)
                 BEGIN
-                    -- Already projected by group_by under alias = field name;
-                    -- reference the outer alias via QUOTENAME(field).
-                    SET @sel_grp += N', ' + @af_func + N'(' + QUOTENAME(@af_path) + N') AS ' + QUOTENAME(@af_alias);
+                    -- Already joined (by a group key or an earlier aggregate): read the same typed
+                    -- column. It used to name the field as if it were an output alias, which only a
+                    -- group key whose alias equals its field has - Min(Value) + Max(Value) failed
+                    -- with "Invalid column name 'Value'".
+                    DECLARE @af_joined NVARCHAR(200) =
+                        (SELECT col_expr FROM @joined_fields WHERE field_path = @af_path);
+                    SET @sel_grp += N', ' + @af_func + N'(' + @af_joined + N') AS ' + QUOTENAME(@af_alias);
                 END
                 ELSE
                 BEGIN
@@ -354,7 +330,8 @@ BEGIN
                             SET @sel_grp += N', ' + @af_func + N'('
                                 + @af_join_alias + N'.[' + @af_col + N']) AS '
                                 + QUOTENAME(@af_alias);
-                            INSERT @joined_fields(field_path) VALUES (@af_path);
+                            INSERT @joined_fields(field_path, col_expr)
+                                VALUES (@af_path, @af_join_alias + N'.[' + @af_col + N']');
                         END;
                     END;
                 END;
@@ -365,12 +342,61 @@ BEGIN
     END;
 
     -- ---- HAVING ------------------------------------------------------
+    -- An item field only the HAVING aggregates gets its own join, as an aggregate
+    -- of the SELECT list would; then every aggregate reads the joined column
+    -- through @cols. A HAVING the translator cannot read makes the query NULL.
     DECLARE @having_clause NVARCHAR(MAX) = N'';
-    IF @having IS NOT NULL AND ISJSON(@having) = 1 AND @having <> N'{}'
+    IF @having IS NOT NULL
     BEGIN
-        DECLARE @having_sql NVARCHAR(MAX) = dbo.pvt_build_array_having_expr(@having);
-        IF @having_sql IS NOT NULL AND @having_sql <> N'' AND @having_sql <> N'1=1'
-            SET @having_clause = CHAR(10) + N'HAVING ' + @having_sql;
+        IF ISJSON(@having) = 0 OR @having = N'{}' RETURN NULL;
+
+        DECLARE @hv_aggs NVARCHAR(MAX) = dbo.pvt_having_agg_entries(@having);
+        IF @hv_aggs <> N''
+        BEGIN
+            DECLARE c_hv CURSOR LOCAL FAST_FORWARD FOR
+                SELECT DISTINCT JSON_VALUE(a.[value], N'$."$field"')
+                  FROM OPENJSON(N'[' + @hv_aggs + N']') e
+                 CROSS APPLY OPENJSON(e.[value]) a
+                 WHERE LEFT(a.[key], 1) = N'$' AND a.[type] = 5;
+            DECLARE @hv_path NVARCHAR(400);
+            OPEN c_hv;
+            FETCH NEXT FROM c_hv INTO @hv_path;
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                IF @hv_path IS NOT NULL
+                   AND NOT EXISTS(SELECT 1 FROM @joined_fields WHERE field_path = @hv_path)
+                BEGIN
+                    DECLARE @hv_meta NVARCHAR(MAX) =
+                        dbo.pvt_resolve_field_path(@scheme_id, @array_path + N'[].' + @hv_path);
+                    DECLARE @hv_sid BIGINT = TRY_CAST(JSON_VALUE(@hv_meta, N'$.sid') AS BIGINT);
+                    DECLARE @hv_col NVARCHAR(64) =
+                        dbo.pvt_db_type_to_value_column(JSON_VALUE(@hv_meta, N'$.db_type'));
+                    -- Not an item field: the translator finds no column and refuses.
+                    IF @hv_sid IS NOT NULL AND @hv_col IS NOT NULL
+                    BEGIN
+                        SET @join_idx += 1;
+                        DECLARE @hv_join_alias NVARCHAR(10) = N'h' + CAST(@join_idx AS NVARCHAR(5));
+                        SET @joins +=
+                              CHAR(10) + N'LEFT JOIN dbo._values ' + @hv_join_alias
+                            + N' ON ' + @hv_join_alias + N'.[_id_object] = v.[_id_object]'
+                            + N'  AND ' + @hv_join_alias + N'.[_id_structure] = ' + CAST(@hv_sid AS NVARCHAR(20))
+                            + N'  AND ' + @hv_join_alias + N'.[_array_parent_id] = v.[_id]';
+                        INSERT @joined_fields(field_path, col_expr)
+                            VALUES (@hv_path, @hv_join_alias + N'.[' + @hv_col + N']');
+                    END;
+                END;
+                FETCH NEXT FROM c_hv INTO @hv_path;
+            END;
+            CLOSE c_hv; DEALLOCATE c_hv;
+        END;
+
+        DECLARE @hv_cols NVARCHAR(MAX) = N'{' + COALESCE(
+            (SELECT STRING_AGG(N'"' + STRING_ESCAPE(field_path, 'json') + N'":"'
+                               + STRING_ESCAPE(col_expr, 'json') + N'"', N',')
+               FROM @joined_fields), N'') + N'}';
+        DECLARE @having_sql NVARCHAR(MAX) = dbo.pvt_build_array_having_expr(@having, @hv_cols);
+        IF @having_sql IS NULL RETURN NULL;
+        SET @having_clause = CHAR(10) + N'HAVING ' + @having_sql;
     END;
 
     DECLARE @grp_sql NVARCHAR(MAX) =
