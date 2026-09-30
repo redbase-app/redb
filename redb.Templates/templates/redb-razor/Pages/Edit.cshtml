@@ -1,0 +1,34 @@
+@page "{id:long?}"
+@model EditModel
+@{
+    ViewData["Title"] = Model.Id is null ? "New product" : "Edit product";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+<form method="post" class="form">
+    <div asp-validation-summary="ModelOnly"></div>
+
+    <label asp-for="Input.Name">Name</label>
+    <input asp-for="Input.Name" />
+    <span asp-validation-for="Input.Name"></span>
+
+    <label asp-for="Input.Category">Category</label>
+    <input asp-for="Input.Category" />
+    <span asp-validation-for="Input.Category"></span>
+
+    <label asp-for="Input.Price">Price</label>
+    <input asp-for="Input.Price" step="0.01" />
+    <span asp-validation-for="Input.Price"></span>
+
+    <label><input asp-for="Input.InStock" /> In stock</label>
+
+    <label asp-for="Input.Description">Description</label>
+    <textarea asp-for="Input.Description" rows="4"></textarea>
+    <span asp-validation-for="Input.Description"></span>
+
+    <div class="actions">
+        <button type="submit">Save</button>
+        <a asp-page="/Index">Cancel</a>
+    </div>
+</form>

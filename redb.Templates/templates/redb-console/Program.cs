@@ -4,6 +4,7 @@ using redb.Core;
 using redb.Core.Models.Contracts;
 using redb.Core.Models.Entities;
 #if (pro)
+using redb.Core.Models.Configuration;
 using redb.Core.Pro.Extensions;
 #else
 using redb.Core.Extensions;
@@ -59,8 +60,18 @@ class Program
             // .WithLicense("YOUR_LICENSE_KEY")  // Not needed: the whole 4.x line is free and unrestricted
             .Configure(c =>
             {
-                // c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;  // Diff-tree save (Pro)
-                // c.EnablePropsCache = true;                            // Cache materialized Props
+                // Narrows the object set before the pivot step, so a selective filter does not scan the
+                // whole scheme. It never changes results.
+                c.EnablePvtPrefilter = true;
+
+                // Saves only the properties that changed since the object was loaded.
+                c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;
+
+                // Props cache: off by default. Turn it on when the same objects are read again and
+                // again; the limit is per process, entries past the TTL are loaded again.
+                // c.EnablePropsCache = true;
+                // c.PropsCacheMaxSize = 10_000;
+                // c.PropsCacheTtl = TimeSpan.FromMinutes(60);
             }));
 #else
         // Free edition.

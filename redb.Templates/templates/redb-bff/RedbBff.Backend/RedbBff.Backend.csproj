@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The backend: a module with InitRoute.main and the controllers. The same DLL runs in two places:
+       RedbBff.Host calls InitRoute.main itself, and a Tsak worker loads it from RedbBff.tpkg
+       (deploy/pack-tpkg.ps1). redb and redb.Route ship with the Tsak worker, so the package carries this
+       DLL and RedbBff.Models.dll. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\RedbBff.Models\RedbBff.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="redb.Core" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route.Core" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route.Http" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route.Controllers" Version="$(RedbVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The module's configuration. Packed into the .tpkg; copied to the output so the host reads the
+         same file the Tsak worker does. -->
+    <None Update="RedbBff.Backend.config.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

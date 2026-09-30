@@ -1,6 +1,8 @@
 using redb.Core;
 using redb.Core.Models.Entities;
+using redb.Core.Query;
 using redb.Core.Query.Aggregation;
+using redb.Core.Query.Base;
 using redb.Core.Query.Window;
 using redb.Tests.Integration.Helpers;
 using redb.Tests.Integration.Models;
@@ -116,6 +118,47 @@ public abstract class TreeQueryShapesTestsBase
 
         var strictRows = await strict.SelectAsync(g => new { Department = g.Key, Count = Agg.Count(g) });
         strictRows.Should().BeEmpty();
+    }
+
+    private IRedbProjectedQueryable<EmployeeRow> ProjectTree(long rootId)
+        => ((TreeQueryableBase<EmployeeProps>)Redb.TreeQuery<EmployeeProps>(rootId))
+            .Select(e => new EmployeeRow(e.Props.Salary, e.Props.Department));
+
+    public sealed record EmployeeRow(decimal Salary, string Department);
+
+    [Fact]
+    public async Task TreeProjection_TakeAfterOrderBy_TakesFromTheSortedRows()
+    {
+        // TPQ-1: OrderBy ran in memory after the projection, Take went to SQL before it - the page was cut from
+        // the unsorted rows (the first child, salary 1000) and then sorted.
+        var rootId = await SeedEmployeeTreeAsync();
+
+        var top = await ProjectTree(rootId).OrderByDescending(x => x.Salary).Take(1).ToListAsync();
+
+        top.Select(x => x.Salary).Should().Equal(4000m);
+    }
+
+    [Fact]
+    public async Task TreeProjection_TakeAfterWhere_TakesFromTheFilteredRows()
+    {
+        // TPQ-1: the filter ran on the page SQL had already cut.
+        var rootId = await SeedEmployeeTreeAsync();
+
+        var rows = await ProjectTree(rootId).Where(x => x.Salary > 2500m).Take(1).ToListAsync();
+
+        rows.Should().ContainSingle().Which.Salary.Should().BeGreaterThan(2500m);
+    }
+
+    [Fact]
+    public async Task TreeProjection_Distinct_IsOverTheProjectedRows()
+    {
+        // TPQ-1: Distinct went to the source query, where every node is distinct, so projected duplicates stayed.
+        var rootId = await SeedEmployeeTreeAsync();
+
+        var departments = await ((TreeQueryableBase<EmployeeProps>)Redb.TreeQuery<EmployeeProps>(rootId))
+            .Select(e => e.Props.Department).Distinct().ToListAsync();
+
+        departments.Should().OnlyHaveUniqueItems().And.HaveCount(2);
     }
 
     [Fact]

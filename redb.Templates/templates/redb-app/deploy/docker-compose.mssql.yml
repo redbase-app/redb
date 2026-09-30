@@ -1,0 +1,40 @@
+# The API with SQL Server instead of SQLite, and the client behind nginx.
+# Before the first run, switch the provider in code (see the comment in RedbApp.Host/Program.cs):
+#   RedbApp.Host.csproj: redb.SQLite.Pro  ->  redb.MSSql.Pro
+#   Program.cs:          .UseSqlite(...)  ->  .UseMsSql(connectionString)
+# RedBase creates its tables but not the database: create redb_app once, for example
+#   docker compose -f deploy/docker-compose.mssql.yml up -d db
+#   docker compose -f deploy/docker-compose.mssql.yml exec db /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "Change_me_123" -Q "CREATE DATABASE redb_app"
+# Then (deploy/.env as for docker-compose.yml): docker compose -f deploy/docker-compose.mssql.yml up --build
+# Then open http://localhost:8080.
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Change_me_123"
+    volumes:
+      - mssqldata:/var/opt/mssql
+
+  api:
+    build:
+      context: ..
+      dockerfile: RedbApp.Host/Dockerfile
+    environment:
+      ConnectionStrings__Redb: "Server=db,1433;Database=redb_app;User Id=sa;Password=Change_me_123;TrustServerCertificate=true"
+      Tsak__Contexts__redbapp__Override__Auth__SigningKey: ${APP_SIGNING_KEY:?APP_SIGNING_KEY required}
+      Tsak__Contexts__redbapp__Override__Auth__Users__admin__Password: ${APP_ADMIN_PASSWORD:?APP_ADMIN_PASSWORD required}
+    depends_on:
+      - db
+
+  web:
+    build:
+      context: ..
+      dockerfile: RedbApp.Web/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  mssqldata:

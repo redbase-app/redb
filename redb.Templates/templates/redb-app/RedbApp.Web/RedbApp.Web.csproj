@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <!-- The client: Blazor WebAssembly. It runs in the browser and talks to RedbApp.Api over HTTP; it never
+       touches the database. In development the dev server serves it (dotnet run); in a deployment it is
+       static files behind nginx, which also forwards /api/ to the API (nginx.conf). -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\RedbApp.Models\RedbApp.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

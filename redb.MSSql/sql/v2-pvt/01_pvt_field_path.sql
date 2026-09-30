@@ -24,6 +24,22 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
+-- ---------- pvt_fail --------------------------------------------------------
+-- The one way a builder of this module refuses input it cannot read (review SQ-5). T-SQL does not allow
+-- THROW or RAISERROR inside a function, so this raises a conversion error that carries the message:
+--   Conversion failed when converting the nvarchar value 'redb: <message>' to data type int.
+-- It stops the statement from any depth of nested calls, which a NULL or a '1=1' / '1=0' substitute
+-- never did: those let the query run with the condition dropped or every row cut. The PostgreSQL module
+-- raises in the same places. Use it in a statement branch or behind COALESCE / CASE, which evaluate it
+-- only when the branch is taken.
+CREATE OR ALTER FUNCTION dbo.pvt_fail(@message NVARCHAR(3000))
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    RETURN CAST(N'redb: ' + COALESCE(@message, N'(no message)') AS INT);
+END;
+GO
+
 -- ---------- pvt_json_string_or_null ---------------------------------------
 -- Tiny helper used by builders to serialize a NVARCHAR value as a JSON
 -- string with proper escaping, or the literal `null` if NULL. Required
@@ -285,14 +301,11 @@ BEGIN
             RETURN @eq;
     END;
 
-    -- Bare JSON string: `"<key>"`. JSON_VALUE on root needs a wrapper:
-    -- wrap in single-element array and read [0]. Works for both `"foo"`
-    -- and bare scalars; for non-string scalars JSON_VALUE returns the
-    -- text form which is acceptable for the caller (it only treats
-    -- non-null strings as dict keys).
-    DECLARE @arr NVARCHAR(MAX) = N'[' + @op + N']';
-    IF ISJSON(@arr) = 1
-        RETURN JSON_VALUE(@arr, N'$[0]');
+    -- Bare key: the callers pass the value as OPENJSON returns it, and for a string that is the text
+    -- itself, without quotes - so anything that is not JSON is the key. (Wrapping it as `[<text>]` made
+    -- invalid JSON for every string key, and {"Dict.ContainsKey":"home"} was never recognised.)
+    IF ISJSON(@op) = 0
+        RETURN @op;
 
     RETURN NULL;
 END;

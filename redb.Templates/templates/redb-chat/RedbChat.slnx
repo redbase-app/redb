@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RedbChat.Module/RedbChat.Module.csproj" />
+  <Project Path="RedbChat.Host/RedbChat.Host.csproj" />
+</Solution>

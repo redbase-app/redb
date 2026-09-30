@@ -99,6 +99,14 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     /// Check for Pro-only Distinct features (DistinctBy, DistinctByRedb, DistinctRedb).
     /// Throws NotSupportedException in Free version.
     /// </summary>
+    /// <summary>
+    /// The <c>p_distinct_on</c> argument of <c>pvt_build_query_sql</c> for a tree query - the same JSON the flat
+    /// query passes. The Free tree providers used to pass none, and DistinctBy / DistinctByRedb on a tree returned
+    /// every node.
+    /// </summary>
+    protected static string? BuildPvtDistinctOnJson<TProps>(QueryContext<TProps> context) where TProps : class, new()
+        => QueryProviderBase.BuildPvtDistinctOnJson(context);
+
     protected virtual void CheckProOnlyDistinctFeatures<TProps>(QueryContext<TProps> context) where TProps : class, new()
     {
         // No-op: DistinctRedb / DistinctBy are evaluated downstream by the SQL builder.

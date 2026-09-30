@@ -1,0 +1,45 @@
+@page "/login"
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in</PageTitle>
+
+<h1>Sign in</h1>
+
+<EditForm Model="request" OnValidSubmit="SignInAsync" class="form">
+    <DataAnnotationsValidator />
+
+    <label>Login</label>
+    <InputText @bind-Value="request.Login" autocomplete="username" />
+    <ValidationMessage For="() => request.Login" />
+
+    <label>Password</label>
+    <InputText type="password" @bind-Value="request.Password" autocomplete="current-password" />
+    <ValidationMessage For="() => request.Password" />
+
+    @if (error is not null)
+    {
+        <p class="error">@error</p>
+    }
+
+    <div class="actions">
+        <button type="submit" disabled="@busy">Sign in</button>
+    </div>
+</EditForm>
+
+<p class="muted">The users are in RedbApp.Host/appsettings.json (Auth:Users).</p>
+
+@code {
+    private readonly LoginRequest request = new();
+    private string? error;
+    private bool busy;
+
+    private async Task SignInAsync()
+    {
+        busy = true;
+        error = await Api.LoginAsync(request);
+        busy = false;
+        if (error is null)
+            Navigation.NavigateTo("");
+    }
+}

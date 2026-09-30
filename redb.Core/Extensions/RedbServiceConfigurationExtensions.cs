@@ -17,55 +17,6 @@ namespace redb.Core.Extensions
         }
 
         /// <summary>
-        /// Clone configuration
-        /// </summary>
-        public static RedbServiceConfiguration Clone(this RedbServiceConfiguration source)
-        {
-            return new RedbServiceConfiguration
-            {
-                // Object deletion settings
-                IdResetStrategy = source.IdResetStrategy,
-                MissingObjectStrategy = source.MissingObjectStrategy,
-
-                // Security settings
-                DefaultCheckPermissionsOnLoad = source.DefaultCheckPermissionsOnLoad,
-                DefaultCheckPermissionsOnSave = source.DefaultCheckPermissionsOnSave,
-                DefaultCheckPermissionsOnDelete = source.DefaultCheckPermissionsOnDelete,
-
-                // Schema settings
-                DefaultStrictDeleteExtra = source.DefaultStrictDeleteExtra,
-                AutoSyncSchemesOnSave = source.AutoSyncSchemesOnSave,
-
-                // Loading settings
-                DefaultLoadDepth = source.DefaultLoadDepth,
-                DefaultMaxTreeDepth = source.DefaultMaxTreeDepth,
-
-                // Performance settings
-                EnableMetadataCache = source.EnableMetadataCache,
-                MetadataCacheLifetimeMinutes = source.MetadataCacheLifetimeMinutes,
-
-                // Validation settings
-                EnableSchemaValidation = source.EnableSchemaValidation,
-                EnableDataValidation = source.EnableDataValidation,
-
-                // Audit settings
-                AutoSetModifyDate = source.AutoSetModifyDate,
-                AutoRecomputeHash = source.AutoRecomputeHash,
-
-                // Security context settings
-                // DefaultSecurityPriority removed,
-                SystemUserId = source.SystemUserId,
-
-                // Serialization settings
-                JsonOptions = new JsonSerializationOptions
-                {
-                    WriteIndented = source.JsonOptions.WriteIndented,
-                    UseUnsafeRelaxedJsonEscaping = source.JsonOptions.UseUnsafeRelaxedJsonEscaping
-                }
-            };
-        }
-
-        /// <summary>
         /// Merge configurations (target is overwritten with source values)
         /// </summary>
         public static RedbServiceConfiguration MergeWith(this RedbServiceConfiguration target, RedbServiceConfiguration source)
@@ -172,28 +123,10 @@ namespace redb.Core.Extensions
         /// </summary>
         public static IDisposable ApplyTemporary(this IRedbService service, RedbServiceConfiguration temporaryConfig)
         {
+            // CFG-1: every behaviour setting, in place (providers hold the same configuration instance); the
+            // connection identity stays. It used to be a hand-written list of fourteen settings out of thirty-six.
             var originalConfig = service.Configuration.Clone();
-            service.UpdateConfiguration(config => 
-            {
-                // Copy all properties from temporaryConfig
-                config.IdResetStrategy = temporaryConfig.IdResetStrategy;
-                config.MissingObjectStrategy = temporaryConfig.MissingObjectStrategy;
-                config.DefaultCheckPermissionsOnLoad = temporaryConfig.DefaultCheckPermissionsOnLoad;
-                config.DefaultCheckPermissionsOnSave = temporaryConfig.DefaultCheckPermissionsOnSave;
-                config.DefaultCheckPermissionsOnDelete = temporaryConfig.DefaultCheckPermissionsOnDelete;
-                config.DefaultLoadDepth = temporaryConfig.DefaultLoadDepth;
-                config.DefaultMaxTreeDepth = temporaryConfig.DefaultMaxTreeDepth;
-                config.EnableMetadataCache = temporaryConfig.EnableMetadataCache;
-                config.MetadataCacheLifetimeMinutes = temporaryConfig.MetadataCacheLifetimeMinutes;
-                config.EnableSchemaValidation = temporaryConfig.EnableSchemaValidation;
-                config.EnableDataValidation = temporaryConfig.EnableDataValidation;
-                config.AutoSetModifyDate = temporaryConfig.AutoSetModifyDate;
-                config.AutoRecomputeHash = temporaryConfig.AutoRecomputeHash;
-                // config.DefaultSecurityPriority = temporaryConfig.DefaultSecurityPriority; // Removed
-                config.SystemUserId = temporaryConfig.SystemUserId;
-                config.JsonOptions = temporaryConfig.JsonOptions;
-            });
-            
+            service.UpdateConfiguration(config => config.CopyBehaviourFrom(temporaryConfig));
             return new TemporaryConfigurationScope(service, originalConfig);
         }
 
@@ -202,7 +135,9 @@ namespace redb.Core.Extensions
         /// </summary>
         public static IDisposable ApplyTemporary(this IRedbService service, Func<RedbServiceConfigurationBuilder, RedbServiceConfigurationBuilder> configure)
         {
-            var builder = new RedbServiceConfigurationBuilder(service.Configuration);
+            // CFG-1: the builder works on a copy. On the live configuration the change was applied before the
+            // snapshot meant to undo it was taken, and the scope "restored" the changed values.
+            var builder = new RedbServiceConfigurationBuilder(service.Configuration.Clone());
             var temporaryConfig = configure(builder).Build();
             
             return service.ApplyTemporary(temporaryConfig);
@@ -228,26 +163,7 @@ namespace redb.Core.Extensions
         {
             if (!_disposed)
             {
-                _service.UpdateConfiguration(config => 
-                {
-                    // Restore all properties from originalConfiguration
-                    config.IdResetStrategy = _originalConfiguration.IdResetStrategy;
-                    config.MissingObjectStrategy = _originalConfiguration.MissingObjectStrategy;
-                    config.DefaultCheckPermissionsOnLoad = _originalConfiguration.DefaultCheckPermissionsOnLoad;
-                    config.DefaultCheckPermissionsOnSave = _originalConfiguration.DefaultCheckPermissionsOnSave;
-                    config.DefaultCheckPermissionsOnDelete = _originalConfiguration.DefaultCheckPermissionsOnDelete;
-                    config.DefaultLoadDepth = _originalConfiguration.DefaultLoadDepth;
-                    config.DefaultMaxTreeDepth = _originalConfiguration.DefaultMaxTreeDepth;
-                    config.EnableMetadataCache = _originalConfiguration.EnableMetadataCache;
-                    config.MetadataCacheLifetimeMinutes = _originalConfiguration.MetadataCacheLifetimeMinutes;
-                    config.EnableSchemaValidation = _originalConfiguration.EnableSchemaValidation;
-                    config.EnableDataValidation = _originalConfiguration.EnableDataValidation;
-                    config.AutoSetModifyDate = _originalConfiguration.AutoSetModifyDate;
-                    config.AutoRecomputeHash = _originalConfiguration.AutoRecomputeHash;
-                    // config.DefaultSecurityPriority = _originalConfiguration.DefaultSecurityPriority; // Removed
-                    config.SystemUserId = _originalConfiguration.SystemUserId;
-                    config.JsonOptions = _originalConfiguration.JsonOptions;
-                });
+                _service.UpdateConfiguration(config => config.CopyBehaviourFrom(_originalConfiguration));
                 _disposed = true;
             }
         }

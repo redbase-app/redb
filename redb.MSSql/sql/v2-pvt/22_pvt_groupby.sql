@@ -126,10 +126,8 @@ BEGIN
 
     IF @k IN (N'$count', N'$sum', N'$avg', N'$min', N'$max')
     BEGIN
-        DECLARE @agg NVARCHAR(MAX) = dbo.pvt_build_agg_expr(@node, @fields, @base_prefix);
-        -- pvt_build_agg_expr marks what it cannot compile with a leading comment.
-        IF @agg IS NULL OR LEFT(@agg, 2) = N'/*' RETURN NULL;
-        RETURN @agg;
+        -- pvt_build_agg_expr refuses what it cannot compile (dbo.pvt_fail), so its result is SQL.
+        RETURN dbo.pvt_build_agg_expr(@node, @fields, @base_prefix);
     END;
 
     IF @k = N'$const'

@@ -1,0 +1,22 @@
+{
+  "ContextName": "redbchat",
+  "AutoStart": true,
+  "Llm": {
+    "Provider": "anthropic",
+    "ModelId": "claude-haiku-4-5",
+    "Temperature": 0.2,
+    "MaxTokens": 1024
+  },
+  "Chat": {
+    "SystemPrompt": "You are a helpful assistant. Answer briefly and plainly."
+  },
+//#if (UseMcp)
+  "Mcp": {
+    "Folder": "data/files"
+  },
+//#endif
+  "Http": {
+    "Host": "127.0.0.1",
+    "Port": 5090
+  }
+}

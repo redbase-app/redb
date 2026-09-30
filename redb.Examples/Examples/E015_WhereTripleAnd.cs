@@ -7,7 +7,7 @@ namespace redb.Examples.Examples;
 
 /// <summary>
 /// Filter employees using triple AND condition.
-/// Find experienced developers with high salary.
+/// Find experienced developers with high salary, highest paid first.
 /// </summary>
 [ExampleMeta("E015", "Where - Triple AND", "Query",
     ExampleTier.Free, 2, "Where", "AND", "Complex")]
@@ -19,6 +19,7 @@ public class E015_WhereTripleAnd : ExampleBase
 
         var query = redb.Query<EmployeeProps>()
             .Where(e => e.Position != "" && e.Age >= 30 && e.Salary > 70000m)
+            .OrderByDescending(e => e.Salary)
             .Take(100);
 
         // Uncomment to see generated SQL:
@@ -29,6 +30,6 @@ public class E015_WhereTripleAnd : ExampleBase
         sw.Stop();
 
         return Ok("E015", "Where - Triple AND", ExampleTier.Free, sw.ElapsedMilliseconds, result.Count,
-            [$"Filter: Position != '' AND Age >= 30 AND Salary > 70k"]);
+            [$"Filter: Position != '' AND Age >= 30 AND Salary > 70k, ORDER BY Salary DESC, top 100"]);
     }
 }

@@ -216,6 +216,10 @@ BEGIN
     DECLARE @join_idx    INT           = 0;
     -- Every item field already joined, with the typed column it reads (g1.[_String], a2.[_Long]).
     DECLARE @joined_fields TABLE(field_path NVARCHAR(400) PRIMARY KEY, col_expr NVARCHAR(200) NOT NULL);
+    -- A key or aggregate the item does not have makes the whole result NULL (the caller refuses). They
+    -- used to be skipped: the grouping ran on the other keys, the aggregate vanished, and with no key
+    -- left the flat list of items came back instead of groups.
+    DECLARE @unresolved BIT = 0;
 
     DECLARE c_grp CURSOR LOCAL FAST_FORWARD FOR
         SELECT [value] FROM OPENJSON(@group_by);
@@ -224,6 +228,7 @@ BEGIN
     FETCH NEXT FROM c_grp INTO @grp_entry;
     WHILE @@FETCH_STATUS = 0
     BEGIN
+        DECLARE @gf_before INT = @join_idx;
         DECLARE @gf_path    NVARCHAR(400) = JSON_VALUE(@grp_entry, N'$.field');
         DECLARE @gf_alias   NVARCHAR(200) = ISNULL(JSON_VALUE(@grp_entry, N'$.alias'), @gf_path);
         IF @gf_path IS NOT NULL AND @gf_path <> N''
@@ -256,21 +261,12 @@ BEGIN
                 END;
             END;
         END;
+        IF @join_idx = @gf_before BEGIN SET @unresolved = 1; BREAK; END;
         FETCH NEXT FROM c_grp INTO @grp_entry;
     END;
     CLOSE c_grp; DEALLOCATE c_grp;
 
-    IF @sel_grp = N''
-    BEGIN
-        RETURN N'SELECT o.[_id] AS [_id_object], v.[_array_index] AS [_idx], '
-             + @val_col_expr + CHAR(10)
-             + N'FROM dbo._values v' + CHAR(10)
-             + N'INNER JOIN dbo._objects o ON o.[_id] = v.[_id_object]'
-             + N' AND o.[_id_scheme] = ' + CAST(@scheme_id AS NVARCHAR(20)) + CHAR(10)
-             + N'WHERE v.[_id_structure] = ' + CAST(@arr_sid AS NVARCHAR(20))
-             + N' AND v.[_array_index] IS NOT NULL'
-             + @filter_clause;
-    END;
+    IF @unresolved = 1 OR @sel_grp = N'' RETURN NULL;
 
     -- ---- Aggregations ------------------------------------------------
     -- Each entry: { field, func: COUNT|SUM|AVG|MIN|MAX, alias }.
@@ -286,6 +282,7 @@ BEGIN
         FETCH NEXT FROM c_agg INTO @agg_entry;
         WHILE @@FETCH_STATUS = 0
         BEGIN
+            DECLARE @af_before NVARCHAR(MAX) = @sel_grp;
             DECLARE @af_path  NVARCHAR(400) = JSON_VALUE(@agg_entry, N'$.field');
             DECLARE @af_func  NVARCHAR(20)  = UPPER(ISNULL(JSON_VALUE(@agg_entry, N'$.func'), N''));
             DECLARE @af_alias NVARCHAR(200) = JSON_VALUE(@agg_entry, N'$.alias');
@@ -336,9 +333,11 @@ BEGIN
                     END;
                 END;
             END;
+            IF @sel_grp = @af_before BEGIN SET @unresolved = 1; BREAK; END;
             FETCH NEXT FROM c_agg INTO @agg_entry;
         END;
         CLOSE c_agg; DEALLOCATE c_agg;
+        IF @unresolved = 1 RETURN NULL;
     END;
 
     -- ---- HAVING ------------------------------------------------------

@@ -1373,27 +1373,23 @@ namespace redb.SQLite.Data
                             continue;
                         }
 
-                        // BLOB -> byte[] (Convert.ChangeType can't handle byte[]).
-                        if (targetType == typeof(byte[]))
+                        // A value already of the property's type is assigned as is (BLOB -> byte[] among them).
+                        if (property.PropertyType.IsInstanceOfType(value))
                         {
-                            if (value is byte[] bytes) property.SetValue(obj, bytes);
+                            property.SetValue(obj, value);
                             continue;
                         }
 
-                        var convertedValue = Convert.ChangeType(value, targetType);
+                        var convertedValue = Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
                         property.SetValue(obj, convertedValue);
                     }
-                    catch
+                    catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
                     {
-                        // Try direct assignment
-                        try
-                        {
-                            property.SetValue(obj, value);
-                        }
-                        catch
-                        {
-                            // Skip if cannot convert
-                        }
+                        // SL-57: two silent catches left the property at its default - the row read as if the
+                        // column were NULL.
+                        throw new InvalidOperationException(
+                            $"Column '{columnName}': the value '{value}' ({value.GetType().Name}) cannot be read as " +
+                            $"{property.PropertyType.Name} ({typeof(T).Name}.{property.Name}).", ex);
                     }
                 }
             }

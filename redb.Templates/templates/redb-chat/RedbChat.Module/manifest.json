@@ -1,0 +1,6 @@
+{
+  "Name": "RedbChat",
+  "Version": "1.0.0",
+  "EntryPoints": ["RedbChat.Module.dll"],
+  "Dependencies": []
+}

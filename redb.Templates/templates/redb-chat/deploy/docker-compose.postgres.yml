@@ -1,0 +1,33 @@
+# The chat in its own host with PostgreSQL instead of SQLite.
+# Before the first run, switch the provider in code (see the comment in RedbChat.Host/Program.cs):
+#   RedbChat.Host.csproj: redb.SQLite.Pro  ->  redb.Postgres.Pro
+#   Program.cs:             .UseSqlite(...)  ->  .UsePostgres(connectionString)
+# Then from the project folder: docker compose -f deploy/docker-compose.postgres.yml up --build
+# Then: curl -d "hello" http://localhost:5090/api/chat   (the key comes from deploy/.env: LLM_API_KEY)
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: redb
+      POSTGRES_PASSWORD: change_me
+      POSTGRES_DB: redb_app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redb -d redb_app"]
+      interval: 5s
+      retries: 10
+
+  chat:
+    build: ..
+    environment:
+      ConnectionStrings__Redb: "Host=db;Port=5432;Username=redb;Password=change_me;Database=redb_app;Pooling=true"
+      Tsak__Contexts__redbchat__Override__Llm__ApiKey: ${LLM_API_KEY:?LLM_API_KEY required}
+    ports:
+      - "5090:5090"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

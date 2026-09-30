@@ -1385,7 +1385,7 @@ public class SqliteDialect : ISqlDialect
     // gate would try to apply a SQL bundle, and there is none. Bump both on every change of the C code.
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
-    public string? Query_PvtRequiredVersion() => "0.6.6";
+    public string? Query_PvtRequiredVersion() => "0.6.7";
 
     public string? Query_BuildPvtProjectionSqlFunction() => null;
 

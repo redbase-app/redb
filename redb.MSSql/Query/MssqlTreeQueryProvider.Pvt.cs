@@ -261,7 +261,9 @@ public partial class MssqlTreeQueryProvider
         //   @scheme_id, @filter, @limit, @offset, @order, @max_depth,
         //   @distinct, @source_mode, @tree_ids, @include_seed,
         //   @polymorphic, @distinct_on
-        var orderArg = hasOrder ? "$2" : "NULL";
+        // A distinct key binds $3; the order then always binds $2, NULL when there is none.
+        var distinctOnJson = BuildPvtDistinctOnJson(context);
+        var orderArg = hasOrder || distinctOnJson != null ? "$2" : "NULL";
         var invocation = "SELECT dbo.pvt_build_query_sql("
             + context.SchemeId.ToString(CultureInfo.InvariantCulture)
             + ", $1, " + limitArg
@@ -273,13 +275,16 @@ public partial class MssqlTreeQueryProvider
             + ", " + treeIdsLiteral
             + ", " + (route.IncludeSeed ? "1" : "0")
             + ", 1"          // @polymorphic=1 matches Pro default
-            + ", NULL)"      // @distinct_on
+            + (distinctOnJson != null ? ", $3)" : ", NULL)")   // @distinct_on
             + " AS [Value]";
 
         object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
 
         string? inner;
-        if (hasOrder)
+        if (distinctOnJson != null)
+            inner = await _context.ExecuteScalarAsync<string>(invocation,
+                new object[] { filterParam, hasOrder ? (object)orderByJson! : DBNull.Value, distinctOnJson }, cancellationToken);
+        else if (hasOrder)
             inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, orderByJson! }, cancellationToken);
         else
             inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam }, cancellationToken);

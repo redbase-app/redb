@@ -1,0 +1,87 @@
+@page "/"
+@inject BackendClient Api
+
+<PageTitle>Products</PageTitle>
+
+<h1>Products</h1>
+
+<div class="filters">
+    <input type="search" placeholder="Search by name" @bind="search" @bind:after="ReloadFromFirstPage" />
+    <label><input type="checkbox" @bind="inStockOnly" @bind:after="ReloadFromFirstPage" /> In stock only</label>
+    <select @bind="sort" @bind:after="ReloadFromFirstPage">
+        <option value="name">Name</option>
+        <option value="category">Category</option>
+        <option value="price">Price, low to high</option>
+        <option value="-price">Price, high to low</option>
+    </select>
+    <a href="products/new">New product</a>
+</div>
+
+@if (error is not null)
+{
+    <p class="error">@error</p>
+}
+
+<p class="muted">@data.Total product(s)</p>
+
+<table>
+    <thead>
+        <tr><th>Name</th><th>Category</th><th class="num">Price</th><th>In stock</th><th></th></tr>
+    </thead>
+    <tbody>
+    @foreach (var item in data.Items)
+    {
+        <tr>
+            <td><a href="products/@item.Id">@item.Name</a></td>
+            <td>@item.Category</td>
+            <td class="num">@item.Price.ToString("F2")</td>
+            <td>@(item.InStock ? "yes" : "no")</td>
+            <td><button class="link" @onclick="() => DeleteAsync(item.Id)">Delete</button></td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<nav class="pager">
+    <button disabled="@(data.Page <= 1)" @onclick="() => GoToAsync(data.Page - 1)">Previous</button>
+    <span>Page @data.Page of @PageCount</span>
+    <button disabled="@(data.Page >= PageCount)" @onclick="() => GoToAsync(data.Page + 1)">Next</button>
+</nav>
+
+@code {
+    private string? search;
+    private bool inStockOnly;
+    private string sort = "name";
+    private ProductPage data = new() { Page = 1, PageSize = 10 };
+    private string? error;
+
+    private int PageCount => Math.Max(1, (data.Total + data.PageSize - 1) / Math.Max(1, data.PageSize));
+
+    protected override Task OnInitializedAsync() => LoadAsync(1);
+
+    private Task ReloadFromFirstPage() => LoadAsync(1);
+
+    private Task GoToAsync(int page) => LoadAsync(page);
+
+    private async Task DeleteAsync(long id)
+    {
+        await RunAsync(() => Api.DeleteProductAsync(id));
+        await LoadAsync(data.Page);
+    }
+
+    // Search, sorting and paging run in the backend, and there in the database.
+    private Task LoadAsync(int page) => RunAsync(async () => data = await Api.ProductsAsync(search, inStockOnly, sort, page));
+
+    private async Task RunAsync(Func<Task> call)
+    {
+        error = null;
+        try
+        {
+            await call();
+        }
+        catch (BackendException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

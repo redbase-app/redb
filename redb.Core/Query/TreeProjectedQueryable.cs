@@ -23,6 +23,14 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
     private readonly List<Expression<Func<TResult, bool>>> _wherePredicates = new();
     private readonly List<(Expression KeySelector, bool IsDescending)> _orderByExpressions = new();
 
+    // TPQ-1 (review 2026-09-24), the tree twin of S-4 in RedbProjectedQueryable: Where/OrderBy run in memory after
+    // the projection, so a Take/Skip called after them must too - sent to the source query it cut the page from
+    // the unfiltered, unsorted rows. Distinct is over the projected rows, not over the source objects (every node
+    // is distinct there). Pipeline: Where* -> OrderBy* -> Distinct -> Skip/Take in call order. A Take/Skip before
+    // the first in-memory operation still goes to SQL.
+    private readonly bool _isDistinct;
+    private readonly List<(bool IsSkip, int Count)> _pagingOps = new();
+
     public TreeProjectedQueryable(
         IRedbQueryable<TProps> sourceQuery,
         Expression<Func<TreeRedbObject<TProps>, TResult>> projection)
@@ -36,13 +44,28 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
         IRedbQueryable<TProps> sourceQuery,
         Expression<Func<TreeRedbObject<TProps>, TResult>> projection,
         List<Expression<Func<TResult, bool>>> wherePredicates,
-        List<(Expression KeySelector, bool IsDescending)> orderByExpressions)
+        List<(Expression KeySelector, bool IsDescending)> orderByExpressions,
+        bool isDistinct,
+        List<(bool IsSkip, int Count)> pagingOps)
     {
         _sourceQuery = sourceQuery;
         _projection = projection;
         _wherePredicates = new List<Expression<Func<TResult, bool>>>(wherePredicates);
         _orderByExpressions = new List<(Expression, bool)>(orderByExpressions);
+        _isDistinct = isDistinct;
+        _pagingOps = new List<(bool, int)>(pagingOps);
     }
+
+    private TreeProjectedQueryable<TProps, TResult> With(
+        IRedbQueryable<TProps>? sourceQuery = null,
+        List<Expression<Func<TResult, bool>>>? wherePredicates = null,
+        List<(Expression KeySelector, bool IsDescending)>? orderByExpressions = null,
+        bool? isDistinct = null)
+        => new(sourceQuery ?? _sourceQuery, _projection, wherePredicates ?? _wherePredicates,
+            orderByExpressions ?? _orderByExpressions, isDistinct ?? _isDistinct, _pagingOps);
+
+    private bool HasInMemoryOps =>
+        _wherePredicates.Count > 0 || _orderByExpressions.Count > 0 || _isDistinct || _pagingOps.Count > 0;
 
     public IRedbProjectedQueryable<TResult> Where(Expression<Func<TResult, bool>> predicate)
     {
@@ -50,13 +73,7 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             throw new ArgumentNullException(nameof(predicate));
 
         // Add filter to operations chain
-        var newWherePredicates = new List<Expression<Func<TResult, bool>>>(_wherePredicates) { predicate };
-
-        return new TreeProjectedQueryable<TProps, TResult>(
-            _sourceQuery,
-            _projection,
-            newWherePredicates,
-            _orderByExpressions);
+        return With(wherePredicates: new List<Expression<Func<TResult, bool>>>(_wherePredicates) { predicate });
     }
 
     public IRedbProjectedQueryable<TResult> OrderBy<TKey>(Expression<Func<TResult, TKey>> keySelector)
@@ -65,13 +82,7 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             throw new ArgumentNullException(nameof(keySelector));
 
         // Replace existing sorting
-        var newOrderByExpressions = new List<(Expression, bool)> { (keySelector, false) };
-
-        return new TreeProjectedQueryable<TProps, TResult>(
-            _sourceQuery,
-            _projection,
-            _wherePredicates,
-            newOrderByExpressions);
+        return With(orderByExpressions: new List<(Expression, bool)> { (keySelector, false) });
     }
 
     public IRedbProjectedQueryable<TResult> OrderByDescending<TKey>(Expression<Func<TResult, TKey>> keySelector)
@@ -80,93 +91,66 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             throw new ArgumentNullException(nameof(keySelector));
 
         // Replace existing sorting
-        var newOrderByExpressions = new List<(Expression, bool)> { (keySelector, true) };
-
-        return new TreeProjectedQueryable<TProps, TResult>(
-            _sourceQuery,
-            _projection,
-            _wherePredicates,
-            newOrderByExpressions);
+        return With(orderByExpressions: new List<(Expression, bool)> { (keySelector, true) });
     }
 
     public IRedbProjectedQueryable<TResult> Take(int count)
     {
-        // Apply Take to source query
-        var limitedSource = (IRedbQueryable<TProps>)_sourceQuery.Take(count);
-        return new TreeProjectedQueryable<TProps, TResult>(limitedSource, _projection, _wherePredicates, _orderByExpressions);
+        if (HasInMemoryOps)
+            return WithPagingOp(isSkip: false, count);
+        return With(sourceQuery: _sourceQuery.Take(count));
     }
 
     public IRedbProjectedQueryable<TResult> Skip(int count)
     {
-        // Apply Skip to source query
-        var skippedSource = (IRedbQueryable<TProps>)_sourceQuery.Skip(count);
-        return new TreeProjectedQueryable<TProps, TResult>(skippedSource, _projection, _wherePredicates, _orderByExpressions);
+        if (HasInMemoryOps)
+            return WithPagingOp(isSkip: true, count);
+        return With(sourceQuery: _sourceQuery.Skip(count));
     }
 
-    public IRedbProjectedQueryable<TResult> Distinct()
+    private TreeProjectedQueryable<TProps, TResult> WithPagingOp(bool isSkip, int count)
     {
-        // Apply Distinct to source query
-        var distinctSource = (IRedbQueryable<TProps>)_sourceQuery.Distinct();
-        return new TreeProjectedQueryable<TProps, TResult>(distinctSource, _projection, _wherePredicates, _orderByExpressions);
+        var copy = With();
+        copy._pagingOps.Add((isSkip, count));
+        return copy;
     }
+
+    public IRedbProjectedQueryable<TResult> Distinct() => With(isDistinct: true);
 
     public async Task<List<TResult>> ToListAsync(CancellationToken cancellationToken = default)
     {
-        // CRITICAL PERFORMANCE ISSUE - EVERYTHING IN MEMORY!
-        // TODO: Rework to SQL-based projections for high performance
+        // Everything after the projection runs in memory over the loaded nodes.
+        var allObjects = await _sourceQuery.ToListAsync(cancellationToken: cancellationToken);
+        var projection = _projection.Compile();
 
-        // OPTIMIZATION: Apply limits TO SOURCE QUERY before loading
-        var optimizedSourceQuery = _sourceQuery;
+        IEnumerable<TResult> projectedResults = allObjects.Select(redbObj => projection((TreeRedbObject<TProps>)redbObj));
 
-        // If there's only projection without additional filters - can use limits
-        if (!_wherePredicates.Any() && !_orderByExpressions.Any())
-        {
-            // Projection without additional logic - use original limits
-            var fullObjects = await optimizedSourceQuery.ToListAsync(cancellationToken: cancellationToken);
-            var simpleProjection = _projection.Compile();
-            return fullObjects.Select(redbObj => simpleProjection((TreeRedbObject<TProps>)redbObj)).ToList();
-        }
-
-        // FALLBACK: Old in-memory logic (for complex cases)
-        // WARNING: Inefficient on large data!
-        var allObjects = await optimizedSourceQuery.ToListAsync(cancellationToken: cancellationToken);
-        var complexProjection = _projection.Compile();
-
-        // Apply projection to each object
-        var projectedResults = allObjects.Select(redbObj => complexProjection((TreeRedbObject<TProps>)redbObj));
-
-        // Apply Where filters after projection
         foreach (var wherePredicate in _wherePredicates)
-        {
-            var compiledWhere = wherePredicate.Compile();
-            projectedResults = projectedResults.Where(compiledWhere);
-        }
+            projectedResults = projectedResults.Where(wherePredicate.Compile());
 
-        // Apply sorting after projection
         IOrderedEnumerable<TResult>? orderedResults = null;
         foreach (var (keySelector, isDescending) in _orderByExpressions)
         {
-            // Compile expression to delegate
             var compiledKeySelector = ((LambdaExpression)keySelector).Compile();
-
             if (orderedResults == null)
-            {
-                // First sort
                 orderedResults = isDescending
                     ? projectedResults.OrderByDescending(item => compiledKeySelector.DynamicInvoke(item))
                     : projectedResults.OrderBy(item => compiledKeySelector.DynamicInvoke(item));
-            }
             else
-            {
-                // Additional sort
                 orderedResults = isDescending
                     ? orderedResults.ThenByDescending(item => compiledKeySelector.DynamicInvoke(item))
                     : orderedResults.ThenBy(item => compiledKeySelector.DynamicInvoke(item));
-            }
         }
+        if (orderedResults != null)
+            projectedResults = orderedResults;
 
-        var finalResults = orderedResults?.AsEnumerable() ?? projectedResults;
-        return finalResults.ToList();
+        if (_isDistinct)
+            projectedResults = projectedResults.Distinct();
+
+        foreach (var (isSkip, n) in _pagingOps)
+            projectedResults = isSkip ? projectedResults.Skip(n) : projectedResults.Take(n);
+
+        return projectedResults.ToList();
     }
 
     public async Task<int> CountAsync(CancellationToken cancellationToken = default)

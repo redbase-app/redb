@@ -67,6 +67,30 @@ BEGIN
 END;
 GO
 
+-- ---------- pvt_array_element_equals --------------------------------
+-- Typed equality of an array element row `av` with a JSON value (@val as OPENJSON gives it, @val_type its
+-- OPENJSON type code). Shared by $arrayContains, $arrayFirst / $arrayLast and $arrayAt; it used to be copied
+-- into each of them.
+CREATE OR ALTER FUNCTION dbo.pvt_array_element_equals(
+    @db_type  NVARCHAR(50),
+    @val      NVARCHAR(MAX),
+    @val_type INT
+)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    DECLARE @lit NVARCHAR(MAX) = dbo.pvt_jsonb_to_sql_literal(@val, @val_type);
+    RETURN CASE @db_type
+        WHEN N'Long'           THEN N'av.[_Long] = CAST(' + @lit + N' AS BIGINT)'
+        WHEN N'Double'         THEN N'av.[_Double] = CAST(' + @lit + N' AS FLOAT)'
+        WHEN N'Numeric'        THEN N'av.[_Numeric] = CAST(' + @lit + N' AS DECIMAL(28,10))'
+        WHEN N'Boolean'        THEN N'av.[_Boolean] = ' + @lit
+        WHEN N'DateTimeOffset' THEN N'av.[_DateTimeOffset] = CAST(' + @lit + N' AS DATETIMEOFFSET)'
+        ELSE                        N'av.[_String] = ' + @lit
+    END;
+END;
+GO
+
 -- ---------- pvt_build_field_condition ---------------------------------
 CREATE OR ALTER FUNCTION dbo.pvt_build_field_condition(
     @field_name   NVARCHAR(400),
@@ -125,13 +149,13 @@ BEGIN
                 + N' WHERE dp._id_object = ' + @obj_alias + N'.[_id]'
                 + N' AND dp._id_structure = ' + @dict_parent_sid
                 + N' AND dp._array_index = N''' + @dict_key_esc + N''''
-                + N' AND av._id_structure = ' + ISNULL(@sid, N'0')
+                + N' AND av._id_structure = ' + COALESCE(@sid, dbo.pvt_fail(N'dictionary field "' + @field_name + N'" has no structure id'))
                 + N' AND av._array_index IS NULL';
         ELSE
             SET @dict_exist_pfx =
                 N'EXISTS (SELECT 1 FROM dbo._values av'
                 + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
-                + N' AND av._id_structure = ' + ISNULL(@sid, N'0')
+                + N' AND av._id_structure = ' + COALESCE(@sid, dbo.pvt_fail(N'dictionary field "' + @field_name + N'" has no structure id'))
                 + N' AND av._array_index = N''' + @dict_key_esc + N'''';
 
         -- Scalar-literal shorthand (non-object operand)
@@ -196,7 +220,7 @@ BEGIN
             ELSE IF @don IN (N'$in', N'$nin')
             BEGIN
                 IF @dot <> 4
-                    SET @dpiece = N'/*invalid-dict-in*/1=0';
+                    SET @dpiece = dbo.pvt_fail(N'$in on dictionary field "' + @field_name + N'" expects an array');
                 ELSE
                 BEGIN
                     DECLARE @dlst NVARCHAR(MAX) = N'';
@@ -218,7 +242,7 @@ BEGIN
                 END;
             END
             ELSE
-                SET @dpiece = N'/*unsupported-dict-op:' + @dok + N'*/1=0';
+                SET @dpiece = dbo.pvt_fail(N'unsupported dictionary operator ' + @dok + N' on field "' + @field_name + N'"');
 
             IF @dpiece IS NOT NULL
             BEGIN
@@ -312,7 +336,7 @@ BEGIN
             ELSE IF @li_on IN (N'$in', N'$nin')
             BEGIN
                 IF @li_ot <> 4
-                    SET @li_piece = N'/*invalid-li-in*/1=0';
+                    SET @li_piece = dbo.pvt_fail(N'$in on list-item field "' + @field_name + N'" expects an array');
                 ELSE
                 BEGIN
                     DECLARE @li_lst NVARCHAR(MAX) = N'';
@@ -368,7 +392,7 @@ BEGIN
                 SET @li_piece = CASE WHEN @li_want = 1 THEN @li_pfx + N')' ELSE N'NOT ' + @li_pfx + N')' END;
             END
             ELSE
-                SET @li_piece = N'/*unsupported-li-op:' + @li_ok + N'*/1=0';
+                SET @li_piece = dbo.pvt_fail(N'unsupported list-item operator ' + @li_ok + N' on field "' + @field_name + N'"');
 
             IF @li_piece IS NOT NULL
             BEGIN
@@ -422,7 +446,7 @@ BEGIN
         END
         ELSE IF @on IN (N'$in', N'$nin')
         BEGIN
-            IF @opt <> 4 SET @piece = N'/*invalid-in*/1=0';
+            IF @opt <> 4 SET @piece = dbo.pvt_fail(N'$in / $nin on field "' + @field_name + N'" expects an array');
             ELSE
             BEGIN
                 DECLARE @lst NVARCHAR(MAX) = N'';
@@ -444,6 +468,8 @@ BEGIN
         END
         ELSE IF @on = N'$like'
             SET @piece = @col_name + N' LIKE ' + dbo.pvt_sql_string_literal(@opv);
+        ELSE IF @on = N'$ilike'   -- the caller's pattern, case folded on both sides (PostgreSQL: ILIKE)
+            SET @piece = N'LOWER(' + @col_name + N') LIKE LOWER(' + dbo.pvt_sql_string_literal(@opv) + N')';
         ELSE IF @on = N'$startswith'
             SET @piece = @col_name + N' LIKE ' + dbo.pvt_sql_string_literal(dbo.pvt_like_escape(@opv) + N'%') + N' ESCAPE ''\''';
         ELSE IF @on = N'$endswith'
@@ -469,17 +495,11 @@ BEGIN
         ELSE IF @on = N'$arraycontains'
         BEGIN
             IF @sid IS NULL
-                SET @piece = N'/*no-sid-$arrayContains*/1=0';
+                SET @piece = dbo.pvt_fail(N'$arrayContains needs an array field; "' + @field_name + N'" has no structure');
             ELSE
             BEGIN
-                DECLARE @ac_cmp NVARCHAR(MAX) = CASE @db_type_f
-                    WHEN N'Long'           THEN N'av.[_Long] = CAST(' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt) + N' AS BIGINT)'
-                    WHEN N'Double'         THEN N'av.[_Double] = CAST(' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt) + N' AS FLOAT)'
-                    WHEN N'Numeric'        THEN N'av.[_Numeric] = CAST(' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt) + N' AS DECIMAL(28,10))'
-                    WHEN N'Boolean'        THEN N'av.[_Boolean] = ' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt)
-                    WHEN N'DateTimeOffset' THEN N'av.[_DateTimeOffset] = CAST(' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt) + N' AS DATETIMEOFFSET)'
-                    ELSE                        N'av.[_String] = ' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt)
-                END;
+                DECLARE @ac_cmp NVARCHAR(MAX) = dbo.pvt_array_element_equals(@db_type_f, @opv, @opt);
+
                 SET @piece = N'EXISTS (SELECT 1 FROM dbo._values av'
                     + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
                     + N' AND av._id_structure = ' + @sid
@@ -490,7 +510,7 @@ BEGIN
         ELSE IF @on IN (N'$arrayany', N'$arrayempty')
         BEGIN
             IF @sid IS NULL
-                SET @piece = N'/*no-sid-' + @opk + N'*/1=0';
+                SET @piece = dbo.pvt_fail(@opk + N' needs an array field; "' + @field_name + N'" has no structure');
             ELSE
             BEGIN
                 DECLARE @aae_base NVARCHAR(MAX) =
@@ -510,10 +530,10 @@ BEGIN
                 SET @piece = CASE WHEN @aae_want = 1 THEN @aae_base ELSE N'NOT ' + @aae_base END;
             END;
         END
-        ELSE IF @on IN (N'$arraycount', N'$arraycountgt', N'$arraycountgte', N'$arraycountlt', N'$arraycountle')
+        ELSE IF @on IN (N'$arraycount', N'$arraycountgt', N'$arraycountgte', N'$arraycountlt', N'$arraycountlte')
         BEGIN
             IF @sid IS NULL
-                SET @piece = N'/*no-sid-' + @opk + N'*/1=0';
+                SET @piece = dbo.pvt_fail(@opk + N' needs an array field; "' + @field_name + N'" has no structure');
             ELSE
             BEGIN
                 DECLARE @acc_cnt NVARCHAR(MAX) =
@@ -521,14 +541,14 @@ BEGIN
                     + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
                     + N' AND av._id_structure = ' + @sid
                     + N' AND av._array_index IS NOT NULL)';
-                DECLARE @acc_val NVARCHAR(20) = ISNULL(CAST(TRY_CAST(@opv AS BIGINT) AS NVARCHAR(20)), N'0');
+                DECLARE @acc_val NVARCHAR(20) = COALESCE(CAST(TRY_CAST(@opv AS BIGINT) AS NVARCHAR(20)), dbo.pvt_fail(@on + N' on field "' + @field_name + N'" expects an integer'));
                 DECLARE @acc_op  NVARCHAR(3)  = CASE @on
                     WHEN N'$arraycount'    THEN N'='
                     WHEN N'$arraycountgt'  THEN N'>'
                     WHEN N'$arraycountgte' THEN N'>='
                     WHEN N'$arraycountlt'  THEN N'<'
-                    WHEN N'$arraycountle'  THEN N'<='
-                    ELSE N'='
+                    WHEN N'$arraycountlte' THEN N'<='
+                    ELSE dbo.pvt_fail(N'unsupported array count operator ' + @on)
                 END;
                 SET @piece = @acc_cnt + N' ' + @acc_op + N' ' + @acc_val;
             END;
@@ -536,28 +556,35 @@ BEGIN
         ELSE IF @on = N'$arrayat'
         BEGIN
             IF @sid IS NULL
-                SET @piece = N'/*no-sid-$arrayAt*/1=0';
+                SET @piece = dbo.pvt_fail(N'$arrayAt needs an array field; "' + @field_name + N'" has no structure');
             ELSE
-                -- _array_index is NVARCHAR; the given index value is cast to string
-                SET @piece = N'EXISTS (SELECT 1 FROM dbo._values av'
-                    + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
-                    + N' AND av._id_structure = ' + @sid
-                    + N' AND av._array_index = N''' + REPLACE(ISNULL(CAST(TRY_CAST(@opv AS BIGINT) AS NVARCHAR(20)), N'0'), N'''', N'''''') + N''')';
+            BEGIN
+                -- Operand {"index": N, "value": V}, as in PostgreSQL: the element at index N equals V
+                -- (_array_index is NVARCHAR). It used to read the operand as the index itself - the object
+                -- did not convert and became index 0 - and never compared the value.
+                DECLARE @aat_idx NVARCHAR(20) = CASE WHEN @opt = 5
+                    THEN CAST(TRY_CAST(JSON_VALUE(@opv, N'$.index') AS BIGINT) AS NVARCHAR(20)) END;
+                DECLARE @aat_val NVARCHAR(MAX) = NULL, @aat_type INT = NULL;
+                IF @opt = 5
+                    SELECT @aat_val = [value], @aat_type = [type] FROM OPENJSON(@opv) WHERE [key] = N'value';
+                IF @aat_idx IS NULL OR @aat_type IS NULL
+                    SET @piece = dbo.pvt_fail(N'$arrayAt on field "' + @field_name + N'" expects {"index":N,"value":V}');
+                ELSE
+                    SET @piece = N'EXISTS (SELECT 1 FROM dbo._values av'
+                        + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
+                        + N' AND av._id_structure = ' + @sid
+                        + N' AND av._array_index = N''' + @aat_idx + N''''
+                        + N' AND ' + dbo.pvt_array_element_equals(@db_type_f, @aat_val, @aat_type) + N')';
+            END;
         END
         ELSE IF @on IN (N'$arrayfirst', N'$arraylast')
         BEGIN
             IF @sid IS NULL
-                SET @piece = N'/*no-sid-' + @opk + N'*/1=0';
+                SET @piece = dbo.pvt_fail(@opk + N' needs an array field; "' + @field_name + N'" has no structure');
             ELSE
             BEGIN
-                DECLARE @afl_cmp NVARCHAR(MAX) = CASE @db_type_f
-                    WHEN N'Long'           THEN N'av.[_Long] = CAST(' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt) + N' AS BIGINT)'
-                    WHEN N'Double'         THEN N'av.[_Double] = CAST(' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt) + N' AS FLOAT)'
-                    WHEN N'Numeric'        THEN N'av.[_Numeric] = CAST(' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt) + N' AS DECIMAL(28,10))'
-                    WHEN N'Boolean'        THEN N'av.[_Boolean] = ' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt)
-                    WHEN N'DateTimeOffset' THEN N'av.[_DateTimeOffset] = CAST(' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt) + N' AS DATETIMEOFFSET)'
-                    ELSE                        N'av.[_String] = ' + dbo.pvt_jsonb_to_sql_literal(@opv, @opt)
-                END;
+                DECLARE @afl_cmp NVARCHAR(MAX) = dbo.pvt_array_element_equals(@db_type_f, @opv, @opt);
+
                 DECLARE @afl_idx NVARCHAR(MAX) = CASE @on
                     WHEN N'$arrayfirst' THEN N'N''0'''
                     ELSE N'(SELECT TOP 1 CAST(av2._array_index AS NVARCHAR(20))'
@@ -577,7 +604,7 @@ BEGIN
         ELSE IF @on = N'$arraystartswith'
         BEGIN
             IF @sid IS NULL
-                SET @piece = N'/*no-sid-$arrayStartsWith*/1=0';
+                SET @piece = dbo.pvt_fail(N'$arrayStartsWith needs an array field; "' + @field_name + N'" has no structure');
             ELSE
                 SET @piece = N'EXISTS (SELECT 1 FROM dbo._values av'
                     + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
@@ -588,7 +615,7 @@ BEGIN
         ELSE IF @on = N'$arrayendswith'
         BEGIN
             IF @sid IS NULL
-                SET @piece = N'/*no-sid-$arrayEndsWith*/1=0';
+                SET @piece = dbo.pvt_fail(N'$arrayEndsWith needs an array field; "' + @field_name + N'" has no structure');
             ELSE
                 SET @piece = N'EXISTS (SELECT 1 FROM dbo._values av'
                     + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
@@ -600,7 +627,7 @@ BEGIN
         ELSE IF @on = N'$arraymatches'
         BEGIN
             IF @sid IS NULL
-                SET @piece = N'/*no-sid-$arrayMatches*/1=0';
+                SET @piece = dbo.pvt_fail(N'$arrayMatches needs an array field; "' + @field_name + N'" has no structure');
             ELSE
                 SET @piece = N'EXISTS (SELECT 1 FROM dbo._values av'
                     + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
@@ -614,7 +641,7 @@ BEGIN
         ELSE IF @on IN (N'$arraysum', N'$arraymin', N'$arraymax', N'$arrayavg')
         BEGIN
             IF @sid IS NULL
-                SET @piece = N'/*no-sid-' + @opk + N'*/1=0';
+                SET @piece = dbo.pvt_fail(@opk + N' needs an array field; "' + @field_name + N'" has no structure');
             ELSE
             BEGIN
                 DECLARE @agg_fn   NVARCHAR(10)  = CASE @on
@@ -671,7 +698,7 @@ BEGIN
             END;
         END
         ELSE
-            SET @piece = N'/*unsupported-op:' + @opk + N'*/1=0';
+            SET @piece = dbo.pvt_fail(N'unsupported operator ' + @opk + N' on field "' + @field_name + N'"');
 
         IF @piece IS NOT NULL
         BEGIN

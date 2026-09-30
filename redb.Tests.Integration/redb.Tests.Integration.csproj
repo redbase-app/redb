@@ -27,14 +27,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\redb.Core\redb.Core.csproj" />
-    <PackageReference Include="redb.Core.Pro" Version="4.1.1" />
+    <PackageReference Include="redb.Core.Pro" Version="4.2.0" />
     <ProjectReference Include="..\redb.Export\redb.Export.csproj" />
     <ProjectReference Include="..\redb.MSSql\redb.MSSql.csproj" />
-    <PackageReference Include="redb.MSSql.Pro" Version="4.1.1" />
+    <PackageReference Include="redb.MSSql.Pro" Version="4.2.0" />
     <ProjectReference Include="..\redb.Postgres\redb.Postgres.csproj" />
-    <PackageReference Include="redb.Postgres.Pro" Version="4.1.1" />
+    <PackageReference Include="redb.Postgres.Pro" Version="4.2.0" />
     <ProjectReference Include="..\redb.SQLite\redb.SQLite.csproj" />
-    <PackageReference Include="redb.SQLite.Pro" Version="4.1.1" />
+    <PackageReference Include="redb.SQLite.Pro" Version="4.2.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -42,6 +42,14 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- The SQL modules' own smoke runners (review SQ-4), run against the fixture databases by
+         PostgresModuleSmokeTests and MsSqlModuleSmokeTests: the file in the provider's source is the one run. -->
+    <Content Include="..\redb.Postgres\sql\v2-pvt\99_smoke_auto.sql" Link="Smoke\postgres_99_smoke_auto.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\redb.MSSql\sql\v2-pvt\99_smoke_auto.sql" Link="Smoke\mssql_99_smoke_auto.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

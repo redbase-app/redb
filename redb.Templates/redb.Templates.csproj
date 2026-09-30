@@ -5,8 +5,8 @@
     <Title>RedBase Project Templates</Title>
     <Authors>RedBase</Authors>
     <Company>RedBase</Company>
-    <Description>Project templates for RedBase (REDB) — the entity database for .NET. Use 'dotnet new redb' to create a ready-to-run console application with CRUD, tree hierarchy, and optional Pro features.</Description>
-    <PackageTags>dotnet-new;templates;redbase;redb;database;entity;tree;linq</PackageTags>
+    <Description>Project templates for RedBase (REDB), the entity database for .NET: a console app (dotnet new redb), a Razor Pages site (redb-razor), a Blazor site (redb-blazor), an integration worker (redb-worker), an LLM chat (redb-chat), a Blazor WebAssembly app with a redb.Route API (redb-app) and a Blazor BFF with redb.Route controllers (redb-bff). Each runs as is on SQLite with Pro; the route-based ones also deploy as Tsak modules.</Description>
+    <PackageTags>dotnet-new;templates;redbase;redb;database;entity;tree;linq;blazor;razor;worker;llm;bff;tsak</PackageTags>
     <PackageProjectUrl>https://redbase.app</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>

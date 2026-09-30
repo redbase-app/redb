@@ -632,7 +632,7 @@ graph TD
     A --> F["ListProvider"]
     A --> G["UserProvider / RoleProvider"]
     
-    B --> H["ExpressionToSqlCompiler"]
+    B --> H["ProSqlBuilder (Pro) / PVT SQL module (Free)"]
     C --> I["CTE recursive queries"]
     D --> J["IRedbContext (SQL)"]
     E --> K["Auto-migration"]

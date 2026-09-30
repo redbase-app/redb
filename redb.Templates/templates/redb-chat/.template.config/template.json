@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "RedBase",
+  "classifications": [ "Console", "AI", "Chat", "RedBase" ],
+  "identity": "RedBase.Chat.Template",
+  "name": "RedBase LLM Chat",
+  "shortName": "redb-chat",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "sourceName": "RedbChat",
+  "preferNameDirectory": true,
+  "symbols": {
+    "tools": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "none",
+      "description": "Tools the model can call",
+      "choices": [
+        { "choice": "none", "description": "A plain chat" },
+        { "choice": "shell", "description": "A route tool that runs a few read-only system commands" },
+        { "choice": "mcp", "description": "The tools of an MCP server (the filesystem server, needs Node.js)" }
+      ]
+    },
+    "audit": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Stamp the user and audit tags on every stored message, and add an /audit console command"
+    },
+    "UseShell": {
+      "type": "computed",
+      "value": "(tools == \"shell\")"
+    },
+    "UseMcp": {
+      "type": "computed",
+      "value": "(tools == \"mcp\")"
+    }
+  },
+  "sources": [
+    {
+      "exclude": [
+        "**/[Bb]in/**", "**/[Oo]bj/**", ".template.config/**/*", "**/*.filelist", "**/*.user", "**/*.lock.json",
+        "**/*.db", "**/*.db-shm", "**/*.db-wal", "data/**", "runtime/**", "deploy/output/**", "deploy/.env"
+      ],
+      "modifiers": [
+        { "condition": "(!UseShell)", "exclude": [ "RedbChat.Module/Tools/ShellToolRouteBuilder.cs" ] },
+        { "condition": "(!UseMcp)", "exclude": [ "RedbChat.Module/Tools/McpTools.cs" ] },
+        { "condition": "(!audit)", "exclude": [ "RedbChat.Module/AuditQueries.cs" ] }
+      ]
+    }
+  ]
+}

@@ -504,14 +504,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         var offset = ignoreLimitOffset ? 0          : (parameters.Offset ?? 0);
 
         // DistinctBy → p_distinct_on jsonb array (PVT engine handles SELECT DISTINCT ON parity)
-        string? distinctOnJson = null;
-        if (context.DistinctByField != null)
-        {
-            var name = context.DistinctByField.Property.Name;
-            distinctOnJson = context.DistinctByIsBaseField
-                ? "[{\"field\":\"0$:" + name + "\"}]"
-                : "[{\"field\":\"" + name + "\"}]";
-        }
+        var distinctOnJson = BuildPvtDistinctOnJson(context);
 
         var invocation = _sql.Query_BuildPvtSqlInvocation(
             schemeId     : context.SchemeId,
@@ -544,6 +537,20 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
             throw new InvalidOperationException(
                 "pvt_build_query_sql returned an empty SQL string for scheme " + context.SchemeId + ".");
         return inner;
+    }
+
+    /// <summary>
+    /// The <c>p_distinct_on</c> argument of <c>pvt_build_query_sql</c> for DistinctBy / DistinctByRedb, or null
+    /// when the query has no distinct key. Shared by the flat query and the tree query of the Free providers.
+    /// </summary>
+    internal static string? BuildPvtDistinctOnJson<TProps>(QueryContext<TProps> context) where TProps : class, new()
+    {
+        if (context.DistinctByField == null)
+            return null;
+        var name = context.DistinctByField.Property.Name;
+        return context.DistinctByIsBaseField
+            ? "[{\"field\":\"0$:" + name + "\"}]"
+            : "[{\"field\":\"" + name + "\"}]";
     }
 
     /// <summary>v2-pvt Count path: COUNT(*) wrapper over the inner _id-list SQL.</summary>

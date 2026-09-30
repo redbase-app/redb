@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="RedbApp.Models/RedbApp.Models.csproj" />
+  <Project Path="RedbApp.Api/RedbApp.Api.csproj" />
+  <Project Path="RedbApp.Host/RedbApp.Host.csproj" />
+  <Project Path="RedbApp.Web/RedbApp.Web.csproj" />
+</Solution>

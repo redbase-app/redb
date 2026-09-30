@@ -1,0 +1,52 @@
+# The module on a Tsak worker: the Tsak stack image (worker and dashboard in one container) loads
+# RedbChat.tpkg from deploy/output. The worker's default redb is SQLite, so nothing else is needed.
+#
+# From the project folder:
+#   cp deploy/.env.example deploy/.env          # then fill in the Tsak values and LLM_API_KEY
+#   pwsh deploy/pack-tpkg.ps1                   # -> deploy/output/RedbChat.tpkg
+#   docker compose -f deploy/docker-compose.tsak.yml up -d
+#
+# Then: curl -d "hello" -H "X-Chat-Id: my-chat" http://localhost:5090/api/chat
+# Dashboard: http://localhost:8085 (admin and TSAK_WEB_ADMIN_PASSWORD).
+
+services:
+  tsak:
+    image: ghcr.io/redbase-app/redb-tsak-stack:${TSAK_VERSION:-4.2.0-net10}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"   # worker API
+      - "127.0.0.1:8085:8085"   # dashboard
+      - "127.0.0.1:5090:5090"   # the module's chat endpoint
+    environment:
+      # The worker's default (unnamed) redb, the one the module keeps the history in. The same settings as
+      # the own host: Pro, change tracking, the PVT prefilter. The props cache stays off; to turn it on add
+      # Tsak__Redb__EnablePropsCache=true.
+      - Tsak__Redb__UsePro=true
+      - Tsak__Redb__PropsSaveStrategy=ChangeTracking
+      - Tsak__Redb__EnablePvtPrefilter=true
+
+      - Tsak__Modules__AssemblyPaths__0=/app/modules
+      - Tsak__Cluster__ApiEndpoint=http://tsak:9090
+      - Tsak__Cluster__NodeId=redbchat-1
+
+      # The worker's API requires a key; the dashboard in the same container calls it with the service key.
+      # The worker stores only the key's hash: HMAC-SHA256 of the key with Tsak:Auth:Secret (see .env.example).
+      - Tsak__Auth__Enabled=true
+      - Tsak__Auth__Secret=${TSAK_AUTH_SECRET:?TSAK_AUTH_SECRET required}
+      - Tsak__Auth__Keys__0__Id=svc-tsak-web
+      - Tsak__Auth__Keys__0__KeyHash=${TSAK_WEB_API_KEY_HASH:?TSAK_WEB_API_KEY_HASH required}
+      - Tsak__Auth__Keys__0__Name=tsak-web-dashboard
+      - Tsak__Auth__Keys__0__Roles=admin
+      - Tsak__Web__AdminLogin=admin
+      - Tsak__Web__AdminPassword=${TSAK_WEB_ADMIN_PASSWORD:?TSAK_WEB_ADMIN_PASSWORD required}
+      - Tsak__Web__ServiceApiKey=${TSAK_WEB_API_KEY:?TSAK_WEB_API_KEY required}
+      - Tsak__Web__Mode=cluster
+
+      # The module's settings: the Override layer of its context, the same keys the own host reads.
+      - Tsak__Contexts__redbchat__Override__Llm__ApiKey=${LLM_API_KEY:?LLM_API_KEY required}
+      # For DeepSeek:
+      # - Tsak__Contexts__redbchat__Override__Llm__Provider=deepseek
+      # - Tsak__Contexts__redbchat__Override__Llm__ModelId=deepseek-chat
+      - Tsak__Contexts__redbchat__Override__Http__Host=0.0.0.0
+    volumes:
+      - ./output:/app/modules

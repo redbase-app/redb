@@ -284,10 +284,24 @@ BEGIN
                 SET @treeWhere += N' AND o.[_id] NOT IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))';
         END;
 
-        RETURN N'SELECT o.[_id] FROM dbo._objects o'
+        DECLARE @baseFromT NVARCHAR(MAX) = N'FROM dbo._objects o'
              + CHAR(10) + N'WHERE o.[_id_scheme] = ' + CAST(@scheme_id AS NVARCHAR(40))
              + N' AND ' + @treeWhere
-             + @filterT
+             + @filterT;
+        -- Distinct as in the flat Shape A. This branch used to ignore both: DistinctByRedb on a base
+        -- field (no props in the query) returned every node of the tree.
+        IF @rn_col IS NOT NULL
+            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                 + N'SELECT o.*, ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY (SELECT 1)) AS [_rn]' + CHAR(10)
+                 + @baseFromT + CHAR(10)
+                 + N') o' + CHAR(10) + N'WHERE o.[_rn] = 1'
+                 + @order_sql + @paging;
+        IF @distinct = 1
+            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                 + N'SELECT DISTINCT o.[_id] AS [_id] ' + @baseFromT + CHAR(10)
+                 + N') _dist'
+                 + @order_sql_dist + @paging;
+        RETURN N'SELECT o.[_id] ' + @baseFromT
              + @order_sql + @paging;
     END;
 

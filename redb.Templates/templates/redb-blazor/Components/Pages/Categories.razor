@@ -1,0 +1,55 @@
+@page "/categories"
+@inject RedbWork Work
+
+<PageTitle>Categories</PageTitle>
+
+<h1>Categories</h1>
+
+<div class="filters">
+    <input placeholder="New top-level category" @bind="newRootName" />
+    <button disabled="@string.IsNullOrWhiteSpace(newRootName)" @onclick="AddRootAsync">Add</button>
+</div>
+
+<CategoryNodeList Nodes="roots" OnAddChild="AddChildAsync" OnDelete="DeleteAsync" />
+
+@code {
+    private List<ITreeRedbObject> roots = [];
+    private string? newRootName;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    // Top-level nodes come from a tree query; each one is then loaded with its whole subtree.
+    private async Task LoadAsync()
+    {
+        roots = await Work.RunAsync(async redb =>
+        {
+            var top = await redb.TreeQuery<Category>().WhereRoots().ToListAsync();
+            var trees = new List<ITreeRedbObject>();
+            foreach (var node in top)
+                trees.Add(await redb.LoadTreeAsync<Category>(node.Id));
+            return trees;
+        });
+    }
+
+    private async Task AddRootAsync()
+    {
+        var name = newRootName!.Trim();
+        await Work.RunAsync(redb => redb.SaveAsync(new TreeRedbObject<Category> { Name = name, Props = new Category() }));
+        newRootName = null;
+        await LoadAsync();
+    }
+
+    private async Task AddChildAsync((ITreeRedbObject Parent, string Name) request)
+    {
+        await Work.RunAsync(redb => redb.CreateChildAsync(
+            new TreeRedbObject<Category> { Name = request.Name, Props = new Category() }, request.Parent));
+        await LoadAsync();
+    }
+
+    // Deleting a node deletes its whole subtree.
+    private async Task DeleteAsync(ITreeRedbObject node)
+    {
+        await Work.RunAsync(redb => redb.DeleteAsync(node.Id));
+        await LoadAsync();
+    }
+}

@@ -127,6 +127,21 @@ BEGIN
     --           subtree, not every leaf in the scheme.
     --         * pvt_tree_leaves / pvt_tree_roots (08_pvt_tree_functions.sql) —
     --           the pvt_build_cte_sql (props-shape) path — seeded the same way.
+    -- 0.2.26 - found by the module smoke runner once it ran in the gate (SQ-4, 2026-09-26), each a PostgreSQL
+    --          parity gap that 1=0 had hidden: $arrayAt reads {"index":N,"value":V}; $arrayCountLte (was
+    --          $arraycountle); $ilike on a field; ContainsKey with a bare string key. One typed element
+    --          comparison (pvt_array_element_equals) instead of copies.
+    -- 0.2.25 - SQ-5 (2026-09-26): dbo.pvt_fail refuses what the filter and aggregate builders cannot read
+    --          (13, 14, 21). An unknown operator was 1=1 or 1=0, an unknown comparison '=', a value that
+    --          was not a number 0, an aggregate it could not compile a NULL column. PostgreSQL raises there.
+    -- 0.2.24 - pvt_build_query_sql, tree mode without props (2026-09-26): @distinct_on and @distinct were
+    --          ignored - DistinctByRedb on a tree returned every node. Wrapped as in the flat Shape A.
+    -- 0.2.23 - pvt_resolve_field_path (2026-09-26): T-SQL keeps a variable when SELECT @v = ... finds no
+    --          row, so an unknown nested child resolved to its parent (Contacts[].NoSuchField became the
+    --          Contacts array); the dictionary child and the 2b ListItem branch had the same trap.
+    -- 0.2.22 - array GroupBy (2026-09-26): a key or aggregate field the array item does not have, or an
+    --          unknown aggregate function, makes the result NULL. They were skipped - the grouping ran on
+    --          the other keys, the aggregate vanished, and with no key left the flat item list came back.
     -- 0.2.21 - HAVING of the array GroupBy (2026-09-25): pvt_build_array_having_expr reads item fields
     --          through the joined columns (@cols) and returns NULL for any shape it does not know; the
     --          orchestrator joins a field only the HAVING aggregates and returns NULL on an unread
@@ -170,7 +185,7 @@ BEGIN
     --          (perf finding, 2026-09-10).
     -- 0.1.0 - skeleton: module bootstrap, drop-all, version function.
     --         Builder functions (pvt_build_query_sql etc.) not implemented yet.
-    RETURN N'0.2.21';
+    RETURN N'0.2.26';
 END;
 GO
 

@@ -66,6 +66,9 @@ BEGIN
         BEGIN
             SET @parent_sid = @sid;
             SET @child_name = SUBSTRING(@rest, 2, 400);
+            -- T-SQL keeps the old value when SELECT @v = ... finds no row: without the reset a child the
+            -- dictionary does not have resolved to the dictionary itself.
+            SET @sid = NULL;
             SELECT TOP 1 @sid = c._structure_id, @db_type = c.db_type,
                          @is_array = CASE WHEN c._collection_type IS NOT NULL THEN 1 ELSE 0 END
               FROM dbo._scheme_metadata_cache c
@@ -117,6 +120,7 @@ BEGIN
         -- 2b. Status.Value|Alias|Id  (scalar ListItem accessors)
         IF @last IN (N'Id', N'Value', N'Alias') AND CHARINDEX(N'.', @path) = LEN(@first) + 1
         BEGIN
+            SELECT @sid = NULL, @db_type = NULL, @is_array = 0;  -- not the values 2a left behind
             SELECT TOP 1 @sid = c._structure_id, @db_type = c.db_type,
                          @is_array = CASE WHEN c._collection_type IS NOT NULL THEN 1 ELSE 0 END
               FROM dbo._scheme_metadata_cache c
@@ -162,11 +166,16 @@ BEGIN
                 SET @rem = SUBSTRING(@rem, @cut + 1, 400);
             END;
             IF RIGHT(@segment, 2) = N'[]' SET @segment = LEFT(@segment, LEN(@segment) - 2);
-            SELECT TOP 1 @cur_sid = c._structure_id
+            -- T-SQL keeps the old value when SELECT @v = ... finds no row: an unknown child used to
+            -- resolve to its parent (Contacts[].NoSuchField became the Contacts array).
+            DECLARE @next_sid BIGINT = NULL;
+            SET @next_sid = NULL;
+            SELECT TOP 1 @next_sid = c._structure_id
               FROM dbo._scheme_metadata_cache c
              WHERE c._scheme_id = @scheme_id AND c._name = @segment AND c._parent_structure_id = @cur_sid;
-            IF @cur_sid IS NULL
+            IF @next_sid IS NULL
                 RETURN NULL;
+            SET @cur_sid = @next_sid;
         END;
 
         SELECT TOP 1 @db_type = c.db_type,

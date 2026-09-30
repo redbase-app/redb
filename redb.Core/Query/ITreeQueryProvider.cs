@@ -90,6 +90,7 @@ public interface ITreeQueryProvider : IRedbQueryProvider
     /// <param name="context">Tree query context with rootObjectId, maxDepth, filters</param>
     /// <param name="groupFields">Fields to group by</param>
     /// <param name="aggregations">Aggregation functions to apply</param>
+    /// <param name="havingJson">HAVING predicate as the JSON HavingPredicateParser writes; null for none.</param>
     /// <returns>JSON document with grouped results</returns>
     /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
     Task<System.Text.Json.JsonDocument?> ExecuteTreeGroupedAggregateAsync<TProps>(

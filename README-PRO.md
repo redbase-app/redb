@@ -29,7 +29,7 @@ RedBase Pro extends the open-source [RedBase](https://github.com/redbase-app/red
 
 ```
 Free:  LINQ → plpgsql function → JSON → Deserialize → Props
-Pro:   LINQ → ExpressionToSqlCompiler → native SQL + PVT CTE → Parallel.ForEach → Props
+Pro:   LINQ → ProSqlBuilder → native SQL + PVT CTE → Parallel.ForEach → Props
 ```
 
 Pro compiles your LINQ expression into raw SQL at runtime. No intermediate JSON, no plpgsql interpreter. The query hits the database as a native `SELECT` with JOINs and WHERE clauses — same as hand-written SQL, but generated from C#.

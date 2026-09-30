@@ -282,7 +282,9 @@ public partial class SqliteTreeQueryProvider
         //   p_distinct, p_source_mode, p_tree_ids, p_include_seed,
         //   p_polymorphic, p_distinct_on
         // SQLite has no ::type casts; booleans pass as 1/0.
-        var orderArg = hasOrder ? "$2" : "NULL";
+        // A distinct key binds $3; the order then always binds $2, NULL when there is none.
+        var distinctOnJson = BuildPvtDistinctOnJson(context);
+        var orderArg = hasOrder || distinctOnJson != null ? "$2" : "NULL";
         var invocation = "SELECT pvt_build_query_sql("
             + context.SchemeId.ToString(CultureInfo.InvariantCulture)
             + ", $1, " + limitArg
@@ -293,13 +295,17 @@ public partial class SqliteTreeQueryProvider
             + ", '" + route.SourceMode + "'"
             + ", " + treeIdsLiteral
             + ", " + (route.IncludeSeed ? "1" : "0")
-            + ", 1)"   // p_polymorphic=1 matches Pro default
-            + " AS \"Value\"";
+            + ", 1"    // p_polymorphic=1 matches Pro default
+            + (distinctOnJson != null ? ", json($3)" : "")
+            + ") AS \"Value\"";
 
         object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
 
         string? inner;
-        if (hasOrder)
+        if (distinctOnJson != null)
+            inner = await _context.ExecuteScalarAsync<string>(invocation,
+                new object[] { filterParam, hasOrder ? (object)orderByJson! : DBNull.Value, distinctOnJson }, cancellationToken);
+        else if (hasOrder)
             inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, orderByJson! }, cancellationToken);
         else
             inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam }, cancellationToken);

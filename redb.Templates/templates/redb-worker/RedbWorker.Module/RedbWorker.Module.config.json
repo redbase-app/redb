@@ -1,0 +1,10 @@
+{
+  "ContextName": "redbworker",
+  "AutoStart": true,
+  "Folders": {
+    "Inbox": "data/inbox",
+    "Outbox": "data/outbox",
+    "Archive": "data/archive",
+    "Error": "data/error"
+  }
+}

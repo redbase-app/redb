@@ -1,0 +1,20 @@
+@inherits LayoutComponentBase
+
+<header>
+    <a class="brand" href="">RedbBff</a>
+    <AuthorizeView>
+        <Authorized>
+            <NavLink href="" Match="NavLinkMatch.All">Products</NavLink>
+            <NavLink href="categories">Categories</NavLink>
+            <span class="who">@context.User.Identity?.Name</span>
+            @* A plain POST: sign-out clears the cookie, which only a plain request can do. *@
+            <form method="post" action="auth/logout" data-enhance="false">
+                <AntiforgeryToken />
+                <button type="submit" class="link">Sign out</button>
+            </form>
+        </Authorized>
+    </AuthorizeView>
+</header>
+<main>
+    @Body
+</main>

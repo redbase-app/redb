@@ -280,7 +280,9 @@ public partial class PostgresTreeQueryProvider
         //   p_scheme_id, p_filter, p_limit, p_offset, p_order, p_max_depth,
         //   p_distinct, p_source_mode, p_tree_ids, p_include_seed,
         //   p_polymorphic, p_distinct_on
-        var orderArg = hasOrder ? "$2::jsonb" : "NULL::jsonb";
+        // A distinct key binds $3; the order then always binds $2, NULL when there is none.
+        var distinctOnJson = BuildPvtDistinctOnJson(context);
+        var orderArg = hasOrder || distinctOnJson != null ? "$2::jsonb" : "NULL::jsonb";
         var invocation = "SELECT pvt_build_query_sql("
             + context.SchemeId.ToString(CultureInfo.InvariantCulture)
             + ", $1::jsonb, " + limitArg
@@ -291,13 +293,17 @@ public partial class PostgresTreeQueryProvider
             + ", '" + route.SourceMode + "'"
             + ", " + treeIdsLiteral
             + ", " + (route.IncludeSeed ? "true" : "false")
-            + ", true)"   // p_polymorphic=true matches Pro default
-            + " AS \"Value\"";
+            + ", true"    // p_polymorphic=true matches Pro default
+            + (distinctOnJson != null ? ", $3::jsonb" : "")
+            + ") AS \"Value\"";
 
         object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
 
         string? inner;
-        if (hasOrder)
+        if (distinctOnJson != null)
+            inner = await _context.ExecuteScalarAsync<string>(invocation,
+                new object[] { filterParam, hasOrder ? (object)orderByJson! : DBNull.Value, distinctOnJson }, cancellationToken);
+        else if (hasOrder)
             inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, orderByJson! }, cancellationToken);
         else
             inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam }, cancellationToken);

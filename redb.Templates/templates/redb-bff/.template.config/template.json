@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "RedBase",
+  "classifications": [ "Web", "Blazor", "BFF", "API", "Database", "RedBase" ],
+  "identity": "RedBase.Bff.Template",
+  "name": "RedBase Blazor BFF with redb.Route controllers",
+  "shortName": "redb-bff",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "sourceName": "RedbBff",
+  "preferNameDirectory": true,
+  "sources": [
+    {
+      "exclude": [
+        "**/[Bb]in/**", "**/[Oo]bj/**", ".template.config/**/*", "**/*.filelist", "**/*.user", "**/*.lock.json",
+        "**/*.db", "**/*.db-shm", "**/*.db-wal", "data/**", "runtime/**", "deploy/output/**", "deploy/.env"
+      ]
+    }
+  ]
+}

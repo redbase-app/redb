@@ -33,9 +33,10 @@ SQLITE_EXTENSION_INIT3
 
 /* Checked by redb.SQLite at initialization against SqliteDialect.Query_PvtRequiredVersion():
  * bump both on every change of this module.
- * 0.6.6 - $regex / $iregex / $regexreplace (2026-09-16); the version gate itself. */
+ * 0.6.6 - $regex / $iregex / $regexreplace (2026-09-16); the version gate itself.
+ * 0.6.7 - DistinctBy in the wide shape (tree without props, absence check) was dropped (2026-09-26). */
 #ifndef PVT_MODULE_VERSION
-#define PVT_MODULE_VERSION "0.6.6"
+#define PVT_MODULE_VERSION "0.6.7"
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -1866,6 +1867,23 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
         strcmp(where_sql,"TRUE")==0 ? "" : where_sql,
         order_sql);
       char *r2 = sqlite3_mprintf("%s%s", result, paging); sqlite3_free(result); result = r2;
+    }else if(part_expr){
+      /* DistinctBy in the wide shape (a tree query without props, or an absence check). This branch
+      ** used to drop the distinct key and return every row. The wide _pvt_cte carries the base
+      ** columns itself, so a base key "o.<col>" is read as "_pvt_cte.<col>"; representative per
+      ** group is the lowest _id, as in the narrow branch. */
+      char *wide_part = !strncmp(part_expr, "o.", 2)
+        ? sqlite3_mprintf("_pvt_cte.%s", part_expr + 2)
+        : sqlite3_mprintf("%s", part_expr);
+      result = sqlite3_mprintf(
+        "%s,\n_ranked AS (\n  SELECT _pvt_cte._id AS _id, ROW_NUMBER() OVER (PARTITION BY %s ORDER BY _pvt_cte._id) AS _rn"
+        "\n  FROM _pvt_cte%s%s\n)"
+        "\nSELECT _id FROM _ranked WHERE _rn = 1%s",
+        cte, wide_part,
+        strcmp(where_sql,"TRUE")==0 ? "" : "\n  WHERE ",
+        strcmp(where_sql,"TRUE")==0 ? "" : where_sql,
+        paging);
+      sqlite3_free(wide_part);
     }else{
       result = sqlite3_mprintf(
         "%s\nSELECT %s_id FROM _pvt_cte%s%s%s%s",

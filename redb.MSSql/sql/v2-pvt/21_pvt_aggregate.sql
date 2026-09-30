@@ -154,7 +154,7 @@ RETURNS NVARCHAR(MAX)
 AS
 BEGIN
     IF @entry IS NULL OR ISJSON(@entry) = 0
-        RETURN N'/* pvt_build_agg_expr: entry not JSON */ NULL';
+        RETURN dbo.pvt_fail(N'aggregate entry is not JSON');
 
     DECLARE @op NVARCHAR(50) = NULL, @arg NVARCHAR(MAX) = NULL, @arg_t INT = NULL;
     DECLARE c CURSOR LOCAL FAST_FORWARD FOR
@@ -163,7 +163,7 @@ BEGIN
     FETCH NEXT FROM c INTO @op, @arg, @arg_t;
     CLOSE c; DEALLOCATE c;
     IF @op IS NULL
-        RETURN N'/* pvt_build_agg_expr: no $<func> key */ NULL';
+        RETURN dbo.pvt_fail(N'aggregate entry has no $<function> key');
 
     DECLARE @lo NVARCHAR(50) = LOWER(@op);
     DECLARE @func NVARCHAR(20) = CASE @lo
@@ -175,7 +175,7 @@ BEGIN
         ELSE NULL
     END;
     IF @func IS NULL
-        RETURN N'/* pvt_build_agg_expr: unsupported operator ' + @op + N' */ NULL';
+        RETURN dbo.pvt_fail(N'unsupported aggregate ' + @op);
 
     -- $count "*" → COUNT(*)
     IF @lo = N'$count' AND @arg_t = 1 AND @arg = N'*'
@@ -186,7 +186,7 @@ BEGIN
     IF @arg_t = 5 AND ISJSON(@arg) = 1
         SET @path = JSON_VALUE(@arg, N'$."$field"');
     IF @path IS NULL
-        RETURN N'/* pvt_build_agg_expr: operand of ' + @op + N' must be "*" or {"$field":"..."} */ NULL';
+        RETURN dbo.pvt_fail(N'operand of ' + @op + N' must be "*" or {"$field":"..."}');
 
     -- Array-field branch: detect is_array=true & non-base. The pivot
     -- column would project the array as JSON, so the orchestrator
@@ -203,7 +203,7 @@ BEGIN
     BEGIN
         DECLARE @sid NVARCHAR(40) = JSON_VALUE(@meta, N'$.sid');
         IF @sid IS NULL
-            RETURN N'/* pvt_build_agg_expr: array field "' + @path + N'" missing sid */ NULL';
+            RETURN dbo.pvt_fail(N'array field "' + @path + N'" has no structure id');
         DECLARE @aa NVARCHAR(80) = N'_aa_' + @sid;
         IF @lo = N'$sum'   RETURN N'SUM(' + @aa + N'.[sum])';
         IF @lo = N'$count' RETURN N'SUM(' + @aa + N'.[cnt])';
@@ -211,12 +211,12 @@ BEGIN
         IF @lo = N'$max'   RETURN N'MAX(' + @aa + N'.[max])';
         IF @lo = N'$avg'
             RETURN N'(SUM(' + @aa + N'.[sum]) / NULLIF(SUM(' + @aa + N'.[cnt]), 0))';
-        RETURN N'/* pvt_build_agg_expr: array operator ' + @op + N' unsupported */ NULL';
+        RETURN dbo.pvt_fail(N'unsupported array aggregate ' + @op);
     END;
 
     DECLARE @col NVARCHAR(MAX) = dbo.pvt_agg_field_ref(@path, @fields, @base_prefix);
     IF @col IS NULL
-        RETURN N'/* pvt_build_agg_expr: unknown field "' + @path + N'" */ NULL';
+        RETURN dbo.pvt_fail(N'aggregate field "' + @path + N'" is not a field of the scheme');
 
     -- Promote SUM / AVG operands to NUMERIC(38,10) for overflow safety and
     -- to match Pro's decimal-typed public surface.

@@ -457,53 +457,78 @@ namespace redb.Core.Models.Configuration
         // === METHODS ===
 
         /// <summary>
+        /// Copy every setting of <paramref name="source"/> into this instance, the connection identity
+        /// (<see cref="ConnectionString"/>, <see cref="CacheDomain"/>) included.
+        /// </summary>
+        public void CopyFrom(RedbServiceConfiguration source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ConnectionString = source.ConnectionString;
+            CacheDomain = source.CacheDomain;
+            CopyBehaviourFrom(source);
+        }
+
+        /// <summary>
+        /// Copy every setting of <paramref name="source"/> into this instance except the connection identity
+        /// (<see cref="ConnectionString"/>, <see cref="CacheDomain"/>): what a temporary scope may change on a
+        /// running service. This is the one list of the behaviour settings - Clone, CopyFrom and ApplyTemporary
+        /// all go through it; a new setting is added here (RedbServiceConfigurationCopyTests fails otherwise).
+        /// </summary>
+        public void CopyBehaviourFrom(RedbServiceConfiguration source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            IdResetStrategy = source.IdResetStrategy;
+            MissingObjectStrategy = source.MissingObjectStrategy;
+            DefaultCheckPermissionsOnLoad = source.DefaultCheckPermissionsOnLoad;
+            DefaultCheckPermissionsOnSave = source.DefaultCheckPermissionsOnSave;
+            DefaultCheckPermissionsOnDelete = source.DefaultCheckPermissionsOnDelete;
+            DefaultCheckPermissionsOnQuery = source.DefaultCheckPermissionsOnQuery;
+            DefaultStrictDeleteExtra = source.DefaultStrictDeleteExtra;
+            AutoSyncSchemesOnSave = source.AutoSyncSchemesOnSave;
+            DefaultLoadDepth = source.DefaultLoadDepth;
+            DefaultMaxTreeDepth = source.DefaultMaxTreeDepth;
+            ThrowOnObjectNotFound = source.ThrowOnObjectNotFound;
+            EnablePvtPrefilter = source.EnablePvtPrefilter;
+            StringCollation = source.StringCollation;
+            EnableLazyReferences = source.EnableLazyReferences;
+            LazyReferenceAccess = source.LazyReferenceAccess;
+            LazyLoadWithoutScope = source.LazyLoadWithoutScope;
+            AutoApplyDatabaseUpgrades = source.AutoApplyDatabaseUpgrades;
+            EnablePropsCache = source.EnablePropsCache;
+            PreloadListItemLinkedObjects = source.PreloadListItemLinkedObjects;
+            MaintenanceAnalysisLimit = source.MaintenanceAnalysisLimit;
+            PropsCacheMaxSize = source.PropsCacheMaxSize;
+            PropsCacheTtl = source.PropsCacheTtl;
+            SkipHashValidationOnCacheCheck = source.SkipHashValidationOnCacheCheck;
+            ThrowOnSchemeMismatch = source.ThrowOnSchemeMismatch;
+            EnableListCache = source.EnableListCache;
+            ListCacheTtl = source.ListCacheTtl;
+            EnableMetadataCache = source.EnableMetadataCache;
+            MetadataCacheLifetimeMinutes = source.MetadataCacheLifetimeMinutes;
+            WarmupMetadataCacheOnInit = source.WarmupMetadataCacheOnInit;
+            EnsureCreated = source.EnsureCreated;
+            EnableSchemaValidation = source.EnableSchemaValidation;
+            EnableDataValidation = source.EnableDataValidation;
+            AutoSetModifyDate = source.AutoSetModifyDate;
+            AutoRecomputeHash = source.AutoRecomputeHash;
+            SystemUserId = source.SystemUserId;
+            PropsSaveStrategy = source.PropsSaveStrategy;
+            JsonOptions = new JsonSerializationOptions
+            {
+                WriteIndented = source.JsonOptions.WriteIndented,
+                UseUnsafeRelaxedJsonEscaping = source.JsonOptions.UseUnsafeRelaxedJsonEscaping
+            };
+        }
+
+        /// <summary>
         /// Create configuration copy.
         /// </summary>
         public RedbServiceConfiguration Clone()
         {
-            return new RedbServiceConfiguration
-            {
-                ConnectionString = ConnectionString,
-                CacheDomain = CacheDomain,
-                IdResetStrategy = IdResetStrategy,
-                MissingObjectStrategy = MissingObjectStrategy,
-                DefaultCheckPermissionsOnLoad = DefaultCheckPermissionsOnLoad,
-                DefaultCheckPermissionsOnSave = DefaultCheckPermissionsOnSave,
-                DefaultCheckPermissionsOnDelete = DefaultCheckPermissionsOnDelete,
-                DefaultStrictDeleteExtra = DefaultStrictDeleteExtra,
-                AutoSyncSchemesOnSave = AutoSyncSchemesOnSave,
-                DefaultLoadDepth = DefaultLoadDepth,
-                DefaultMaxTreeDepth = DefaultMaxTreeDepth,
-                ThrowOnObjectNotFound = ThrowOnObjectNotFound,
-                EnablePropsCache = EnablePropsCache,
-                PreloadListItemLinkedObjects = PreloadListItemLinkedObjects,
-                LazyLoadWithoutScope = LazyLoadWithoutScope,
-                MaintenanceAnalysisLimit = MaintenanceAnalysisLimit,
-                PropsCacheMaxSize = PropsCacheMaxSize,
-                PropsCacheTtl = PropsCacheTtl,
-                SkipHashValidationOnCacheCheck = SkipHashValidationOnCacheCheck,
-                ThrowOnSchemeMismatch = ThrowOnSchemeMismatch,
-                EnableListCache = EnableListCache,
-                ListCacheTtl = ListCacheTtl,
-                EnableMetadataCache = EnableMetadataCache,
-                MetadataCacheLifetimeMinutes = MetadataCacheLifetimeMinutes,
-                WarmupMetadataCacheOnInit = WarmupMetadataCacheOnInit,
-                EnsureCreated = EnsureCreated,
-                //MetadataCache = MetadataCache, // New caching settings
-                EnableSchemaValidation = EnableSchemaValidation,
-                EnableDataValidation = EnableDataValidation,
-                AutoSetModifyDate = AutoSetModifyDate,
-                AutoRecomputeHash = AutoRecomputeHash,
-                EnableLazyReferences = EnableLazyReferences,
-                LazyReferenceAccess = LazyReferenceAccess,
-                // DefaultSecurityPriority removed,
-                SystemUserId = SystemUserId,
-                JsonOptions = new JsonSerializationOptions
-                {
-                    WriteIndented = JsonOptions.WriteIndented,
-                    UseUnsafeRelaxedJsonEscaping = JsonOptions.UseUnsafeRelaxedJsonEscaping
-                }
-            };
+            // CFG-1: one list of settings (CopyFrom); a hand-written copy here had fallen five settings behind.
+            var copy = new RedbServiceConfiguration();
+            copy.CopyFrom(this);
+            return copy;
         }
 
         /// <summary>

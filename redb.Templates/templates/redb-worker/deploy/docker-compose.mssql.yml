@@ -1,0 +1,30 @@
+# The worker in its own host with SQL Server instead of SQLite.
+# Before the first run, switch the provider in code (see the comment in RedbWorker.Host/Program.cs):
+#   RedbWorker.Host.csproj: redb.SQLite.Pro  ->  redb.MSSql.Pro
+#   Program.cs:             .UseSqlite(...)  ->  .UseMsSql(connectionString)
+# RedBase creates its tables but not the database: create redb_app once, for example
+#   docker compose -f deploy/docker-compose.mssql.yml up -d db
+#   docker compose -f deploy/docker-compose.mssql.yml exec db /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "Change_me_123" -Q "CREATE DATABASE redb_app"
+# Then: docker compose -f deploy/docker-compose.mssql.yml up --build
+# Put order files into runtime/inbox; receipts arrive in runtime/outbox.
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Change_me_123"
+    volumes:
+      - mssqldata:/var/opt/mssql
+
+  worker:
+    build: ..
+    environment:
+      ConnectionStrings__Redb: "Server=db,1433;Database=redb_app;User Id=sa;Password=Change_me_123;TrustServerCertificate=true"
+    volumes:
+      # On Linux the folder must be writable by the container's user.
+      - ../runtime:/data
+    depends_on:
+      - db
+
+volumes:
+  mssqldata:

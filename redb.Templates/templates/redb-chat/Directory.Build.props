@@ -1,0 +1,13 @@
+<Project>
+
+  <!-- Shared settings of both projects. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- One place for the RedBase version. -->
+    <RedbVersion>4.2.0</RedbVersion>
+  </PropertyGroup>
+
+</Project>

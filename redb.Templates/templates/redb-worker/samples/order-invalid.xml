@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Violates Order.xsd: the amount is negative and the currency is not three capital letters.
+     The worker answers it with a Rejected receipt. -->
+<Order>
+  <OrderId>1002</OrderId>
+  <Customer>Contoso Ltd</Customer>
+  <Amount>-5</Amount>
+  <Currency>euro</Currency>
+</Order>

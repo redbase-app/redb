@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="RedbBff.Models/RedbBff.Models.csproj" />
+  <Project Path="RedbBff.Backend/RedbBff.Backend.csproj" />
+  <Project Path="RedbBff.Host/RedbBff.Host.csproj" />
+  <Project Path="RedbBff.Web/RedbBff.Web.csproj" />
+</Solution>

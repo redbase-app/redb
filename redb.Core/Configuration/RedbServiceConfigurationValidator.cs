@@ -106,13 +106,10 @@ namespace redb.Core.Configuration
         /// <summary>
         /// Copy fixed values
         /// </summary>
+        // The fixed configuration is a full copy (CFG-1), so everything is taken back: a list of the fields
+        // FixCriticalErrors happens to touch today goes stale the day it touches another.
         private static void CopyFixedValues(RedbServiceConfiguration source, RedbServiceConfiguration target)
-        {
-            target.DefaultLoadDepth = source.DefaultLoadDepth;
-            target.DefaultMaxTreeDepth = source.DefaultMaxTreeDepth;
-            target.SystemUserId = source.SystemUserId;
-            target.MetadataCacheLifetimeMinutes = source.MetadataCacheLifetimeMinutes;
-        }
+            => target.CopyFrom(source);
     }
 
     /// <summary>

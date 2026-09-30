@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The API's own host: a console process that runs the API module without Tsak. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RedbApp.Api\RedbApp.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SQLite with Pro: the database is a file next to the process, nothing to install. For PostgreSQL or SQL Server
+         replace it with redb.Postgres.Pro or redb.MSSql.Pro and follow the comment in Program.cs. -->
+    <PackageReference Include="redb.SQLite.Pro" Version="$(RedbVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

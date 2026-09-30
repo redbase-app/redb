@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "RedBase",
+  "classifications": [ "Web", "Blazor", "WebAssembly", "API", "Database", "RedBase" ],
+  "identity": "RedBase.App.Template",
+  "name": "RedBase Blazor WebAssembly App with a redb.Route API",
+  "shortName": "redb-app",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "sourceName": "RedbApp",
+  "preferNameDirectory": true,
+  "sources": [
+    {
+      "exclude": [
+        "**/[Bb]in/**", "**/[Oo]bj/**", ".template.config/**/*", "**/*.filelist", "**/*.user", "**/*.lock.json",
+        "**/*.db", "**/*.db-shm", "**/*.db-wal", "data/**", "runtime/**", "deploy/output/**", "deploy/.env"
+      ]
+    }
+  ]
+}

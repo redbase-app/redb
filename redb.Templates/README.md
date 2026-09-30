@@ -9,17 +9,34 @@ cd MyApp
 dotnet run
 ```
 
-The default project runs as is: SQLite creates its database file next to the app, and Pro is on. Pro is free of
+Every project runs as is: SQLite creates its database file next to the app, and Pro is on. Pro is free of
 charge for the whole 4.x line, no license key required.
 
-## Parameters
+## Templates
+
+| Short name | What it is |
+|------------|------------|
+| `redb` | Console app: create, load, update, query, tree |
+| `redb-razor` | Razor Pages site: list with search, sorting and paging, create / edit form |
+| `redb-blazor` | Blazor site (Interactive Server): products list and form, category tree |
+| `redb-worker` | Integration worker: folder inbox, XSD check, one transaction, receipt; own host or a Tsak module |
+| `redb-chat` | LLM chat with the history in RedBase; console and HTTP; options for tools and audit; own host or a Tsak module |
+| `redb-app` | Blazor WebAssembly client and a redb.Route REST API with sign-in (JWT); the API runs in its own host or as a Tsak module |
+| `redb-bff` | Blazor backend-for-frontend with a cookie session, and a backend of redb.Route controllers; the backend runs in its own host or as a Tsak module |
+
+Every template configures RedBase the same way: with Pro, the PVT prefilter and change tracking are on, the props cache is
+off and the comment next to it shows how to turn it on.
+
+## `redb`: console app
+
+### Parameters
 
 | Parameter | Values | Default | Description |
 |-----------|--------|---------|-------------|
 | `--db` | `sqlite`, `postgres`, `mssql` | `sqlite` | Database provider |
 | `--pro` | `true`, `false` | `true` | Pro packages: compiled LINQ, change tracking, aggregation |
 
-## Examples
+### Examples
 
 ```bash
 # SQLite + Pro (default)
@@ -38,7 +55,7 @@ dotnet new redb -n MyApp --db mssql --pro false
 For PostgreSQL and SQL Server, put your password into the connection string in `Program.cs` first. The database
 named there must already exist: the app creates the RedBase tables in it, not the database itself.
 
-## What you get
+### What you get
 
 A console app that walks through the basics:
 

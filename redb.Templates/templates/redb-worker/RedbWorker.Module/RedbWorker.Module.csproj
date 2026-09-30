@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The module: InitRoute.main, the routes, the XML contract. The same DLL runs in two places:
+       RedbWorker.Host calls InitRoute.main itself, and a Tsak worker loads it from RedbWorker.tpkg
+       (deploy/pack-tpkg.ps1). redb and redb.Route ship with the Tsak worker, so the package carries
+       only this DLL. -->
+
+  <ItemGroup>
+    <PackageReference Include="redb.Core" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route.Core" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route.File" Version="$(RedbVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Xml\*.xsd" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The module's configuration. Packed into the .tpkg; copied to the output so the host reads the
+         same file the Tsak worker does. -->
+    <None Update="RedbWorker.Module.config.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

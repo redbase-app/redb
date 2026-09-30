@@ -3,7 +3,25 @@
 Внутренний документ, на русском. Всё, что видит пользователь (README пакета, README внутри каждого
 шаблона, комментарии в коде), пишется на английском.
 
-Статус: план согласован 2026-09-23, код не начат.
+Статус (2026-09-30): написаны `redb` (префильтр + ChangeTracking), `redb-razor`, `redb-blazor`, `redb-worker`,
+`redb-chat`, `redb-app`, `redb-bff`, смоук `scripts/smoke-templates.ps1` (кейсы по опциям), README пакета. 2026-10-01: смоук на локальных 4.2.0 (nupkg/) — все 12 кейсов собираются, `redb` (Pro и Free) запускается; веб/воркер/чат, docker и путь Tsak запуском не проверены. Identity — отдельной волной позже. Пины `redb-console` подняты на 4.2.0 при бампе; в новых шаблонах версия в одном свойстве `RedbVersion` = 4.2.0 (у многопроектных в
+`Directory.Build.props`) — добавить их в шаг 2 чек-листа.
+
+Решения по ходу (2026-09-30):
+
+- Шаблоны на маршрутах (`redb-worker`, `redb-chat`, API `redb-app`, бэкенд `redb-bff`) устроены как
+  SerialNumbersDemo: проект-модуль с `InitRoute.main`, `*.config.json`, `manifest.json` (модуль Tsak,
+  `deploy/pack-tpkg.ps1`, `deploy/docker-compose.tsak.yml`) и проект-хост, который строит `RouteContext` и
+  вызывает тот же `main`. Настройки модуля — свойства контекста; слои: config.json модуля, затем
+  `Tsak:Contexts:{ctx}:Override` (одни и те же переменные окружения в обоих хостах).
+- `redb-chat`: `--front` не нужен, консоль и HTTP всегда оба; варианты `--tools none|shell|mcp` и `--audit`.
+  История в redb (`RedbConversationStore`). HTTP по умолчанию на 127.0.0.1. Инструмент shell — только
+  одиночные read-only программы, без cmd/sh. MCP — filesystem-сервер через npx (нужен Node.js).
+- `redb-blazor`: компоненты не берут `IRedbService` напрямую, а открывают его на операцию через `RedbWork`
+  (как `IDbContextFactory` в EF Core): scoped-сервис живёт весь circuit.
+- `redb-app`: API на REST DSL; `POST /api/auth/login` выдаёт JWT, остальное `InboundAuth=Bearer` +
+  `IHttpTokenValidator` из реестра; CORS через `RestOptions.ExtraConsumerOptions`, preflight отвечает
+  middleware до проверки токена. Пользователи из конфига — заглушка до redb.Identity.
 
 ## 1. Цель
 
@@ -19,13 +37,13 @@
 - никаких заглушек, секретов в коде и «TODO: доделать»: шаблон запускается и работает;
 - всё, что пользователь обязан вписать сам (пароль БД, ключ LLM), лежит в `appsettings.json` с
   комментарием в коде и строкой в README шаблона;
-- версии пакетов одинаковые во всех шаблонах (4.1.0 на момент плана).
+- версии пакетов одинаковые во всех шаблонах (**4.2.0**: владелец 2026-09-30 бампает всё на 4.2.0, выпуск ещё не готов; шаблоны пишем под 4.2.0).
 
 ## 2. Решения владельца (2026-09-23)
 
 | Вопрос | Решение |
 |---|---|
-| Вход в систему в шаблонах 4 и 5 | простой (cookie, пользователи из конфига); redb.Identity последним, отдельной волной |
+| Вход в систему в шаблонах 4 и 5 | простой, пользователи из конфига: `redb-app` JWT (как в tsum), `redb-bff` cookie (как Tsak.Web); redb.Identity последним, отдельной волной |
 | Бэкенд API | REST DSL и контроллеры redb.Route (`redb.Route.Http`, `redb.Route.Controllers`); ASP.NET-контроллеры и Minimal API не используем |
 | Режим Blazor в шаблоне 4 | WASM, как в tsum (сначала выбирали Auto; 2026-09-24 заменено: Auto требует серверного хоста и сливает `redb-app` с `redb-bff`) |
 | Ключ LLM в шаблоне 7 | пустое поле в `appsettings.json`, в коде комментарий, куда вписать; README шаблона об этом же |
@@ -103,7 +121,7 @@ EWS (tsum, honest) в публичных материалах не называ�
 - `*.Api`: маршруты redb.Route, REST DSL (`redb.Route.Http`), доступ к redb;
 - `*.Web`: Blazor WASM (`WebAssembly.DevServer` для `dotnet run`), ходит в API по HTTP; в деплое статика за nginx с прокси `/api/`.
 
-Функции: вход (cookie, пользователи из конфига), список с фильтром и страницами, карточка с правкой,
+Функции: вход (как в tsum: маршрут логина выдаёт JWT, API проверяет его через `inboundAuth=bearer` у `redb.Route.Http`; пользователи из конфига), список с фильтром и страницами, карточка с правкой,
 дерево. Один пример «действия» (смена статуса) через `direct:`-маршрут.
 
 Два процесса, как в образце (решение владельца 2026-09-23). В tsum: `tsum.Api` — маршруты с
@@ -215,3 +233,20 @@ SFTP, AS2, SQL Server в шаблон не входят; в README шаблон�
 ## 8. Открытые вопросы
 
 Открытых вопросов нет (2026-09-24).
+
+## 9. Что проверить первым прогоном (2026-09-30)
+
+Код написан без сборки. Места, где API сверено по исходникам, но поведение не проверено запуском:
+
+- `redb-chat --tools mcp`: запуск `npx` через `cmd /c` на Windows, `McpTransport.Stdio` из модуля.
+- `redb-bff`: привязка `[FromQuery]` при отсутствующем параметре (ожидаю null), `[FromRoute("id")] long`,
+  статус через `Exchange.Out.Headers[redbHttp.ResponseCode]` из контроллера.
+- `redb-bff` Web: вход статическим SSR (`[ExcludeFromInteractiveRouting]` + `AcceptsInteractiveRouting()`),
+  POST `/auth/login` и `/auth/logout` — эндпоинты веб-хоста для cookie, как в Tsak.Web; данные идут только
+  через бэкенд.
+- `redb-app`: preflight CORS при `InboundAuth=Bearer` (middleware отвечает до проверки токена — по коду
+  `SharedHttpServerManager`), JSON-привязка camelCase.
+- Модули на Tsak: `Microsoft.IdentityModel.JsonWebTokens` (`redb-app`) берётся из worker-а, в `.tpkg` не кладётся.
+- Все шаблоны: исключения `template.json` на уровне source (свой список заменяет стандартный — стандартные
+  пути перечислены явно), замена `sourceName` в нижнем регистре (`redbworker`, `redbchat`, ...) в именах
+  контекстов и переменных окружения.

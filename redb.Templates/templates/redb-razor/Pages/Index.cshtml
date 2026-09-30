@@ -1,0 +1,61 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Products";
+}
+
+<h1>Products</h1>
+
+<form method="get" class="filters">
+    <input type="search" name="Search" value="@Model.Search" placeholder="Search by name" />
+    <label><input type="checkbox" name="InStockOnly" value="true" checked="@Model.InStockOnly" /> In stock only</label>
+    <select name="Sort">
+        <option value="name" selected="@(Model.Sort == "name")">Name</option>
+        <option value="category" selected="@(Model.Sort == "category")">Category</option>
+        <option value="price" selected="@(Model.Sort == "price")">Price, low to high</option>
+        <option value="-price" selected="@(Model.Sort == "-price")">Price, high to low</option>
+    </select>
+    <button type="submit">Apply</button>
+</form>
+
+<p class="muted">@Model.Total product(s)</p>
+
+<table>
+    <thead>
+        <tr><th>Name</th><th>Category</th><th class="num">Price</th><th>In stock</th><th></th></tr>
+    </thead>
+    <tbody>
+    @foreach (var item in Model.Items)
+    {
+        <tr>
+            <td><a asp-page="/Edit" asp-route-id="@item.Id">@item.Name</a></td>
+            <td>@item.Props!.Category</td>
+            <td class="num">@item.Props.Price.ToString("F2")</td>
+            <td>@(item.Props.InStock ? "yes" : "no")</td>
+            <td>
+                <form method="post" asp-page-handler="Delete" asp-route-id="@item.Id"
+                      asp-route-Search="@Model.Search" asp-route-InStockOnly="@Model.InStockOnly"
+                      asp-route-Sort="@Model.Sort" asp-route-p="@Model.PageNumber"
+                      onsubmit="return confirm('Delete @item.Name?');">
+                    <button type="submit" class="link">Delete</button>
+                </form>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<nav class="pager">
+    @for (var i = 1; i <= Model.PageCount; i++)
+    {
+        if (i == Model.PageNumber)
+        {
+            <span>@i</span>
+        }
+        else
+        {
+            <a asp-page="/Index" asp-route-Search="@Model.Search" asp-route-InStockOnly="@Model.InStockOnly"
+               asp-route-Sort="@Model.Sort" asp-route-p="@i">@i</a>
+        }
+    }
+</nav>

@@ -1,0 +1,111 @@
+@page "/products/new"
+@page "/products/{Id:long}"
+@inject RedbWork Work
+@inject NavigationManager Navigation
+
+<PageTitle>@(Id is null ? "New product" : "Edit product")</PageTitle>
+
+<h1>@(Id is null ? "New product" : "Edit product")</h1>
+
+@if (notFound)
+{
+    <p>Product @Id was not found. <a href="">Back to the list</a></p>
+}
+else
+{
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="product" class="form">
+        <DataAnnotationsValidator />
+
+        <label>Name</label>
+        <InputText @bind-Value="input.Name" />
+        <ValidationMessage For="() => input.Name" />
+
+        <label>Category</label>
+        <InputText @bind-Value="input.Category" />
+        <ValidationMessage For="() => input.Category" />
+
+        <label>Price</label>
+        <InputNumber @bind-Value="input.Price" step="0.01" />
+        <ValidationMessage For="() => input.Price" />
+
+        <label><InputCheckbox @bind-Value="input.InStock" /> In stock</label>
+
+        <label>Description</label>
+        <InputTextArea @bind-Value="input.Description" rows="4" />
+        <ValidationMessage For="() => input.Description" />
+
+        <div class="actions">
+            <button type="submit">Save</button>
+            <a href="">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public long? Id { get; set; }
+
+    private ProductInput input = new();
+    private bool notFound;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id is null)
+            return;
+
+        var product = await Work.RunAsync(redb => redb.LoadAsync<Product>(Id.Value));
+        if (product is null)
+        {
+            notFound = true;
+            return;
+        }
+
+        input = new ProductInput
+        {
+            Name = product.Name ?? string.Empty,
+            Category = product.Props!.Category,
+            Price = product.Props.Price,
+            InStock = product.Props.InStock,
+            Description = product.Props.Description,
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        await Work.RunAsync(async redb =>
+        {
+            // Load, then change: with change tracking on, the save writes only the fields that
+            // differ from what was loaded.
+            var product = Id is null
+                ? new RedbObject<Product> { Props = new Product() }
+                : await redb.LoadAsync<Product>(Id.Value) ?? throw new InvalidOperationException($"Product {Id} not found.");
+
+            product.Name = input.Name;
+            product.Props!.Category = input.Category;
+            product.Props.Price = input.Price;
+            product.Props.InStock = input.InStock;
+            product.Props.Description = input.Description;
+
+            await redb.SaveAsync(product);
+        });
+
+        Navigation.NavigateTo("");
+    }
+
+    /// <summary>What the form edits. Validation lives here, not on the Props class.</summary>
+    private sealed class ProductInput
+    {
+        [Required, StringLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required, StringLength(100)]
+        public string Category { get; set; } = string.Empty;
+
+        [Range(0, 1_000_000)]
+        public decimal Price { get; set; }
+
+        public bool InStock { get; set; }
+
+        [StringLength(2000)]
+        public string? Description { get; set; }
+    }
+}

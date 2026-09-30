@@ -452,13 +452,13 @@ BEGIN
             DECLARE @co_id BIGINT = TRY_CAST(@v AS BIGINT);
             SET @piece = CASE WHEN @co_id IS NOT NULL
                 THEN @obj_alias + N'.[_id_parent] = ' + CAST(@co_id AS NVARCHAR(20))
-                ELSE N'/*$childrenOf: invalid id*/1=0' END;
+                ELSE dbo.pvt_fail(N'$childrenOf expects an object id') END;
         END
         ELSE IF @lk = N'$level'
         BEGIN
             DECLARE @lvl_expr NVARCHAR(100) = N'dbo.pvt_object_depth(' + @obj_alias + N'.[_id])';
             IF @t = 2 OR @t = 3  -- direct number: exact equality
-                SET @piece = @lvl_expr + N' = ' + ISNULL(CAST(TRY_CAST(@v AS BIGINT) AS NVARCHAR(20)), N'0');
+                SET @piece = @lvl_expr + N' = ' + COALESCE(CAST(TRY_CAST(@v AS BIGINT) AS NVARCHAR(20)), dbo.pvt_fail(N'$level expects an integer'));
             ELSE IF @t = 5       -- operator object: {"$gt":2} etc.
             BEGIN
                 DECLARE @lvl_parts NVARCHAR(MAX) = N'';
@@ -476,11 +476,11 @@ BEGIN
                         WHEN N'$gte' THEN N'>='
                         WHEN N'$lt'  THEN N'<'
                         WHEN N'$lte' THEN N'<='
-                        ELSE N'='
+                        ELSE dbo.pvt_fail(N'unsupported $level comparison ' + @lvlk)
                     END;
                     IF @lvl_cnt > 0 SET @lvl_parts = @lvl_parts + N' AND ';
                     SET @lvl_parts += @lvl_expr + N' ' + @lvl_cmp + N' '
-                        + ISNULL(CAST(TRY_CAST(@lvlv AS BIGINT) AS NVARCHAR(20)), N'0');
+                        + COALESCE(CAST(TRY_CAST(@lvlv AS BIGINT) AS NVARCHAR(20)), dbo.pvt_fail(N'$level expects an integer'));
                     SET @lvl_cnt += 1;
                     FETCH NEXT FROM c_lvl INTO @lvlk, @lvlv;
                 END;
@@ -488,7 +488,7 @@ BEGIN
                 SET @piece = CASE WHEN @lvl_cnt > 0 THEN @lvl_parts ELSE N'1=1' END;
             END;
             ELSE
-                SET @piece = N'/*$level: unsupported type*/1=1';
+                SET @piece = dbo.pvt_fail(N'$level expects an integer or an operator object');
         END
         ELSE IF @lk = N'$hasancestor'
         BEGIN
@@ -498,7 +498,7 @@ BEGIN
                 SET @ha_id = TRY_CAST(JSON_VALUE(@v, N'$.id') AS BIGINT);
             SET @piece = CASE WHEN @ha_id IS NOT NULL
                 THEN N'dbo.pvt_is_descendant_of(' + @obj_alias + N'.[_id], ' + CAST(@ha_id AS NVARCHAR(20)) + N') = 1'
-                ELSE N'/*$hasAncestor: no id*/1=0' END;
+                ELSE dbo.pvt_fail(N'$hasAncestor expects an object id') END;
         END
         ELSE IF @lk = N'$hasdescendant'
         BEGIN
@@ -508,7 +508,7 @@ BEGIN
                 SET @hd_id = TRY_CAST(JSON_VALUE(@v, N'$.id') AS BIGINT);
             SET @piece = CASE WHEN @hd_id IS NOT NULL
                 THEN N'dbo.pvt_is_descendant_of(' + CAST(@hd_id AS NVARCHAR(20)) + N', ' + @obj_alias + N'.[_id]) = 1'
-                ELSE N'/*$hasDescendant: no id*/1=0' END;
+                ELSE dbo.pvt_fail(N'$hasDescendant expects an object id') END;
         END
 
         -- ---- B2-expr: comparison operators with expression operands ----
@@ -652,7 +652,7 @@ BEGIN
 
         -- ---- Other unsupported top-level $* keys ----------------------
         ELSE IF LEFT(@k, 1) = N'$'
-            SET @piece = N'/*unsupported-top:' + @k + N'*/1=1';
+            SET @piece = dbo.pvt_fail(N'unsupported operator ' + @k);
 
         ELSE
         BEGIN
@@ -689,9 +689,9 @@ BEGIN
                                 WHEN N'$gte' THEN N'>='
                                 WHEN N'$lt'  THEN N'<'
                                 WHEN N'$lte' THEN N'<='
-                                ELSE N'='
+                                ELSE dbo.pvt_fail(N'unsupported comparison ' + @pfk + N' on ' + @k)
                             END;
-                            DECLARE @pf_num  NVARCHAR(20) = ISNULL(CAST(TRY_CAST(@pfv AS INT) AS NVARCHAR(20)), N'0');
+                            DECLARE @pf_num  NVARCHAR(20) = COALESCE(CAST(TRY_CAST(@pfv AS INT) AS NVARCHAR(20)), dbo.pvt_fail(@k + N' expects an integer'));
                             DECLARE @pf_frag NVARCHAR(MAX);
                             IF @pf_is_len = 1
                                 SET @pf_frag = N'EXISTS (SELECT 1 FROM dbo._values fv'
@@ -716,7 +716,7 @@ BEGIN
                     END;
                 END;
                 IF @piece IS NULL
-                    SET @piece = N'/*pf-not-found:' + @pf_base + N'*/1=1';
+                    SET @piece = dbo.pvt_fail(@k + N': field "' + @pf_base + N'" is not an array or string field of the scheme');
             END
             ELSE
             BEGIN
@@ -725,7 +725,7 @@ BEGIN
                 DECLARE @norm NVARCHAR(400) = dbo.pvt_normalize_field_name(@k, @peek);
                 DECLARE @meta NVARCHAR(MAX) = JSON_QUERY(@fields, N'$.' + N'"' + STRING_ESCAPE(@norm, 'json') + N'"');
                 IF @meta IS NULL
-                    SET @piece = N'/*missing-meta:' + @norm + N'*/1=0';
+                    SET @piece = dbo.pvt_fail(N'field "' + @norm + N'" is not a field of the scheme');
                 ELSE IF @norm <> @k AND JSON_VALUE(@meta, '$.was_contains_key') = N'true'
                 BEGIN
                     -- ContainsKey: emit EXISTS checking _array_index = key.
@@ -736,7 +736,7 @@ BEGIN
                     SET @piece = N'EXISTS (SELECT 1 FROM dbo._values av'
                         + N' JOIN dbo._structures ds ON av._id_structure = ds._id'
                         + N' WHERE av._id_object = ' + @obj_alias + N'.[_id]'
-                        + N' AND (ds._id = ' + ISNULL(@ck_sid, N'0') + N' OR ds._id_parent = ' + ISNULL(@ck_sid, N'0') + N')'
+                        + N' AND (ds._id = ' + COALESCE(@ck_sid, dbo.pvt_fail(N'ContainsKey on "' + @norm + N'": the dictionary has no structure id')) + N' OR ds._id_parent = ' + COALESCE(@ck_sid, dbo.pvt_fail(N'ContainsKey on "' + @norm + N'": the dictionary has no structure id')) + N')'
                         + N' AND av._array_index = N''' + REPLACE(ISNULL(@ck_dict_key, N''), N'''', N'''''') + N''')';
                 END
                 ELSE
