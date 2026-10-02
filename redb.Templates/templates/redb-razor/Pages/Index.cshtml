@@ -30,7 +30,7 @@
         <tr>
             <td><a asp-page="/Edit" asp-route-id="@item.Id">@item.Name</a></td>
             <td>@item.Props!.Category</td>
-            <td class="num">@item.Props.Price.ToString("F2")</td>
+            <td class="num">@item.Props.Price.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)</td>
             <td>@(item.Props.InStock ? "yes" : "no")</td>
             <td>
                 <form method="post" asp-page-handler="Delete" asp-route-id="@item.Id"

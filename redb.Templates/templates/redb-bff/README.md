@@ -95,3 +95,11 @@ folder; each has the commands at the top.
 
 The images: `RedbBff.Host/Dockerfile` (the backend) and `RedbBff.Web/Dockerfile` (the web server), both
 built from the project folder.
+
+`pack-tpkg.ps1` puts the manifest, the module config, the module backend DLL and every dependency the
+worker does not ship itself into the package; `deploy/shipped-module-deps.txt` lists what the worker
+provides, and `deploy/output/RedbBff.tpkg.contents.txt` shows what went in. To run the module on a Tsak
+host built locally from the `tsak-worker` template, drop the assemblies that host lacks
+(`redb.Route.File.dll`, `redb.Route.Controller`-related assemblies, ...) into its `Libs/shared`: the host
+resolves a module's shared assemblies from `Libs/shared` next to the application, and that template
+copies `Libs/**` to its output.

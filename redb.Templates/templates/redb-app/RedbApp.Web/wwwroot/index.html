@@ -5,10 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RedbApp</title>
     <base href="/" />
+    <!-- The SDK fills the preload link, the import map and the fingerprint while serving or publishing:
+         this is the Blazor WebAssembly layout of .NET 10. A plain _framework/blazor.webassembly.js
+         works too, but then the loader resolves the assemblies without the map. -->
+    <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="app.css" />
+    <script type="importmap"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </head>
 <body>
     <div id="app">Loading...</div>
-    <script src="_framework/blazor.webassembly.js"></script>
 </body>
 </html>

@@ -139,7 +139,8 @@ class Program
         // -----------------------------------------------
         // 2. Load
         // -----------------------------------------------
-        var loaded = await redb.LoadAsync<Product>(product.Id);
+        var loaded = await redb.LoadAsync<Product>(product.Id)
+            ?? throw new InvalidOperationException($"Product {product.Id} was not loaded.");
         Console.WriteLine($"Loaded:  #{loaded.Id} {loaded.Name} — {loaded.Props!.Category}, ${loaded.Props.Price:F2}");
         Console.WriteLine($"  Tags:  {string.Join(", ", loaded.Props.Tags)}");
 

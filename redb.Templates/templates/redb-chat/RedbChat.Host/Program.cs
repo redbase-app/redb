@@ -28,11 +28,26 @@ var configuration = new ConfigurationBuilder()
 var connectionString = configuration.GetConnectionString("Redb")
     ?? throw new InvalidOperationException("ConnectionStrings:Redb is missing in appsettings.json.");
 
+// The module's context and its settings file: the same names a Tsak worker uses.
+var moduleConfig = Path.Combine(AppContext.BaseDirectory, "RedbChat.Module.config.json");
+var contextName = ContextConfiguration.ContextNameOf(moduleConfig);
+
+// Checked before anything is created: otherwise the module would fail later, once the database file
+// has already been made.
+if (string.IsNullOrWhiteSpace(configuration[$"Tsak:Contexts:{contextName}:Override:Llm:ApiKey"]))
+    throw new InvalidOperationException(
+        $"The LLM API key is not set for context '{contextName}'. Put it into RedbChat.Host/appsettings.json " +
+        $"(Tsak:Contexts:{contextName}:Override:Llm:ApiKey), or set the environment variable " +
+        $"Tsak__Contexts__{contextName}__Override__Llm__ApiKey.");
+
 var services = new ServiceCollection();
 services.AddSingleton<IConfiguration>(configuration);
+
+// Warning keeps the chat readable (Information shows every route step and the token counts).
+// Override it with the standard key, for example Logging__LogLevel__Default=Information.
 services.AddLogging(b => b
     .AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss "; })
-    .SetMinimumLevel(LogLevel.Warning));   // Information shows every route step; Warning keeps the chat readable
+    .SetMinimumLevel(configuration.GetValue("Logging:LogLevel:Default", LogLevel.Warning)));
 
 services.AddRedbPro(options => options
     .UseSqlite(connectionString)
@@ -69,8 +84,6 @@ await using (var scope = provider.CreateAsyncScope())
     await scope.ServiceProvider.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
 }
 
-var moduleConfig = Path.Combine(AppContext.BaseDirectory, "RedbChat.Module.config.json");
-var contextName = ContextConfiguration.ContextNameOf(moduleConfig);
 var context = new RouteContext(provider, contextName, provider.GetRequiredService<ILoggerFactory>());
 ContextConfiguration.ApplyTo(context, ContextConfiguration.Build(configuration, contextName, moduleConfig));
 

@@ -55,7 +55,12 @@ dotnet new redb-chat -n MyChat --tools shell --audit true
 
 The module reads its settings from its route context. Both hosts fill it the same way: the module's
 config file first, then `Tsak:Contexts:redbchat:Override`, which wins. The API key belongs only in the
-Override layer, never in the module's config file, which ships inside the package.
+Override layer, never in the module's config file, which ships inside the package. The key is checked
+before anything is created, so a missing key stops the host without leaving an empty database behind.
+
+The log level comes from `Logging:LogLevel:Default` in `appsettings.json` (Warning by default, which
+keeps the chat readable). Set `Logging__LogLevel__Default=Information` to see every route step and the
+token counts.
 
 The HTTP endpoint listens on 127.0.0.1: it has no authentication and every call costs tokens. The
 Dockerfile opens it to the container network (`Http:Host = 0.0.0.0`); put it behind your own gateway
@@ -92,6 +97,14 @@ variables of the worker (`Tsak__Redb__...`, see `deploy/docker-compose.tsak.yml`
 2. `pwsh deploy/pack-tpkg.ps1` packs the module into `deploy/output/RedbChat.tpkg`.
 3. `docker compose -f deploy/docker-compose.tsak.yml up -d` starts the Tsak stack with the module.
 4. `curl -d "hello" http://localhost:5090/api/chat`; the dashboard is at http://localhost:8085.
+
+`pack-tpkg.ps1` puts the manifest, the module config, the module DLL and every dependency the worker
+does not ship itself into the package; `deploy/shipped-module-deps.txt` lists what the worker provides,
+and `deploy/output/RedbChat.tpkg.contents.txt` shows what went in. To run the module on a Tsak host
+built locally from the `tsak-worker` template, drop the assemblies that host lacks
+(`redb.Route.Llm.dll`, `redb.Route.File.dll`, ...) into its `Libs/shared`: the host resolves a module's
+shared assemblies from `Libs/shared` next to the application, and that template copies `Libs/**` to its
+output.
 
 With `--tools mcp` in a container, the image must have Node.js for `npx`: the .NET runtime image of the
 `Dockerfile` has none, and neither may your Tsak image. Without it the module stops at startup when it

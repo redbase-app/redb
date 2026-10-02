@@ -21,8 +21,11 @@ cp samples/order-1001.xml data/inbox/again.xml   # duplicate: the same order id
 cp samples/order-invalid.xml data/inbox/     # rejected: violates the schema
 ```
 
-Each file gets a receipt in `data/outbox` and moves to `data/archive`. A file that fails for another
-reason (it is not XML at all, the database is down) moves to `data/error`.
+Every file taken from the inbox gets a receipt in `data/outbox` and moves to `data/archive`. A file
+that violates the schema - a negative amount, a currency that is not three capitals - and a file that
+is not XML at all are both answered with `Rejected`: the schema check wraps a parsing error in the same
+`ValidationException`. A file that fails for another reason (the database is down, the runtime cannot
+process it) moves to `data/error` and is picked up again on the next poll.
 
 ## Where things are
 
@@ -80,3 +83,11 @@ The route reads a local folder. For another source, replace the `From(...)` line
 2. `pwsh deploy/pack-tpkg.ps1` packs the module into `deploy/output/RedbWorker.tpkg`.
 3. `docker compose -f deploy/docker-compose.tsak.yml up -d` starts the Tsak stack with the module.
 4. Put a sample into `runtime/inbox`; the dashboard is at http://localhost:8085.
+
+`pack-tpkg.ps1` puts the manifest, the module config, the module DLL and every dependency the worker
+does not ship itself into the package; `deploy/shipped-module-deps.txt` lists what the worker provides,
+and `deploy/output/RedbWorker.tpkg.contents.txt` shows what went in. To run the module on a Tsak host
+built locally from the `tsak-worker` template, drop the assemblies that host lacks
+(`redb.Route.File.dll`, `redb.Route.GenericFile.dll`, ...) into its `Libs/shared`: the host resolves a
+module's shared assemblies from `Libs/shared` next to the application, and that template copies
+`Libs/**` to its output.

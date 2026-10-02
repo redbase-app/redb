@@ -27,6 +27,29 @@ RedBase tables and adds a few sample products.
 `Program.cs` turns on the PVT prefilter and change tracking. The props cache is off; the comment next
 to it shows the three lines that turn it on.
 
+## Culture
+
+The edit form carries a decimal price, so `Program.cs` pins the invariant culture: a machine set to a
+comma locale (ru-RU, de-DE) would otherwise reject the `123.45` a browser sends for a
+`<input asp-for="Input.Price" step="0.01">`, and the site would answer differently per deployment.
+`Pages/Index.cshtml` formats the price with the same culture, so input and output agree.
+
+To follow the caller's locale instead, replace the two `CultureInfo.DefaultThreadCurrent*` lines with
+request localization:
+
+```csharp
+builder.Services.Configure<RequestLocalizationOptions>(o => o
+    .SetDefaultCulture("en-US")
+    .AddSupportedCultures("en-US", "ru-RU")
+    .AddSupportedUICultures("en-US", "ru-RU"));
+// ...
+app.UseRequestLocalization();
+```
+
+Mind the trade-off: then "123.45" posts from an en-US browser and "123,45" from a ru-RU one, so the
+same form accepts different input per caller. `InvariantCulture.Parse("1299,5")` is 12995 (a comma is
+a group separator there), which is why the invariant choice keeps the decimal point meaningful.
+
 ## Another database
 
 1. In `RedbRazor.csproj` replace `redb.SQLite.Pro` with `redb.Postgres.Pro` or `redb.MSSql.Pro`.

@@ -1,3 +1,4 @@
+using System.Globalization;
 using redb.Core;
 using redb.Core.Models.Configuration;
 using redb.Core.Models.Entities;
@@ -6,6 +7,14 @@ using redb.SQLite.Pro.Extensions;
 using RedbRazor.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// --- Culture ---
+// The forms carry a decimal price, so parsing must not depend on the locale of the machine the site
+// runs on: with a comma locale (ru-RU, de-DE) the value "123.45" a browser sends would not bind, and
+// the answer would differ per deployment. Pinning the invariant culture makes input, output and the
+// HTML number input agree. To accept the caller's locale instead, use RequestLocalization (see README).
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 builder.Services.AddRazorPages();
 

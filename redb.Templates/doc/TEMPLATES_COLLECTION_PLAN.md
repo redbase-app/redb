@@ -246,7 +246,14 @@ SFTP, AS2, SQL Server в шаблон не входят; в README шаблон�
   через бэкенд.
 - `redb-app`: preflight CORS при `InboundAuth=Bearer` (middleware отвечает до проверки токена — по коду
   `SharedHttpServerManager`), JSON-привязка camelCase.
-- Модули на Tsak: `Microsoft.IdentityModel.JsonWebTokens` (`redb-app`) берётся из worker-а, в `.tpkg` не кладётся.
+- Модули на Tsak: `pack-tpkg.ps1` сверяется с `deploy/shipped-module-deps.txt` — списком сборок образа
+  `redb-tsak-worker:4.2.0` (`/app/*.dll` + `/app/Libs/shared/*.dll`, 182 записи) — и кладёт в `.tpkg` все
+  зависимости, которых там нет; состав пишется рядом как `<package>.contents.txt`. Локально собранный
+  Tsak-хост (шаблон `tsak-worker`) ship’ит меньше: те же сборки ему нужны в `Libs/shared` рядом с
+  приложением — см. шапку `shipped-module-deps.txt` и README модульных шаблонов.
+- Клиент `redb-app`: `wwwroot/index.html` использует разметку .NET 10 (import map, `#[.{fingerprint}]`,
+  preload), а `RedbApp.Web.csproj` включает `OverrideHtmlAssetPlaceholders` — без него подстановка не
+  делается и страница уходит с placeholder’ами. `scripts/smoke-templates.ps1` это проверяет.
 - Все шаблоны: исключения `template.json` на уровне source (свой список заменяет стандартный — стандартные
   пути перечислены явно), замена `sourceName` в нижнем регистре (`redbworker`, `redbchat`, ...) в именах
   контекстов и переменных окружения.

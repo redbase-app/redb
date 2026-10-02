@@ -2,6 +2,9 @@
   <PropertyGroup>
     <PackageType>Template</PackageType>
     <PackageId>redb.Templates</PackageId>
+    <!-- The pack version only. The redb.* packages the templates install stay on $(Version) from the root
+         Directory.Build.props: bump this one when the templates themselves change. -->
+    <Version>4.2.1</Version>
     <Title>RedBase Project Templates</Title>
     <Authors>RedBase</Authors>
     <Company>RedBase</Company>

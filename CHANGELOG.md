@@ -21,6 +21,46 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.1] — 2026-10-02
+### Fixed — a module packed by `redb-worker` now loads on a Tsak worker
+
+The template's packing script put the manifest, the module config and the module assembly into the `.tpkg`
+and nothing else, so a module that uses a transport the worker does not ship (`redb.Route.File`,
+`redb.Route.GenericFile`) failed on its first start with `FileNotFoundException` — the `.tpkg` is the unit
+of deployment, and a consumer has no way to add the missing assembly afterwards. The package now carries
+every dependency the worker does not already provide; what the worker provides is listed in the
+`deploy/shipped-module-deps.txt` of each module template, and the real contents are written next to the
+package as `<package>.contents.txt`.
+
+### Fixed — the Razor template answers the same numbers on every machine
+
+`redb-razor` bound `decimal` with the server's culture: on a machine set to a comma decimal separator the
+price a browser posted as `123.45` was rejected with `The value '123.45' is not valid for 'Price'.` — a
+template that works in one region and fails in the next. The site pins the invariant culture and prints
+prices with it, so a form behaves the same everywhere; the README shows the one-line change that follows
+the caller's locale instead.
+
+### Fixed — the Blazor WebAssembly client ships the .NET 10 asset layout
+
+`redb-app` served `_framework/blazor.webassembly.js` while the .NET 10 SDK publishes the fingerprinted
+layout, and the client host project missed `OverrideHtmlAssetPlaceholders`, so a published page could go
+out with a literal `#[.{fingerprint}]` still in its markup. The index carries the import map, the preload
+links and the fingerprinted loader now, and the property is set.
+
+### Fixed — the chat template reads its configuration before it creates anything
+
+`redb-chat` hard-coded `SetMinimumLevel(LogLevel.Warning)`, so `Logging:LogLevel:Default` — and the
+environment variable behind it — could not switch the route-step logging on, which is the one thing you
+need while wiring a model. It also created `redbchat.db` before noticing that the LLM key was missing. The
+level comes from configuration, the key is checked first, and the README states the HTTP endpoint the
+template exposes.
+
+### Fixed — the console template builds clean, and the worker's README is true again
+
+`dotnet new redb` built with a `CS8602` warning on the nullable result of `LoadAsync`; the warning is gone.
+The `redb-worker` README no longer claims that a file which is not valid XML lands in `data/error` — it is
+answered with a `Rejected` receipt and archived like any other schema violation.
+
 ## [4.2.0] — 2026-09-30
 ### Added
 - **`redb.Templates` is a collection of seven templates.** Each one runs as is: SQLite with Pro, the PVT

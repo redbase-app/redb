@@ -4,6 +4,13 @@
        touches the database. In development the dev server serves it (dotnet run); in a deployment it is
        static files behind nginx, which also forwards /api/ to the API (nginx.conf). -->
 
+  <PropertyGroup>
+    <!-- Fills the #[.{fingerprint}] placeholders and the import map in wwwroot/index.html: without it the
+         page goes out with the placeholders themselves and the browser asks for a file that does not
+         exist. This is the Blazor WebAssembly layout of .NET 10. -->
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\RedbApp.Models\RedbApp.Models.csproj" />
   </ItemGroup>
