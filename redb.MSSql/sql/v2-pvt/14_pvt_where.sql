@@ -57,7 +57,10 @@ BEGIN
     IF @nk = N'$field'
     BEGIN
         DECLARE @b2_fm NVARCHAR(MAX) = JSON_QUERY(@fields, N'$."' + STRING_ESCAPE(@nv, 'json') + N'"');
-        IF @b2_fm IS NULL RETURN N'/*unknown-b2-field:' + @nv + N'*/NULL';
+        -- Fail closed, like the PostgreSQL module (RAISE EXCEPTION there): never echo the
+        -- unescaped name into the SQL text. A '*/' in the name used to close this comment
+        -- and turn the rest of the name into live T-SQL (SQLI-PoC p.1).
+        IF @b2_fm IS NULL RETURN dbo.pvt_fail(N'unknown props field in $field: ' + @nv);
         IF JSON_VALUE(@b2_fm, N'$.kind') = N'base'
             RETURN @obj_alias + N'.' + QUOTENAME(JSON_VALUE(@b2_fm, N'$.column'));
         RETURN QUOTENAME(@nv);  -- props field resolved as CTE column in Shape C
@@ -358,7 +361,9 @@ BEGIN
         RETURN @ca_sb + N' ELSE ' + @ca_else + N' END)';
     END;
 
-    RETURN N'/*unknown-b2-expr:' + @nk + N'*/NULL';
+    -- Fail closed: the node name is data, not SQL. It used to be echoed inside a comment,
+    -- so a crafted name could close it and inject live T-SQL (SQLI-PoC p.1).
+    RETURN dbo.pvt_fail(N'unknown expression node in $expr: ' + @nk);
 END;
 GO
 

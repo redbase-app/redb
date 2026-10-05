@@ -796,10 +796,19 @@ namespace redb.Core.Providers.Base
 
             // Dictionary implements IDictionary, but we need to get key-value pairs via reflection
             var dictType = rawValue.GetType();
-            if (!dictType.IsGenericType) return;
-
-            var genericDef = dictType.GetGenericTypeDefinition();
-            if (genericDef != typeof(Dictionary<,>) && genericDef != typeof(IDictionary<,>)) return;
+            // Fail closed (DataLoss p.3). A dictionary field whose runtime value is not a plain
+            // Dictionary<K,V> used to be skipped in silence, and under DeleteInsert the stored
+            // values had already been deleted, so the field disappeared. This runs while the value
+            // records are built, i.e. before the delete, so a refusal loses nothing.
+            if (!dictType.IsGenericType ||
+                (dictType.GetGenericTypeDefinition() != typeof(Dictionary<,>) &&
+                 dictType.GetGenericTypeDefinition() != typeof(IDictionary<,>)))
+            {
+                throw new InvalidOperationException(
+                    $"Dictionary field '{dictStructureNode.Structure.Name}' holds '{dictType.FullName}', " +
+                    "which cannot be stored as rows. Declare the field as Dictionary<K,V> (or " +
+                    "IDictionary<K,V>) and put a Dictionary<K,V> instance in it.");
+            }
 
             var keyType = dictType.GetGenericArguments()[0];
 

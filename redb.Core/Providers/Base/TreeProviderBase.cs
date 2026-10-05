@@ -379,8 +379,15 @@ public abstract class TreeProviderBase : ITreeProvider
         await CollectDescendantIds(parentId, objectIds, 100, 0);
         objectIds.Add(parentId);
 
-        await Context.ExecuteAsync(Sql.Tree_DeleteValuesByObjectIds(), new object[] { objectIds.ToArray() }, cancellationToken);
-        await Context.ExecuteAsync(Sql.Tree_DeleteObjectsByIds(), new object[] { objectIds.ToArray() }, cancellationToken);
+        // One transaction for both statements. They used to run in sequence, and a failure in the
+        // second (a live FK reference pointing into the subtree) left the first committed: the
+        // objects survived with their values already gone (DataLoss p.2).
+        var ids = objectIds.ToArray();
+        await Context.ExecuteAtomicAsync(async () =>
+        {
+            await Context.ExecuteAsync(Sql.Tree_DeleteValuesByObjectIds(), new object[] { ids }, cancellationToken);
+            await Context.ExecuteAsync(Sql.Tree_DeleteObjectsByIds(), new object[] { ids }, cancellationToken);
+        }, cancellationToken);
 
         // The collected id list IS the subtree (self + descendants), so its count is the correct,
         // dialect-independent number of objects deleted. The raw DELETE rows-affected is unreliable

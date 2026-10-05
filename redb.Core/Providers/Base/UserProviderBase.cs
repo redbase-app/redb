@@ -455,11 +455,23 @@ public abstract class UserProviderBase : IUserProvider
     }
 
     /// <summary>
-    /// Escapes LIKE/ILIKE wildcard characters (%, _, \) in user input
-    /// so they are treated as literal characters.
+    /// True when this dialect treats '[' as a LIKE character-class opener. SQL Server does, so
+    /// <c>MssqlUserProvider</c> overrides this to also escape brackets; PostgreSQL and SQLite treat
+    /// '[' as an ordinary character, where escaping it would change the search itself
+    /// (SQLI-PoC: LIKE bracket).
     /// </summary>
-    protected static string EscapeLikeWildcards(string value)
-        => value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+    protected virtual bool LikeBracketIsWildcard => false;
+
+    /// <summary>
+    /// Escapes LIKE/ILIKE wildcard characters (%, _, \) in user input
+    /// so they are treated as literal characters. Dialects whose LIKE also reads '[' as a
+    /// character-class opener escape that too.
+    /// </summary>
+    protected string EscapeLikeWildcards(string value)
+    {
+        var escaped = value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        return LikeBracketIsWildcard ? escaped.Replace("[", "[[]") : escaped;
+    }
 
     // ============================================================
     // === AUTHENTICATION ===

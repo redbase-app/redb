@@ -66,7 +66,8 @@ public class SqliteDialect : ISqlDialect
         => $"${index}";
 
     public string QuoteIdentifier(string name)
-        => $"\"{name}\"";
+        // SQLite escapes a double quote by doubling it, same as PostgreSQL (SQLI-PoC p.7).
+        => "\"" + name.Replace("\"", "\"\"") + "\"";
 
     /// <summary>
     /// Returns the expression unchanged, because in SQLite there is nothing to attach. Its only
@@ -1335,8 +1336,9 @@ public class SqliteDialect : ISqlDialect
     // === v2-pvt MODULE ENTRY-POINTS (free Sqlite) ===
     // Two-step pipeline: ask DB to BUILD the inner _id-list SQL,
     // then wrap on the C# side with a materializer/COUNT/EXISTS.
-    // The v2-pvt SQL module must be deployed (see redb.SQLite/sql/v2-pvt/).
-    // Init-time check lives in RedbServiceBase.InitializeAsync using
+    // SQLite deploys no v2-pvt SQL module: the native C extension hosts those functions.
+    // redb.SQLite/sql/v2-pvt/ is the port's logic spec (PG PL/pgSQL), not deployed SQL - see its
+    // README.md. Init-time check lives in RedbServiceBase.InitializeAsync using
     // Query_PvtModuleVersionFunction().
     // ============================================================
 
@@ -1385,7 +1387,7 @@ public class SqliteDialect : ISqlDialect
     // gate would try to apply a SQL bundle, and there is none. Bump both on every change of the C code.
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
-    public string? Query_PvtRequiredVersion() => "0.6.7";
+    public string? Query_PvtRequiredVersion() => "0.6.8";
 
     public string? Query_BuildPvtProjectionSqlFunction() => null;
 

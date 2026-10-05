@@ -269,7 +269,7 @@ public partial class MssqlQueryProvider
                 => NormaliseGwndValueFunc(func) + "(g."
                     + QuoteGwndIdent(ResolveGwndColumnName(w.FieldPath, aggList, groupList))
                     + ")",
-            _ => func + "()"
+            _ => WindowFunctionName.ZeroArgCall(w.Func)
         };
     }
 

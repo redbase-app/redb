@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
 
     <!-- One place for the RedBase version. -->
-    <RedbVersion>4.2.0</RedbVersion>
+    <RedbVersion>4.2.2</RedbVersion>
   </PropertyGroup>
 
 </Project>

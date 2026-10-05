@@ -185,7 +185,15 @@ BEGIN
     --          (perf finding, 2026-09-10).
     -- 0.1.0 - skeleton: module bootstrap, drop-all, version function.
     --         Builder functions (pvt_build_query_sql etc.) not implemented yet.
-    RETURN N'0.2.26';
+    -- 0.2.27 - fail-closed on unescaped splices (SQLI-PoC): pvt_b2_expr_sql (:60 and :361 of
+    --          14_pvt_where.sql) and pvt_build_window_expr (23_pvt_window.sql) call
+    --          dbo.pvt_fail instead of echoing a raw name inside a comment.
+    -- 0.2.28 - the $case branch of pvt_extract_field_pairs (10_pvt_field_collection.sql) is
+    --          reachable: the generic array descent swallowed $case first (its value is an
+    --          array), so "when"/"then"/"else" were harvested as field paths and the $field
+    --          references inside the arms were never collected. The expression builder then
+    --          could not resolve the field (silently NULL before 0.2.27, an error after).
+    RETURN N'0.2.28';
 END;
 GO
 

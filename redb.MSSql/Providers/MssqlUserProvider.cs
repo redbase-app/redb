@@ -32,6 +32,9 @@ public class MssqlUserProvider : UserProviderBase
     {
     }
 
+    /// <inheritdoc />
+    protected override bool LikeBracketIsWildcard => true;
+
     /// <summary>
     /// Creates a new MSSQL user provider with custom password hasher.
     /// </summary>

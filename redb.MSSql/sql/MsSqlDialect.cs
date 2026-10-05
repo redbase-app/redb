@@ -63,7 +63,9 @@ public class MsSqlDialect : ISqlDialect
         => $"@p{index - 1}";
     
     public string QuoteIdentifier(string name)
-        => $"[{name}]";
+        // SQL Server escapes a closing bracket by doubling it. Without this a name like
+        // `a]b; SELECT 1--` closes the identifier and the rest becomes SQL (SQLI-PoC p.7).
+        => "[" + name.Replace("]", "]]") + "]";
 
     /// <summary>
     /// Returns the expression unchanged, and unlike SQLite this is not a gap being papered over.
@@ -1317,7 +1319,7 @@ public class MsSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
 
     // Bump together with the literal RETURNed by dbo.pvt_module_version() in redb.MSSql/sql/v2-pvt/99_module_version.sql.
-    public string? Query_PvtRequiredVersion() => "0.2.26";
+    public string? Query_PvtRequiredVersion() => "0.2.28";
 
     // Native PVT projection orchestrator — not supported on MSSql (yet).
     // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these

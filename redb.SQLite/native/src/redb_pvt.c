@@ -34,9 +34,13 @@ SQLITE_EXTENSION_INIT3
 /* Checked by redb.SQLite at initialization against SqliteDialect.Query_PvtRequiredVersion():
  * bump both on every change of this module.
  * 0.6.6 - $regex / $iregex / $regexreplace (2026-09-16); the version gate itself.
- * 0.6.7 - DistinctBy in the wide shape (tree without props, absence check) was dropped (2026-09-26). */
+ * 0.6.7 - DistinctBy in the wide shape (tree without props, absence check) was dropped (2026-09-26).
+ * 0.6.8 - the operand builder is total and fail-closed: a JSON string against a non-text column
+ *         must be a plain numeric literal, and every other token type is either rendered as a
+ *         quoted literal or refused through pvt_refuse(). No operand can reach the statement as raw
+ *         JSON text any more (2026-10-04). */
 #ifndef PVT_MODULE_VERSION
-#define PVT_MODULE_VERSION "0.6.7"
+#define PVT_MODULE_VERSION "0.6.8"
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -708,13 +712,47 @@ static int pvtColIsDateTime(const char *kind, const char *column, const char *db
   return db_type && (!strcmp(db_type,"DateTimeOffset") || !strcmp(db_type,"DateTime"));
 }
 
+/* Registered as pvt_refuse(TEXT): always raises, carrying its argument as the message. The
+** operand builder splices a call to it where it cannot render a value safely, so the statement
+** fails with a readable reason instead of running with caller text inside it (SQLI-PoC:
+** operand splice). */
+static void pvtRefuseFunc(sqlite3_context *ctx, int argc, sqlite3_value **argv){
+  const char *m = argc > 0 ? (const char*)sqlite3_value_text(argv[0]) : 0;
+  sqlite3_result_error(ctx, m ? m : "redb: refused", -1);
+}
+
+/* True when s is a plain SQL numeric literal: optional sign, digits with an optional fractional
+** part, optional exponent, nothing else. Only such a string may be spliced unquoted into a
+** comparison against a non-text column. */
+static int pvtIsNumericLiteral(const char *s){
+  if(!s || !*s) return 0;
+  const char *p = s;
+  if(*p=='+' || *p=='-') p++;
+  int digits = 0;
+  while(*p>='0' && *p<='9'){ p++; digits++; }
+  if(*p=='.'){ p++; while(*p>='0' && *p<='9'){ p++; digits++; } }
+  if(!digits) return 0;
+  if(*p=='e' || *p=='E'){
+    p++;
+    if(*p=='+' || *p=='-') p++;
+    int ed = 0;
+    while(*p>='0' && *p<='9'){ p++; ed++; }
+    if(!ed) return 0;
+  }
+  return *p == 0;
+}
+
 /* Append a JSON operand as a SQL literal, typed per the LHS column. */
 static void pvtAppendOperand(sqlite3_str *o, const char *txt, const char *jtype, int is_text, int is_datetime, int is_hash){
   if(jtype){
     if(!strcmp(jtype, "true"))  { sqlite3_str_append(o, "1", 1); return; }
     if(!strcmp(jtype, "false")) { sqlite3_str_append(o, "0", 1); return; }
     if(!strcmp(jtype, "integer") || !strcmp(jtype, "real")) {
-      sqlite3_str_appendf(o, "%s", txt ? txt : "0"); return;
+      /* A JSON number is already a safe literal, but validate it anyway: the splice below must never
+      ** be able to carry anything but sign, digits, dot and exponent. */
+      if(pvtIsNumericLiteral(txt)) { sqlite3_str_appendf(o, "%s", txt); return; }
+      sqlite3_str_appendf(o, "pvt_refuse(%Q)", "operand type mismatch: malformed number");
+      return;
     }
   }
   /* hash operand: canonical uuid text -> the BLOB(16) the column holds (RFC 4122
@@ -723,8 +761,21 @@ static void pvtAppendOperand(sqlite3_str *o, const char *txt, const char *jtype,
   /* datetime operand: ISO string -> UTC Julian (julianday parses any offset).
   ** Wrapped on the VALUE (constant), not the column, so it stays index-sargable. */
   if(is_datetime){ sqlite3_str_appendf(o, "julianday(%Q)", txt ? txt : ""); return; }
-  if(is_text) sqlite3_str_appendf(o, "%Q", txt ? txt : "");
-  else        sqlite3_str_appendf(o, "%s", txt ? txt : "NULL");
+  if(is_text){ sqlite3_str_appendf(o, "%Q", txt ? txt : ""); return; }
+  /* No value at all (a JSON null, or an absent operand). */
+  if(!txt){ sqlite3_str_append(o, "NULL", 4); return; }
+  if(jtype && !strcmp(jtype, "text")){
+    /* A JSON string against a NON-text column. A plain number can be spliced unquoted (callers
+    ** legitimately send "30" for a Long column); anything else has no safe literal form, and
+    ** pasting it raw put caller text straight into the statement (SQLI-PoC: operand splice). */
+    if(pvtIsNumericLiteral(txt)){ sqlite3_str_appendf(o, "%s", txt); return; }
+    sqlite3_str_appendf(o, "pvt_refuse(%Q)",
+                        "operand type mismatch: a string against a non-text column");
+    return;
+  }
+  /* Every remaining token type (array, object, unknown) has no literal form here. Refuse instead of
+  ** splicing the raw JSON text: that is the same class of hole as the string case above. */
+  sqlite3_str_appendf(o, "pvt_refuse(%Q)", "operand type mismatch: unsupported operand type");
 }
 
 /* Escape LIKE metacharacters so a sugar operand matches LITERALLY (BR-7, 2026-09-02):
@@ -3073,6 +3124,11 @@ int redbRegisterPvt(sqlite3 *db){
   rc = sqlite3_create_function(db, "pvt_module_version", 0,
                                SQLITE_UTF8 | SQLITE_DETERMINISTIC, 0,
                                pvtModuleVersionFunc, 0, 0);
+  if(rc != SQLITE_OK) return rc;
+
+  /* pvt_refuse(TEXT): always raises. See the comment on pvtRefuseFunc. */
+  rc = sqlite3_create_function(db, "pvt_refuse", 1, SQLITE_UTF8, 0,
+                               pvtRefuseFunc, 0, 0);
   if(rc != SQLITE_OK) return rc;
 
   rc = sqlite3_create_function(db, "pvt_db_type_to_value_column", 1,

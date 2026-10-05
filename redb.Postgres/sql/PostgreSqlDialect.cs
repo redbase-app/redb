@@ -81,7 +81,9 @@ public class PostgreSqlDialect : ISqlDialect
         => $"${index}";
 
     public string QuoteIdentifier(string name)
-        => $"\"{name}\"";
+        // PostgreSQL escapes a double quote by doubling it. Without this a name like
+        // `a"b` closes the identifier and the rest becomes SQL (SQLI-PoC p.7).
+        => "\"" + name.Replace("\"", "\"\"") + "\"";
 
     public string FormatCaseInsensitiveLike(string column, string parameter)
         => $"{FoldCase(column)} ILIKE {parameter}";

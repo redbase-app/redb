@@ -113,12 +113,15 @@ BEGIN
     IF @func IS NULL
         RETURN N'NULL /* pvt_build_window_expr: missing func */';
 
+    -- Fail closed: a function name outside the whitelist below is not supported, and the name
+    -- must not travel into the SQL text. It used to be echoed inside a comment, so a crafted
+    -- name could close it and inject live T-SQL (SQLI-PoC: window function name).
     IF @func NOT IN (
         N'row_number', N'rank', N'dense_rank', N'percent_rank', N'cume_dist',
         N'ntile', N'lag', N'lead', N'first_value', N'last_value',
         N'sum', N'avg', N'min', N'max', N'count'
     )
-        RETURN N'NULL /* pvt_build_window_expr: unsupported func "' + @func + N'" */';
+        RETURN dbo.pvt_fail(N'unsupported window function: ' + @func);
 
     -- nth_value is not available in SQL Server
     IF @func = N'nth_value'

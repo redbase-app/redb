@@ -144,9 +144,19 @@ namespace redb.SQLite.Data
             var path = NativeExtensionPath;
             if (string.IsNullOrEmpty(path)) return;
             conn.EnableExtensions(true);
-            // Explicit entry point: the file is redbsqlite.<ext> but the C init symbol is
-            // sqlite3_redb_init, so we can't rely on SQLite's basename derivation.
-            conn.LoadExtension(path, "sqlite3_redb_init");
+            try
+            {
+                // Explicit entry point: the file is redbsqlite.<ext> but the C init symbol is
+                // sqlite3_redb_init, so we can't rely on SQLite's basename derivation.
+                conn.LoadExtension(path, "sqlite3_redb_init");
+            }
+            finally
+            {
+                // Loading is done, so turn the loader back off. Leaving it enabled turned any SQL
+                // injection on this connection into load_extension(), i.e. arbitrary code
+                // (SQLI-PoC: load_extension amplifier).
+                conn.EnableExtensions(false);
+            }
         }
 
         /// <summary>

@@ -272,7 +272,7 @@ public partial class SqliteQueryProvider
             "LAG" or "LEAD" or "FIRSTVALUE" or "FIRST_VALUE" or "LASTVALUE" or "LAST_VALUE"
                 when !string.IsNullOrEmpty(w.FieldPath)
                 => NormaliseValueFunc(func) + "(g." + QuoteIdent(ResolveColumnName(w.FieldPath, aggList, groupList)) + ")",
-            _ => func + "()"
+            _ => WindowFunctionName.ZeroArgCall(w.Func)
         };
     }
 

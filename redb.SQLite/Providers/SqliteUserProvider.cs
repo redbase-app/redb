@@ -49,5 +49,6 @@ public class SqliteUserProvider : UserProviderBase
 
     // All business logic is inherited from UserProviderBase.
     // SQLite-specific SQL is provided by SqliteDialect.
-    // Password hashing is provided by SimplePasswordHasher (or custom implementation).
+    // Password hashing is provided by IPasswordHasher - bcrypt by default (SimplePasswordHasher is
+    // only the legacy format, and BcryptPasswordHasher.VerifyPassword still accepts it).
 }

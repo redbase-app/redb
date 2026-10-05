@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using redb.Core.Diagnostics;
 
 namespace redb.Core.Data
 {
@@ -37,76 +38,115 @@ namespace redb.Core.Data
         protected abstract IBulkOperations BulkOperations { get; }
 
         // === CONNECTION SHORTCUTS ===
+        //
+        // Every command runs inside a telemetry span on RedbActivitySource (see RedbTelemetry), so the time
+        // an ORM call spends in the database is a span of its own rather than an empty gap - including when
+        // the call comes from a bean inside a route. With no OpenTelemetry subscriber the source has no
+        // listeners and the connection is called directly: no span and no extra allocation.
         
         /// <summary>
         /// Execute SQL query and return list of mapped objects.
         /// </summary>
         public Task<List<T>> QueryAsync<T>(string sql, params object[] parameters) where T : new()
-            => Db.QueryAsync<T>(sql, parameters);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Query, () => Db.QueryAsync<T>(sql, parameters))
+                : Db.QueryAsync<T>(sql, parameters);
 
         /// <inheritdoc />
         public Task<List<T>> QueryAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
-            => Db.QueryAsync<T>(sql, parameters, cancellationToken);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Query, () => Db.QueryAsync<T>(sql, parameters, cancellationToken))
+                : Db.QueryAsync<T>(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL query and return first result or null.
         /// </summary>
         public Task<T?> QueryFirstOrDefaultAsync<T>(string sql, params object[] parameters) where T : class, new()
-            => Db.QueryFirstOrDefaultAsync<T>(sql, parameters);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Query, () => Db.QueryFirstOrDefaultAsync<T>(sql, parameters))
+                : Db.QueryFirstOrDefaultAsync<T>(sql, parameters);
 
         /// <inheritdoc />
         public Task<T?> QueryFirstOrDefaultAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : class, new()
-            => Db.QueryFirstOrDefaultAsync<T>(sql, parameters, cancellationToken);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Query, () => Db.QueryFirstOrDefaultAsync<T>(sql, parameters, cancellationToken))
+                : Db.QueryFirstOrDefaultAsync<T>(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL query and return scalar value.
         /// </summary>
         public Task<T?> ExecuteScalarAsync<T>(string sql, params object[] parameters)
-            => Db.ExecuteScalarAsync<T>(sql, parameters);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Scalar, () => Db.ExecuteScalarAsync<T>(sql, parameters))
+                : Db.ExecuteScalarAsync<T>(sql, parameters);
 
         /// <inheritdoc />
         public Task<T?> ExecuteScalarAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken)
-            => Db.ExecuteScalarAsync<T>(sql, parameters, cancellationToken);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Scalar, () => Db.ExecuteScalarAsync<T>(sql, parameters, cancellationToken))
+                : Db.ExecuteScalarAsync<T>(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL query and return list of scalar values (first column only).
         /// </summary>
         public Task<List<T>> QueryScalarListAsync<T>(string sql, params object[] parameters)
-            => Db.QueryScalarListAsync<T>(sql, parameters);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Query, () => Db.QueryScalarListAsync<T>(sql, parameters))
+                : Db.QueryScalarListAsync<T>(sql, parameters);
 
         /// <inheritdoc />
         public Task<List<T>> QueryScalarListAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken)
-            => Db.QueryScalarListAsync<T>(sql, parameters, cancellationToken);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Query, () => Db.QueryScalarListAsync<T>(sql, parameters, cancellationToken))
+                : Db.QueryScalarListAsync<T>(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL command (INSERT, UPDATE, DELETE).
         /// </summary>
         public Task<int> ExecuteAsync(string sql, params object[] parameters)
-            { TransactionWrites.Mark(this); return Db.ExecuteAsync(sql, parameters); }
+            {
+                TransactionWrites.Mark(this);
+                return RedbTelemetry.Enabled
+                    ? RedbTelemetry.RunAsync(RedbTelemetry.Execute, () => Db.ExecuteAsync(sql, parameters))
+                    : Db.ExecuteAsync(sql, parameters);
+            }
 
         /// <inheritdoc />
         public Task<int> ExecuteAsync(string sql, object[] parameters, CancellationToken cancellationToken)
-            { TransactionWrites.Mark(this); return Db.ExecuteAsync(sql, parameters, cancellationToken); }
+            {
+                TransactionWrites.Mark(this);
+                return RedbTelemetry.Enabled
+                    ? RedbTelemetry.RunAsync(RedbTelemetry.Execute, () => Db.ExecuteAsync(sql, parameters, cancellationToken))
+                    : Db.ExecuteAsync(sql, parameters, cancellationToken);
+            }
         
         /// <summary>
         /// Execute SQL returning JSON.
         /// </summary>
         public Task<string?> ExecuteJsonAsync(string sql, params object[] parameters)
-            => Db.ExecuteJsonAsync(sql, parameters);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Json, () => Db.ExecuteJsonAsync(sql, parameters))
+                : Db.ExecuteJsonAsync(sql, parameters);
 
         /// <inheritdoc />
         public Task<string?> ExecuteJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken)
-            => Db.ExecuteJsonAsync(sql, parameters, cancellationToken);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Json, () => Db.ExecuteJsonAsync(sql, parameters, cancellationToken))
+                : Db.ExecuteJsonAsync(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Execute SQL returning multiple JSON rows.
         /// </summary>
         public Task<List<string>> ExecuteJsonListAsync(string sql, params object[] parameters)
-            => Db.ExecuteJsonListAsync(sql, parameters);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Json, () => Db.ExecuteJsonListAsync(sql, parameters))
+                : Db.ExecuteJsonListAsync(sql, parameters);
 
         /// <inheritdoc />
         public Task<List<string>> ExecuteJsonListAsync(string sql, object[] parameters, CancellationToken cancellationToken)
-            => Db.ExecuteJsonListAsync(sql, parameters, cancellationToken);
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Json, () => Db.ExecuteJsonListAsync(sql, parameters, cancellationToken))
+                : Db.ExecuteJsonListAsync(sql, parameters, cancellationToken);
 
         // === TRANSACTION SHORTCUTS ===
         

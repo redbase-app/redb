@@ -28,7 +28,7 @@ No Entity Framework. No migrations. No 40-table Include chains. Just C# classes 
 | Learn curve | DbContext, Fluent API, migrations, conventions | One interface: `IRedbService`. One attribute: `[RedbScheme]` |
 | Forgot Include? | Runtime crash or silent null | Impossible — Props are always loaded |
 
-> **Strong typing — real columns, not JSON blobs.** Every property of your `*Props` class maps to a dedicated typed column with a FK constraint and an index. `string` → `nvarchar`, `decimal` → `numeric(18,4)`, `DateTime` → `timestamptz`, arrays and dictionaries → normalised rows. Your data is queryable, filterable, and aggregatable at the SQL level — no `JSON_VALUE` hacks, no full-table JSON scans, no cast errors at runtime.
+> **Strong typing — real columns, not JSON blobs.** Each property of your `*Props` class is a row in the `_values` table, indexed, and its value goes into a column typed by the property type: `string` → `text` (`nvarchar` on SQL Server), `decimal` → `numeric(38,18)` (on SQLite the value sits in a `REAL` column by default, or in `TEXT` in the exact mode), `DateTime` → `timestamptz`. The table carries real foreign keys to the object, the structure and the referenced objects, and arrays and dictionaries are normalised rows as well. Your data is queryable, filterable, and aggregatable at the SQL level — no `JSON_VALUE` hacks, no full-table JSON scans, no cast errors at runtime.
 
 ---
 
@@ -592,7 +592,7 @@ Built-in user management with password hashing, roles, and object-level permissi
 | Feature | API | Notes |
 |---------|-----|-------|
 | Create user | `UserProvider.CreateUserAsync(request)` | Login, password, name, email, phone |
-| Authenticate | `UserProvider.ValidateUserAsync(login, password)` | Returns `IRedbUser?`, SHA256 + salt |
+| Authenticate | `UserProvider.ValidateUserAsync(login, password)` | Returns `IRedbUser?`, bcrypt by default (`IPasswordHasher`); legacy SHA256 + salt hashes keep verifying and rehash on the next password change |
 | Change password | `UserProvider.ChangePasswordAsync(userId, old, new)` | Verifies old password first |
 | Enable / disable | `UserProvider.EnableUserAsync(id)`, `DisableUserAsync(id)` | Soft disable |
 | Search users | `UserProvider.GetUsersAsync(criteria)` | Filter by login, email, role, date range |

@@ -11,8 +11,9 @@
 --   dbo.pvt_collect_fields(@scheme_id, @filter, @order)      -> NVARCHAR(MAX) JSON object keyed by field name
 --   dbo.pvt_has_absence_check(@filter)                       -> BIT
 --
--- Skipped vs PG (v0.1 slice): $expr field walk, $case/$fts/$cast/$dateAdd
--- branches, length/count modifier registration.
+-- Skipped vs PG (v0.1 slice): $fts/$cast/$dateAdd branches, length/count modifier registration.
+-- $case is handled here; $field references inside the arms are collected (see the $case branch
+-- in pvt_extract_field_pairs).
 -- =====================================================================
 
 SET QUOTED_IDENTIFIER ON;
@@ -251,7 +252,13 @@ BEGIN
         IF LEFT(@k, 1) = N'$'
         BEGIN
             -- Logical operator: descend
-            IF @t = 4  -- array
+            -- The generic array descent must NOT swallow $case: its value is an array of
+            -- {when,then} arm objects, and walking those as plain objects harvested
+            -- "when"/"then"/"else" as field paths while the $field references inside the arms
+            -- were never reached, so pvt_b2_expr_sql could not find the field. The dedicated
+            -- $case branch below walks the arm VALUES instead, mirroring
+            -- pvt_extract_field_names in the PostgreSQL module (10, :52).
+            IF @t = 4 AND LOWER(@k) <> N'$case'
             BEGIN
                 DECLARE @elem NVARCHAR(MAX);
                 DECLARE c_arr CURSOR LOCAL FAST_FORWARD FOR
