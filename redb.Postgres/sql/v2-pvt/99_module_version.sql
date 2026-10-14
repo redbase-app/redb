@@ -22,6 +22,13 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $BODY$
 BEGIN
+    -- 0.7.14 - the stock value index IX__values__structure_object_lookup is retired (2026-10-12):
+    --   dropped from existing databases (00_module_init.sql), no longer created on new ones
+    --   (redbPostgre.sql). The statement that brings it back is kept in both files. No function changed.
+    -- 0.7.13 - index cleanup (2026-10-12): seven indexes that another index of the same table fully
+    --   replaces are dropped from existing databases (00_module_init.sql) and no longer created on
+    --   new ones (redbPostgre.sql). No function changed; the bump exists so that existing databases
+    --   re-run the module and lose the redundant indexes.
     -- 0.7.12 - purge_trash marks 'failed' on an empty batch, not on a batch that deleted nothing
     --   (2026-09-16): a batch chosen here and deleted by a concurrent purger meanwhile - the
     --   background worker beside a caller's PurgeTrashAsync, another node - failed the container with
@@ -198,7 +205,7 @@ BEGIN
     --   * `_array_index IS NULL` filter for scalars (NOT `_array_parent_id IS NULL`).
     --   * `0$:` base-field prefix stripping in pvt_normalize_base_field_name.
     --   * full collection / nested / dictionary / ListItem.Value/Alias / array-op support.
-    RETURN '0.7.12';
+    RETURN '0.7.14';
 END;
 $BODY$;
 

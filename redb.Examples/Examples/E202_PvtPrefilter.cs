@@ -33,12 +33,13 @@ public class E202_PvtPrefilter : ExampleBase
     {
         var sw = Stopwatch.StartNew();
 
-        var enabled = Environment.GetEnvironmentVariable("REDB_PVT_PREFILTER") == "1";
+        // What the service actually runs with: Program.cs may set it without the environment variable.
+        var enabled = redb.Configuration.EnablePvtPrefilter;
         var log = new StringBuilder();
         var summary = new List<string>();
         var withPrefilter = 0;
 
-        log.AppendLine($"-- REDB_PVT_PREFILTER = {(enabled ? "1 (enabled)" : "<unset> (disabled)")}");
+        log.AppendLine($"-- EnablePvtPrefilter = {(enabled ? "true (enabled)" : "false (disabled)")}");
         log.AppendLine();
 
         async Task CaseAsync(string label, string expectation, IRedbQueryable<EmployeeProps> query)
@@ -220,14 +221,21 @@ public class E202_PvtPrefilter : ExampleBase
 
         sw.Stop();
 
-        var output = new List<string>(summary)
+        // The run time above is the sum over all the queries of the example, each printed and then
+        // executed, so the count comes first: without it the figure reads as one slow query.
+        var output = new List<string>
         {
-            $"Prefilter: {(enabled ? "ENABLED" : "disabled")}, applied in {withPrefilter} of 11 cases",
+            $"{summary.Count} queries in this example: SQL printed, then each executed",
+            $"Prefilter: {(enabled ? "ENABLED" : "disabled")}, applied in {withPrefilter} of {summary.Count} cases"
+        };
+        output.AddRange(summary);
+        output.AddRange(new[]
+        {
             outPath != null ? $"Output: {outPath}" : "Output file: <not written>",
             "Diff pvt_prefilter_off.txt against pvt_prefilter_on.txt: id sets must match exactly"
-        };
+        });
 
         return Ok("E202", "PVT prefilter: SQL with and without the cutting step", ExampleTier.Pro,
-            sw.ElapsedMilliseconds, 11, output.ToArray());
+            sw.ElapsedMilliseconds, summary.Count, output.ToArray());
     }
 }

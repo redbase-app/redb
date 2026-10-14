@@ -160,7 +160,10 @@ public class RedbGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
         windowConfig(windowSpec);
         // Pass FilterExpression directly (Pro uses it, Free falls back to facet-JSON)
         return new GroupedWindowedQueryable<TKey, TProps>(
-            _provider, _schemeId, _keySelector, windowSpec, _filter);
+            _provider, _schemeId, _keySelector, windowSpec, _filter)
+        {
+            IsBaseFieldGrouping = _isBaseFieldGrouping
+        };
     }
 
     /// <inheritdoc />

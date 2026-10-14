@@ -382,6 +382,9 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         return treeObjects.Cast<RedbObject<TProps>>().ToList();
     }
 
+    internal override RedbQueryable<TProps> CloneForProjection()
+        => CreateInstance(_treeContext.Clone());
+
     /// <summary>
     /// Override ToListWithProjectionAsync for correct type conversion.
     /// Tree provider returns List&lt;TreeRedbObject&gt;, need Cast to List&lt;RedbObject&gt;.
@@ -396,6 +399,8 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         {
             _treeContext.ProjectedStructureIds = projectedStructureIds;
         }
+
+        _treeContext.ProjectionReadsNoProps = projectedStructureIds is { Count: 0 };
 
         if (skipPropsLoading)
         {
@@ -565,7 +570,20 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         return CreateInstance(newContext);
     }
 
+    /// <summary>Same contract as the flat query: the rows ToListAsync returns, Take and Skip included.</summary>
     public override async Task<int> CountAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsPaged(_treeContext))
+            return await CountWholeTreeSetAsync(cancellationToken);
+
+        var unpaged = _treeContext.Clone();
+        unpaged.Limit = null;
+        unpaged.Offset = null;
+        var total = await CreateInstance(unpaged).CountWholeTreeSetAsync(cancellationToken);
+        return PagedCount(total, _treeContext.Offset, _treeContext.Limit);
+    }
+
+    private async Task<int> CountWholeTreeSetAsync(CancellationToken cancellationToken)
     {
         var result = await _treeProvider.ExecuteAsync(BuildCountExpression(), typeof(int), cancellationToken: cancellationToken);
         return (int)result;
@@ -589,12 +607,15 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         if (predicate == null)
             throw new ArgumentNullException(nameof(predicate));
 
-        // All() == true if all records satisfy condition
-        var totalCount = await CountAsync(cancellationToken: cancellationToken);
+        // All() == true if all records satisfy condition. Counts of the whole set, as in the flat query.
+        var totalCount = await CountWholeTreeSetAsync(cancellationToken);
         if (totalCount == 0)
             return true; // All elements of empty set satisfy any condition
 
-        var matchingCount = await Where(predicate).CountAsync(cancellationToken: cancellationToken);
+        var matching = Where(predicate);
+        var matchingCount = matching is TreeQueryableBase<TProps> tree
+            ? await tree.CountWholeTreeSetAsync(cancellationToken)
+            : await matching.CountAsync(cancellationToken: cancellationToken);
         return totalCount == matchingCount;
     }
 
@@ -930,5 +951,70 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         windowConfig(windowSpec);
         return new Window.TreeWindowedQueryable<TProps>(
             _treeProvider, _treeContext, filterJson, windowSpec);
+    }
+
+    // ===== AGGREGATIONS =====
+    //
+    // SumAsync, AverageAsync, MinAsync, MaxAsync, GetStatisticsAsync, AggregateAsync and their
+    // *RedbAsync counterparts all end in the three calls below. Left to the flat provider they
+    // aggregated the whole scheme: the root, the depth limit and the tree filters of this query
+    // never reached it. A tree aggregate is a tree GROUP BY with no group fields, so all three go
+    // through the same call GroupBy already uses, and return its single row.
+
+    /// <inheritdoc />
+    protected override async Task<System.Text.Json.JsonDocument?> ExecuteGroupedAggregateCoreAsync(
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        CancellationToken cancellationToken)
+        => await _treeProvider.ExecuteTreeGroupedAggregateAsync(
+            _treeContext, groupFields, aggregations, havingJson: null, cancellationToken: cancellationToken);
+
+    /// <inheritdoc />
+    protected override async Task<Aggregation.AggregateResult> ExecuteAggregateBatchCoreAsync(
+        IEnumerable<Aggregation.AggregateRequest> requests, CancellationToken cancellationToken)
+    {
+        var requestList = requests.ToList();
+        var result = new Aggregation.AggregateResult();
+
+        using var json = await _treeProvider.ExecuteTreeGroupedAggregateAsync(
+            _treeContext, Array.Empty<Grouping.GroupFieldRequest>(), requestList, havingJson: null, cancellationToken: cancellationToken);
+
+        var row = json != null && json.RootElement.GetArrayLength() > 0
+            ? json.RootElement[0]
+            : (System.Text.Json.JsonElement?)null;
+
+        foreach (var request in requestList)
+        {
+            object? value = null;
+            if (row.HasValue && row.Value.TryGetProperty(request.Alias, out var element))
+            {
+                value = element.ValueKind switch
+                {
+                    System.Text.Json.JsonValueKind.Number => element.GetDecimal(),
+                    System.Text.Json.JsonValueKind.String => element.GetString(),
+                    System.Text.Json.JsonValueKind.True => true,
+                    System.Text.Json.JsonValueKind.False => false,
+                    _ => null
+                };
+            }
+
+            result.Values[request.Alias] = value;
+        }
+
+        return result;
+    }
+
+    /// <inheritdoc />
+    protected override async Task<decimal?> ExecuteAggregateCoreAsync(
+        string fieldPath, Aggregation.AggregateFunction function, CancellationToken cancellationToken)
+    {
+        const string alias = "result";
+        var batch = await ExecuteAggregateBatchCoreAsync(
+            [new Aggregation.AggregateRequest { FieldPath = fieldPath, Function = function, Alias = alias }],
+            cancellationToken);
+
+        return batch.Values.TryGetValue(alias, out var value) && value != null
+            ? Convert.ToDecimal(value, System.Globalization.CultureInfo.InvariantCulture)
+            : null;
     }
 }

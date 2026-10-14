@@ -94,6 +94,25 @@ public interface IDataProvider : IAsyncDisposable
     Task BulkInsertAsync(string tableName, System.Data.DataTable data, CancellationToken ct = default);
 
     /// <summary>
+    /// Executes a statement that returns no rows (DDL included). Inside an import it runs in the
+    /// import transaction, so it commits or rolls back with everything else the import wrote.
+    /// </summary>
+    /// <param name="sql">Statement text in the provider's dialect.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task ExecuteAsync(string sql, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads a date column of a redb table into its portable <see cref="DateTimeOffset"/> form.
+    /// PostgreSQL and SQL Server store these columns natively. SQLite stores them as a UTC Julian
+    /// day (REAL), and the number has to be decoded the way the redb SQLite provider decodes it.
+    /// The write side of the same seam is <see cref="BulkInsertAsync"/>, which stores a
+    /// <see cref="DateTimeOffset"/> in the form the provider reads.
+    /// </summary>
+    /// <param name="reader">Reader positioned on a row.</param>
+    /// <param name="ordinal">Ordinal of a non-null date column.</param>
+    DateTimeOffset ReadDateTimeOffset(DbDataReader reader, int ordinal);
+
+    /// <summary>
     /// Reads a uuid-semantic column value into its portable <see cref="Guid"/> form.
     /// PostgreSQL/MSSQL store these columns natively; SQLite stores them as a 16-byte BLOB in
     /// RFC 4122 (text) order - <c>_users._hash</c>, <c>_schemes._structure_hash</c>,

@@ -110,6 +110,10 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
             {
                 return await ExecuteCountAsyncGeneric(constantExpr.Value, cancellationToken);
             }
+            else if (elementType == typeof(bool))
+            {
+                return await ExecuteAnyAsyncGeneric(constantExpr.Value, cancellationToken);
+            }
             else if (elementType.IsGenericType && elementType.GetGenericTypeDefinition() == typeof(List<>))
             {
                 return await ExecuteToListAsyncGeneric(constantExpr.Value, cancellationToken);
@@ -134,6 +138,33 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         }
 
         throw new NotSupportedException($"Unsupported context type: {contextType.Name}");
+    }
+
+    private async Task<bool> ExecuteAnyAsyncGeneric(object contextObj, CancellationToken cancellationToken)
+    {
+        // Use reflection to call the generic method
+        var contextType = contextObj.GetType();
+        if (contextType.IsGenericType && contextType.GetGenericTypeDefinition() == typeof(QueryContext<>))
+        {
+            var propsType = contextType.GetGenericArguments()[0];
+            // Look for the method in the ACTUAL type (to support inheritance in Pro)
+            var method = GetType().GetMethod(nameof(ExecuteAnyAsync), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var genericMethod = method!.MakeGenericMethod(propsType);
+            var task = (Task<bool>)genericMethod.Invoke(this, new object[] { contextObj, cancellationToken })!;
+            return await task;
+        }
+
+        throw new NotSupportedException($"Unsupported context type: {contextType.Name}");
+    }
+
+    /// <summary>
+    /// Is there at least one object the query returns. The default is the count compared with
+    /// zero, which is what AnyAsync has always been; a provider that can stop at the first match
+    /// overrides it.
+    /// </summary>
+    protected virtual async Task<bool> ExecuteAnyAsync<TProps>(QueryContext<TProps> context, CancellationToken cancellationToken = default) where TProps : class, new()
+    {
+        return await ExecuteCountAsync(context, cancellationToken) > 0;
     }
 
     private async Task<object> ExecuteToListAsyncGeneric(object contextObj, CancellationToken cancellationToken)

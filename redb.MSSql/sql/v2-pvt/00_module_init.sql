@@ -96,6 +96,42 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._valu
     CREATE INDEX [IX__values__Object_not_null] ON [dbo].[_values]([_Object]) WHERE [_Object] IS NOT NULL;
 GO
 
+-- Index cleanup (0.2.29, 2026-10-14): indexes another index of the same table fully replaces, the
+-- same set PostgreSQL dropped in its module 0.7.13. They were removed from redbMSSQL.sql, but that
+-- file only runs on a new database, so an existing one keeps them until they are dropped here.
+--   IX__values__object_structure_array_index - same key as IX__values__object_structure_lookup,
+--       which has no filter and carries the values in INCLUDE.
+--   ix__objects_parent_scheme - same key and filter as IX__objects__parent_id_descendant_lookup.
+--   IX__structures__not_collection - a prefix of IX__structures__not_collection_enhanced, same filter.
+--   the rest - a single column that is the leading column of a UNIQUE constraint.
+-- DROP INDEX takes a short exclusive lock on its table.
+-- IF QUERIES GOT SLOWER AFTER THIS UPGRADE, the statements that bring them back are below. This
+-- block drops them again whenever the module version changes, so report the case.
+--   CREATE INDEX [IX__values__object_structure_array_index] ON [dbo].[_values]([_id_object], [_id_structure], [_array_index]) WHERE [_array_index] IS NOT NULL;
+--   CREATE INDEX [ix__objects_parent_scheme] ON [dbo].[_objects]([_id_parent], [_id_scheme]) WHERE [_id_parent] IS NOT NULL;
+--   CREATE INDEX [IX__structures__not_collection] ON [dbo].[_structures]([_id], [_name], [_id_scheme]) WHERE [_collection_type] IS NULL;
+--   CREATE INDEX [IX__functions__schemes] ON [dbo].[_functions]([_id_scheme]);
+--   CREATE INDEX [IX__permissions__roles] ON [dbo].[_permissions]([_id_role]);
+--   CREATE INDEX [IX__dependencies__schemes_1] ON [dbo].[_dependencies]([_id_scheme_1]);
+--   CREATE INDEX [IX__users_roles__roles] ON [dbo].[_users_roles]([_id_role]);
+-- IX__values__structure_object_lookup is NOT dropped here, unlike PostgreSQL: the streams form reads
+-- string fields through it.
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__object_structure_array_index')
+    DROP INDEX [IX__values__object_structure_array_index] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._objects') AND name = N'ix__objects_parent_scheme')
+    DROP INDEX [ix__objects_parent_scheme] ON [dbo].[_objects];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._structures') AND name = N'IX__structures__not_collection')
+    DROP INDEX [IX__structures__not_collection] ON [dbo].[_structures];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._functions') AND name = N'IX__functions__schemes')
+    DROP INDEX [IX__functions__schemes] ON [dbo].[_functions];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._permissions') AND name = N'IX__permissions__roles')
+    DROP INDEX [IX__permissions__roles] ON [dbo].[_permissions];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._dependencies') AND name = N'IX__dependencies__schemes_1')
+    DROP INDEX [IX__dependencies__schemes_1] ON [dbo].[_dependencies];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._users_roles') AND name = N'IX__users_roles__roles')
+    DROP INDEX [IX__users_roles__roles] ON [dbo].[_users_roles];
+GO
+
 -- ---------- 1. System infrastructure check ------------------------------
 -- NOTE: dbo.get_object_json (and its helpers) is now OWNED by this module
 -- (defined in 09_core_object_json.sql), so it is no longer guarded as an

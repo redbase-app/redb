@@ -2,6 +2,8 @@
 using System.Data.Common;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using redb.Core.Attributes;
+using redb.Export.Flat;
 using redb.Export.Providers;
 using redb.Export.Services;
 
@@ -26,6 +28,17 @@ namespace redb.CLI;
 /// Import (with clean):
 ///   dotnet run -- import -p mssql -c "Server=localhost;Database=redb;User Id=sa;Password=1;TrustServerCertificate=True;Command Timeout=600" -i data.redb --clean -v --batch-size 100000
 /// 
+/// === Flat export (redb objects -> ordinary relational tables) ===
+///
+/// Print the DDL of the flat tables, no database opened:
+///   dotnet run -- flat -a MyApp.Models.dll -tp postgres --ddl-only
+///
+/// Unfold and copy (source and target are independent connections, of any two providers):
+///   dotnet run -- flat -a MyApp.Models.dll -sp postgres -sc "Host=localhost;Database=redb;..." -tp mssql -tc "Server=localhost;Database=flat;..." --batch-size 10000 -v
+///
+///   --types       - Props classes to unfold (name or full name, comma-separated);
+///                   default: every class marked with [RedbScheme] in the assembly
+///
 /// === Options ===
 ///   --compress    - compress exported file with ZIP (export only)
 ///   --clean       - clean database before import (import only)
@@ -127,7 +140,15 @@ public static class Program
         importCommand.AddOption(connectionOption);
         importCommand.AddOption(providerOption);
         importCommand.AddOption(inputOption);
+        var parallelOption = new Option<int>(
+            aliases: ["--parallel", "-j"],
+            getDefaultValue: () => 1,
+            description: "Number of connections to load over (postgres). 1 keeps the whole import in one " +
+                         "transaction. More than 1 loads in parallel and rebuilds the secondary indexes of the " +
+                         "large tables afterwards: much faster on a large file, but not atomic - a run that " +
+                         "fails leaves a partly loaded database to be imported again with --clean.");
         importCommand.AddOption(cleanOption);
+        importCommand.AddOption(parallelOption);
         importCommand.AddOption(verboseOption);
         importCommand.AddOption(batchSizeOption);
         importCommand.AddOption(dryRunOption);
@@ -141,9 +162,10 @@ public static class Program
             var verbose = context.ParseResult.GetValueForOption(verboseOption);
             var batchSize = context.ParseResult.GetValueForOption(batchSizeOption);
             var dryRun = context.ParseResult.GetValueForOption(dryRunOption);
-            
-            await ImportAsync(connection, provider, input, clean, 
-                              verbose, batchSize, dryRun, context.GetCancellationToken());
+            var parallel = context.ParseResult.GetValueForOption(parallelOption);
+
+            await ImportAsync(connection, provider, input, clean,
+                              verbose, batchSize, dryRun, parallel, context.GetCancellationToken());
         });
         
         rootCommand.AddCommand(exportCommand);
@@ -193,8 +215,207 @@ public static class Program
         
         rootCommand.AddCommand(initCommand);
         rootCommand.AddCommand(schemaCommand);
-        
+
+        // Flat command — unfold redb objects into ordinary relational tables
+        var flatCommand = new Command("flat",
+            "Unfold redb objects into flat relational tables and copy the data into them");
+
+        var sourceConnectionOption = new Option<string?>(
+            aliases: ["--source-connection", "-sc"],
+            description: "Connection string of the redb database to read");
+
+        var sourceProviderOption = new Option<string?>(
+            aliases: ["--source-provider", "-sp"],
+            description: "Provider of the source database: postgres | mssql | sqlite");
+
+        var targetConnectionOption = new Option<string?>(
+            aliases: ["--target-connection", "-tc"],
+            description: "Connection string of the database that receives the flat tables " +
+                         "(may be the source database itself; the tables must not exist yet)");
+
+        var targetProviderOption = new Option<string>(
+            aliases: ["--target-provider", "-tp"],
+            description: "Provider of the target database: postgres | mssql | sqlite")
+        { IsRequired = true };
+
+        var assemblyOption = new Option<string[]>(
+            aliases: ["--assembly", "-a"],
+            description: "Path to an assembly that declares Props classes. Give several paths, or repeat " +
+                         "the option, when the classes live in more than one project. The dependencies of " +
+                         "each assembly are resolved from the folder it lies in.")
+        { IsRequired = true, AllowMultipleArgumentsPerToken = true };
+
+        var typesOption = new Option<string?>(
+            aliases: ["--types"],
+            description: "Props classes to unfold, by name or full name (comma-separated). " +
+                         "When omitted, every class marked with [RedbScheme] in the given assemblies is taken.");
+
+        var ddlOnlyOption = new Option<bool>(
+            aliases: ["--ddl-only"],
+            description: "Print the DDL of the flat tables for the target provider and exit. " +
+                         "No database is opened; only --assembly and --target-provider are needed.");
+
+        flatCommand.AddOption(sourceConnectionOption);
+        flatCommand.AddOption(sourceProviderOption);
+        flatCommand.AddOption(targetConnectionOption);
+        flatCommand.AddOption(targetProviderOption);
+        flatCommand.AddOption(assemblyOption);
+        flatCommand.AddOption(typesOption);
+        flatCommand.AddOption(ddlOnlyOption);
+        flatCommand.AddOption(verboseOption);
+        flatCommand.AddOption(batchSizeOption);
+
+        flatCommand.SetHandler(async (context) =>
+        {
+            var sourceConnection = context.ParseResult.GetValueForOption(sourceConnectionOption);
+            var sourceProvider = context.ParseResult.GetValueForOption(sourceProviderOption);
+            var targetConnection = context.ParseResult.GetValueForOption(targetConnectionOption);
+            var targetProvider = context.ParseResult.GetValueForOption(targetProviderOption)!;
+            var assemblyPaths = context.ParseResult.GetValueForOption(assemblyOption)!;
+            var typesStr = context.ParseResult.GetValueForOption(typesOption);
+            var ddlOnly = context.ParseResult.GetValueForOption(ddlOnlyOption);
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            var batchSize = context.ParseResult.GetValueForOption(batchSizeOption);
+
+            await FlatAsync(sourceConnection, sourceProvider, targetConnection, targetProvider,
+                            assemblyPaths, typesStr, ddlOnly, verbose, batchSize, context.GetCancellationToken());
+        });
+
+        rootCommand.AddCommand(flatCommand);
+
         return await rootCommand.InvokeAsync(args);
+    }
+
+    // === Flat Export ===
+
+    private static async Task FlatAsync(
+        string? sourceConnection,
+        string? sourceProvider,
+        string? targetConnection,
+        string targetProvider,
+        string[] assemblyPaths,
+        string? typesStr,
+        bool ddlOnly,
+        bool verbose,
+        int batchSize,
+        CancellationToken ct)
+    {
+        try
+        {
+            var propsTypes = LoadPropsTypes(assemblyPaths, typesStr);
+
+            await using var target = ProviderFactory.Create(targetProvider);
+
+            if (ddlOnly)
+            {
+                // Built without the source, so without structure ids: the shape of the tables does
+                // not depend on them. Nothing but the script goes to stdout.
+                var model = new FlatModelBuilder().Build(propsTypes);
+                Console.WriteLine(new FlatDdlGenerator(target.Name).Script(model));
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(sourceConnection) ||
+                string.IsNullOrWhiteSpace(sourceProvider) ||
+                string.IsNullOrWhiteSpace(targetConnection))
+            {
+                throw new ArgumentException(
+                    "--source-connection, --source-provider and --target-connection are required unless --ddl-only is given.");
+            }
+
+            Console.WriteLine("REDB Flat Export");
+            Console.WriteLine("================");
+            Console.WriteLine();
+
+            await using var source = ProviderFactory.Create(sourceProvider);
+
+            if (verbose)
+            {
+                Console.WriteLine($"Props types ({propsTypes.Count}): {string.Join(", ", propsTypes.Select(t => t.Name))}");
+                Console.WriteLine($"Connecting to source ({sourceProvider}) and target ({targetProvider})...");
+            }
+
+            await source.OpenAsync(sourceConnection, ct);
+            await target.OpenAsync(targetConnection, ct);
+
+            if (verbose)
+            {
+                Console.WriteLine("Connected.");
+                Console.WriteLine();
+            }
+
+            var flatExportService = new FlatExportService(source, target, verbose, batchSize);
+            await flatExportService.ExportAsync(propsTypes, ct);
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("Flat export completed successfully.");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Error: {ex.Message}");
+            Console.ResetColor();
+
+            if (verbose)
+            {
+                Console.WriteLine();
+                Console.WriteLine(ex.StackTrace);
+            }
+
+            Environment.ExitCode = 1;
+        }
+    }
+
+    /// <summary>
+    /// Loads the Props classes to unfold from the user assemblies: the ones named in
+    /// <paramref name="typesStr"/> (by name or full name), or every class marked with
+    /// <see cref="RedbSchemeAttribute"/> when none is named. The classes are looked up across all
+    /// the given assemblies, so a scheme and the scheme it references may live in different projects.
+    /// </summary>
+    private static IReadOnlyList<Type> LoadPropsTypes(string[] assemblyPaths, string? typesStr)
+    {
+        var classes = new List<Type>();
+        foreach (var assemblyPath in assemblyPaths)
+        {
+            var fullPath = Path.GetFullPath(assemblyPath);
+            if (!File.Exists(fullPath))
+                throw new FileNotFoundException($"Assembly not found: {fullPath}");
+
+            // LoadFrom resolves the assembly's own dependencies from the folder it lies in.
+            classes.AddRange(Assembly.LoadFrom(fullPath).GetTypes().Where(t => t.IsClass && !t.IsAbstract));
+        }
+
+        var where = string.Join(", ", assemblyPaths.Select(Path.GetFileName));
+
+        if (string.IsNullOrWhiteSpace(typesStr))
+        {
+            var marked = classes
+                .Where(t => t.GetCustomAttribute<RedbSchemeAttribute>() != null)
+                .OrderBy(t => t.FullName, StringComparer.Ordinal)
+                .ToList();
+
+            if (marked.Count == 0)
+                throw new InvalidOperationException(
+                    $"No class marked with [RedbScheme] in {where}. Name the Props classes with --types.");
+
+            return marked;
+        }
+
+        var selected = new List<Type>();
+        foreach (var name in typesStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var matches = classes.Where(t => t.FullName == name || t.Name == name).ToList();
+            if (matches.Count == 0)
+                throw new InvalidOperationException($"Class '{name}' not found in {where}.");
+            if (matches.Count > 1)
+                throw new InvalidOperationException(
+                    $"Class name '{name}' is ambiguous in {where}: {string.Join(", ", matches.Select(t => t.AssemblyQualifiedName))}. Use the full name.");
+
+            selected.Add(matches[0]);
+        }
+
+        return selected;
     }
     
     private static async Task ExportAsync(
@@ -256,6 +477,7 @@ public static class Program
         bool verbose,
         int batchSize,
         bool dryRun,
+        int parallel,
         CancellationToken ct)
     {
         Console.WriteLine("REDB Import");
@@ -279,7 +501,7 @@ public static class Program
                 Console.WriteLine();
             }
             
-            var importService = new ImportService(dataProvider, verbose, batchSize);
+            var importService = new ImportService(dataProvider, verbose, batchSize, parallel);
             await importService.ImportAsync(input, clean, dryRun, ct);
         }
         catch (Exception ex)

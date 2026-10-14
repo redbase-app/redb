@@ -23,10 +23,10 @@ public class E096_TreeQuery : ExampleBase
             .OrderBy(d => d.Name)
             .ToListAsync();
 
-        // var sql = await redb.TreeQuery<DepartmentProps>()
-        //     .Where(d => d.Name.Contains("IT"))
-        //     .ToSqlStringAsync();
-        // Console.WriteLine(sql);
+        var sql = await redb.TreeQuery<DepartmentProps>()
+            .Where(d => d.Name.Contains("IT"))
+            .ToSqlStringAsync();
+        Console.WriteLine(sql);
 
         sw.Stop();
 

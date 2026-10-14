@@ -20,9 +20,13 @@ namespace redb.Tests.Integration.Tests.Base;
 /// uuid and bytea keep array_agg. The second half of the class runs such queries end to end, so a max() over a
 /// column that has none fails here and not in production.
 ///
+/// The class is about the aggregate pivot, so it runs with the planner off whatever the suite was started
+/// with (REDB_PVT_PREFILTER): with the planner on these queries take the streams form, which has no pivot
+/// and so nothing for the class to check. The setting is put back when the test ends.
+///
 /// Wrap this base in a Pro PG fixture only.
 /// </summary>
-public abstract class ProPgPvtPickAggregateTestsBase
+public abstract class ProPgPvtPickAggregateTestsBase : IDisposable
 {
     // array_agg(...)[1] over a column that has max() or bool_or(): the shape this class forbids.
     private static readonly Regex ArrayAggPickOverCheapColumn = new(
@@ -30,8 +34,20 @@ public abstract class ProPgPvtPickAggregateTestsBase
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     protected readonly IRedbService Redb;
+    private readonly bool _plannerWas;
 
-    protected ProPgPvtPickAggregateTestsBase(IRedbService redb) => Redb = redb;
+    protected ProPgPvtPickAggregateTestsBase(IRedbService redb)
+    {
+        Redb = redb;
+        _plannerWas = redb.Configuration.EnablePvtPrefilter;
+        redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+    }
+
+    public void Dispose()
+    {
+        Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = _plannerWas);
+        GC.SuppressFinalize(this);
+    }
 
     private static void AssertCheapPick(string sql, string shape)
     {

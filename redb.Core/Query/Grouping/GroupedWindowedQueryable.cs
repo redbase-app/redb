@@ -23,6 +23,9 @@ public class GroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQueryable<
     private readonly long _schemeId;
     private readonly Expression _keySelector;
     private readonly GroupedWindowSpec<TKey, TProps> _windowSpec;
+
+    /// <summary>True when the key comes from GroupByRedb: its members are fields of the object, not of Props.</summary>
+    public bool IsBaseFieldGrouping { get; init; }
     private readonly string? _filterJson;
     private readonly FilterExpression? _filter;
 
@@ -109,13 +112,13 @@ public class GroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQueryable<
                 var member = newExpr.Members[i];
                 var arg = newExpr.Arguments[i];
                 var fieldPath = ExtractFieldPath(arg);
-                result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = member.Name });
+                result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = member.Name, IsBaseField = IsBaseFieldGrouping });
             }
         }
         else if (body is MemberExpression memberExpr)
         {
             var fieldPath = ExtractFieldPath(memberExpr);
-            result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = memberExpr.Member.Name });
+            result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = memberExpr.Member.Name, IsBaseField = IsBaseFieldGrouping });
         }
         
         return result;

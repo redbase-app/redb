@@ -424,4 +424,136 @@ public abstract class ProjectionTestsBase : IAsyncLifetime
         rs.Should().ContainSingle("Select с агрегатами - одна строка агрегатов");
         rs[0].Total.Should().Be(42m);
     }
+
+    // ============================================================
+    // === A field next to something that needs every field ===
+    // ============================================================
+    // Found 2026-10-12 on a copy of a production database. A selector that named one field and, next
+    // to it, used the object, its Props, or an expression the field walk did not enter, loaded that
+    // one field only: the rest arrived as defaults, silently. Alone, each of these shapes fell back
+    // to a full load by accident (no field recognised at all), which is why they went unnoticed.
+
+    private static string Describe(RedbObject<ProjectionProbeProps> o) => $"{o.Props.S}:{o.Props.N}";
+
+    [Fact]
+    public async Task WholeObject_NextToField_IsNotSilentlyPartial()
+    {
+        await SyncAsync();
+        await SeedAsync(new ProjectionProbeProps { S = "whole", N = 5 });
+
+        var rs = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { O = x, x.Props.S })
+            .ToListAsync();
+
+        rs.Should().ContainSingle();
+        rs[0].S.Should().Be("whole");
+        rs[0].O.Props.N.Should().Be(5, "the object handed on whole must carry every field");
+    }
+
+    [Fact]
+    public async Task WholeProps_NextToField_IsNotSilentlyPartial()
+    {
+        await SyncAsync();
+        await SeedAsync(new ProjectionProbeProps { S = "props", N = 6, Flag = true });
+
+        var rs = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { P = x.Props, x.Props.S })
+            .ToListAsync();
+
+        rs.Should().ContainSingle();
+        rs[0].P.N.Should().Be(6);
+        rs[0].P.Flag.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task MethodOverObject_NextToField_IsNotSilentlyPartial()
+    {
+        await SyncAsync();
+        await SeedAsync(new ProjectionProbeProps { S = "call", N = 8 });
+
+        var rs = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { D = Describe(x), x.Props.S })
+            .ToListAsync();
+
+        rs.Should().ContainSingle();
+        rs[0].D.Should().Be("call:8", "a method that receives the object may read any field of it");
+    }
+
+    [Fact]
+    public async Task MemberOfCoalesce_NextToField_LoadsTheCoalescedField()
+    {
+        await SyncAsync();
+        await SeedAsync(new ProjectionProbeProps { S = "four", N = 9 });
+
+        var rs = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { x.Props.N, L = (x.Props.S ?? "").Length })
+            .ToListAsync();
+
+        rs.Should().ContainSingle();
+        rs[0].N.Should().Be(9);
+        rs[0].L.Should().Be(4, "S is read inside the parentheses and has to be loaded");
+    }
+
+    [Fact]
+    public async Task MemberOfCallResult_NextToField_LoadsTheCalledField()
+    {
+        await SyncAsync();
+        await SeedAsync(new ProjectionProbeProps { S = " pad ", N = 10 });
+
+        var rs = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { x.Props.N, L = x.Props.S!.Trim().Length })
+            .ToListAsync();
+
+        rs.Should().ContainSingle();
+        rs[0].L.Should().Be(3, "S is the receiver of Trim() and has to be loaded");
+    }
+
+    [Fact]
+    public async Task NullGuardOfProps_KeepsTheFieldValue()
+    {
+        await SyncAsync();
+        await SeedAsync(new ProjectionProbeProps { S = "guarded" });
+
+        var rs = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { x.Id, S = x.Props != null ? x.Props.S : null })
+            .ToListAsync();
+
+        rs.Should().ContainSingle();
+        rs[0].S.Should().Be("guarded");
+    }
+
+    [Fact]
+    public async Task BaseFieldsOnly_ReturnsTheirValues()
+    {
+        await SyncAsync();
+        var id = await SeedAsync(new ProjectionProbeProps { S = "base", N = 1 }, name: "base-only");
+
+        var ids = await Redb.Query<ProjectionProbeProps>().Select(x => x.Id).ToListAsync();
+        var rows = await Redb.Query<ProjectionProbeProps>().Select(x => new { x.Id, x.Name }).ToListAsync();
+
+        ids.Should().Equal(id);
+        rows.Should().ContainSingle();
+        rows[0].Id.Should().Be(id);
+        rows[0].Name.Should().Be("base-only");
+    }
+
+    [Fact]
+    public async Task SourceQuery_RunAgainAfterProjection_ReturnsWholeObjects()
+    {
+        // The projection used to write its settings into the query it was built from; the same
+        // query run again as a list then returned objects with the projected fields only.
+        await SyncAsync();
+        await SeedAsync(new ProjectionProbeProps { S = "reuse", N = 11, Flag = true });
+
+        var query = Redb.Query<ProjectionProbeProps>();
+        (await query.Select(x => x.Props.S).ToListAsync()).Should().Equal("reuse");
+        (await query.Select(x => x.Id).ToListAsync()).Should().ContainSingle();
+
+        var objects = await query.ToListAsync();
+
+        objects.Should().ContainSingle();
+        objects[0].Props.S.Should().Be("reuse");
+        objects[0].Props.N.Should().Be(11, "a projection run earlier over the same query must not strip its objects");
+        objects[0].Props.Flag.Should().BeTrue();
+    }
 }

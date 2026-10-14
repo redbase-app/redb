@@ -19,7 +19,12 @@ public class ProjectionFieldExtractor
     /// Extracts HashSet of structure_ids for optimized BULK SELECT.
     /// </summary>
     /// <returns>
-    /// HashSet of structure_ids or null (if parsing failed → load everything)
+    /// Three different answers, and the caller must not mix them up:
+    /// null - the selector could not be reduced to a list of fields (a node was not recognized, the
+    /// object or its Props is used whole, a field is unknown to the scheme): load everything;
+    /// an empty set - the selector was read completely and touches no Props field (base fields
+    /// only): nothing has to be loaded;
+    /// a non-empty set - exactly these structures are read.
     /// </returns>
     public HashSet<long>? ExtractStructureIds<TProps, TResult>(
         IRedbScheme scheme,
@@ -29,14 +34,17 @@ public class ProjectionFieldExtractor
         try
         {
             var result = new HashSet<long>();
-            var paths = ExtractFieldPaths(selector.Body);
+            var paths = ExtractFieldPaths(selector.Body, selector.Parameters[0]);
 
             foreach (var path in paths)
             {
-                AddStructureIdsForPath(scheme, path, result);
+                // A member of Props the scheme does not know is not a stored field: a computed
+                // property, most likely, reading fields this method cannot see.
+                if (!AddStructureIdsForPath(scheme, path, result))
+                    return null;
             }
 
-            return result.Count > 0 ? result : null;
+            return result;
         }
         catch (NotSupportedException)
         {
@@ -60,7 +68,7 @@ public class ProjectionFieldExtractor
     {
         try
         {
-            var paths = ExtractFieldPaths(selector.Body);
+            var paths = ExtractFieldPaths(selector.Body, selector.Parameters[0]);
 
             if (paths.Count == 0)
                 return null;
@@ -107,10 +115,17 @@ public class ProjectionFieldExtractor
     /// <summary>
     /// Extracts all field paths from expression
     /// </summary>
-    private List<FieldPathInfo> ExtractFieldPaths(Expression expression)
+    /// <param name="expression">Expression to read.</param>
+    /// <param name="source">
+    /// The selector's own parameter (the object). With it the walk can tell the object read whole
+    /// (<c>Map(o)</c>, <c>new { O = o }</c>, <c>o.Props</c>) from a field of it, and throws
+    /// NotSupportedException for the former: such a selector needs every field. Null where there is
+    /// no such parameter (arguments of aggregates).
+    /// </param>
+    private List<FieldPathInfo> ExtractFieldPaths(Expression expression, ParameterExpression? source)
     {
         var paths = new List<FieldPathInfo>();
-        CollectFieldPaths(expression, paths);
+        CollectFieldPaths(expression, paths, source);
         return paths;
     }
 
@@ -122,86 +137,93 @@ public class ProjectionFieldExtractor
     /// путей из поддерева: при ЧАСТИЧНОМ разборе лямбды поле молча не загружалось и проекция
     /// отдавала default вместо значения.
     /// </summary>
-    private void CollectFieldPaths(Expression expression, List<FieldPathInfo> paths)
+    private void CollectFieldPaths(Expression expression, List<FieldPathInfo> paths, ParameterExpression? source)
     {
         switch (expression)
         {
             case NewExpression newExpr:
                 foreach (var arg in newExpr.Arguments)
                 {
-                    CollectFieldPaths(arg, paths);
+                    CollectFieldPaths(arg, paths, source);
                 }
                 break;
 
             case MemberInitExpression initExpr:
-                CollectFieldPaths(initExpr.NewExpression, paths);
-                CollectBindings(initExpr.Bindings, paths);
+                CollectFieldPaths(initExpr.NewExpression, paths, source);
+                CollectBindings(initExpr.Bindings, paths, source);
                 break;
 
             case MemberExpression memberExpr:
-                var path = ExtractMemberPath(memberExpr);
-                if (path != null)
-                {
-                    paths.Add(path);
-                }
+                CollectFromMemberChain(memberExpr, paths, source);
                 break;
 
             case MethodCallExpression methodExpr:
-                CollectFromMethodCall(methodExpr, paths);
+                CollectFromMethodCall(methodExpr, paths, source);
                 break;
 
             case UnaryExpression unaryExpr:
-                CollectFieldPaths(unaryExpr.Operand, paths);
+                CollectFieldPaths(unaryExpr.Operand, paths, source);
                 break;
 
             case ConditionalExpression condExpr:
                 // S-5b: условие тернарника раньше НЕ сканировалось - поле из условия молча не
                 // загружалось и ветка выбиралась по default-значению.
-                CollectFieldPaths(condExpr.Test, paths);
-                CollectFieldPaths(condExpr.IfTrue, paths);
-                CollectFieldPaths(condExpr.IfFalse, paths);
+                CollectFieldPaths(condExpr.Test, paths, source);
+                CollectFieldPaths(condExpr.IfTrue, paths, source);
+                CollectFieldPaths(condExpr.IfFalse, paths, source);
                 break;
 
             case BinaryExpression binaryExpr:
-                CollectFieldPaths(binaryExpr.Left, paths);
-                CollectFieldPaths(binaryExpr.Right, paths);
+                // o == null and o.Props != null read no field: the usual guard in front of a field
+                // must not turn the whole selector into a full load.
+                if (IsNullCheckOfSource(binaryExpr, source))
+                    break;
+                CollectFieldPaths(binaryExpr.Left, paths, source);
+                CollectFieldPaths(binaryExpr.Right, paths, source);
                 break;
 
             case LambdaExpression lambdaExpr:
-                CollectFieldPaths(lambdaExpr.Body, paths);
+                CollectFieldPaths(lambdaExpr.Body, paths, source);
                 break;
 
             case NewArrayExpression newArrayExpr:
                 foreach (var el in newArrayExpr.Expressions)
-                    CollectFieldPaths(el, paths);
+                    CollectFieldPaths(el, paths, source);
                 break;
 
             case ListInitExpression listInitExpr:
-                CollectFieldPaths(listInitExpr.NewExpression, paths);
+                CollectFieldPaths(listInitExpr.NewExpression, paths, source);
                 foreach (var init in listInitExpr.Initializers)
                     foreach (var arg in init.Arguments)
-                        CollectFieldPaths(arg, paths);
+                        CollectFieldPaths(arg, paths, source);
                 break;
 
             case InvocationExpression invocationExpr:
-                CollectFieldPaths(invocationExpr.Expression, paths);
+                CollectFieldPaths(invocationExpr.Expression, paths, source);
                 foreach (var arg in invocationExpr.Arguments)
-                    CollectFieldPaths(arg, paths);
+                    CollectFieldPaths(arg, paths, source);
                 break;
 
             case TypeBinaryExpression typeBinaryExpr:
-                CollectFieldPaths(typeBinaryExpr.Expression, paths);
+                CollectFieldPaths(typeBinaryExpr.Expression, paths, source);
                 break;
 
             case IndexExpression indexExpr:
                 if (indexExpr.Object != null)
-                    CollectFieldPaths(indexExpr.Object, paths);
+                    CollectFieldPaths(indexExpr.Object, paths, source);
                 foreach (var arg in indexExpr.Arguments)
-                    CollectFieldPaths(arg, paths);
+                    CollectFieldPaths(arg, paths, source);
+                break;
+
+            case ParameterExpression parameterExpr:
+                // The object itself handed on (Map(o), new { O = o }): whatever receives it may read
+                // any field. Parameters of inner lambdas are plain leaves.
+                if (source != null && parameterExpr == source)
+                    throw new NotSupportedException(
+                        "ProjectionFieldExtractor: the object is used whole - full load.");
                 break;
 
             case ConstantExpression:
-            case ParameterExpression:
             case DefaultExpression:
                 break; // листья без полей
 
@@ -213,25 +235,133 @@ public class ProjectionFieldExtractor
     }
 
     /// <summary>
+    /// Reads a member chain (<c>a.b.c</c>, indexers included) by what it hangs on.
+    /// On the selector's parameter it is a field of the object: a Props path is recorded, a base
+    /// field needs nothing, Props taken whole or a computed property of Props means a full load.
+    /// On anything else that is an expression of its own - a call, <c>??</c>, a conditional, a cast -
+    /// that expression is read in turn: <c>(o.Props.A ?? "").Length</c> reads A, and before this
+    /// method existed the chain simply ended there and A was never loaded.
+    /// </summary>
+    private void CollectFromMemberChain(MemberExpression memberExpr, List<FieldPathInfo> paths, ParameterExpression? source)
+    {
+        // Same walk as ExtractMemberPath: members and indexers down to whatever carries them.
+        var members = new List<MemberInfo>();
+        Expression? root = memberExpr;
+        while (true)
+        {
+            if (root is MemberExpression member)
+            {
+                members.Insert(0, member.Member);
+                root = member.Expression;
+            }
+            else if (root is MethodCallExpression { Method.Name: "get_Item", Object: not null } indexer)
+            {
+                // The key of an indexer may itself read a field: Dict[o.Props.Key].
+                foreach (var arg in indexer.Arguments)
+                    CollectFieldPaths(arg, paths, source);
+                root = indexer.Object;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // A cast of the object changes nothing about which field is read: ((IRedbObject)o).Name.
+        var carrier = root;
+        while (carrier is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked or ExpressionType.TypeAs } cast)
+            carrier = cast.Operand;
+
+        switch (carrier)
+        {
+            case null:               // static member
+            case ConstantExpression: // captured variable
+                return;
+
+            case ParameterExpression parameter when source == null || parameter == source:
+                var propsIndex = members.FindIndex(m => m.Name == "Props");
+                if (propsIndex < 0)
+                    return; // base field of the object
+
+                if (source != null)
+                {
+                    if (propsIndex == members.Count - 1)
+                        throw new NotSupportedException(
+                            "ProjectionFieldExtractor: Props is used whole - full load.");
+
+                    // A property without a setter is not stored; what it computes from is unknown here.
+                    if (members[propsIndex + 1] is PropertyInfo { CanWrite: false })
+                        throw new NotSupportedException(
+                            $"ProjectionFieldExtractor: {members[propsIndex + 1].Name} is a computed property - full load.");
+
+                    // Behind a cast ExtractMemberPath cannot follow the chain; rare enough to load everything.
+                    if (!ReferenceEquals(carrier, root))
+                        throw new NotSupportedException(
+                            "ProjectionFieldExtractor: Props read through a cast of the object - full load.");
+                }
+
+                var path = ExtractMemberPath(memberExpr);
+                if (path != null)
+                    paths.Add(path);
+                return;
+
+            case ParameterExpression:
+                return; // parameter of an inner lambda: its collection is already recorded with all children
+
+            default:
+                CollectFieldPaths(root!, paths, source);
+                return;
+        }
+    }
+
+    /// <summary>
+    /// True for a comparison of the object or of its Props with null.
+    /// </summary>
+    private static bool IsNullCheckOfSource(BinaryExpression binaryExpr, ParameterExpression? source)
+    {
+        if (source == null || binaryExpr.NodeType is not (ExpressionType.Equal or ExpressionType.NotEqual))
+            return false;
+
+        return (IsNullConstant(binaryExpr.Right) && IsSourceOrItsProps(binaryExpr.Left))
+            || (IsNullConstant(binaryExpr.Left) && IsSourceOrItsProps(binaryExpr.Right));
+
+        static Expression StripCasts(Expression e)
+        {
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked or ExpressionType.TypeAs } cast)
+                e = cast.Operand;
+            return e;
+        }
+
+        static bool IsNullConstant(Expression e) => StripCasts(e) is ConstantExpression { Value: null };
+
+        bool IsSourceOrItsProps(Expression e)
+        {
+            e = StripCasts(e);
+            if (e == source) return true;
+            return e is MemberExpression { Member.Name: "Props" } member && StripCasts(member.Expression!) == source;
+        }
+    }
+
+    /// <summary>
     /// Разбор всех видов member-биндингов, включая вложенные объектные инициализаторы
     /// (MemberMemberBinding: new Dto { Sub = { X = p.Props.N } }) и списковые (MemberListBinding).
     /// </summary>
-    private void CollectBindings(System.Collections.ObjectModel.ReadOnlyCollection<MemberBinding> bindings, List<FieldPathInfo> paths)
+    private void CollectBindings(System.Collections.ObjectModel.ReadOnlyCollection<MemberBinding> bindings, List<FieldPathInfo> paths, ParameterExpression? source)
     {
         foreach (var binding in bindings)
         {
             switch (binding)
             {
                 case MemberAssignment assignment:
-                    CollectFieldPaths(assignment.Expression, paths);
+                    CollectFieldPaths(assignment.Expression, paths, source);
                     break;
                 case MemberMemberBinding nested:
-                    CollectBindings(nested.Bindings, paths);
+                    CollectBindings(nested.Bindings, paths, source);
                     break;
                 case MemberListBinding list:
                     foreach (var init in list.Initializers)
                         foreach (var arg in init.Arguments)
-                            CollectFieldPaths(arg, paths);
+                            CollectFieldPaths(arg, paths, source);
                     break;
                 default:
                     throw new NotSupportedException(
@@ -317,7 +447,7 @@ public class ProjectionFieldExtractor
     /// <summary>
     /// Processes method calls: Select, Agg.Sum, Dictionary indexer, etc.
     /// </summary>
-    private void CollectFromMethodCall(MethodCallExpression methodExpr, List<FieldPathInfo> paths)
+    private void CollectFromMethodCall(MethodCallExpression methodExpr, List<FieldPathInfo> paths, ParameterExpression? source)
     {
         var methodName = methodExpr.Method.Name;
         var declaringType = methodExpr.Method.DeclaringType;
@@ -342,7 +472,7 @@ public class ProjectionFieldExtractor
         {
             foreach (var arg in methodExpr.Arguments)
             {
-                CollectFieldPaths(arg, paths);
+                CollectFieldPaths(arg, paths, source);
             }
             return;
         }
@@ -351,12 +481,12 @@ public class ProjectionFieldExtractor
         if (methodName == "Select" && methodExpr.Arguments.Count >= 1)
         {
             // Base collection
-            CollectFieldPaths(methodExpr.Arguments[0], paths);
+            CollectFieldPaths(methodExpr.Arguments[0], paths, source);
 
             // Lambda inside Select
             if (methodExpr.Arguments.Count >= 2 && methodExpr.Arguments[1] is LambdaExpression lambda)
             {
-                CollectFieldPaths(lambda.Body, paths);
+                CollectFieldPaths(lambda.Body, paths, source);
             }
             return;
         }
@@ -364,18 +494,18 @@ public class ProjectionFieldExtractor
         // LINQ ToList
         if (methodName == "ToList" && methodExpr.Arguments.Count >= 1)
         {
-            CollectFieldPaths(methodExpr.Arguments[0], paths);
+            CollectFieldPaths(methodExpr.Arguments[0], paths, source);
             return;
         }
 
         // Extension methods (FirstOrDefault, etc.)
         if (methodExpr.Object != null)
         {
-            CollectFieldPaths(methodExpr.Object, paths);
+            CollectFieldPaths(methodExpr.Object, paths, source);
         }
         foreach (var arg in methodExpr.Arguments)
         {
-            CollectFieldPaths(arg, paths);
+            CollectFieldPaths(arg, paths, source);
         }
     }
 
@@ -447,7 +577,11 @@ public class ProjectionFieldExtractor
     /// <summary>
     /// Adds structure_ids for path considering NESTED arrays
     /// </summary>
-    private void AddStructureIdsForPath(IRedbScheme scheme, FieldPathInfo pathInfo, HashSet<long> result)
+    /// <returns>
+    /// False when the first segment is not a structure of the scheme. Deeper segments may well be
+    /// missing: Name.Length or Date.Value.Year read a member of a loaded value, not a field.
+    /// </returns>
+    private bool AddStructureIdsForPath(IRedbScheme scheme, FieldPathInfo pathInfo, HashSet<long> result)
     {
         long? parentId = null;
 
@@ -458,7 +592,8 @@ public class ProjectionFieldExtractor
             var structure = scheme.Structures
                 .FirstOrDefault(s => s.Name == cleanName && s.IdParent == parentId);
 
-            if (structure == null) break;
+            if (structure == null)
+                return parentId != null;
 
             result.Add(structure.Id);
 
@@ -470,6 +605,8 @@ public class ProjectionFieldExtractor
 
             parentId = structure.Id;
         }
+
+        return true;
     }
 
     /// <summary>
@@ -559,7 +696,7 @@ public class ProjectionFieldExtractor
                 };
                 foreach (var arg in methodExpr.Arguments)
                 {
-                    var argPaths = ExtractFieldPaths(arg);
+                    var argPaths = ExtractFieldPaths(arg, source: null);
                     aggInfo.FieldPaths.AddRange(argPaths);
                 }
                 result.Add(aggInfo);

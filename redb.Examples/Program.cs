@@ -170,6 +170,12 @@ class Program
         // base dir. (Harmless for the Pro run — Pro never calls those functions.)
         SqliteDataSource.NativeExtensionPath ??= ResolveSqliteNativeExtension();
 
+        // SQLite reads through a 2 MB page cache per connection by default; on the seeded examples
+        // database (2.5 GB) that is what most of a query's time goes into. Map the file instead,
+        // and give each connection a moderate cache on top of the mapping.
+        SqliteDataSource.MmapSizeBytes = 4L * 1024 * 1024 * 1024;
+        SqliteDataSource.CacheSizeBytes = 64L * 1024 * 1024;
+
         // Pro is free from 3.3.0 — no license key required for the entire 3.x line.
         // Empty string = no key; set a JWT here only against a 4.x+ build that re-enables licensing.
         var TestLicense=@"";

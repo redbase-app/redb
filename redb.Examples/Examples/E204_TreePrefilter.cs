@@ -20,9 +20,9 @@ namespace redb.Examples.Examples;
 /// so the prefilter only starts paying once the subtree itself is large. Measured on a 6-level
 /// tree of 99200 nodes: 1189 -> 401 ms and 716677 -> 333755 buffers, identical result sets.
 ///
-/// Needs a tree with real depth under the Employee scheme. E203 seeds objects but leaves them
-/// flat; the tree used for the measurement above was built by re-parenting them into a 10-ary
-/// tree. Without depth this example still runs, it just measures very little.
+/// Needs a tree with real depth under the Employee scheme: E203 seeds one, employees arranged as a
+/// reporting tree with ten direct reports per manager. Without depth this example still runs, it
+/// just measures very little.
 ///
 /// The differential check here is by COUNT rather than by id set: a tree query over a large
 /// subtree returns tens of thousands of objects and materialising them all would dwarf the
@@ -37,21 +37,22 @@ public class E204_TreePrefilter : ExampleBase
     {
         var sw = Stopwatch.StartNew();
 
-        var enabled = Environment.GetEnvironmentVariable("REDB_PVT_PREFILTER") == "1";
+        // What the service actually runs with: Program.cs may set it without the environment variable.
+        var enabled = redb.Configuration.EnablePvtPrefilter;
 
         var root = await redb.TreeQuery<EmployeeProps>().WhereRoots().FirstOrDefaultAsync();
         if (root == null)
         {
             sw.Stop();
             return Fail("E204", "PVT prefilter in tree queries", ExampleTier.Pro, sw.ElapsedMilliseconds,
-                "No Employee tree found. Seed with E000/E203, then give the objects parents.");
+                "No Employee tree found. Seed one with E203.");
         }
 
         var log = new StringBuilder();
         var summary = new List<string>();
         var withPrefilter = 0;
 
-        log.AppendLine($"-- REDB_PVT_PREFILTER = {(enabled ? "1 (enabled)" : "<unset> (disabled)")}");
+        log.AppendLine($"-- EnablePvtPrefilter = {(enabled ? "true (enabled)" : "false (disabled)")}");
         log.AppendLine($"-- root id = {root.Id}");
         log.AppendLine();
 
@@ -161,14 +162,22 @@ public class E204_TreePrefilter : ExampleBase
 
         sw.Stop();
 
-        var output = new List<string>(summary)
+        // The run time above is the sum over all the queries of the example, each a count over the
+        // whole subtree of the root, so the count of queries comes first: without it the figure reads
+        // as one slow query.
+        var output = new List<string>
         {
-            $"Prefilter: {(enabled ? "ENABLED" : "disabled")}, applied in {withPrefilter} of 5 cases",
+            $"{summary.Count} queries in this example: SQL printed, then each counted over the subtree of root {root.Id}",
+            $"Prefilter: {(enabled ? "ENABLED" : "disabled")}, applied in {withPrefilter} of {summary.Count} cases"
+        };
+        output.AddRange(summary);
+        output.AddRange(new[]
+        {
             outPath != null ? $"Output: {outPath}" : "Output file: <not written>",
             "Diff tree_prefilter_off.txt against tree_prefilter_on.txt: counts must match exactly"
-        };
+        });
 
         return Ok("E204", "PVT prefilter in tree queries", ExampleTier.Pro,
-            sw.ElapsedMilliseconds, 5, output.ToArray());
+            sw.ElapsedMilliseconds, summary.Count, output.ToArray());
     }
 }

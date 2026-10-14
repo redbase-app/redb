@@ -115,9 +115,12 @@ public abstract class PvtPrefilterEquivalenceTestsBase
         {
             Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
 
+            // The prefilter lives in the aggregate form. A plain OrderByRedb(o => o.Id) now goes inside
+            // the streams form, so the ordering is an expression over Id, which still keeps the query
+            // on the aggregate form; the order is the same.
             var applied = await Redb.Query<EmployeeProps>()
                 .Where(e => e.Position.Contains("Developer") || e.Department.Contains("Engineering"))
-                .OrderByRedb(o => o.Id)
+                .OrderByRedb(o => o.Id + 0)
                 .Take(100)
                 .ToSqlStringAsync();
             applied.Should().Contain("-- PVT prefilter:",
@@ -133,7 +136,7 @@ public abstract class PvtPrefilterEquivalenceTestsBase
             var declined = await Redb.Query<EmployeeProps>()
                 .Where(e => e.Position.Contains("Developer"))
                 .OrderBy(e => e.Age)
-                .ThenByRedb(o => o.Id)
+                .ThenByRedb(o => o.Id + 0)
                 .Take(100)
                 .ToSqlStringAsync();
             declined.Should().Contain("PivotNotCovered",

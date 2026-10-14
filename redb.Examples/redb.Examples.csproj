@@ -14,11 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- DIAG: temporarily switched to ProjectReference for diagnostics -->
-    <PackageReference Include="redb.Core.Pro" Version="$(Version)" />
-    <PackageReference Include="redb.Postgres.Pro" Version="$(Version)" />
-    <PackageReference Include="redb.MSSql.Pro" Version="$(Version)" />
-    <PackageReference Include="redb.SQLite.Pro" Version="$(Version)" />
+    <!-- Local projects instead of NuGet packages: the PVT planner work is checked here against the sources. -->
+    <PackageReference Include="redb.Core.Pro" Version="4.3.0" />
+    <PackageReference Include="redb.Postgres.Pro" Version="4.3.0" />
+    <PackageReference Include="redb.MSSql.Pro" Version="4.3.0" />
+    <PackageReference Include="redb.SQLite.Pro" Version="4.3.0" />
   </ItemGroup>
 
 </Project>

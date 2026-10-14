@@ -193,7 +193,10 @@ BEGIN
     --          array), so "when"/"then"/"else" were harvested as field paths and the $field
     --          references inside the arms were never collected. The expression builder then
     --          could not resolve the field (silently NULL before 0.2.27, an error after).
-    RETURN N'0.2.28';
+    -- 0.2.29 - block 0: the indexes another index of the same table fully replaces are dropped,
+    --          the set PostgreSQL dropped in 0.7.13 (2026-10-14). The statements that bring them
+    --          back are in the comment above the DROP block of 00_module_init.sql.
+    RETURN N'0.2.29';
 END;
 GO
 

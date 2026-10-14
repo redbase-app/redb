@@ -446,8 +446,10 @@ CREATE INDEX idx_metadata_cache_key_type    ON _scheme_metadata_cache (_scheme_i
 -- equivalent; text pattern search to be revisited via FTS5).
 -- ============================================================================
 
-CREATE INDEX IF NOT EXISTS "IX__functions__schemes"  ON _functions  (_id_scheme);
-CREATE INDEX IF NOT EXISTS "IX__permissions__roles"  ON _permissions (_id_role);
+-- REMOVED (2026-10-14): "IX__functions__schemes" (_id_scheme) is the leading column of the UNIQUE constraint
+-- IX__functions_scheme_name (_id_scheme, _name); the constraint's index serves the same lookups.
+-- REMOVED (2026-10-14): "IX__permissions__roles" (_id_role) is the leading column of the UNIQUE constraint
+-- IX__permissions (_id_role, _id_user, ...).
 CREATE INDEX IF NOT EXISTS "IX__permissions__users"  ON _permissions (_id_user);
 CREATE INDEX IF NOT EXISTS "IX__permissions__ref"    ON _permissions (_id_ref);
 CREATE INDEX IF NOT EXISTS "IX__values__objects"     ON _values (_id_object);
@@ -492,7 +494,8 @@ CREATE INDEX IF NOT EXISTS "IX__objects__value_guid"     ON _objects (_value_gui
 CREATE INDEX IF NOT EXISTS "IX__objects__value_datetime" ON _objects (_value_datetime) WHERE _value_datetime IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_numeric"  ON _objects (_value_numeric)  WHERE _value_numeric  IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS "IX__dependencies__schemes_1" ON _dependencies (_id_scheme_1);
+-- REMOVED (2026-10-14): "IX__dependencies__schemes_1" (_id_scheme_1) is the leading column of the UNIQUE
+-- constraint IX__dependencies (_id_scheme_1, _id_scheme_2). The index on _id_scheme_2 below stays.
 CREATE INDEX IF NOT EXISTS "IX__dependencies__schemes_2" ON _dependencies (_id_scheme_2);
 CREATE INDEX IF NOT EXISTS "IX__structures__structures"  ON _structures (_id_parent);
 CREATE INDEX IF NOT EXISTS "IX__structures__schemes"     ON _structures (_id_scheme);
@@ -501,7 +504,8 @@ CREATE INDEX IF NOT EXISTS "IX__structures__lists"       ON _structures (_id_lis
 CREATE INDEX IF NOT EXISTS "IX__schemes__schemes"        ON _schemes (_id_parent);
 CREATE INDEX IF NOT EXISTS "IX__schemes__structure_hash" ON _schemes (_structure_hash);
 CREATE INDEX IF NOT EXISTS "IX__schemes__type"           ON _schemes (_type);
-CREATE INDEX IF NOT EXISTS "IX__users_roles__roles"      ON _users_roles (_id_role);
+-- REMOVED (2026-10-14): "IX__users_roles__roles" (_id_role) is the leading column of the UNIQUE constraint
+-- IX__users_roles (_id_role, _id_user).
 CREATE INDEX IF NOT EXISTS "IX__users_roles__users"      ON _users_roles (_id_user);
 
 CREATE INDEX IF NOT EXISTS "IX__users__id_configuration" ON _users (_id_configuration) WHERE _id_configuration IS NOT NULL;
@@ -522,8 +526,8 @@ CREATE INDEX IF NOT EXISTS "IX__structures__name"
     ON _structures (_name, _id, _id_type, _collection_type, _id_scheme);
 CREATE INDEX IF NOT EXISTS "IX__structures__id_lookup"
     ON _structures (_id, _id_type, _name, _collection_type, _id_scheme);
-CREATE INDEX IF NOT EXISTS "IX__structures__not_collection"
-    ON _structures (_id, _name, _id_scheme) WHERE _collection_type IS NULL;
+-- REMOVED (2026-10-14): "IX__structures__not_collection" (_id, _name, _id_scheme) WHERE _collection_type IS NULL
+-- is a prefix of IX__structures__not_collection_enhanced below, same predicate.
 CREATE INDEX IF NOT EXISTS "IX__structures__not_collection_enhanced"
     ON _structures (_id, _name, _id_scheme, _id_type) WHERE _collection_type IS NULL;
 CREATE INDEX IF NOT EXISTS "IX__structures__collection"
@@ -545,8 +549,8 @@ CREATE INDEX IF NOT EXISTS "IX__values__structure_object_lookup"
     ON _values (_id_structure, _id_object, _Long, _DateTimeOffset, _Boolean, _Double, _Guid, _Numeric, _ListItem, _Object);
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent"
     ON _objects (_id_scheme, _id_parent, _id);
-CREATE INDEX IF NOT EXISTS "IX__values__object_structure_array_index"
-    ON _values (_id_object, _id_structure, _array_index) WHERE _array_index IS NOT NULL;
+-- REMOVED (2026-10-14): "IX__values__object_structure_array_index" (_id_object, _id_structure, _array_index)
+-- WHERE _array_index IS NOT NULL is a prefix of IX__values__object_structure_lookup above, which has no predicate.
 
 -- Partial NOT NULL value indexes
 -- NOTE: unlike PostgreSQL there is NO length guard here, and that is deliberate.

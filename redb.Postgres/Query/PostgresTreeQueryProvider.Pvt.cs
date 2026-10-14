@@ -350,8 +350,12 @@ public partial class PostgresTreeQueryProvider
             + "'value_datetime', o._value_datetime,"
             + "'value_bytes', o._value_bytes,"
             + "'hash', o._hash"
-            + "))::text AS \"Value\""
-            + " FROM (" + inner + ") sub JOIN _objects o ON o._id = sub._id";
+            // The order of the inner query is carried explicitly. Aggregating over the join without
+            // ORDER BY kept it only while the planner happened to choose a nested loop; under a hash
+            // or merge join OrderBy on a tree query came back in whatever order the join produced.
+            + ") ORDER BY sub._rn)::text AS \"Value\""
+            + " FROM (SELECT ordered._id, row_number() OVER () AS _rn FROM (" + inner + ") ordered) sub"
+            + " JOIN _objects o ON o._id = sub._id";
 
         object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
         var orderByJson = context.Orderings.Count > 0
@@ -362,5 +366,27 @@ public partial class PostgresTreeQueryProvider
         if (hasOrder)
             return await _context.ExecuteScalarAsync<string>(sql, new object[] { filterParam, orderByJson! }, cancellationToken);
         return await _context.ExecuteScalarAsync<string>(sql, new object[] { filterParam }, cancellationToken);
+    }
+    /// <summary>
+    /// SQL preview of a tree query: the statement <c>pvt_build_query_sql</c> compiles for it, with
+    /// the values it binds listed above it. The base implementation asks the database for
+    /// <c>get_search_tree_sql_preview_base</c>, a function of the retired search module that this
+    /// provider no longer installs, so ToSqlStringAsync on a tree query failed with 42883.
+    /// </summary>
+    public override async Task<string> GetSqlPreviewAsync<TProps>(
+        TreeQueryContext<TProps> context, CancellationToken cancellationToken = default)
+    {
+        if (!ShouldRoutePvtTree(context, out var route))
+            return await base.GetSqlPreviewAsync(context, cancellationToken);
+
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: false, cancellationToken);
+        var orderByJson = context.Orderings.Count > 0 ? _facetBuilder.BuildOrderBy(context.Orderings) : null;
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("-- $1 (filter) = ").AppendLine(string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson);
+        if (!string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]")
+            sb.Append("-- $2 (order)  = ").AppendLine(orderByJson);
+        sb.Append(inner);
+        return sb.ToString();
     }
 }

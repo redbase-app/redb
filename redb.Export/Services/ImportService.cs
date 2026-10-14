@@ -44,11 +44,31 @@ public sealed class ImportService
     /// <param name="provider">An opened <see cref="IDataProvider"/>.</param>
     /// <param name="verbose">When <c>true</c>, progress is written to <see cref="Console"/>.</param>
     /// <param name="batchSize">Number of records per bulk-insert batch.</param>
-    public ImportService(IDataProvider provider, bool verbose, int batchSize)
+    private readonly int _parallelism;
+    private ParallelImportWriter? _writer;
+    private CountingStream? _progress;
+    private long _totalBytes;
+    private DateTime _loadStarted;
+
+    /// <param name="provider">Connection the import runs on.</param>
+    /// <param name="verbose">Print progress.</param>
+    /// <param name="batchSize">Rows per bulk insert.</param>
+    /// <param name="parallelism">
+    /// 1 (the default) keeps the whole import in one transaction on one connection. More than 1 writes
+    /// over that many connections and rebuilds the secondary indexes of the large tables afterwards;
+    /// see <see cref="IParallelImportProvider"/> for what is given up in exchange.
+    /// </param>
+    public ImportService(IDataProvider provider, bool verbose, int batchSize, int parallelism = 1)
     {
+        if (parallelism < 1)
+            throw new ArgumentOutOfRangeException(nameof(parallelism), "Parallelism must be at least 1.");
+        if (parallelism > 1 && provider is not IParallelImportProvider)
+            throw new NotSupportedException($"Parallel import is not available for the '{provider.Name}' provider.");
+
         _provider = provider;
         _verbose = verbose;
         _batchSize = batchSize;
+        _parallelism = parallelism;
     }
 
     /// <summary>
@@ -83,11 +103,17 @@ public sealed class ImportService
             var entry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(".jsonl"))
                 ?? throw new InvalidOperationException("No .jsonl file found in archive");
             dataStream = entry.Open();
+            _totalBytes = entry.Length;
         }
         else
         {
             dataStream = File.OpenRead(inputPath);
+            _totalBytes = new FileInfo(inputPath).Length;
         }
+
+        // Progress and the time estimate are told from how far into the file the reader is.
+        _progress = new CountingStream(dataStream);
+        dataStream = _progress;
 
         try
         {
@@ -118,6 +144,7 @@ public sealed class ImportService
             // integrity switched off (review 2026-09-24).
             await _provider.BeginImportAsync(ct);
             var committed = false;
+            var parallelFinished = false;
             try
             {
                 if (clean)
@@ -127,8 +154,29 @@ public sealed class ImportService
                     Log("Database cleaned.");
                 }
 
-                await _provider.DisableConstraintsAsync(ct);
+                IReadOnlyList<DroppedIndex> droppedIndexes = [];
+                if (_parallelism > 1)
+                {
+                    // From here on several connections write and commit on their own, so the cleaning is
+                    // committed first: there is no single transaction to roll back any more.
+                    var parallel = (IParallelImportProvider)_provider;
+                    await _provider.CommitImportAsync(ct);
+                    committed = true;
 
+                    droppedIndexes = await parallel.DropLoadIndexesAsync(ct);
+                    Log($"Took {droppedIndexes.Count} secondary indexes out for the load; they are rebuilt at the end.");
+
+                    await parallel.RelaxConstraintsForLoadAsync(ct);
+
+                    _writer = await ParallelImportWriter.StartAsync(parallel, _parallelism, ct);
+                    Log($"Writing over {_parallelism} connections.");
+                }
+                else
+                {
+                    await _provider.DisableConstraintsAsync(ct);
+                }
+
+                _loadStarted = DateTime.UtcNow;
                 var tables = CreateDataTables();
                 long sequenceValue = 0;
                 ExportFooter? footer = null;
@@ -251,14 +299,34 @@ public sealed class ImportService
                 if (_verbose && _lastTable != null)
                 {
                     _tableRowCounts.TryGetValue(_lastTable, out var lastCount);
-                    Console.WriteLine($"\r  {_lastTable}: {lastCount:N0} rows - done                    ");
+                    WriteProgressLine($"  {_lastTable}: {lastCount:N0} rows", final: true);
                 }
+
+                if (_writer != null)
+                    Console.WriteLine($"Data read in {(DateTime.UtcNow - _loadStarted):hh\\:mm\\:ss}; waiting for the writers, then the indexes are rebuilt.");
 
                 // The footer is the last line of every export: without it the file was cut short, and with it every
                 // table must have arrived in full. Checked before the commit, so a short file changes nothing.
-                VerifyAgainstFooter(footer, tables);
-
-                await _provider.EnableConstraintsAsync(ct);
+                if (_writer != null)
+                {
+                    await _writer.CompleteAsync();
+                    try
+                    {
+                        VerifyAgainstFooter(footer, tables);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        // The serial import says "nothing was imported" here; a parallel one has already written.
+                        throw new InvalidOperationException(
+                            ex.Message.Replace(" Nothing was imported; the database is unchanged.", "") +
+                            " The parallel import has already written its rows: run it again with --clean.", ex);
+                    }
+                }
+                else
+                {
+                    VerifyAgainstFooter(footer, tables);
+                    await _provider.EnableConstraintsAsync(ct);
+                }
 
                 if (sequenceValue > 0)
                 {
@@ -266,8 +334,21 @@ public sealed class ImportService
                     await _provider.SetSequenceValueAsync(sequenceValue, ct);
                 }
 
-                await _provider.CommitImportAsync(ct);
-                committed = true;
+                if (_writer != null)
+                {
+                    await RebuildIndexesAsync(droppedIndexes, ct);
+
+                    // After the indexes: checking foreign keys over the loaded rows wants them in place.
+                    var constraintsStarted = DateTime.UtcNow;
+                    await ((IParallelImportProvider)_provider).RestoreConstraintsAfterLoadAsync(ct);
+                    Log($"Constraints restored in {(DateTime.UtcNow - constraintsStarted):hh\\:mm\\:ss}.");
+                    parallelFinished = true;
+                }
+                else
+                {
+                    await _provider.CommitImportAsync(ct);
+                    committed = true;
+                }
 
                 _typesCount = tables.TypesTotal;
                 _listsCount = tables.ListsTotal;
@@ -283,6 +364,20 @@ public sealed class ImportService
             {
                 if (!committed)
                     await _provider.AbortImportAsync();
+
+                if (_writer != null)
+                {
+                    await _writer.DisposeAsync();
+                    _writer = null;
+                    if (!parallelFinished)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("The parallel import did not finish. The database holds part of the data, the secondary indexes");
+                        Console.WriteLine("of the large tables are out (dropped with their definitions kept in _import_dropped_indexes, or");
+                        Console.WriteLine("disabled, depending on the database), and foreign key checks may still be off.");
+                        Console.WriteLine("Run the import again with --clean and --parallel: it reloads the data and puts all of that back.");
+                    }
+                }
             }
 
             var duration = DateTime.UtcNow - startTime;
@@ -364,13 +459,21 @@ public sealed class ImportService
             if (_lastTable != null && _lastTable != tableName)
             {
                 _tableRowCounts.TryGetValue(_lastTable, out var prevCount);
-                Console.WriteLine($"\r  {_lastTable}: {prevCount:N0} rows                    ");
+                WriteProgressLine($"  {_lastTable}: {prevCount:N0} rows", final: true);
             }
             _lastTable = tableName;
-            Console.Write($"\r  {tableName}: {currentCount:N0} rows...                    ");
+            WriteProgressLine($"  {tableName}: {currentCount:N0} rows... {ProgressText()}", final: false);
         }
 
-        await _provider.BulkInsertAsync(tableName, table, ct);
+        if (_writer != null)
+        {
+            // The batch is handed over as a copy: the reader keeps filling this table while a worker sends that one.
+            await _writer.EnqueueAsync(tableName, table.Copy());
+        }
+        else
+        {
+            await _provider.BulkInsertAsync(tableName, table, ct);
+        }
         table.Clear();
     }
 
@@ -437,7 +540,110 @@ public sealed class ImportService
         Console.WriteLine($"  Values:      {values:N0}");
     }
 
+    /// <summary>
+    /// Index builds running at the same time, whatever the number of writer connections. Each build
+    /// sorts the whole table; more of them at once compete for the same disk and memory and finish
+    /// no sooner.
+    /// </summary>
+    private const int MaxConcurrentIndexBuilds = 5;
+
+    private int _progressLineLength;
+
+    /// <summary>
+    /// Writes the progress line over the previous one and blanks whatever the previous one left
+    /// beyond it. A final line ends with a newline; a running one is overwritten by the next.
+    /// </summary>
+    private void WriteProgressLine(string text, bool final)
+    {
+        var padding = Math.Max(0, _progressLineLength - text.Length);
+        Console.Write("\r" + text + new string(' ', padding));
+        if (final)
+        {
+            Console.WriteLine();
+            _progressLineLength = 0;
+        }
+        else
+        {
+            _progressLineLength = text.Length;
+        }
+    }
+
+    /// <summary>
+    /// How far into the file the reader is and how long the rest should take, from the bytes read so
+    /// far. It measures reading; in a parallel import the index rebuild comes on top and is timed
+    /// separately.
+    /// </summary>
+    private string ProgressText()
+    {
+        if (_progress == null || _totalBytes <= 0) return "";
+
+        var fraction = Math.Clamp((double)_progress.BytesRead / _totalBytes, 0d, 1d);
+        var elapsed = DateTime.UtcNow - _loadStarted;
+        if (fraction < 0.005 || elapsed.TotalSeconds < 2)
+            return $"data {fraction:P0}";
+
+        var remaining = TimeSpan.FromSeconds(elapsed.TotalSeconds * (1 - fraction) / fraction);
+        var indexes = _parallelism > 1 ? "; indexes follow" : "";
+        return $"data {fraction:P0}, {elapsed:hh\\:mm\\:ss} elapsed, about {remaining:hh\\:mm\\:ss} left{indexes}";
+    }
+
+    /// <summary>
+    /// Builds the indexes again, several at a time: one statement per connection. Where the
+    /// database lets index builds on one table run side by side, any free connection takes the next
+    /// index; where it does not, each table gets one connection and its indexes go in turn.
+    /// </summary>
+    private async Task RebuildIndexesAsync(IReadOnlyList<DroppedIndex> indexes, CancellationToken ct)
+    {
+        var parallel = (IParallelImportProvider)_provider;
+        if (indexes.Count == 0)
+        {
+            await parallel.ForgetDroppedIndexesAsync(ct);
+            return;
+        }
+
+        Console.WriteLine();
+        // One queue for everything, or one queue per table.
+        List<System.Collections.Concurrent.ConcurrentQueue<DroppedIndex>> queues = parallel.BuildsIndexesOfOneTableConcurrently
+            ? [new System.Collections.Concurrent.ConcurrentQueue<DroppedIndex>(indexes)]
+            : indexes.GroupBy(i => i.Table)
+                .Select(g => new System.Collections.Concurrent.ConcurrentQueue<DroppedIndex>(g))
+                .ToList();
+
+        var connections = _writer!.Connections.Take(MaxConcurrentIndexBuilds).ToList();
+        var builders = parallel.BuildsIndexesOfOneTableConcurrently
+            ? connections.Select(c => (Connection: c, Queue: queues[0])).ToList()
+            : connections.Zip(queues, (c, q) => (Connection: c, Queue: q)).ToList();
+        if (builders.Count < queues.Count)
+            throw new InvalidOperationException(
+                $"{queues.Count} tables have indexes to rebuild and only {builders.Count} connections are open; raise --parallel.");
+
+        Console.WriteLine($"Rebuilding {indexes.Count} indexes, {builders.Count} at a time...");
+
+        var started = DateTime.UtcNow;
+        var done = 0;
+
+        async Task BuildAsync((IDataProvider Connection, System.Collections.Concurrent.ConcurrentQueue<DroppedIndex> Queue) work)
+        {
+            var builder = (IParallelImportProvider)work.Connection;
+            var pending = work.Queue;
+            while (pending.TryDequeue(out var index))
+            {
+                var indexStarted = DateTime.UtcNow;
+                await builder.CreateIndexAsync(index, ct);
+                var finished = Interlocked.Increment(ref done);
+                Console.WriteLine(
+                    $"  [{finished}/{indexes.Count}] {index.Table}.{index.Name}  {(DateTime.UtcNow - indexStarted):hh\\:mm\\:ss}");
+            }
+        }
+
+        await Task.WhenAll(builders.Select(BuildAsync));
+        await parallel.ForgetDroppedIndexesAsync(ct);
+
+        Console.WriteLine($"Indexes rebuilt in {(DateTime.UtcNow - started):hh\\:mm\\:ss}.");
+    }
+
     private void Log(string message)
+
     {
         if (_verbose) Console.WriteLine(message);
     }

@@ -73,6 +73,36 @@ UPDATE _scheme_metadata_cache c SET _unique_scope = s._unique_scope, _tags = s._
 CREATE INDEX IF NOT EXISTS "IX__values__ListItem_not_null" ON _values (_ListItem) WHERE _ListItem IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__values__Object_not_null"   ON _values (_Object)   WHERE _Object   IS NOT NULL;
 
+-- Index cleanup (0.7.13, 2026-10-12): indexes another index of the same table fully replaces. They
+-- were removed from redbPostgre.sql, but that file only ever runs CREATE INDEX IF NOT EXISTS on a
+-- new database, so an existing one keeps them until they are dropped here.
+--   IX__values__object_structure_array_index - same key as IX__values__object_structure_lookup,
+--       which has no predicate and carries the values in INCLUDE.
+--   ix__objects_parent_scheme - commented out of the schema long ago; left behind on older
+--       databases. Same key and predicate as IX__objects__parent_id_descendant_lookup.
+--   the rest - a single column that is the leading column of a UNIQUE constraint or of a wider
+--       index with the same predicate.
+-- DROP INDEX takes a short exclusive lock on the table; none of these is read by any plan that
+-- the replacing index cannot serve.
+DROP INDEX IF EXISTS "IX__values__object_structure_array_index";
+DROP INDEX IF EXISTS ix__objects_parent_scheme;
+DROP INDEX IF EXISTS "IX__functions__schemes";
+DROP INDEX IF EXISTS "IX__permissions__roles";
+DROP INDEX IF EXISTS "IX__dependencies__schemes_1";
+DROP INDEX IF EXISTS "IX__users_roles__roles";
+DROP INDEX IF EXISTS "IX__structures__not_collection";
+
+-- Stock value index retired (0.7.14, 2026-10-12). It and the covering index of the streams form
+-- (IX__values__structure_object_scalar, redb.Postgres.Pro/Sql/pvt_streams_indexes.sql) were two
+-- indexes of the same size over the same rows; the queries read the covering one and the
+-- object-led ones. Measured before retiring it: only the row prefilter over a dictionary item or
+-- a number got slower, falling back to IX__values__structures (27 -> 52 ms, 3 -> 7 ms).
+-- IF QUERIES GOT SLOWER AFTER THIS UPGRADE, put it back, CONCURRENTLY so that writes go on:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX__values__structure_object_lookup"
+--   ON _values (_id_structure, _id_object, _Long, _DateTimeOffset, _Boolean, _Double, _Guid, _Numeric, _ListItem, _Object);
+-- This file drops it again whenever the module version changes, so report the case.
+DROP INDEX IF EXISTS "IX__values__structure_object_lookup";
+
 -- ---------- 1. System infrastructure check ------------------------------
 DO $$
 BEGIN

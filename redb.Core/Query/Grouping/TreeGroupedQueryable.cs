@@ -80,7 +80,10 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
         var windowSpec = new GroupedWindowSpec<TKey, TProps>();
         windowConfig(windowSpec);
         return new TreeGroupedWindowedQueryable<TKey, TProps>(
-            _treeProvider, _treeContext, _keySelector, windowSpec);
+            _treeProvider, _treeContext, _keySelector, windowSpec)
+        {
+            IsBaseFieldGrouping = _isBaseFieldGrouping
+        };
     }
 
     /// <inheritdoc />

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>RedbBlazor</RootNamespace>
     <!-- One place for the RedBase version used by this project. -->
-    <RedbVersion>4.2.2</RedbVersion>
+    <RedbVersion>4.3.0</RedbVersion>
   </PropertyGroup>
 
   <ItemGroup>

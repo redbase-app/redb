@@ -1812,6 +1812,7 @@ public class TreeQueryContext<TProps> : QueryContext<TProps> where TProps : clas
             ProjectedStructureIds = ProjectedStructureIds,
             ProjectedFieldPaths = ProjectedFieldPaths,
             SkipPropsLoading = SkipPropsLoading,
+            ProjectionReadsNoProps = ProjectionReadsNoProps,
             PropsDepth = PropsDepth
         };
 

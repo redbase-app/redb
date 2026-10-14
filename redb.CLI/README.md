@@ -1,6 +1,7 @@
 # REDB CLI
 
-Command-line tool for REDB database management: schema creation, data export and import.
+Command-line tool for REDB database management: schema creation, data export and import, and
+unfolding redb objects into ordinary relational tables.
 
 ## Installation
 
@@ -109,6 +110,93 @@ redb import -p mssql -c "..." -i backup.redb --dry-run
 | `--dry-run` | | No | Show what would be done without execution |
 | `--verbose` | `-v` | No | Enable verbose output |
 
+### `flat` — Unfold Objects into Relational Tables
+
+Builds ordinary relational tables from your `*Props` classes and copies the data of a redb database
+into them. Use it to hand data to reporting and BI tools, to another system, or to read it with plain
+SQL or any ORM. The transfer is one-way: the flat tables are a copy, changes made to them do not go
+back to redb.
+
+Source and target are two independent connections. They may be the same provider or different ones,
+and the target may be the source database itself.
+
+```bash
+# Print the DDL of the flat tables. No database is opened.
+redb flat -a MyApp/bin/Release/net10.0/MyApp.Models.dll -tp postgres --ddl-only
+
+# Unfold and copy, PostgreSQL -> PostgreSQL
+redb flat -a MyApp/bin/Release/net10.0/MyApp.Models.dll \
+  -sp postgres -sc "Host=localhost;Database=redb;Username=postgres;Password=pass" \
+  -tp postgres -tc "Host=localhost;Database=redb_flat;Username=postgres;Password=pass" \
+  --batch-size 10000 -v
+
+# Props classes spread over several projects, target on another provider
+redb flat -a App.Orders.dll App.Catalog.dll --types OrderProps,ProductProps \
+  -sp postgres -sc "..." -tp mssql -tc "..."
+```
+
+| Option | Alias | Required | Description |
+|--------|-------|----------|-------------|
+| `--assembly` | `-a` | Yes | Path to an assembly that declares Props classes. Several paths may be given, or the option repeated |
+| `--target-provider` | `-tp` | Yes | Provider of the target database: `postgres`, `mssql`, `sqlite` |
+| `--target-connection` | `-tc` | Unless `--ddl-only` | Connection string of the database that receives the flat tables |
+| `--source-provider` | `-sp` | Unless `--ddl-only` | Provider of the redb database to read |
+| `--source-connection` | `-sc` | Unless `--ddl-only` | Connection string of the redb database to read |
+| `--types` | | No | Props classes to unfold, by name or full name (comma-separated). Default: every class marked with `[RedbScheme]` in the given assemblies |
+| `--ddl-only` | | No | Print the DDL for the target provider and exit |
+| `--batch-size` | | No | Rows buffered per table before a bulk insert (default: 1000) |
+| `--verbose` | `-v` | No | Enable verbose output |
+
+#### Before you run it
+
+- **The target database must exist and must not contain the flat tables.** The tool creates tables,
+  it does not create the database, and it never uses `IF NOT EXISTS`: a name that is already taken
+  stops the run.
+- **Point `-a` at the build output of your application** (`bin/...`), where all its assemblies lie
+  together. The dependencies of each assembly are resolved from the folder it lies in.
+- **A class without `[RedbScheme]` has to be named in `--types`.**
+- **A type referenced through `RedbObject<T>` must be part of the run.** The reference becomes a
+  foreign key to the table of `T`; if `T` is not exported the tool refuses before writing anything.
+- **The scheme must match the class.** A property with no structure in the source database stops the
+  run: synchronise the scheme with the current version of the class first.
+- Everything is written in one transaction of the target. After an error the target is left as it was.
+
+#### What you get
+
+| In your Props | In the target database |
+|---|---|
+| Every object of the source | A row in `objects`: id, parent, owner, dates, name, note and the `_value_*` columns |
+| A Props class | A table named after the class (`EmployeeProps`), one row per object, keyed by the object id |
+| A scalar property | A column named after the property |
+| A nested class | A table named by the property path (`EmployeeProps.HomeAddress`), one-to-one with its owner |
+| An array or list | A table (`EmployeeProps.Skills`) with `_idx` and either `_value` or the columns of the element class |
+| A dictionary | A table with `_key` and either `_value` or the columns of the value class |
+| A dictionary with a tuple key | The same, with one column per component: `_key_Item1`, `_key_Item2`, ... |
+| `RedbObject<T>` | A column holding the id of the target object, with a foreign key to the table of `T` |
+| `RedbListItem` | A column holding the list item id; the lists themselves are copied to `lists` and `list_items` |
+| A tree | `objects._id_parent`, a foreign key to `objects`; parents and children of different schemes are supported |
+
+Rules that apply everywhere:
+
+- Names are taken from the code as they are and are always quoted, so in PostgreSQL they are
+  case-sensitive: `SELECT "FirstName" FROM "EmployeeProps"`.
+- Service columns start with an underscore: `_id`, `_owner_id`, `_idx`, `_key`, `_value`.
+- A name longer than 63 bytes is cut and gets `~` plus eight hex digits of a hash, the same on every
+  provider.
+- Ids are kept: a row in a scheme table has the id of its object.
+- Hashes and unique-key columns of redb are not copied.
+- Users, roles and permissions are not copied.
+
+#### Limitations
+
+- An empty collection and a missing one look the same in the flat tables: neither has rows.
+- SQL Server: a `TimeSpan` is stored as `time` and cannot hold 24 hours or more; a text dictionary
+  key is limited to 430 characters.
+- SQL Server as a source is read under `SNAPSHOT` isolation, which has to be allowed in that database.
+- SQLite as both source and target in one file needs the file in WAL mode.
+- Soft-deleted objects are present in `objects`. A `RedbObject<T>` reference that still points to one
+  cannot get its foreign key, and the run is rolled back.
+
 ## Supported Providers
 
 | Provider | Aliases | Connection String Example |
@@ -153,6 +241,21 @@ redb export -p postgres -c "..." -o "backup_$(date +%Y%m%d).redb" --compress
 
 # Restore (clean + import)
 redb import -p postgres -c "..." -i backup_20260213.redb --clean -v
+```
+
+### Flat Tables for Reporting
+
+```bash
+# 1. Create an empty target database
+createdb myapp_flat
+
+# 2. Review the tables that will be created
+redb flat -a MyApp/bin/Release/net10.0/MyApp.Models.dll -tp postgres --ddl-only
+
+# 3. Unfold and copy
+redb flat -a MyApp/bin/Release/net10.0/MyApp.Models.dll \
+  -sp postgres -sc "Host=localhost;Database=myapp;..." \
+  -tp postgres -tc "Host=localhost;Database=myapp_flat;..." -v
 ```
 
 ## Exit Codes

@@ -193,8 +193,20 @@ public sealed class SqliteProvider : IDataProvider
         {
             for (int i = 0; i < columns.Length; i++)
             {
-                var value = row[i];
-                parameters[i].Value = value is null or DBNull ? DBNull.Value : value;
+                parameters[i].Value = row[i] switch
+                {
+                    null or DBNull => DBNull.Value,
+                    // The driver would bind a date as TEXT. redb's SQLite schema keeps dates as a
+                    // UTC Julian day (REAL) and the provider compares them as numbers, so a TEXT
+                    // date matches no date filter and sorts as a string.
+                    DateTimeOffset moment => SqliteJulianDay.ToJulian(moment),
+                    DateTime moment => SqliteJulianDay.ToJulian(new DateTimeOffset(DateTime.SpecifyKind(moment, DateTimeKind.Utc))),
+                    // Same reason, same cure as the redb SQLite provider: the driver binds a decimal
+                    // as TEXT, _Numeric and _value_numeric are REAL, and a REAL never compares equal
+                    // to, and always sorts before, a TEXT.
+                    decimal number => (double)number,
+                    var value => value
+                };
             }
             await cmd.ExecuteNonQueryAsync(ct);
         }
@@ -206,12 +218,12 @@ public sealed class SqliteProvider : IDataProvider
         }
     }
 
-    /// <summary>
-    /// Executes a non-query statement on the open connection.
-    /// </summary>
-    private async Task ExecuteAsync(string sql, CancellationToken ct)
+    /// <inheritdoc />
+    public async Task ExecuteAsync(string sql, CancellationToken ct = default)
     {
-        await using var cmd = _connection!.CreateCommand();
+        if (_connection is null) throw new InvalidOperationException("Connection not opened. Call OpenAsync first.");
+
+        await using var cmd = _connection.CreateCommand();
         cmd.Transaction = _transaction;
         cmd.CommandText = sql;
         await cmd.ExecuteNonQueryAsync(ct);
@@ -225,6 +237,23 @@ public sealed class SqliteProvider : IDataProvider
             await _connection.DisposeAsync();
         }
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Decoded here, not by the driver: the driver's own Julian conversion returns a date of
+    /// unspecified kind and keeps sub-millisecond noise of the REAL, while the redb SQLite provider
+    /// reads the number as UTC rounded to the millisecond. A database filled by an earlier import
+    /// holds these columns as TEXT; that form is read too.
+    /// </remarks>
+    public DateTimeOffset ReadDateTimeOffset(DbDataReader reader, int ordinal) => reader.GetValue(ordinal) switch
+    {
+        double julian => SqliteJulianDay.FromJulian(julian),
+        long julian => SqliteJulianDay.FromJulian(julian),
+        string text => DateTimeOffset.Parse(text, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal),
+        var other => throw new InvalidOperationException(
+            $"Unexpected date column representation: {other.GetType().Name}")
+    };
 
     /// <inheritdoc />
     /// <remarks>

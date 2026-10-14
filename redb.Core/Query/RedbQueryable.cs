@@ -225,10 +225,40 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         return (List<RedbObject<TProps>>)result;
     }
 
+    /// <summary>
+    /// Number of rows <see cref="ToListAsync"/> of the same query returns, Take and Skip included.
+    /// The providers count the filtered set and leave paging out, so <c>Take(10).CountAsync()</c>
+    /// used to answer with the size of the whole set. The set is counted without paging and the
+    /// page is cut from that number here, the same way for every provider.
+    /// </summary>
     public virtual async Task<int> CountAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsPaged(_context))
+            return await CountWholeSetAsync(cancellationToken);
+
+        var unpaged = _context.Clone();
+        unpaged.Limit = null;
+        unpaged.Offset = null;
+        var total = await new RedbQueryable<TProps>(_provider, unpaged, _filterParser, _orderingParser, _facetBuilder)
+            .CountWholeSetAsync(cancellationToken);
+        return PagedCount(total, _context.Offset, _context.Limit);
+    }
+
+    /// <summary>Count as the provider computes it: the filtered set, whatever Take and Skip say.</summary>
+    private protected async Task<int> CountWholeSetAsync(CancellationToken cancellationToken)
     {
         var result = await _provider.ExecuteAsync(BuildCountExpression(), typeof(int), cancellationToken: cancellationToken);
         return (int)result;
+    }
+
+    internal static bool IsPaged(QueryContext<TProps> context)
+        => context.Limit != null || (context.Offset ?? 0) > 0;
+
+    /// <summary>Rows left of <paramref name="total"/> after skipping and taking.</summary>
+    internal static int PagedCount(int total, int? offset, int? limit)
+    {
+        var afterSkip = Math.Max(0, total - (offset ?? 0));
+        return limit is { } take ? Math.Min(take, afterSkip) : afterSkip;
     }
 
     public virtual async Task<RedbObject<TProps>?> FirstOrDefaultAsync(CancellationToken cancellationToken = default)
@@ -250,8 +280,14 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
 
     public virtual async Task<bool> AnyAsync(CancellationToken cancellationToken = default)
     {
-        var count = await CountAsync(cancellationToken: cancellationToken);
-        return count > 0;
+        // A paged query has rows only if the page has: Take(0) has none, Skip(n) only past the n-th.
+        if (IsPaged(_context))
+            return await CountAsync(cancellationToken) > 0;
+
+        // Asked of the provider as its own operation: one that can stop at the first match does
+        // not have to count the whole set. The provider default is still "count is above zero".
+        var result = await _provider.ExecuteAsync(BuildCountExpression(), typeof(bool), cancellationToken: cancellationToken);
+        return (bool)result;
     }
 
     public virtual async Task<bool> AnyAsync(Expression<Func<TProps, bool>> predicate, CancellationToken cancellationToken = default)
@@ -328,12 +364,17 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         if (predicate == null)
             throw new ArgumentNullException(nameof(predicate));
 
-        // All() == true if all records satisfy the condition
-        var totalCount = await CountAsync(cancellationToken: cancellationToken);
+        // All() == true if all records satisfy the condition.
+        // Both counts are of the whole filtered set: two counts cut to the same page size would
+        // come out equal whenever enough rows match, whether or not all of them do.
+        var totalCount = await CountWholeSetAsync(cancellationToken);
         if (totalCount == 0)
             return true; // All elements of empty set satisfy any condition
 
-        var matchingCount = await Where(predicate).CountAsync(cancellationToken: cancellationToken);
+        var matching = Where(predicate);
+        var matchingCount = matching is RedbQueryable<TProps> flat
+            ? await flat.CountWholeSetAsync(cancellationToken)
+            : await matching.CountAsync(cancellationToken: cancellationToken);
         return totalCount == matchingCount;
     }
 
@@ -373,6 +414,9 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
             _context.ProjectedStructureIds = projectedStructureIds;
         }
 
+        // An empty set is an answer of its own: the selector reads base fields only.
+        _context.ProjectionReadsNoProps = projectedStructureIds is { Count: 0 };
+
         if (skipPropsLoading)
         {
             // FIX: Skip BOTH Props loading AND lazy loader setup.
@@ -386,6 +430,15 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         var result = await _provider.ExecuteAsync(BuildExpression(), typeof(List<RedbObject<TProps>>), cancellationToken: cancellationToken);
         return (List<RedbObject<TProps>>)result;
     }
+
+    /// <summary>
+    /// A copy of this query for a projection to configure and run. The projection writes its
+    /// settings (fields to load, skipping of Props) into the context; written into the query itself
+    /// they stayed there, and the same query run again as ToListAsync returned objects with part
+    /// of their Props.
+    /// </summary>
+    internal virtual RedbQueryable<TProps> CloneForProjection()
+        => new RedbQueryable<TProps>(_provider, _context.Clone(), _filterParser, _orderingParser, _facetBuilder);
 
     /// <summary>
     /// Scheme ID for access from projections
@@ -637,7 +690,29 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         return await _provider.ExecuteDeleteAsync(_context.SchemeId, _context.Filter, cancellationToken: cancellationToken);
     }
 
-    // ===== AGGREGATIONS (EAV) =====
+    // ===== AGGREGATIONS =====
+
+    // Every aggregate method below ends in one of these three provider calls. They are the seam a
+    // derived queryable overrides to aggregate over its own object set: a tree query has to range
+    // over its subtree, and the flat provider calls know nothing but the scheme.
+
+    /// <summary>One aggregate over a Props field of the objects this query selects.</summary>
+    protected virtual Task<decimal?> ExecuteAggregateCoreAsync(
+        string fieldPath, Aggregation.AggregateFunction function, CancellationToken cancellationToken)
+        => _provider.ExecuteAggregateAsync(_context.SchemeId, fieldPath, function, _context.Filter, cancellationToken: cancellationToken);
+
+    /// <summary>Several aggregates in one statement over the objects this query selects.</summary>
+    protected virtual Task<Aggregation.AggregateResult> ExecuteAggregateBatchCoreAsync(
+        IEnumerable<Aggregation.AggregateRequest> requests, CancellationToken cancellationToken)
+        => _provider.ExecuteAggregateBatchAsync(_context.SchemeId, requests, _context.Filter, cancellationToken: cancellationToken);
+
+    /// <summary>Grouped aggregates; with no group fields, one row over the objects this query selects.</summary>
+    protected virtual Task<JsonDocument?> ExecuteGroupedAggregateCoreAsync(
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        CancellationToken cancellationToken)
+        => _provider.ExecuteGroupedAggregateAsync(_context.SchemeId, groupFields, aggregations, _context.Filter, cancellationToken: cancellationToken);
+
 
     public virtual async Task<decimal> SumAsync<TField>(Expression<Func<TProps, TField>> selector, CancellationToken cancellationToken = default)
         where TField : struct
@@ -645,11 +720,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         var fieldPath = ExtractFieldPath(selector);
 
         // Pass FilterExpression directly (Pro uses it, Free falls back to facet-JSON)
-        var result = await _provider.ExecuteAggregateAsync(
-            _context.SchemeId,
-            fieldPath,
-            Aggregation.AggregateFunction.Sum,
-            _context.Filter, cancellationToken: cancellationToken);
+        var result = await ExecuteAggregateCoreAsync(fieldPath, Aggregation.AggregateFunction.Sum, cancellationToken);
 
         return result ?? 0m;
     }
@@ -660,11 +731,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         var fieldPath = ExtractFieldPath(selector);
 
         // Pass FilterExpression directly (Pro uses it, Free falls back to facet-JSON)
-        var result = await _provider.ExecuteAggregateAsync(
-            _context.SchemeId,
-            fieldPath,
-            Aggregation.AggregateFunction.Average,
-            _context.Filter, cancellationToken: cancellationToken);
+        var result = await ExecuteAggregateCoreAsync(fieldPath, Aggregation.AggregateFunction.Average, cancellationToken);
 
         return result ?? 0m;
     }
@@ -675,11 +742,7 @@ where TField : struct
         var fieldPath = ExtractFieldPath(selector);
 
         // Pass FilterExpression directly (Pro uses it, Free falls back to facet-JSON)
-        var result = await _provider.ExecuteAggregateAsync(
-            _context.SchemeId,
-            fieldPath,
-            Aggregation.AggregateFunction.Min,
-            _context.Filter, cancellationToken: cancellationToken);
+        var result = await ExecuteAggregateCoreAsync(fieldPath, Aggregation.AggregateFunction.Min, cancellationToken);
 
         if (result == null) return null;
         return (TField)Utils.TemporalDecoder.ChangeType(result.Value, typeof(TField));
@@ -691,11 +754,7 @@ where TField : struct
         var fieldPath = ExtractFieldPath(selector);
 
         // Pass FilterExpression directly (Pro uses it, Free falls back to facet-JSON)
-        var result = await _provider.ExecuteAggregateAsync(
-            _context.SchemeId,
-            fieldPath,
-            Aggregation.AggregateFunction.Max,
-            _context.Filter, cancellationToken: cancellationToken);
+        var result = await ExecuteAggregateCoreAsync(fieldPath, Aggregation.AggregateFunction.Max, cancellationToken);
 
         if (result == null) return null;
         return (TField)Utils.TemporalDecoder.ChangeType(result.Value, typeof(TField));
@@ -723,8 +782,7 @@ where TField : struct
 
         // Pass FilterExpression directly: Pro's filterJson grouped-overload drops the filter and
         // aggregates the whole scheme (same defect fixed in AggregateAsync). Free converts it to facet-JSON.
-        var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, _context.Filter, cancellationToken: cancellationToken);
+        var jsonResult = await ExecuteGroupedAggregateCoreAsync(groupFields, aggregations, cancellationToken);
 
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
@@ -760,8 +818,7 @@ where TField : struct
         }};
 
         // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
-        var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, _context.Filter, cancellationToken: cancellationToken);
+        var jsonResult = await ExecuteGroupedAggregateCoreAsync(groupFields, aggregations, cancellationToken);
 
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
@@ -792,8 +849,7 @@ where TField : struct
         }};
 
         // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
-        var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, _context.Filter, cancellationToken: cancellationToken);
+        var jsonResult = await ExecuteGroupedAggregateCoreAsync(groupFields, aggregations, cancellationToken);
 
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
@@ -823,8 +879,7 @@ where TField : struct
         }};
 
         // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
-        var jsonResult = await _provider.ExecuteGroupedAggregateAsync(
-            _context.SchemeId, groupFields, aggregations, _context.Filter, cancellationToken: cancellationToken);
+        var jsonResult = await ExecuteGroupedAggregateCoreAsync(groupFields, aggregations, cancellationToken);
 
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)
         {
@@ -858,7 +913,7 @@ where TField : struct
 
         // Pass FilterExpression directly: Pro's filterJson batch-overload drops the filter (whole-scheme
         // stats). Same fix as AggregateAsync; Free converts to facet-JSON.
-        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, _context.Filter, cancellationToken: cancellationToken);
+        var batchResult = await ExecuteAggregateBatchCoreAsync(requests, cancellationToken);
 
         return new Aggregation.FieldStatistics<TField>
         {
@@ -886,12 +941,13 @@ where TField : struct
         {
             FieldPath = agg.FieldPath,
             Function = agg.Function,
-            Alias = agg.PropertyName
+            Alias = agg.PropertyName,
+            IsBaseField = agg.IsBaseField
         });
 
         // BUG FIX: pass the FilterExpression directly so providers that only
         // honour the typed overload (e.g. Pro) don't silently drop the outer Where.
-        var batchResult = await _provider.ExecuteAggregateBatchAsync(schemeId, requests, _context.Filter, cancellationToken: cancellationToken);
+        var batchResult = await ExecuteAggregateBatchCoreAsync(requests, cancellationToken);
 
         // Build result
         return BuildAggregateResult<TResult>(selector, batchResult.Values);
@@ -900,10 +956,10 @@ where TField : struct
     /// <summary>
     /// Parses AggregateAsync expression and extracts aggregations
     /// </summary>
-    private List<(string PropertyName, string FieldPath, Aggregation.AggregateFunction Function)> ParseAggregateExpression<TResult>(
+    private List<(string PropertyName, string FieldPath, Aggregation.AggregateFunction Function, bool IsBaseField)> ParseAggregateExpression<TResult>(
         Expression<Func<RedbObject<TProps>, TResult>> selector)
     {
-        var result = new List<(string PropertyName, string FieldPath, Aggregation.AggregateFunction Function)>();
+        var result = new List<(string PropertyName, string FieldPath, Aggregation.AggregateFunction Function, bool IsBaseField)>();
 
         if (selector.Body is NewExpression newExpr)
         {
@@ -927,12 +983,14 @@ where TField : struct
 
                     // Extract field path
                     string fieldPath = "*"; // for Count()
+                    var isBaseField = false;
                     if (methodCall.Arguments.Count > 0)
                     {
                         fieldPath = ExtractFieldPathFromExpression(methodCall.Arguments[0]);
+                        isBaseField = Aggregation.AggregateRequest.ReadsObjectField(methodCall.Arguments[0]);
                     }
 
-                    result.Add((propName, fieldPath, function));
+                    result.Add((propName, fieldPath, function, isBaseField));
                 }
             }
         }
@@ -966,7 +1024,7 @@ where TField : struct
         });
 
         // Pass FilterExpression directly (Pro drops filterJson here — see SumRedbAsync).
-        var jsonResult = await _provider.ExecuteGroupedAggregateAsync(schemeId, groupFields, requests, _context.Filter, cancellationToken: cancellationToken);
+        var jsonResult = await ExecuteGroupedAggregateCoreAsync(groupFields, requests, cancellationToken);
 
         // Parse result (first row, since no grouping)
         if (jsonResult != null && jsonResult.RootElement.GetArrayLength() > 0)

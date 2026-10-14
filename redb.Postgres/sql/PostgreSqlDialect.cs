@@ -1285,7 +1285,7 @@ public class PostgreSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
     // Bump together with the literal in redb.Postgres/sql/v2-pvt/99_module_version.sql.
-    public string? Query_PvtRequiredVersion() => "0.7.12";
+    public string? Query_PvtRequiredVersion() => "0.7.14";
 
     // ============================================================
     // Native PVT projection orchestrator (pvt_build_projection_sql).

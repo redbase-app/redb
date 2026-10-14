@@ -146,14 +146,21 @@ public class E201_NullCheckBaseIdAmbiguity : ExampleBase
 
         sw.Stop();
 
-        var output = new List<string>(summary)
+        // The run time above is the sum over all the queries of the example, each printed and then
+        // executed, so the count comes first: without it the figure reads as one slow query.
+        var output = new List<string>
+        {
+            $"{summary.Count} queries in this example: SQL printed, then each executed"
+        };
+        output.AddRange(summary);
+        output.AddRange(new[]
         {
             $"Suspect cases: {suspects} (expected 1: the repro)",
             outPath != null ? $"Output: {outPath}" : "Output file: <not written>",
             "Report: docs/BUG_PVT_NULLCHECK_AMBIGUOUS_ID.md"
-        };
+        });
 
         return Ok("E201", "NullCheck + base Id: ambiguous _id in PVT CTE", ExampleTier.Pro,
-            sw.ElapsedMilliseconds, 4, output.ToArray());
+            sw.ElapsedMilliseconds, summary.Count, output.ToArray());
     }
 }

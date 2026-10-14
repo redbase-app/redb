@@ -413,7 +413,8 @@ GO
 -- =====================================================
 
 -- Users/Roles indexes
-CREATE INDEX [IX__users_roles__roles] ON [dbo].[_users_roles]([_id_role])
+-- REMOVED (2026-10-14): [IX__users_roles__roles] (_id_role) is the leading column of the UNIQUE
+-- constraint IX__users_roles (_id_role, _id_user).
 CREATE INDEX [IX__users_roles__users] ON [dbo].[_users_roles]([_id_user])
 CREATE INDEX [IX__users__id_configuration] ON [dbo].[_users]([_id_configuration]) WHERE [_id_configuration] IS NOT NULL
 CREATE INDEX [IX__users__name] ON [dbo].[_users]([_name])
@@ -437,8 +438,8 @@ CREATE INDEX [IX__structures__lists] ON [dbo].[_structures]([_id_list])
 CREATE INDEX [IX__structures__name] ON [dbo].[_structures]([_name]) INCLUDE ([_id], [_id_type], [_collection_type], [_id_scheme])
 -- Covering index for structure lookup by ID (critical for InitPlan/EXISTS)
 CREATE INDEX [IX__structures__id_lookup] ON [dbo].[_structures]([_id]) INCLUDE ([_id_type], [_name], [_collection_type], [_id_scheme])
--- Partial index for non-collection structures
-CREATE INDEX [IX__structures__not_collection] ON [dbo].[_structures]([_id], [_name], [_id_scheme]) WHERE [_collection_type] IS NULL
+-- REMOVED (2026-10-14): [IX__structures__not_collection] (_id, _name, _id_scheme) WHERE _collection_type IS NULL
+-- is a prefix of IX__structures__not_collection_enhanced below, same predicate.
 -- Enhanced partial index for non-collection structures with type
 CREATE INDEX [IX__structures__not_collection_enhanced] ON [dbo].[_structures]([_id], [_name], [_id_scheme], [_id_type]) WHERE [_collection_type] IS NULL
 -- Index for collection fields (Array/Dictionary)
@@ -448,7 +449,8 @@ CREATE INDEX [IX__structures__key_type] ON [dbo].[_structures]([_key_type]) WHER
 GO
 
 -- Dependencies indexes
-CREATE INDEX [IX__dependencies__schemes_1] ON [dbo].[_dependencies]([_id_scheme_1])
+-- REMOVED (2026-10-14): [IX__dependencies__schemes_1] (_id_scheme_1) is the leading column of the UNIQUE
+-- constraint IX__dependencies (_id_scheme_1, _id_scheme_2). The index on _id_scheme_2 below stays.
 CREATE INDEX [IX__dependencies__schemes_2] ON [dbo].[_dependencies]([_id_scheme_2])
 GO
 
@@ -568,21 +570,8 @@ ON [dbo].[_objects] ([_id_parent])
 INCLUDE ([_id], [_hash], [_id_scheme])
 WHERE [_id_parent] IS NOT NULL;
 
--- 1. Проверка существования индекса
-IF NOT EXISTS (
-    SELECT 1 
-    FROM sys.indexes i
-    INNER JOIN sys.objects o ON i.object_id = o.object_id
-    WHERE o.name = '_objects' 
-        AND i.name = 'ix__objects_parent_scheme'
-)
-BEGIN
-    -- 2. Создание индекса с опцией ONLINE = ON
-    CREATE NONCLUSTERED INDEX ix__objects_parent_scheme
-    ON _objects (_id_parent, _id_scheme)
-    WHERE _id_parent IS NOT NULL
-    WITH (ONLINE = ON);
-END;
+-- REMOVED (2026-10-14): ix__objects_parent_scheme (_id_parent, _id_scheme) WHERE _id_parent IS NOT NULL
+-- has the key and the predicate of IX__objects__parent_id_descendant_lookup.
 
 GO
 
@@ -596,9 +585,9 @@ GO
 -- lands, recreate it deliberately with that feature.
 GO
 
--- Index for non-array values
-CREATE INDEX [IX__values__object_structure_array_index] ON [dbo].[_values]([_id_object], [_id_structure], [_array_index]) WHERE [_array_index] IS NOT NULL
-GO
+-- REMOVED (2026-10-14): [IX__values__object_structure_array_index] (_id_object, _id_structure, _array_index)
+-- WHERE _array_index IS NOT NULL. IX__values__object_structure_lookup has the same three key columns with no
+-- predicate and the values in INCLUDE, so it answers everything this one did.
 
 -- Unique indexes for data integrity
 CREATE UNIQUE INDEX [UIX__values__structure_object] ON [dbo].[_values]([_id_structure], [_id_object]) 
@@ -612,14 +601,14 @@ CREATE UNIQUE INDEX [UIX__values__structure_object_array_index] ON [dbo].[_value
 GO
 
 -- Permissions indexes
-CREATE INDEX [IX__permissions__roles] ON [dbo].[_permissions]([_id_role])
+-- REMOVED (2026-10-14): [IX__permissions__roles] (_id_role) is the leading column of the UNIQUE constraint
+-- IX__permissions (_id_role, _id_user, ...).
 CREATE INDEX [IX__permissions__users] ON [dbo].[_permissions]([_id_user])
 CREATE INDEX [IX__permissions__ref] ON [dbo].[_permissions]([_id_ref])
 GO
 
--- Functions indexes
-CREATE INDEX [IX__functions__schemes] ON [dbo].[_functions]([_id_scheme])
-GO
+-- REMOVED (2026-10-14): [IX__functions__schemes] (_id_scheme) is the leading column of the UNIQUE constraint
+-- IX__functions_scheme_name (_id_scheme, _name); the constraint's index serves the same lookups.
 
 -- =====================================================
 -- CREATE SEQUENCE

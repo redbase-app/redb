@@ -446,11 +446,15 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
         // Try to use optimized loading via internal method
         if (_sourceQuery is RedbQueryable<TProps> redbQueryable)
         {
+            // The settings of the projection go into a copy: the source query stays as it was
+            // and can be run again, as a list or under another projection.
+            var working = redbQueryable.CloneForProjection();
+
             // Set text paths in context BEFORE call
             // Context is read in PostgresQueryProvider to select SQL function
-            redbQueryable.SetProjectedFieldPaths(_projectedFieldPaths);
+            working.SetProjectedFieldPaths(_projectedFieldPaths);
 
-            fullObjects = await redbQueryable.ToListWithProjectionAsync(_projectedStructureIds, skipProps, cancellationToken);
+            fullObjects = await working.ToListWithProjectionAsync(_projectedStructureIds, skipProps, cancellationToken);
         }
         else
         {
@@ -569,10 +573,11 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             }
         }
 
-        var count = structureIds?.Count ?? 0;
+        if (structureIds == null)
+            return "Full load";
 
-        return count > 0
-            ? $"Projection: {count} structure_ids"
-            : "Full load";
+        return structureIds.Count > 0
+            ? $"Projection: {structureIds.Count} structure_ids"
+            : "Projection: base fields only";
     }
 }

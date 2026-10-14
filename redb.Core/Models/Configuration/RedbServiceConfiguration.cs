@@ -127,9 +127,10 @@ namespace redb.Core.Models.Configuration
         /// analyse a filter it emits nothing and behaviour is identical to disabled.
         /// Pro only; implemented by all three Pro providers - PostgreSQL, SQL Server and SQLite. How
         /// much it saves depends on the engine and the predicate (see docs/PVT_PREFILTER_PLAN.md).
-        /// Default is false (opt-in while the feature is being validated).
+        /// Also selects the streams query form where it applies. Default is true; set it to false to
+        /// get the aggregate form only.
         /// </summary>
-        public bool EnablePvtPrefilter { get; set; } = false;
+        public bool EnablePvtPrefilter { get; set; } = true;
 
         private string? _stringCollation;
 

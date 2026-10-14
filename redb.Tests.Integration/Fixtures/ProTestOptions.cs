@@ -7,8 +7,9 @@ namespace redb.Tests.Integration.Fixtures;
 internal static class ProTestOptions
 {
     /// <summary>
-    /// REDB_PVT_PREFILTER=1|true|on|yes enables the PVT prefilter. Off by default, matching
-    /// <c>RedbServiceConfiguration.EnablePvtPrefilter</c>.
+    /// REDB_PVT_PREFILTER=1|true|on|yes enables the PVT prefilter. Off when the variable is unset,
+    /// although <c>RedbServiceConfiguration.EnablePvtPrefilter</c> defaults to true: the fixtures set
+    /// the flag explicitly, so each pass runs the form it names.
     ///
     /// The prefilter is built as a superset and must not change a single result, so BOTH passes are
     /// expected to be green and identical. A test that passes with it off and fails with it on is a

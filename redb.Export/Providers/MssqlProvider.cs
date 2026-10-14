@@ -10,9 +10,10 @@ namespace redb.Export.Providers;
 /// <c>sp_MSforeachtable</c> to toggle constraints and triggers during import.
 /// </para>
 /// </summary>
-public sealed class MssqlProvider : IDataProvider
+public sealed class MssqlProvider : IDataProvider, IParallelImportProvider
 {
     private SqlConnection? _connection;
+    private string? _connectionString;
     private SqlTransaction? _transaction;
 
     /// <inheritdoc />
@@ -55,6 +56,7 @@ public sealed class MssqlProvider : IDataProvider
     /// <inheritdoc />
     public async Task OpenAsync(string connectionString, CancellationToken ct = default)
     {
+        _connectionString = connectionString;
         _connection = new SqlConnection(connectionString);
         await _connection.OpenAsync(ct);
     }
@@ -153,11 +155,11 @@ public sealed class MssqlProvider : IDataProvider
         if (_connection is null) return;
 
         await using var cmd1 = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL'", _connection, _transaction);
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL'", _connection, _transaction) { CommandTimeout = 0 };
         await cmd1.ExecuteNonQueryAsync(ct);
 
         await using var cmd2 = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? DISABLE TRIGGER ALL'", _connection, _transaction);
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? DISABLE TRIGGER ALL'", _connection, _transaction) { CommandTimeout = 0 };
         await cmd2.ExecuteNonQueryAsync(ct);
     }
 
@@ -167,11 +169,11 @@ public sealed class MssqlProvider : IDataProvider
         if (_connection is null) return;
 
         await using var cmd1 = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? ENABLE TRIGGER ALL'", _connection, _transaction);
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? ENABLE TRIGGER ALL'", _connection, _transaction) { CommandTimeout = 0 };
         await cmd1.ExecuteNonQueryAsync(ct);
 
         await using var cmd2 = new SqlCommand(
-            "EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL'", _connection, _transaction);
+            "EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL'", _connection, _transaction) { CommandTimeout = 0 };
         await cmd2.ExecuteNonQueryAsync(ct);
     }
 
@@ -196,6 +198,109 @@ public sealed class MssqlProvider : IDataProvider
     }
 
     /// <inheritdoc />
+    public async Task ExecuteAsync(string sql, CancellationToken ct = default)
+    {
+        if (_connection is null) throw new InvalidOperationException("Connection not opened. Call OpenAsync first.");
+
+        await using var cmd = new SqlCommand(sql, _connection, _transaction);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    // ===== Parallel import =====
+
+    /// <summary>Tables large enough for their secondary indexes to dominate the load.</summary>
+    private static readonly string[] LoadTables = ["_values", "_objects"];
+
+    /// <inheritdoc />
+    public async Task<IDataProvider> OpenWorkerAsync(CancellationToken ct = default)
+    {
+        if (_connectionString is null) throw new InvalidOperationException("Connection not opened. Call OpenAsync first.");
+
+        // Nothing to set on the session: SqlBulkCopy neither checks foreign keys nor fires triggers
+        // unless asked to, and what it skipped is checked once at the end by
+        // RestoreConstraintsAfterLoadAsync.
+        var worker = new MssqlProvider();
+        await worker.OpenAsync(_connectionString, ct);
+        return worker;
+    }
+
+    /// <summary>
+    /// Disables the secondary indexes of the large tables and returns the statements that rebuild them.
+    /// A disabled index keeps its definition in the catalog, so nothing has to be stored elsewhere and
+    /// a run that died half-way loses nothing: the next call finds the indexes still disabled and
+    /// returns them with the rest. Left alone: the clustered index (disabling it takes the table
+    /// offline), indexes that back a PRIMARY KEY or UNIQUE constraint, and any index a foreign key
+    /// resolves through (disabling it would disable that foreign key).
+    /// </summary>
+    public async Task<IReadOnlyList<DroppedIndex>> DropLoadIndexesAsync(CancellationToken ct = default)
+    {
+        if (_connection is null) throw new InvalidOperationException("Connection not opened. Call OpenAsync first.");
+
+        var indexes = new List<(string Name, string Table, bool Disabled)>();
+        await using (var read = new SqlCommand($"""
+            SELECT i.name, t.name, i.is_disabled
+            FROM sys.indexes i
+            JOIN sys.tables t ON t.object_id = i.object_id
+            WHERE SCHEMA_NAME(t.schema_id) = 'dbo'
+              AND t.name IN ({string.Join(", ", LoadTables.Select(n => "'" + n + "'"))})
+              AND i.type = 2
+              AND i.is_primary_key = 0
+              AND i.is_unique_constraint = 0
+              AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys f
+                              WHERE f.referenced_object_id = i.object_id AND f.key_index_id = i.index_id)
+            ORDER BY t.name, i.name
+            """, _connection))
+        await using (var reader = await read.ExecuteReaderAsync(ct))
+        {
+            while (await reader.ReadAsync(ct))
+                indexes.Add((reader.GetString(0), reader.GetString(1), reader.GetBoolean(2)));
+        }
+
+        var disabled = new List<DroppedIndex>();
+        foreach (var (name, table, alreadyDisabled) in indexes)
+        {
+            var target = $"{QuoteIdentifier(name)} ON [dbo].{QuoteIdentifier(table)}";
+            if (!alreadyDisabled)
+            {
+                await using var disable = new SqlCommand($"ALTER INDEX {target} DISABLE", _connection) { CommandTimeout = 0 };
+                await disable.ExecuteNonQueryAsync(ct);
+            }
+            disabled.Add(new DroppedIndex(name, table, $"ALTER INDEX {target} REBUILD"));
+        }
+
+        return disabled;
+    }
+
+    /// <inheritdoc />
+    public async Task CreateIndexAsync(DroppedIndex index, CancellationToken ct = default)
+    {
+        if (_connection is null) throw new InvalidOperationException("Connection not opened. Call OpenAsync first.");
+
+        // A rebuild over tens of millions of rows outlives any ordinary command timeout.
+        await using var cmd = new SqlCommand(index.Definition, _connection) { CommandTimeout = 0 };
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <inheritdoc />
+    // The catalog itself says which indexes are still disabled; there is nothing kept to forget.
+    public Task ForgetDroppedIndexesAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task RelaxConstraintsForLoadAsync(CancellationToken ct = default) => DisableConstraintsAsync(ct);
+
+    /// <inheritdoc />
+    // WITH CHECK CHECK CONSTRAINT reads every loaded row against its foreign keys; on a large
+    // database that is minutes, and it is what makes the constraints trusted again.
+    public Task RestoreConstraintsAfterLoadAsync(CancellationToken ct = default) => EnableConstraintsAsync(ct);
+
+    /// <inheritdoc />
+    // An offline index rebuild ends by taking a schema-modification lock on the table; two of them
+    // on one table wait for each other.
+    public bool BuildsIndexesOfOneTableConcurrently => false;
+
+    private static string QuoteIdentifier(string identifier) => "[" + identifier.Replace("]", "]]") + "]";
+
+    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         if (_connection is not null)
@@ -203,6 +308,10 @@ public sealed class MssqlProvider : IDataProvider
             await _connection.DisposeAsync();
         }
     }
+
+    /// <inheritdoc />
+    public DateTimeOffset ReadDateTimeOffset(DbDataReader reader, int ordinal) =>
+        reader.GetFieldValue<DateTimeOffset>(ordinal);
 
     /// <inheritdoc />
     public Guid GuidFromDb(object raw) => (Guid)raw;

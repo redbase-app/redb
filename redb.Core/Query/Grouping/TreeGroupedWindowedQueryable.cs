@@ -24,6 +24,9 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
     private readonly Expression _keySelector;
     private readonly GroupedWindowSpec<TKey, TProps> _windowSpec;
 
+    /// <summary>True when the key comes from GroupByRedb: its members are fields of the object, not of Props.</summary>
+    public bool IsBaseFieldGrouping { get; init; }
+
     public TreeGroupedWindowedQueryable(
         ITreeQueryProvider treeProvider,
         TreeQueryContext<TProps> treeContext,
@@ -82,13 +85,13 @@ public class TreeGroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQuerya
                     throw new NotSupportedException(
                         $"GroupBy on a tree: key member '{member.Name}' is not a field ('{arg}'). Computed keys are not supported.");
                 var fieldPath = ExtractFieldPath(arg);
-                result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = member.Name });
+                result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = member.Name, IsBaseField = IsBaseFieldGrouping });
             }
         }
         else if (body is MemberExpression memberExpr)
         {
             var fieldPath = ExtractFieldPath(memberExpr);
-            result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = memberExpr.Member.Name });
+            result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = memberExpr.Member.Name, IsBaseField = IsBaseFieldGrouping });
         }
         else
         {

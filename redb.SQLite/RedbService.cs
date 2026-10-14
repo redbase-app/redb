@@ -159,8 +159,10 @@ public class RedbService : RedbServiceBase
     /// 7 — FK-column indexes IX__values__ListItem_not_null / IX__values__Object_not_null (partial):
     ///     without them every DELETE of a referenced object or list item scans the whole _values
     ///     for the FK check (perf finding, 2026-09-10).
+    /// 10 — the indexes another index of the same table fully replaces are dropped, the set PostgreSQL
+    ///     dropped in its module 0.7.13 (2026-10-14).
     /// </remarks>
-    private const int SchemaVersion = 9;
+    private const int SchemaVersion = 10;
 
     /// <summary>
     /// Schema upgrades for a database created by an older build — the SQLite counterpart of the
@@ -273,6 +275,27 @@ public class RedbService : RedbServiceBase
             "UPDATE _scheme_metadata_cache SET " +
             "_unique_scope = (SELECT s._unique_scope FROM _structures s WHERE s._id = _structure_id), " +
             "_tags = (SELECT s._tags FROM _structures s WHERE s._id = _structure_id)");
+
+        // 10 - index cleanup (2026-10-14): indexes another index of the same table fully replaces,
+        // the set PostgreSQL dropped in its module 0.7.13. Runs once, on the stamp: an index put back
+        // by hand stays. The statements that put them back:
+        //   CREATE INDEX "IX__values__object_structure_array_index" ON _values (_id_object, _id_structure, _array_index) WHERE _array_index IS NOT NULL;
+        //   CREATE INDEX "IX__structures__not_collection" ON _structures (_id, _name, _id_scheme) WHERE _collection_type IS NULL;
+        //   CREATE INDEX "IX__functions__schemes" ON _functions (_id_scheme);
+        //   CREATE INDEX "IX__permissions__roles" ON _permissions (_id_role);
+        //   CREATE INDEX "IX__dependencies__schemes_1" ON _dependencies (_id_scheme_1);
+        //   CREATE INDEX "IX__users_roles__roles" ON _users_roles (_id_role);
+        // IX__values__structure_object_lookup stays, unlike PostgreSQL: the streams form reads
+        // string fields through it.
+        foreach (var index in new[]
+                 {
+                     "IX__values__object_structure_array_index", "IX__structures__not_collection",
+                     "IX__functions__schemes", "IX__permissions__roles", "IX__dependencies__schemes_1",
+                     "IX__users_roles__roles",
+                 })
+        {
+            await Context.ExecuteAsync($"DROP INDEX IF EXISTS \"{index}\"");
+        }
 
         await StampSchemaVersionAsync();
     }

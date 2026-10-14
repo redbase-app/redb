@@ -79,4 +79,69 @@ public abstract class OrderingTestsBase
 
         page.Should().HaveCount(4);
     }
+
+    // CountAsync and AnyAsync answer for the rows ToListAsync of the same query returns. They used
+    // to answer for the whole filtered set: Take(3).CountAsync() over ten rows returned ten
+    // (found 2026-10-12; every provider did it, the count SQL leaves LIMIT and OFFSET out).
+
+    [Fact]
+    public async Task CountAsync_FollowsTakeAndSkip()
+    {
+        var ids = await SeedAsync();
+        var query = Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+
+        (await query.CountAsync()).Should().Be(10);
+        (await query.Take(3).CountAsync()).Should().Be(3);
+        (await query.Take(50).CountAsync()).Should().Be(10);
+        (await query.Skip(4).CountAsync()).Should().Be(6);
+        (await query.Skip(4).Take(3).CountAsync()).Should().Be(3);
+        (await query.Skip(8).Take(5).CountAsync()).Should().Be(2);
+        (await query.Skip(10).CountAsync()).Should().Be(0);
+        (await query.Skip(100).Take(5).CountAsync()).Should().Be(0);
+        (await query.Take(0).CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task CountAsync_Paged_MatchesToListAsync()
+    {
+        var ids = await SeedAsync();
+        var page = Redb.Query<EmployeeProps>()
+            .WhereRedb(o => ids.Contains(o.Id))
+            .Where(e => e.Age >= 0)
+            .OrderBy(e => e.Age)
+            .Skip(2)
+            .Take(5);
+
+        var rows = await page.ToListAsync();
+
+        (await page.CountAsync()).Should().Be(rows.Count);
+        (await page.Select(o => o.Id).CountAsync()).Should().Be(rows.Count, "a projection counts the rows of its source");
+    }
+
+    [Fact]
+    public async Task AnyAsync_FollowsTakeAndSkip()
+    {
+        var ids = await SeedAsync();
+        var query = Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+
+        (await query.AnyAsync()).Should().BeTrue();
+        (await query.Take(0).AnyAsync()).Should().BeFalse();
+        (await query.Skip(9).AnyAsync()).Should().BeTrue();
+        (await query.Skip(10).AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AllAsync_OnPagedQuery_StillChecksEveryRow()
+    {
+        // Counts cut to the same page size are equal as soon as enough rows match; All has to
+        // compare the counts of the whole set.
+        var ids = await SeedAsync();
+        var query = Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+        var ages = (await query.ToListAsync()).Select(r => r.Props.Age).OrderBy(a => a).ToList();
+        var youngest = ages[0];
+        var threshold = ages[5];
+
+        (await query.Take(3).AllAsync(e => e.Age >= youngest)).Should().BeTrue();
+        (await query.Take(3).AllAsync(e => e.Age > threshold)).Should().Be(ages.All(a => a > threshold));
+    }
 }

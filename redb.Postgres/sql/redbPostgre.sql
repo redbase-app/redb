@@ -294,8 +294,10 @@ CREATE TABLE _functions
 );
 
 
-CREATE INDEX IF NOT EXISTS "IX__functions__schemes" ON _functions (_id_scheme) WITH (deduplicate_items=True);
-CREATE INDEX IF NOT EXISTS "IX__permissions__roles" ON _permissions (_id_role) WITH (deduplicate_items=True);
+-- REMOVED (2026-10-12): "IX__functions__schemes" (_id_scheme) is the leading column of the UNIQUE constraint
+-- IX__functions_scheme_name (_id_scheme, _name); the constraint's index serves the same lookups.
+-- REMOVED (2026-10-12): "IX__permissions__roles" (_id_role) is the leading column of the UNIQUE constraint
+-- IX__permissions (_id_role, _id_user, ...).
 CREATE INDEX IF NOT EXISTS "IX__permissions__users" ON _permissions (_id_user) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__permissions__ref" ON _permissions (_id_ref);
 CREATE INDEX IF NOT EXISTS "IX__values__objects" ON _values (_id_object) WITH (deduplicate_items=True);
@@ -309,7 +311,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "UIX__values__structure_unique"
 
 -- ============================================
 -- REMOVED REDUNDANT INDEXES (migration_drop_redundant_indexes.sql)
--- Reason: Covered by composite index IX__values__structure_object_lookup
+-- Reason: were covered by the composite index IX__values__structure_object_lookup (itself retired in 0.7.14, see "RETIRED" below)
 -- Facet search ALWAYS filters by (_id_structure, _id_object) BEFORE value
 -- ============================================
 -- CREATE INDEX IF NOT EXISTS "IX__values__String" ON _values (_String) WITH (deduplicate_items=True);
@@ -381,7 +383,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS "UIX__objects__scheme_unique"
 CREATE INDEX IF NOT EXISTS "IX__objects__value_guid" ON _objects (_value_guid) WHERE _value_guid IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_datetime" ON _objects (_value_datetime) WHERE _value_datetime IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__value_numeric" ON _objects (_value_numeric) WHERE _value_numeric IS NOT NULL;
-CREATE INDEX IF NOT EXISTS "IX__dependencies__schemes_1" ON _dependencies (_id_scheme_1) WITH (deduplicate_items=True); 
+-- REMOVED (2026-10-12): "IX__dependencies__schemes_1" (_id_scheme_1) is the leading column of the UNIQUE
+-- constraint IX__dependencies (_id_scheme_1, _id_scheme_2). The index on _id_scheme_2 below stays.
 CREATE INDEX IF NOT EXISTS "IX__dependencies__schemes_2" ON _dependencies (_id_scheme_2) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__structures__structures" ON _structures (_id_parent) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__structures__schemes" ON _structures (_id_scheme) WITH (deduplicate_items=True);
@@ -392,7 +395,8 @@ CREATE INDEX IF NOT EXISTS "IX__structures__lists" ON _structures (_id_list) WIT
 CREATE INDEX IF NOT EXISTS "IX__schemes__schemes" ON _schemes (_id_parent) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__schemes__structure_hash" ON _schemes (_structure_hash) WITH (deduplicate_items=True);
 CREATE INDEX IF NOT EXISTS "IX__schemes__type" ON _schemes (_type) WITH (deduplicate_items=True);
-CREATE INDEX IF NOT EXISTS "IX__users_roles__roles" ON _users_roles (_id_role) WITH (deduplicate_items=True);
+-- REMOVED (2026-10-12): "IX__users_roles__roles" (_id_role) is the leading column of the UNIQUE constraint
+-- IX__users_roles (_id_role, _id_user).
 CREATE INDEX IF NOT EXISTS "IX__users_roles__users" ON _users_roles (_id_user) WITH (deduplicate_items=True);
 
 -- Indexes for user and role configurations
@@ -441,10 +445,8 @@ ON _structures (_id)
 INCLUDE (_id_type, _name, _collection_type, _id_scheme)
 WITH (deduplicate_items=True);
 
--- Partial index for non-array structures (base)
-CREATE INDEX IF NOT EXISTS "IX__structures__not_collection" 
-ON _structures (_id, _name, _id_scheme) 
-WHERE _collection_type IS NULL;
+-- REMOVED (2026-10-12): "IX__structures__not_collection" (_id, _name, _id_scheme) WHERE _collection_type IS NULL
+-- is a prefix of IX__structures__not_collection_enhanced below, same predicate.
 
 -- Extended partial index for non-collection structures
 -- Used in Nested Loop for fast search by _id with _collection_type IS NULL
@@ -495,9 +497,6 @@ COMMENT ON INDEX "IX__structures__name" IS
 COMMENT ON INDEX "IX__structures__id_lookup" IS 
 '🔥 CRITICAL covering index for InitPlan and EXISTS subqueries. Eliminates Seq Scan on Filter: (_id = X). INCLUDE contains all necessary fields for Index Only Scan. Covers InitPlan 2 and Nested Loop conditions. Cost: 6.10 → 4.29 (-30%). Tested EXPLAIN ANALYZE Stage 41';
 
-COMMENT ON INDEX "IX__structures__not_collection" IS 
-'Base partial index for NON collection fields. Optimizes filtering _collection_type IS NULL in faceted queries. Used together with IX__structures__name';
-
 COMMENT ON INDEX "IX__structures__not_collection_enhanced" IS 
 'Extended partial index for NON collection fields. Includes _id_type to eliminate additional JOINs in Nested Loop. Used when searching by _id with condition _collection_type IS NULL. Provides Index Only Scan';
 
@@ -520,19 +519,28 @@ COMMENT ON INDEX "IX__values__object_array_null" IS
 -- CRITICAL INDEXES FOR FACETED SEARCH
 -- ============================================
 
--- 1. 🔥 MOST IMPORTANT: search values by structure + object
--- NOTE: _String excluded from KEY — large text values (>2700 bytes) exceed btree row limit
-CREATE INDEX IF NOT EXISTS "IX__values__structure_object_lookup" 
-ON _values (_id_structure, _id_object, _Long, _DateTimeOffset, _Boolean, _Double, _Guid, _Numeric, _ListItem, _Object);
+-- 1. Values by structure + object: RETIRED (2026-10-12, PVT module 0.7.14).
+-- The queries moved to the streams form, which reads values through
+-- IX__values__structure_object_scalar (redb.Postgres.Pro/Sql/pvt_streams_indexes.sql) and through the
+-- object-led indexes below; keeping this one as well meant two indexes of 1.7 GB each over the same
+-- rows on a 38M-row _values, both maintained on every write. Existing databases lose it when the
+-- module is re-applied (v2-pvt/00_module_init.sql).
+-- Measured on that database before retiring it: nothing got slower except the row prefilter over a
+-- dictionary item or a number, which fell back to IX__values__structures (27 -> 52 ms, 3 -> 7 ms).
+-- IF QUERIES GOT SLOWER AFTER THE UPGRADE, put it back - CONCURRENTLY, so that writes go on:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX__values__structure_object_lookup"
+--   ON _values (_id_structure, _id_object, _Long, _DateTimeOffset, _Boolean, _Double, _Guid, _Numeric, _ListItem, _Object);
+-- (_String is not in the key: a text value over ~2700 bytes does not fit a btree entry.)
+-- The module drops it again on its next version change, so tell us if you needed it.
 
 -- 2. 🌳 Tree queries
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent" 
 ON _objects (_id_scheme, _id_parent, _id);
 
--- 3. 🔢 Arrays
-CREATE INDEX IF NOT EXISTS "IX__values__object_structure_array_index" 
-ON _values (_id_object, _id_structure, _array_index)
-WHERE _array_index IS NOT NULL;
+-- 3. Arrays
+-- REMOVED (2026-10-12): "IX__values__object_structure_array_index" (_id_object, _id_structure, _array_index)
+-- WHERE _array_index IS NOT NULL. IX__values__object_structure_lookup has the same three key columns with no
+-- predicate and the values in INCLUDE, so it answers everything this one did.
 
 -- 4. 📌 Partial indexes for NOT NULL values
 -- NOTE: length guard prevents btree overflow on large string values (JWT payloads > 2704 bytes)
@@ -598,14 +606,8 @@ ON _objects (_id_scheme, _name, _id);
 -- WHERE _id_parent IS NOT NULL;
 
 -- Comments for indexes
-COMMENT ON INDEX "IX__values__structure_object_lookup" IS 
-'Composite index for fast value search by structure and object. CRITICAL for faceted queries with filtering by Props fields. Updated: added _Numeric, _ListItem, _Object; _DateTime → _DateTimeOffset';
-
 COMMENT ON INDEX "IX__objects__scheme_parent" IS 
 'Composite index for fast filtering of objects by scheme and parent. CRITICAL for tree queries and searching direct children';
-
-COMMENT ON INDEX "IX__values__object_structure_array_index" IS 
-'Composite index for fast work with arrays. Optimizes $arrayContains, $arrayFirst, $arrayLast, $arrayAt and aggregation operators';
 
 COMMENT ON INDEX "IX__values__String_not_null" IS 
 'Partial index for fast search of objects with NOT NULL string values. Optimizes queries with {"field": {"$ne": null}} and {"field": {"$exists": true}}';
@@ -627,9 +629,13 @@ COMMENT ON INDEX "IX__objects__scheme_date_create" IS
 -- ====================================================================================================
 
 -- 1. CRITICAL: Covering index for fast descendant search by ancestor
+-- _date_modify is deliberately NOT in INCLUDE (2026-10-12). It changes on every save, and an index that
+-- carries it gets a new entry for every saved object: on a database with frequent saves these indexes had
+-- grown to 700-1400 bytes per entry and shrank 10-20 times when rebuilt without it. Queries that go through
+-- them read the whole object row from the table anyway.
 CREATE INDEX IF NOT EXISTS "IX__objects__parent_id_descendant_lookup" 
 ON _objects (_id_parent, _id_scheme) 
-INCLUDE (_id, _id_owner, _date_create, _date_modify)
+INCLUDE (_id, _id_owner, _date_create)
 WHERE _id_parent IS NOT NULL;
 
 COMMENT ON INDEX "IX__objects__parent_id_descendant_lookup" IS 
@@ -638,7 +644,7 @@ COMMENT ON INDEX "IX__objects__parent_id_descendant_lookup" IS
 -- 2. IMPORTANT: Composite index for tree queries with date sorting
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent_date_create" 
 ON _objects (_id_scheme, _id_parent, _date_create DESC)
-INCLUDE (_id, _id_owner, _date_modify);
+INCLUDE (_id, _id_owner);
 
 COMMENT ON INDEX "IX__objects__scheme_parent_date_create" IS 
 'Optimizes tree queries with sorting by creation date. Used in WhereHasAncestor + ORDER BY _date_create. INCLUDE for Index Only Scan';
@@ -654,7 +660,7 @@ COMMENT ON INDEX "IX__objects__id_parent_scheme" IS
 -- 4. MEDIUM PRIORITY: Covering index for search with filtering
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent_owner" 
 ON _objects (_id_scheme, _id_parent)
-INCLUDE (_id, _id_owner, _date_create, _date_modify, _name)
+INCLUDE (_id, _id_owner, _date_create, _name)
 WHERE _id_parent IS NOT NULL;
 
 COMMENT ON INDEX "IX__objects__scheme_parent_owner" IS 

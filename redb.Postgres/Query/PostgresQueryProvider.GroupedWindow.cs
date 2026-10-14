@@ -122,6 +122,12 @@ public partial class PostgresQueryProvider
         var partitionList = partitionBy?.ToList() ?? new List<WindowFieldRequest>();
         var orderList = orderBy?.ToList() ?? new List<WindowOrderRequest>();
 
+        // An aggregate the window sorts or partitions by need not be in the selector. It is then
+        // computed inside the grouping under a private alias and left out of the result.
+        var shownAggregates = aggList.ToList();
+        aggList.AddRange(GroupedWindowNames.HiddenAggregates(
+            partitionList.Select(p => p.FieldPath).Concat(orderList.Select(o => o.FieldPath)), aggList));
+
         if (groupList.Count == 0)
             throw new ArgumentException("groupFields must contain at least one entry.", nameof(groupFields));
         if (windowList.Count == 0)
@@ -148,7 +154,8 @@ public partial class PostgresQueryProvider
                 "pvt_build_groupby_sql returned an empty SQL string for scheme " + schemeId + ".");
 
         var window = BuildWindowedSelect(
-            innerSql, groupList, aggList, windowList, partitionList, orderList);
+            innerSql, groupList, aggList, windowList, partitionList, orderList,
+            shownAggregates.Count == aggList.Count ? null : shownAggregates);
 
         return "SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json)::text AS \"Value\" FROM ("
             + window
@@ -166,10 +173,21 @@ public partial class PostgresQueryProvider
         IList<AggregateRequest> aggList,
         IList<WindowFuncRequest> windowList,
         IList<WindowFieldRequest> partitionList,
-        IList<WindowOrderRequest> orderList)
+        IList<WindowOrderRequest> orderList,
+        IList<AggregateRequest>? shownAggregates = null)
     {
         var sb = new StringBuilder();
-        sb.Append("SELECT g.*");
+        if (shownAggregates == null)
+        {
+            sb.Append("SELECT g.*");
+        }
+        else
+        {
+            // Named columns instead of g.*: the inner query carries aggregates the caller did not ask for.
+            var columns = groupList.Select(g => string.IsNullOrEmpty(g.Alias) ? g.FieldPath : g.Alias)
+                .Concat(shownAggregates.Select(a => a.Alias ?? a.Function.ToString()));
+            sb.Append("SELECT ").Append(string.Join(", ", columns.Select(c => "g." + QuoteIdent(c))));
+        }
 
         var overClause = BuildOverClause(partitionList, orderList, aggList, groupList);
 
@@ -221,35 +239,10 @@ public partial class PostgresQueryProvider
         IList<AggregateRequest> aggList,
         IList<GroupFieldRequest> groupList)
     {
+        // One resolver for every provider (GroupedWindowNames): "Key", "Agg_Count_g" and "Avg" are
+        // understood there. A name it does not know passes through as it stands.
         var path = fieldPath ?? string.Empty;
-
-        if (path.StartsWith("Agg_", StringComparison.Ordinal))
-        {
-            var segments = path.Split('_', 3);
-            if (segments.Length >= 2)
-            {
-                var funcName = segments[1];
-                var aggField = segments.Length > 2 ? segments[2] : null;
-                var match = aggList.FirstOrDefault(a =>
-                    string.Equals(a.Function.ToString(), funcName, StringComparison.OrdinalIgnoreCase)
-                    && (aggField is null || a.FieldPath == aggField));
-                if (match is not null)
-                    return match.Alias ?? match.Function.ToString();
-            }
-        }
-
-        // Group field alias passthrough.
-        var grp = groupList.FirstOrDefault(g =>
-            g.Alias == path || g.FieldPath == path);
-        if (grp is not null)
-            return grp.Alias ?? grp.FieldPath;
-
-        // Aggregation alias passthrough.
-        var agg = aggList.FirstOrDefault(a => a.Alias == path);
-        if (agg is not null)
-            return agg.Alias!;
-
-        return path;
+        return GroupedWindowNames.TryResolveColumn(path, aggList.ToList(), groupList.ToList()) ?? path;
     }
 
     private static string BuildWindowFunctionExpr(

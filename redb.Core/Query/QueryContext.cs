@@ -78,6 +78,14 @@ public class QueryContext<TProps> where TProps : class, new()
     public bool SkipPropsLoading { get; set; }
 
     /// <summary>
+    /// PROJECTION: the selector was read completely and touches no Props field (base fields only),
+    /// so no Props has to be loaded at all. Not the same as <see cref="ProjectedStructureIds"/> being
+    /// null, which means "load every field". A provider that does not know this flag loads everything,
+    /// which is slower and still correct.
+    /// </summary>
+    public bool ProjectionReadsNoProps { get; set; }
+
+    /// <summary>
     /// Maximum depth for loading nested RedbObject in Props.
     /// Controls recursion when Props contain references to other RedbObjects via _values._Object.
     /// null = use global DefaultMaxTreeDepth from config.
@@ -115,6 +123,7 @@ public class QueryContext<TProps> where TProps : class, new()
             ProjectedStructureIds = ProjectedStructureIds,
             ProjectedFieldPaths = ProjectedFieldPaths,
             SkipPropsLoading = SkipPropsLoading,
+            ProjectionReadsNoProps = ProjectionReadsNoProps,
             PropsDepth = PropsDepth
         };
     }
