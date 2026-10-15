@@ -1,5 +1,5 @@
 # Assemblies the redb.Tsak worker already provides: /app/*.dll and /app/Libs/shared/*.dll of
-# redb-tsak-worker:4.2.0. A module dependency present here is NOT packed into the .tpkg; every other
+# redb-tsak-worker:4.3.0. A module dependency present here is NOT packed into the .tpkg; every other
 # dependency travels inside the package.
 #
 # The worker resolves these from its own folder and from Libs/shared next to the application

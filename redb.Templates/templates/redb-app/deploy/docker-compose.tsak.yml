@@ -12,7 +12,7 @@
 services:
   # The service is called "api" so that RedbApp.Web/nginx.conf reaches it unchanged.
   api:
-    image: ghcr.io/redbase-app/redb-tsak-stack:${TSAK_VERSION:-4.2.0-net10}
+    image: ghcr.io/redbase-app/redb-tsak-stack:${TSAK_VERSION:-4.3.0-net10}
     restart: unless-stopped
     ports:
       - "127.0.0.1:9090:9090"   # worker API

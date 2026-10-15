@@ -21,7 +21,22 @@ This changelog covers the **NuGet-published packages** only:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.1] — 2026-10-15
+
+`redb.Templates` only; the libraries stay on 4.3.0.
+
+### Fixed — the module templates deploy onto a Tsak worker of the same release
+
+`redb.Templates` 4.3.0 installed the `redb.*` 4.3.0 packages, but the deploy files of `redb-worker`,
+`redb-chat`, `redb-app` and `redb-bff` still started `redb-tsak-stack:4.2.0-net10` in
+`deploy/docker-compose.tsak.yml`. A module built on 4.3.0 does not load on a 4.2 worker: Tsak compares the
+major and minor version of the module with its own. The compose file starts `redb-tsak-stack:4.3.0-net10`
+now, and `deploy/shipped-module-deps.txt` is taken from `redb-tsak-worker:4.3.0` (the same 182 assemblies).
+A project generated from 4.3.0 can be fixed by hand: set `TSAK_VERSION=4.3.0-net10`, or change the default in
+its compose file.
+
 ## [4.3.0] — 2026-10-14
+
 
 > **`redb.Templates` — why the bump.** No template change of its own. The pack moves to 4.3.0 with the
 > libraries because each template pins the `redb.*` packages of its release: a project generated from it now
