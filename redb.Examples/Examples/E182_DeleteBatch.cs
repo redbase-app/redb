@@ -46,11 +46,8 @@ public class E182_DeleteBatch : ExampleBase
         // Verify count before delete
         var countBefore = (await redb.LoadAsync(ids)).Count;
 
-        // Delete all by IDs
-        foreach (var id in ids)
-        {
-            await redb.DeleteAsync(id);
-        }
+        // Delete all by IDs in one call
+        await redb.DeleteAsync(ids);
 
         // Verify count after delete
         var countAfter = (await redb.LoadAsync(ids)).Count;

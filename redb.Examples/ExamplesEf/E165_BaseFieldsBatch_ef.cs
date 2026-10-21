@@ -41,7 +41,7 @@ public class E165_BaseFieldsBatch_ef : EfExampleBase
 
         if (loaded.Count != 1000)
             return Fail("E165_ef", "EF: Base Fields - Batch Operations", ExampleTier.Free, sw.ElapsedMilliseconds,
-                $"Expected 10 objects, got {loaded.Count}.");
+                $"Expected 1000 objects, got {loaded.Count}.");
 
         var verified = loaded.All(x => x._value_string != null && x._value_string.StartsWith("Item_"));
         var result = Ok("E165_ef", "EF: Base Fields - Batch Operations", ExampleTier.Free, sw.ElapsedMilliseconds, loaded.Count,

@@ -44,9 +44,9 @@ public class E997_DateTimeJulianVerify_ef : EfExampleBase
                         HireDate = dt, EmployeeCode = $"JV-{code}"
                     }
                 }));
-                // One save per employee, as redb saves them one by one.
-                await db.SaveChangesAsync();
             }
+            // One save for the three, as redb saves them as one batch.
+            await db.SaveChangesAsync();
         }
 
         List<RedbObject<Biz.EmployeeProps>> midRange, futureOnly, pastOnly;

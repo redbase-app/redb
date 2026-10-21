@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using redb.Core;
+using redb.Core.Models.Contracts;
 using redb.Core.Models.Entities;
 using redb.Examples.Models;
 using redb.Examples.Output;
@@ -26,7 +27,8 @@ public class E997_DateTimeJulianVerify : ExampleBase
 
         // Idempotent: purge any leftovers from a previous run so the "exactly 1 per range"
         // asserts hold whether this runs once or as part of the full suite.
-        foreach (var stale in await redb.Query<EmployeeProps>().Where(e => e.Department == Dept).ToListAsync())
+        var stale = await redb.Query<EmployeeProps>().Where(e => e.Department == Dept).Select(e => e.Id).ToListAsync();
+        if (stale.Count > 0)
             await redb.DeleteAsync(stale);
 
         // Distinct UTC instants, years apart; the 2024 one carries a fractional
@@ -35,19 +37,19 @@ public class E997_DateTimeJulianVerify : ExampleBase
         var dMiddle = new DateTime(2024, 06, 15, 13, 45, 30, DateTimeKind.Utc);
         var dFuture = new DateTime(2030, 09, 20, 00, 00, 00, DateTimeKind.Utc);
 
-        foreach (var (dt, code) in new[] { (dPast, "PAST"), (dMiddle, "MID"), (dFuture, "FUT") })
-        {
-            await redb.SaveAsync(new RedbObject<EmployeeProps>
+        var seeded = new[] { (dPast, "PAST"), (dMiddle, "MID"), (dFuture, "FUT") }
+            .Select(s => (IRedbObject)new RedbObject<EmployeeProps>
             {
-                name = $"JulianVerify-{code}",
+                name = $"JulianVerify-{s.Item2}",
                 Props = new EmployeeProps
                 {
-                    FirstName = code, LastName = "Verify", Age = 30,
+                    FirstName = s.Item2, LastName = "Verify", Age = 30,
                     Position = "QA", Department = Dept, Salary = 1m,
-                    HireDate = dt, EmployeeCode = $"JV-{code}"
+                    HireDate = s.Item1, EmployeeCode = $"JV-{s.Item2}"
                 }
-            });
-        }
+            })
+            .ToList();
+        await redb.SaveAsync(seeded);
 
         // Range filters — each must return exactly its single seeded match.
         var midRange = await redb.Query<EmployeeProps>()

@@ -45,7 +45,7 @@ public class E165_BaseFieldsBatch : ExampleBase
         if (loaded.Count != 1000)
         {
             return Fail("E165", "Base Fields - Batch Operations", ExampleTier.Free, sw.ElapsedMilliseconds,
-                $"Expected 10 objects, got {loaded.Count}.");
+                $"Expected 1000 objects, got {loaded.Count}.");
         }
 
         // Verify data integrity
@@ -56,9 +56,8 @@ public class E165_BaseFieldsBatch : ExampleBase
              $"IDs: [{string.Join(", ", ids.Take(3))}...]",
              $"Data verified: {verified}"]);
 
-        // Cleanup
-        foreach (var id in ids)
-            await redb.DeleteAsync(id);
+        // Cleanup: one delete for the whole batch
+        await redb.DeleteAsync(ids);
 
         return result;
     }

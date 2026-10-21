@@ -9,8 +9,8 @@ using Biz = redb.Examples.Models;
 namespace redb.Examples.ExamplesEf;
 
 /// <summary>
-/// EF Core twin of <see cref="E182_DeleteBatch"/>: five employees saved, loaded as whole objects, deleted one by
-/// one (the cascade removes their Props rows) and looked up again.
+/// EF Core twin of <see cref="E182_DeleteBatch"/>: five employees saved, loaded as whole objects, deleted in one
+/// statement (the cascade removes their Props rows) and looked up again.
 /// </summary>
 [ExampleMeta("E182_ef", "EF: Delete - Batch", "Core", ExampleTier.Free, 1, "EF", "Delete")]
 public class E182_DeleteBatch_ef : EfExampleBase
@@ -44,10 +44,7 @@ public class E182_DeleteBatch_ef : EfExampleBase
             countBefore = (await db.EmployeeProps.WithGraph().Where(e => ids.Contains(e._id)).ToBusinessListAsync()).Count;
 
         await using (var db = await contexts.CreateDbContextAsync())
-        {
-            foreach (var id in ids)
-                await db.objects.Where(o => o._id == id).ExecuteDeleteAsync();
-        }
+            await db.objects.Where(o => ids.Contains(o._id)).ExecuteDeleteAsync();
 
         int countAfter;
         await using (var db = await contexts.CreateDbContextAsync())

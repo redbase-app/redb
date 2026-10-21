@@ -82,9 +82,8 @@ public class E167_MixedBatch : ExampleBase
              $"Non-Generic: {nonGenCount}, Generic: {genCount}",
              $"IDs: [{string.Join(", ", ids)}]"]);
 
-        // Cleanup
-        foreach (var id in ids)
-            await redb.DeleteAsync(id);
+        // Cleanup: one delete for the whole batch
+        await redb.DeleteAsync(ids);
 
         return result;
     }

@@ -1,5 +1,5 @@
 # Assemblies the redb.Tsak worker already provides: /app/*.dll and /app/Libs/shared/*.dll of
-# redb-tsak-worker:4.3.0. A module dependency present here is NOT packed into the .tpkg; every other
+# redb-tsak-worker:4.4.0. A module dependency present here is NOT packed into the .tpkg; every other
 # dependency travels inside the package.
 #
 # The worker resolves these from its own folder and from Libs/shared next to the application
@@ -19,7 +19,7 @@ Amqp.Net.dll
 Azure.Core.Amqp.dll
 Azure.Core.dll
 Azure.Messaging.ServiceBus.dll
-BCrypt.Net-Next.dll
+BCrypt-Net-Next.dll
 BouncyCastle.Cryptography.dll
 Chr.Avro.Binary.dll
 Chr.Avro.Json.dll
@@ -27,6 +27,7 @@ Chr.Avro.dll
 Confluent.Kafka.dll
 CsvHelper.dll
 Elastic.Clients.Elasticsearch.dll
+Elastic.Esql.dll
 Elastic.Transport.dll
 FirebaseAdmin.dll
 FluentFTP.dll
@@ -64,6 +65,7 @@ Microsoft.AspNetCore.Http.Connections.Client.dll
 Microsoft.AspNetCore.SignalR.Client.Core.dll
 Microsoft.AspNetCore.SignalR.Client.dll
 Microsoft.AspNetCore.SignalR.Protocols.MessagePack.dll
+Microsoft.AspNetCore.SignalR.StackExchangeRedis.dll
 Microsoft.Azure.Amqp.dll
 Microsoft.Bcl.AsyncInterfaces.dll
 Microsoft.Bcl.Cryptography.dll
@@ -71,7 +73,38 @@ Microsoft.Data.SqlClient.Extensions.Abstractions.dll
 Microsoft.Data.SqlClient.Internal.Logging.dll
 Microsoft.Data.SqlClient.dll
 Microsoft.Data.Sqlite.dll
+Microsoft.Extensions.Caching.Abstractions.dll
+Microsoft.Extensions.Caching.Memory.dll
+Microsoft.Extensions.Configuration.Abstractions.dll
+Microsoft.Extensions.Configuration.Binder.dll
+Microsoft.Extensions.Configuration.CommandLine.dll
+Microsoft.Extensions.Configuration.EnvironmentVariables.dll
+Microsoft.Extensions.Configuration.FileExtensions.dll
+Microsoft.Extensions.Configuration.Json.dll
+Microsoft.Extensions.Configuration.UserSecrets.dll
+Microsoft.Extensions.Configuration.dll
+Microsoft.Extensions.DependencyInjection.Abstractions.dll
+Microsoft.Extensions.DependencyInjection.dll
 Microsoft.Extensions.DependencyModel.dll
+Microsoft.Extensions.Diagnostics.Abstractions.dll
+Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.dll
+Microsoft.Extensions.Diagnostics.HealthChecks.dll
+Microsoft.Extensions.Diagnostics.dll
+Microsoft.Extensions.FileProviders.Abstractions.dll
+Microsoft.Extensions.FileProviders.Physical.dll
+Microsoft.Extensions.FileSystemGlobbing.dll
+Microsoft.Extensions.Hosting.Abstractions.dll
+Microsoft.Extensions.Hosting.dll
+Microsoft.Extensions.Logging.Abstractions.dll
+Microsoft.Extensions.Logging.Configuration.dll
+Microsoft.Extensions.Logging.Console.dll
+Microsoft.Extensions.Logging.Debug.dll
+Microsoft.Extensions.Logging.EventLog.dll
+Microsoft.Extensions.Logging.EventSource.dll
+Microsoft.Extensions.Logging.dll
+Microsoft.Extensions.Options.ConfigurationExtensions.dll
+Microsoft.Extensions.Options.dll
+Microsoft.Extensions.Primitives.dll
 Microsoft.Identity.Client.Extensions.Msal.dll
 Microsoft.Identity.Client.dll
 Microsoft.IdentityModel.Abstractions.dll
@@ -122,11 +155,12 @@ StackExchange.Redis.dll
 System.ClientModel.dll
 System.CodeDom.dll
 System.Configuration.ConfigurationManager.dll
+System.Diagnostics.EventLog.dll
 System.IO.Hashing.dll
 System.IdentityModel.Tokens.Jwt.dll
-System.Linq.Async.dll
 System.Management.dll
 System.Memory.Data.dll
+System.Security.Cryptography.Pkcs.dll
 System.Security.Cryptography.ProtectedData.dll
 Telegram.Bot.dll
 XPath2.dll
@@ -175,6 +209,7 @@ redb.Route.RabbitMQ.dll
 redb.Route.Redis.dll
 redb.Route.S3.dll
 redb.Route.Sftp.dll
+redb.Route.SignalR.StackExchangeRedis.dll
 redb.Route.SignalR.dll
 redb.Route.Soap.dll
 redb.Route.Sql.dll

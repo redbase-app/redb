@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>RedbBlazor</RootNamespace>
     <!-- One place for the RedBase version used by this project. -->
-    <RedbVersion>4.3.0</RedbVersion>
+    <RedbVersion>4.4.0</RedbVersion>
     <!-- Versions live in these files: the project is created where no central Directory.Packages.props applies. -->
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
