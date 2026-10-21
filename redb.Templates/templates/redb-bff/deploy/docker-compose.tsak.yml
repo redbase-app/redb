@@ -11,7 +11,7 @@
 
 services:
   backend:
-    image: ghcr.io/redbase-app/redb-tsak-stack:${TSAK_VERSION:-4.4.0-net10}
+    image: ghcr.io/redbase-app/redb-tsak-stack:${TSAK_VERSION:-4.4.1-net10}
     restart: unless-stopped
     ports:
       - "127.0.0.1:9090:9090"   # worker API
