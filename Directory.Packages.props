@@ -122,7 +122,7 @@
 
   <!-- redb packages: the monorepo ProjectReferences, rewritten for the public repository. -->
   <ItemGroup>
-    <PackageVersion Include="redb.SQLite.Pro" Version="4.4.0" />
+    <PackageVersion Include="redb.SQLite.Pro" Version="4.4.1" />
   </ItemGroup>
 </Project>
 
