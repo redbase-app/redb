@@ -7,7 +7,7 @@ namespace redb.Examples.Examples;
 
 /// <summary>
 /// Demonstrates DistinctByRedb on TreeQuery to get unique tree nodes by a base field.
-/// Uses _objects table fields directly (no EAV join) - highly optimized.
+/// Uses _objects table fields directly (no props join) - highly optimized.
 /// Pro feature: DistinctByRedb with tree context.
 /// </summary>
 [ExampleMeta("E177", "TreeQuery - DistinctByRedb", "Tree",

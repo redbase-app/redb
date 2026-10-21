@@ -61,6 +61,14 @@ namespace redb.Core.Caching
         /// Get cache statistics
         /// </summary>
         PropsCacheStatistics GetStats();
+
+        /// <summary>
+        /// Removes every cached object whose type <paramref name="unloading"/> answers true for. redb calls it when a
+        /// collectible <c>AssemblyLoadContext</c> unloads (a module of Tsak, for instance), with a predicate that
+        /// recognizes the types of that context: an object of such a type kept here would keep the context alive.
+        /// The default implementation clears the whole cache, which is correct at the price of a cold cache.
+        /// </summary>
+        void RemoveObjectsOfTypes(Func<Type, bool> unloading) => Clear();
         
         // === LEGACY METHODS (COMMENTED OUT - use Get/Set for full RedbObject) ===
         

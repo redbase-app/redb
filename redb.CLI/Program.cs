@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using System.Data.Common;
+using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using redb.Core.Attributes;
@@ -51,68 +52,81 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        // The texts of System.CommandLine itself (help headings, parse errors) follow the UI culture; keep them in
+        // English like the rest of the tool, whatever the language of the operating system.
+        CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+        CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
+
         var rootCommand = new RootCommand("REDB CLI - Database export/import tool");
-        
+
         // Common options
-        var connectionOption = new Option<string>(
-            aliases: ["--connection", "-c"],
-            description: "Database connection string")
-        { IsRequired = true };
-        
-        var providerOption = new Option<string>(
-            aliases: ["--provider", "-p"],
-            description: "Database provider: postgres | mssql | oracle | sqlite")
-        { IsRequired = true };
-        
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Enable verbose output");
-        
-        var batchSizeOption = new Option<int>(
-            aliases: ["--batch-size"],
-            getDefaultValue: () => 1000,
-            description: "Batch size for operations (default: 1000)");
-        
-        var dryRunOption = new Option<bool>(
-            aliases: ["--dry-run"],
-            description: "Show what would be done without making changes");
-        
+        var connectionOption = new Option<string>("--connection", "-c")
+        {
+            Description = "Database connection string",
+            Required = true
+        };
+
+        var providerOption = new Option<string>("--provider", "-p")
+        {
+            Description = "Database provider: postgres | mssql | oracle | sqlite",
+            Required = true
+        };
+
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output"
+        };
+
+        var batchSizeOption = new Option<int>("--batch-size")
+        {
+            Description = "Batch size for operations (default: 1000)",
+            DefaultValueFactory = _ => 1000
+        };
+
+        var dryRunOption = new Option<bool>("--dry-run")
+        {
+            Description = "Show what would be done without making changes"
+        };
+
         // Export command
         var exportCommand = new Command("export", "Export database to .redb file");
-        
-        var outputOption = new Option<string>(
-            aliases: ["--output", "-o"],
-            description: "Output file path (.redb)")
-        { IsRequired = true };
-        
-        var compressOption = new Option<bool>(
-            aliases: ["--compress"],
-            description: "Compress output file with ZIP");
-        
-        var schemesOption = new Option<string?>(
-            aliases: ["--schemes"],
-            description: "Export only specified scheme IDs (comma-separated): --schemes 100,200,300");
-        
-        exportCommand.AddOption(connectionOption);
-        exportCommand.AddOption(providerOption);
-        exportCommand.AddOption(outputOption);
-        exportCommand.AddOption(compressOption);
-        exportCommand.AddOption(schemesOption);
-        exportCommand.AddOption(verboseOption);
-        exportCommand.AddOption(batchSizeOption);
-        exportCommand.AddOption(dryRunOption);
-        
-        exportCommand.SetHandler(async (context) =>
+
+        var outputOption = new Option<string>("--output", "-o")
         {
-            var connection = context.ParseResult.GetValueForOption(connectionOption)!;
-            var provider = context.ParseResult.GetValueForOption(providerOption)!;
-            var output = context.ParseResult.GetValueForOption(outputOption)!;
-            var compress = context.ParseResult.GetValueForOption(compressOption);
-            var schemesStr = context.ParseResult.GetValueForOption(schemesOption);
-            var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            var batchSize = context.ParseResult.GetValueForOption(batchSizeOption);
-            var dryRun = context.ParseResult.GetValueForOption(dryRunOption);
-            
+            Description = "Output file path (.redb)",
+            Required = true
+        };
+
+        var compressOption = new Option<bool>("--compress")
+        {
+            Description = "Compress output file with ZIP"
+        };
+
+        var schemesOption = new Option<string?>("--schemes")
+        {
+            Description = "Export only specified scheme IDs (comma-separated): --schemes 100,200,300"
+        };
+
+        exportCommand.Options.Add(connectionOption);
+        exportCommand.Options.Add(providerOption);
+        exportCommand.Options.Add(outputOption);
+        exportCommand.Options.Add(compressOption);
+        exportCommand.Options.Add(schemesOption);
+        exportCommand.Options.Add(verboseOption);
+        exportCommand.Options.Add(batchSizeOption);
+        exportCommand.Options.Add(dryRunOption);
+
+        exportCommand.SetAction(async (parseResult, ct) =>
+        {
+            var connection = parseResult.GetValue(connectionOption)!;
+            var provider = parseResult.GetValue(providerOption)!;
+            var output = parseResult.GetValue(outputOption)!;
+            var compress = parseResult.GetValue(compressOption);
+            var schemesStr = parseResult.GetValue(schemesOption);
+            var verbose = parseResult.GetValue(verboseOption);
+            var batchSize = parseResult.GetValue(batchSizeOption);
+            var dryRun = parseResult.GetValue(dryRunOption);
+
             long[]? schemeIds = null;
             if (!string.IsNullOrWhiteSpace(schemesStr))
             {
@@ -120,175 +134,187 @@ public static class Program
                     .Select(s => long.Parse(s.Trim()))
                     .ToArray();
             }
-            
-            await ExportAsync(connection, provider, output, compress, schemeIds, 
-                              verbose, batchSize, dryRun, context.GetCancellationToken());
+
+            return await ExportAsync(connection, provider, output, compress, schemeIds,
+                              verbose, batchSize, dryRun, ct);
         });
-        
+
         // Import command
         var importCommand = new Command("import", "Import database from .redb file");
-        
-        var inputOption = new Option<string>(
-            aliases: ["--input", "-i"],
-            description: "Input file path (.redb)")
-        { IsRequired = true };
-        
-        var cleanOption = new Option<bool>(
-            aliases: ["--clean"],
-            description: "Clean database before import");
-        
-        importCommand.AddOption(connectionOption);
-        importCommand.AddOption(providerOption);
-        importCommand.AddOption(inputOption);
-        var parallelOption = new Option<int>(
-            aliases: ["--parallel", "-j"],
-            getDefaultValue: () => 1,
-            description: "Number of connections to load over (postgres). 1 keeps the whole import in one " +
-                         "transaction. More than 1 loads in parallel and rebuilds the secondary indexes of the " +
-                         "large tables afterwards: much faster on a large file, but not atomic - a run that " +
-                         "fails leaves a partly loaded database to be imported again with --clean.");
-        importCommand.AddOption(cleanOption);
-        importCommand.AddOption(parallelOption);
-        importCommand.AddOption(verboseOption);
-        importCommand.AddOption(batchSizeOption);
-        importCommand.AddOption(dryRunOption);
-        
-        importCommand.SetHandler(async (context) =>
-        {
-            var connection = context.ParseResult.GetValueForOption(connectionOption)!;
-            var provider = context.ParseResult.GetValueForOption(providerOption)!;
-            var input = context.ParseResult.GetValueForOption(inputOption)!;
-            var clean = context.ParseResult.GetValueForOption(cleanOption);
-            var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            var batchSize = context.ParseResult.GetValueForOption(batchSizeOption);
-            var dryRun = context.ParseResult.GetValueForOption(dryRunOption);
-            var parallel = context.ParseResult.GetValueForOption(parallelOption);
 
-            await ImportAsync(connection, provider, input, clean,
-                              verbose, batchSize, dryRun, parallel, context.GetCancellationToken());
+        var inputOption = new Option<string>("--input", "-i")
+        {
+            Description = "Input file path (.redb)",
+            Required = true
+        };
+
+        var cleanOption = new Option<bool>("--clean")
+        {
+            Description = "Clean database before import"
+        };
+
+        importCommand.Options.Add(connectionOption);
+        importCommand.Options.Add(providerOption);
+        importCommand.Options.Add(inputOption);
+        var parallelOption = new Option<int>("--parallel", "-j")
+        {
+            Description = "Number of connections to load over (postgres). 1 keeps the whole import in one " +
+                          "transaction. More than 1 loads in parallel and rebuilds the secondary indexes of the " +
+                          "large tables afterwards: much faster on a large file, but not atomic - a run that " +
+                          "fails leaves a partly loaded database to be imported again with --clean.",
+            DefaultValueFactory = _ => 1
+        };
+        importCommand.Options.Add(cleanOption);
+        importCommand.Options.Add(parallelOption);
+        importCommand.Options.Add(verboseOption);
+        importCommand.Options.Add(batchSizeOption);
+        importCommand.Options.Add(dryRunOption);
+
+        importCommand.SetAction(async (parseResult, ct) =>
+        {
+            var connection = parseResult.GetValue(connectionOption)!;
+            var provider = parseResult.GetValue(providerOption)!;
+            var input = parseResult.GetValue(inputOption)!;
+            var clean = parseResult.GetValue(cleanOption);
+            var verbose = parseResult.GetValue(verboseOption);
+            var batchSize = parseResult.GetValue(batchSizeOption);
+            var dryRun = parseResult.GetValue(dryRunOption);
+            var parallel = parseResult.GetValue(parallelOption);
+
+            return await ImportAsync(connection, provider, input, clean,
+                              verbose, batchSize, dryRun, parallel, ct);
         });
-        
-        rootCommand.AddCommand(exportCommand);
-        rootCommand.AddCommand(importCommand);
-        
+
+        rootCommand.Subcommands.Add(exportCommand);
+        rootCommand.Subcommands.Add(importCommand);
+
         // Init command — create REDB schema in a database
         var initCommand = new Command("init", "Create REDB schema in an existing database");
-        initCommand.AddOption(connectionOption);
-        initCommand.AddOption(providerOption);
-        initCommand.AddOption(verboseOption);
-        
-        initCommand.SetHandler(async (context) =>
+        initCommand.Options.Add(connectionOption);
+        initCommand.Options.Add(providerOption);
+        initCommand.Options.Add(verboseOption);
+
+        initCommand.SetAction(async (parseResult, ct) =>
         {
-            var connection = context.ParseResult.GetValueForOption(connectionOption)!;
-            var provider = context.ParseResult.GetValueForOption(providerOption)!;
-            var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            
-            await InitSchemaAsync(connection, provider, verbose, context.GetCancellationToken());
+            var connection = parseResult.GetValue(connectionOption)!;
+            var provider = parseResult.GetValue(providerOption)!;
+            var verbose = parseResult.GetValue(verboseOption);
+
+            return await InitSchemaAsync(connection, provider, verbose, ct);
         });
-        
+
         // Schema command — export REDB schema SQL to stdout or file
         var schemaCommand = new Command("schema", "Export REDB schema SQL script");
-        schemaCommand.AddOption(providerOption);
-        
-        var schemaOutputOption = new Option<string?>(
-            aliases: ["--output", "-o"],
-            description: "Output file path. If omitted, writes to stdout.");
-        schemaCommand.AddOption(schemaOutputOption);
+        schemaCommand.Options.Add(providerOption);
 
-        var schemaUpgradeOption = new Option<bool>(
-            aliases: ["--upgrade"],
-            description: "Export the upgrade script for an EXISTING database (the versioned SQL module) " +
-                         "instead of the full schema. Hand it to the schema owner when the application " +
-                         "is not allowed to apply it itself. Idempotent, safe to re-run. " +
-                         "Not available for sqlite (the database file upgrades itself).");
-        schemaCommand.AddOption(schemaUpgradeOption);
-
-        schemaCommand.SetHandler(async (context) =>
+        var schemaOutputOption = new Option<string?>("--output", "-o")
         {
-            var provider = context.ParseResult.GetValueForOption(providerOption)!;
-            var output = context.ParseResult.GetValueForOption(schemaOutputOption);
-            var upgrade = context.ParseResult.GetValueForOption(schemaUpgradeOption);
+            Description = "Output file path. If omitted, writes to stdout."
+        };
+        schemaCommand.Options.Add(schemaOutputOption);
 
-            await Task.CompletedTask;
+        var schemaUpgradeOption = new Option<bool>("--upgrade")
+        {
+            Description = "Export the upgrade script for an EXISTING database (the versioned SQL module) " +
+                          "instead of the full schema. Hand it to the schema owner when the application " +
+                          "is not allowed to apply it itself. Idempotent, safe to re-run. " +
+                          "Not available for sqlite (the database file upgrades itself)."
+        };
+        schemaCommand.Options.Add(schemaUpgradeOption);
+
+        schemaCommand.SetAction(parseResult =>
+        {
+            var provider = parseResult.GetValue(providerOption)!;
+            var output = parseResult.GetValue(schemaOutputOption);
+            var upgrade = parseResult.GetValue(schemaUpgradeOption);
+
             ExportSchemaScript(provider, output, upgrade);
         });
-        
-        rootCommand.AddCommand(initCommand);
-        rootCommand.AddCommand(schemaCommand);
+
+        rootCommand.Subcommands.Add(initCommand);
+        rootCommand.Subcommands.Add(schemaCommand);
 
         // Flat command — unfold redb objects into ordinary relational tables
         var flatCommand = new Command("flat",
             "Unfold redb objects into flat relational tables and copy the data into them");
 
-        var sourceConnectionOption = new Option<string?>(
-            aliases: ["--source-connection", "-sc"],
-            description: "Connection string of the redb database to read");
-
-        var sourceProviderOption = new Option<string?>(
-            aliases: ["--source-provider", "-sp"],
-            description: "Provider of the source database: postgres | mssql | sqlite");
-
-        var targetConnectionOption = new Option<string?>(
-            aliases: ["--target-connection", "-tc"],
-            description: "Connection string of the database that receives the flat tables " +
-                         "(may be the source database itself; the tables must not exist yet)");
-
-        var targetProviderOption = new Option<string>(
-            aliases: ["--target-provider", "-tp"],
-            description: "Provider of the target database: postgres | mssql | sqlite")
-        { IsRequired = true };
-
-        var assemblyOption = new Option<string[]>(
-            aliases: ["--assembly", "-a"],
-            description: "Path to an assembly that declares Props classes. Give several paths, or repeat " +
-                         "the option, when the classes live in more than one project. The dependencies of " +
-                         "each assembly are resolved from the folder it lies in.")
-        { IsRequired = true, AllowMultipleArgumentsPerToken = true };
-
-        var typesOption = new Option<string?>(
-            aliases: ["--types"],
-            description: "Props classes to unfold, by name or full name (comma-separated). " +
-                         "When omitted, every class marked with [RedbScheme] in the given assemblies is taken.");
-
-        var ddlOnlyOption = new Option<bool>(
-            aliases: ["--ddl-only"],
-            description: "Print the DDL of the flat tables for the target provider and exit. " +
-                         "No database is opened; only --assembly and --target-provider are needed.");
-
-        flatCommand.AddOption(sourceConnectionOption);
-        flatCommand.AddOption(sourceProviderOption);
-        flatCommand.AddOption(targetConnectionOption);
-        flatCommand.AddOption(targetProviderOption);
-        flatCommand.AddOption(assemblyOption);
-        flatCommand.AddOption(typesOption);
-        flatCommand.AddOption(ddlOnlyOption);
-        flatCommand.AddOption(verboseOption);
-        flatCommand.AddOption(batchSizeOption);
-
-        flatCommand.SetHandler(async (context) =>
+        var sourceConnectionOption = new Option<string?>("--source-connection", "-sc")
         {
-            var sourceConnection = context.ParseResult.GetValueForOption(sourceConnectionOption);
-            var sourceProvider = context.ParseResult.GetValueForOption(sourceProviderOption);
-            var targetConnection = context.ParseResult.GetValueForOption(targetConnectionOption);
-            var targetProvider = context.ParseResult.GetValueForOption(targetProviderOption)!;
-            var assemblyPaths = context.ParseResult.GetValueForOption(assemblyOption)!;
-            var typesStr = context.ParseResult.GetValueForOption(typesOption);
-            var ddlOnly = context.ParseResult.GetValueForOption(ddlOnlyOption);
-            var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            var batchSize = context.ParseResult.GetValueForOption(batchSizeOption);
+            Description = "Connection string of the redb database to read"
+        };
 
-            await FlatAsync(sourceConnection, sourceProvider, targetConnection, targetProvider,
-                            assemblyPaths, typesStr, ddlOnly, verbose, batchSize, context.GetCancellationToken());
+        var sourceProviderOption = new Option<string?>("--source-provider", "-sp")
+        {
+            Description = "Provider of the source database: postgres | mssql | sqlite"
+        };
+
+        var targetConnectionOption = new Option<string?>("--target-connection", "-tc")
+        {
+            Description = "Connection string of the database that receives the flat tables " +
+                          "(may be the source database itself; the tables must not exist yet)"
+        };
+
+        var targetProviderOption = new Option<string>("--target-provider", "-tp")
+        {
+            Description = "Provider of the target database: postgres | mssql | sqlite",
+            Required = true
+        };
+
+        var assemblyOption = new Option<string[]>("--assembly", "-a")
+        {
+            Description = "Path to an assembly that declares Props classes. Give several paths, or repeat " +
+                          "the option, when the classes live in more than one project. The dependencies of " +
+                          "each assembly are resolved from the folder it lies in.",
+            Required = true,
+            AllowMultipleArgumentsPerToken = true
+        };
+
+        var typesOption = new Option<string?>("--types")
+        {
+            Description = "Props classes to unfold, by name or full name (comma-separated). " +
+                          "When omitted, every class marked with [RedbScheme] in the given assemblies is taken."
+        };
+
+        var ddlOnlyOption = new Option<bool>("--ddl-only")
+        {
+            Description = "Print the DDL of the flat tables for the target provider and exit. " +
+                          "No database is opened; only --assembly and --target-provider are needed."
+        };
+
+        flatCommand.Options.Add(sourceConnectionOption);
+        flatCommand.Options.Add(sourceProviderOption);
+        flatCommand.Options.Add(targetConnectionOption);
+        flatCommand.Options.Add(targetProviderOption);
+        flatCommand.Options.Add(assemblyOption);
+        flatCommand.Options.Add(typesOption);
+        flatCommand.Options.Add(ddlOnlyOption);
+        flatCommand.Options.Add(verboseOption);
+        flatCommand.Options.Add(batchSizeOption);
+
+        flatCommand.SetAction(async (parseResult, ct) =>
+        {
+            var sourceConnection = parseResult.GetValue(sourceConnectionOption);
+            var sourceProvider = parseResult.GetValue(sourceProviderOption);
+            var targetConnection = parseResult.GetValue(targetConnectionOption);
+            var targetProvider = parseResult.GetValue(targetProviderOption)!;
+            var assemblyPaths = parseResult.GetValue(assemblyOption)!;
+            var typesStr = parseResult.GetValue(typesOption);
+            var ddlOnly = parseResult.GetValue(ddlOnlyOption);
+            var verbose = parseResult.GetValue(verboseOption);
+            var batchSize = parseResult.GetValue(batchSizeOption);
+
+            return await FlatAsync(sourceConnection, sourceProvider, targetConnection, targetProvider,
+                            assemblyPaths, typesStr, ddlOnly, verbose, batchSize, ct);
         });
 
-        rootCommand.AddCommand(flatCommand);
+        rootCommand.Subcommands.Add(flatCommand);
 
-        return await rootCommand.InvokeAsync(args);
+        return await rootCommand.Parse(args).InvokeAsync();
     }
 
     // === Flat Export ===
 
-    private static async Task FlatAsync(
+    private static async Task<int> FlatAsync(
         string? sourceConnection,
         string? sourceProvider,
         string? targetConnection,
@@ -312,7 +338,7 @@ public static class Program
                 // not depend on them. Nothing but the script goes to stdout.
                 var model = new FlatModelBuilder().Build(propsTypes);
                 Console.WriteLine(new FlatDdlGenerator(target.Name).Script(model));
-                return;
+                return 0;
             }
 
             if (string.IsNullOrWhiteSpace(sourceConnection) ||
@@ -363,8 +389,10 @@ public static class Program
                 Console.WriteLine(ex.StackTrace);
             }
 
-            Environment.ExitCode = 1;
+            return 1;
         }
+
+        return 0;
     }
 
     /// <summary>
@@ -418,7 +446,7 @@ public static class Program
         return selected;
     }
     
-    private static async Task ExportAsync(
+    private static async Task<int> ExportAsync(
         string connection,
         string provider,
         string output,
@@ -465,11 +493,13 @@ public static class Program
                 Console.WriteLine(ex.StackTrace);
             }
             
-            Environment.ExitCode = 1;
+            return 1;
         }
+
+        return 0;
     }
     
-    private static async Task ImportAsync(
+    private static async Task<int> ImportAsync(
         string connection,
         string provider,
         string input,
@@ -516,8 +546,10 @@ public static class Program
                 Console.WriteLine(ex.StackTrace);
             }
             
-            Environment.ExitCode = 1;
+            return 1;
         }
+
+        return 0;
     }
     
     // === Schema Management Commands ===
@@ -546,7 +578,7 @@ public static class Program
     private static bool IsMssql(string providerName)
         => providerName.ToLowerInvariant() is "mssql" or "sqlserver";
     
-    private static async Task InitSchemaAsync(
+    private static async Task<int> InitSchemaAsync(
         string connection, string provider, bool verbose, CancellationToken ct)
     {
         Console.WriteLine("REDB Schema Init");
@@ -618,8 +650,10 @@ public static class Program
                 Console.WriteLine(ex.StackTrace);
             }
             
-            Environment.ExitCode = 1;
+            return 1;
         }
+
+        return 0;
     }
     
     private static void ExportSchemaScript(string provider, string? outputPath, bool upgrade = false)

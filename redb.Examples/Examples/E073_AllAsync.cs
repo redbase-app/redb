@@ -30,15 +30,21 @@ public class E073_AllAsync : ExampleBase
         var allMillionaires = await redb.Query<EmployeeProps>()
             .AllAsync(e => e.Salary > 1_000_000m);
 
+        // Filter and check both on nested classes: everyone in Berlin lives on floor 1 or higher
+        var allBerlinFloorsValid = await redb.Query<EmployeeProps>()
+            .Where(e => e.HomeAddress!.City == "Berlin")
+            .AllAsync(e => e.HomeAddress!.Building!.Floor >= 1);
+
         sw.Stop();
 
         // Count passed validations
-        var checks = new[] { allNonNegativeSalary, allHighEarnersOver25 };
+        var checks = new[] { allNonNegativeSalary, allHighEarnersOver25, allBerlinFloorsValid };
         var passedCount = checks.Count(c => c);
 
         return Ok("E073", "AllAsync - Check All Match", ExampleTier.Free, sw.ElapsedMilliseconds, passedCount,
             [$"All Salary >= 0: {allNonNegativeSalary}",
              $"All high earners (>100k) over 25: {allHighEarnersOver25}",
-             $"All millionaires (>1M): {allMillionaires} (expected false)"]);
+             $"All millionaires (>1M): {allMillionaires} (expected false)",
+             $"All in Berlin on floor 1 or higher: {allBerlinFloorsValid}"]);
     }
 }

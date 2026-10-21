@@ -167,6 +167,20 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         return await ExecuteCountAsync(context, cancellationToken) > 0;
     }
 
+    /// <summary>
+    /// The provider compiles <see cref="LogicalOperator.NotTrue"/> over a filter on Props fields. AllAsync then asks
+    /// for the first counterexample (AnyAsync of the set filtered by NotTrue of the predicate) instead of counting the
+    /// set twice. A provider that does not compile it keeps the two counts.
+    /// </summary>
+    protected internal virtual bool CompilesNotTrue => false;
+
+    /// <summary>
+    /// An ordering by Props fields keeps the objects without a value for the key and places them as LINQ does (null
+    /// first ascending), ThenBy included. A projection then sends an OrderBy or ThenBy written after Select to the
+    /// source, so a later Take/Skip stays in SQL; otherwise it sorts the projected rows in memory.
+    /// </summary>
+    protected internal virtual bool SortsByPropsLikeLinq => false;
+
     private async Task<object> ExecuteToListAsyncGeneric(object contextObj, CancellationToken cancellationToken)
     {
         // Use reflection to call the generic method

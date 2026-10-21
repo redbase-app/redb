@@ -619,6 +619,28 @@ using (redb.CreateSystemContext())
 }
 ```
 
+### Save Interceptors
+
+`IRedbSaveInterceptor` sees every save and hard delete: `SavingAsync` and `DeletingAsync` before the transaction (an exception cancels the operation), `SavedAsync` and `DeletedAsync` after the commit. Under `ChangeTracking` the saved context carries the value-level changes. Inside `ExecuteAtomicAsync` all four run within the caller's transaction. With nothing registered the save pipeline pays nothing.
+
+| Source | How | Order |
+|--------|-----|-------|
+| DI | `services.AddSingleton<IRedbSaveInterceptor, MyAudit>()` | first, in registration order |
+| Run time | `IRedbSaveInterceptorRegistry.Add(interceptor)` returns an `IDisposable` | after DI, in subscription order |
+
+The registry is for code that cannot reach the container the redb service was built from, such as a module loaded into its own `AssemblyLoadContext`. `AddRedb` and `AddRedbPro` register it as a singleton with `TryAdd`, so a registry put into the container before them is kept and can be shared.
+
+- A subscription sees **every** save and delete of the process made through a redb service over that registry: scopes already open, other modules, and named instances (`RedbInstanceFactory`) built over the same registry.
+- An exception from its `SavingAsync` or `DeletingAsync` therefore cancels **any** save or delete of the process, not only the subscriber's own.
+- It takes effect from the next operation. An operation already running keeps the set of interceptors it started with, so its Saving and Saved always reach the same interceptors.
+- Disposing the handle removes the interceptor for every later operation, and the registry keeps no reference to it, so the load context can unload once the running operations end. Disposing twice, or from another thread, is safe.
+
+```csharp
+var registry = services.GetRequiredService<IRedbSaveInterceptorRegistry>();
+using var subscription = registry.Add(new NotifyOnSave(hub));
+// ... until the module stops
+```
+
 ---
 
 ## Architecture
@@ -696,6 +718,14 @@ The per-save value-set ownership contract (one object's `SaveAsync` rewrites
 its full value set) is still destructive in this release — old and new versions
 should not write to the same object during the multi-version window. An opt-in
 `PropsSaveMode.PreserveUnknownStructures` flag is planned; see ROADMAP.
+
+### Modules in a collectible AssemblyLoadContext
+
+A module that brings its own Props types (a Tsak module, a plugin) can live in a collectible `AssemblyLoadContext` and unload while the host's redb service goes on. redb keeps no strong reference to its types: the caches keyed by type hold them weakly, and when the context unloads redb drops the module's objects from the props and list caches. The host only calls `Unload()`.
+
+The .NET libraries keep caches of their own over the types they handled; System.Text.Json does not support unloadable assemblies otherwise ([dotnet/runtime#65323](https://github.com/dotnet/runtime/issues/65323)). On every unload redb therefore calls `ClearCache` of the hot reload handlers (`MetadataUpdateHandler`) of all loaded assemblies, as `dotnet watch` does: System.Text.Json, TypeDescriptor and the others. A failing handler is logged as a warning and the rest still run. The price is cold caches in those libraries once per unload.
+
+What the module must release itself: its interceptor subscriptions (`IRedbSaveInterceptorRegistry`), and any redb object or service it handed to the host.
 
 ---
 

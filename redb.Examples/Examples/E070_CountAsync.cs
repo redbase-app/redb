@@ -25,9 +25,14 @@ public class E070_CountAsync : ExampleBase
             .Where(e => e.Position == "Manager")
             .CountAsync();
 
+        // Filtered by a field two nested classes deep
+        var highFloorCount = await redb.Query<EmployeeProps>()
+            .Where(e => e.HomeAddress!.Building!.Floor > 20)
+            .CountAsync();
+
         sw.Stop();
 
         return Ok("E070", "CountAsync - Total and Filtered", ExampleTier.Free, sw.ElapsedMilliseconds, totalCount,
-            [$"Total: {totalCount}, Managers: {managersCount}"]);
+            [$"Total: {totalCount}, Managers: {managersCount}, Home floor above 20: {highFloorCount}"]);
     }
 }

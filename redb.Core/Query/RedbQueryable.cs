@@ -251,6 +251,34 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         return (int)result;
     }
 
+    /// <summary>Is there an object in the whole set filtered by <paramref name="filter"/>, Take and Skip aside.</summary>
+    private async Task<bool> AnyOfWholeSetAsync(FilterExpression? filter, CancellationToken cancellationToken)
+    {
+        if (_context.IsEmpty)
+            return false;
+
+        var whole = _context.Clone();
+        whole.Limit = null;
+        whole.Offset = null;
+        whole.Filter = filter;
+        var result = await _provider.ExecuteAsync(Expression.Constant(whole), typeof(bool), cancellationToken: cancellationToken);
+        return (bool)result;
+    }
+
+    /// <summary>
+    /// The filter reads Props fields directly, nothing else: no field of the object itself, no computed value
+    /// (arithmetic, functions). The constant of Where(x => true / false) passes.
+    /// </summary>
+    private static bool ReadsPropsFieldsOnly(FilterExpression filter) => filter switch
+    {
+        ComparisonExpression c => c.Property.Name == "__constant"
+                                  || (c.LeftExpression == null && c.RightExpression == null && !c.Property.IsBaseField),
+        InExpression i => !i.Property.IsBaseField,
+        NullCheckExpression n => !n.Property.IsBaseField,
+        LogicalExpression l => l.Operator != LogicalOperator.NotTrue && l.Operands.All(ReadsPropsFieldsOnly),
+        _ => false
+    };
+
     internal static bool IsPaged(QueryContext<TProps> context)
         => context.Limit != null || (context.Offset ?? 0) > 0;
 
@@ -364,8 +392,25 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         if (predicate == null)
             throw new ArgumentNullException(nameof(predicate));
 
-        // All() == true if all records satisfy the condition.
-        // Both counts are of the whole filtered set: two counts cut to the same page size would
+        // All() == true if all records satisfy the condition: no object of the whole filtered set (Take and Skip
+        // aside) is a counterexample, an object for which the predicate is not TRUE. A provider that compiles NotTrue
+        // answers that as one existence check, which stops at the first counterexample. The predicate must read Props
+        // fields only: a provider compiles the fields of the object and Props in separate parts of a statement, and
+        // NotTrue cannot be split across them.
+        var predicateFilter = _filterParser.ParseFilter(predicate);
+        if (_provider is Base.QueryProviderBase { CompilesNotTrue: true } && ReadsPropsFieldsOnly(predicateFilter))
+        {
+            if (IsEmptyFilter(predicateFilter))
+                return !await AnyOfWholeSetAsync(_context.Filter, cancellationToken);   // All(x => false): only an empty set
+
+            var notTrue = new LogicalExpression(LogicalOperator.NotTrue, new[] { predicateFilter });
+            var counterexamples = _context.Filter == null
+                ? notTrue
+                : new LogicalExpression(LogicalOperator.And, new[] { _context.Filter, notTrue });
+            return !await AnyOfWholeSetAsync(counterexamples, cancellationToken);
+        }
+
+        // Otherwise both counts are of the whole filtered set: two counts cut to the same page size would
         // come out equal whenever enough rows match, whether or not all of them do.
         var totalCount = await CountWholeSetAsync(cancellationToken);
         if (totalCount == 0)

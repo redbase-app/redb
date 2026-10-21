@@ -65,9 +65,9 @@ public class E201_NullCheckBaseIdAmbiguity : ExampleBase
             log.AppendLine(sql);
             log.AppendLine();
 
-            Console.WriteLine();
-            Console.WriteLine($"--- {label} (expected: {expectation}) ---");
-            Console.WriteLine(sql);
+            // Console.WriteLine();
+            // Console.WriteLine($"--- {label} (expected: {expectation}) ---");
+            // Console.WriteLine(sql);
 
             // Static verdict: the two-table CTE form together with an unqualified _id.
             var twoTableForm = sql.Contains("FROM _objects o_src");

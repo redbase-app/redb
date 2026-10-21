@@ -303,13 +303,19 @@ public abstract class AmbientTransactionTestsBase : IAsyncLifetime
     {
         // Owner decision P1: parallel branches in ONE transaction are not supported and must fail loudly,
         // never write silently. Two dependent clones write at the same time.
+        //
+        // The branches meet before EVERY insert, not only before the first. A collision is two commands
+        // in flight at once; on SQLite an insert takes microseconds, and two branches released only once
+        // could run their 200 inserts without ever overlapping under the load of a full run - the test
+        // then failed now and then. A branch that leaves (it collided, or failed) leaves the barrier too,
+        // so the other one never waits for it.
         var tag = NewTag();
         Exception? failure = null;
 
         try
         {
             using var tx = NewScope();
-            var start = new Barrier(2);
+            var meet = new Barrier(2);
             var branches = Enumerable.Range(0, 2).Select(branch =>
             {
                 var dependent = Transaction.Current!.DependentClone(DependentCloneOption.BlockCommitUntilComplete);
@@ -320,13 +326,16 @@ public abstract class AmbientTransactionTestsBase : IAsyncLifetime
                         using var branchScope = new TransactionScope(dependent, TransactionScopeAsyncFlowOption.Enabled);
                         await using var scope = _services.CreateAsyncScope();
                         var redb = scope.ServiceProvider.GetRequiredService<IRedbService>();
-                        start.SignalAndWait();
                         for (var i = 0; i < 200; i++)
+                        {
+                            meet.SignalAndWait();
                             await InsertRowAsync(redb, $"{tag}-{branch}-{i}");
+                        }
                         branchScope.Complete();
                     }
                     finally
                     {
+                        meet.RemoveParticipant();
                         dependent.Complete();
                     }
                 });

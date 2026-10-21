@@ -150,6 +150,33 @@ public abstract class PvtPrefilterEquivalenceTestsBase
         }
     }
 
+    /// <summary>
+    /// "a || b || c" parses as OrElse(OrElse(a, b), c). The planner read only the direct operands of
+    /// the outer OR, met the inner OR as an unknown leaf and declined the whole disjunction with
+    /// NoAnalyzableLeaf, although each leaf was expressible. Two leaves got the prefilter, three
+    /// did not. The ordering is an expression over Id for the reason given in PlannerTrace_ExplainsTheDecision.
+    /// </summary>
+    [Fact]
+    public async Task Or_ThreeLeaves_GetsOneBranchEach()
+    {
+        await SeedAsync();
+
+        IRedbQueryable<EmployeeProps> Build() => Redb.Query<EmployeeProps>()
+            .WhereRedb(o => o.Id > 0)
+            .Where(e => e.Position.Contains("Developer")
+                     || e.Department.Contains("Engineering")
+                     || e.LastName.Contains("son"))
+            .OrderByRedb(o => o.Id + 0)
+            .Take(100);
+
+        var (_, sql) = await BothAsync(() => Build().ToSqlStringAsync());
+        sql.Should().Contain("-- PVT prefilter: Row form, 3 branch(es)",
+            "every leaf of a nested OR is reachable, so each becomes a branch");
+
+        var (off, on) = await BothAsync(async () => (await Build().ToListAsync()).Select(r => r.id).ToList());
+        on.Should().Equal(off, "the prefilter is a superset and must not change the answer");
+    }
+
     // ──────────────────────────────────────────────────────────────────
     //  Shapes the planner accepts
     // ──────────────────────────────────────────────────────────────────
@@ -452,5 +479,51 @@ public abstract class PvtPrefilterEquivalenceTestsBase
         var (off, on) = await BothAsync(() => RunAsync(Guid.NewGuid().ToString("N")[..8]));
 
         on.Should().Be(off, "DeleteAsync keeps its own scheme check; the prefilter must not widen it");
+    }
+
+    /// <summary>
+    /// An entry of a dictionary addressed by its key (PhoneDirectory["desk"]) is one row per object: the streams join
+    /// it by the key instead of grouping every row of the dictionary in the scheme (E060, 100 000 employees, a page of
+    /// 100: 270-300 ms -> 90-100 ms). Asserted on the SQL; the answers must not change.
+    /// </summary>
+    [Fact]
+    public async Task DictionaryEntryByKey_ReadByStreams_SameAnswers()
+    {
+        await TestDataFactory.SeedEmployees(Redb, 40);
+        // An employee without the dictionary has no key in it: both forms must count it under !ContainsKey.
+        var withoutDirectory = TestDataFactory.CreateEmployee(9201);
+        withoutDirectory.Props.PhoneDirectory = null;
+        await Redb.SaveAsync(withoutDirectory);
+        var restore = Redb.Configuration.EnablePvtPrefilter;
+        try
+        {
+            IRedbQueryable<EmployeeProps> HasDesk() => Redb.Query<EmployeeProps>()
+                .Where(e => e.PhoneDirectory!.ContainsKey("desk"))
+                .OrderByRedb(o => o.Id).Take(10);
+            IRedbQueryable<EmployeeProps> DeskIs() => Redb.Query<EmployeeProps>()
+                .Where(e => e.PhoneDirectory!["desk"] == "555-1003");
+
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
+            (await HasDesk().ToSqlStringAsync()).Should().Contain("-- PVT form: Streams,",
+                "a dictionary entry by its key maps to one row per object");
+
+            async Task<(List<long> Page, int Count, int Missing)> AnswersAsync() => (
+                (await HasDesk().ToListAsync()).Select(o => o.Id).ToList(),
+                await DeskIs().CountAsync(),
+                await Redb.Query<EmployeeProps>().Where(e => !e.PhoneDirectory!.ContainsKey("absent-key")).CountAsync());
+
+            var on = await AnswersAsync();
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            var off = await AnswersAsync();
+            on.Page.Should().Equal(off.Page);
+            on.Page.Should().NotBeEmpty();
+            on.Count.Should().Be(off.Count);
+            on.Missing.Should().Be(off.Missing);
+            on.Missing.Should().Be(await Redb.Query<EmployeeProps>().CountAsync(), "no employee has the key absent-key");
+        }
+        finally
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = restore);
+        }
     }
 }

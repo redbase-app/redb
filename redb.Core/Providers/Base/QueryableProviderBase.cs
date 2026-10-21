@@ -114,15 +114,17 @@ namespace redb.Core.Providers.Base
             // Fallback: use Task.Run to avoid Blazor/ASP.NET SynchronizationContext deadlock.
             // This runs GetSchemeByTypeAsync on ThreadPool where there's no SynchronizationContext.
             // Note: GetSchemeByTypeAsync will cache the result, so subsequent calls will hit cache.
-            Logger?.LogWarning(
-                "Scheme '{SchemeName}' not found in cache. Consider calling InitializeAsync() at startup for better performance.",
-                typeof(TProps).Name);
-            
             scheme = Task.Run(() => SchemeSync.GetSchemeByTypeAsync<TProps>()).GetAwaiter().GetResult();
-            
+
             if (scheme == null)
                 throw new InvalidOperationException($"Scheme for type '{typeof(TProps).Name}' not found. Ensure InitializeAsync() was called at startup.");
-            
+
+            // Read once and cached for the process: a process that reads schemes another one owns (a Tsak worker
+            // whose module does not sync them) meets this on every first query, and nothing is wrong with it.
+            Logger?.LogDebug(
+                "Scheme '{SchemeName}' was not in the cache and was read from the database on first use.",
+                scheme.Name);
+
             return scheme;
         }
 

@@ -70,7 +70,7 @@ public class RedbService : RedbServiceBase
         IRedbContext context, IRedbObjectSerializer serializer, IPermissionProvider permissionProvider,
         IRedbSecurityContext securityContext, ISchemeSyncProvider schemeSync,
         RedbServiceConfiguration config, IListProvider listProvider, ILogger? logger,
-        IEnumerable<redb.Core.Interception.IRedbSaveInterceptor>? saveInterceptors)
+        redb.Core.Interception.RedbSaveInterceptorPipeline? saveInterceptors)
         => new SqliteObjectStorageProvider(context, serializer, permissionProvider, 
             securityContext, schemeSync, config, listProvider, logger, saveInterceptors);
     
@@ -161,8 +161,13 @@ public class RedbService : RedbServiceBase
     ///     for the FK check (perf finding, 2026-09-10).
     /// 10 — the indexes another index of the same table fully replaces are dropped, the set PostgreSQL
     ///     dropped in its module 0.7.13 (2026-10-14).
+    /// 11 — value-leading indexes IX__values__structure_&lt;value&gt;_object for every value column, the set
+    ///     PostgreSQL got in its module 0.7.16; the object-leading *_not_null, ix__values__array_null_structure
+    ///     and the IX__values__scalar_*_object of SQLite Pro dropped (2026-10-17).
+    /// 12 — IX__values__structure_object_string (partial, text values only): which objects hold a text value of a
+    ///     field, without reading the text. A filter Field == null over a text field reads it (2026-10-21).
     /// </remarks>
-    private const int SchemaVersion = 10;
+    private const int SchemaVersion = 12;
 
     /// <summary>
     /// Schema upgrades for a database created by an older build — the SQLite counterpart of the
@@ -297,8 +302,72 @@ public class RedbService : RedbServiceBase
             await Context.ExecuteAsync($"DROP INDEX IF EXISTS \"{index}\"");
         }
 
+        // 11 - value-leading indexes (2026-10-17), see redbSqlite.sql. Built before the old ones are
+        // dropped. An index of one of these names with any other definition is rebuilt: CREATE INDEX IF
+        // NOT EXISTS alone would keep it. sqlite_master keeps the statement as written, so it is compared
+        // with whitespace collapsed and IF NOT EXISTS taken out. An index built here gets planner
+        // statistics at once, bounded as the maintenance ANALYZE is: without them SQLite costs it blind.
+        var built = new List<string>();
+        foreach (var column in ValueColumns)
+        {
+            var name = $"IX__values__structure_{column.ToLowerInvariant()}_object";
+            var definition = $"CREATE INDEX \"{name}\" ON _values (_id_structure, _{column}, _id_object, _array_index) WHERE _{column} IS NOT NULL";
+            var existing = await Context.ExecuteScalarAsync<string?>(
+                $"SELECT sql FROM sqlite_master WHERE type = 'index' AND name = '{name}'");
+            if (existing != null && NormalizeIndexSql(existing) != definition)
+            {
+                await Context.ExecuteAsync($"DROP INDEX \"{name}\"");
+                existing = null;
+            }
+            if (existing == null)
+            {
+                await Context.ExecuteAsync(definition);
+                built.Add(name);
+            }
+        }
+        if (built.Count > 0)
+        {
+            var limit = Configuration.MaintenanceAnalysisLimit;
+            await Context.ExecuteAsync($"PRAGMA analysis_limit = {(limit > 0 ? limit : 0)}");
+            foreach (var name in built)
+                await Context.ExecuteAsync($"ANALYZE \"{name}\"");
+        }
+        foreach (var index in new[]
+                 {
+                     "IX__values__String_not_null", "IX__values__Long_not_null", "IX__values__DateTimeOffset_not_null",
+                     "IX__values__Numeric_not_null", "ix__values__array_null_structure",
+                     "IX__values__scalar_String_object", "IX__values__scalar_Long_object",
+                     "IX__values__scalar_Numeric_object", "IX__values__scalar_DateTimeOffset_object",
+                 })
+        {
+            await Context.ExecuteAsync($"DROP INDEX IF EXISTS \"{index}\"");
+        }
+
+        // 12 - which objects hold a text value of a field (2026-10-21), see redbSqlite.sql. The text column is
+        // in no other index by object, so a check that a text field is absent read every row from the table.
+        // Statistics at once, as in step 11.
+        var stringIndexExists = await Context.ExecuteScalarAsync<long?>(
+            "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'IX__values__structure_object_string'");
+        if (!stringIndexExists.HasValue)
+        {
+            await Context.ExecuteAsync(
+                "CREATE INDEX \"IX__values__structure_object_string\" ON _values (_id_structure, _id_object) WHERE _String IS NOT NULL");
+            var limit = Configuration.MaintenanceAnalysisLimit;
+            await Context.ExecuteAsync($"PRAGMA analysis_limit = {(limit > 0 ? limit : 0)}");
+            await Context.ExecuteAsync("ANALYZE \"IX__values__structure_object_string\"");
+        }
+
         await StampSchemaVersionAsync();
     }
+
+    /// <summary>Value columns of _values that get a value-leading index (schema step 11).</summary>
+    private static readonly string[] ValueColumns =
+        ["String", "Long", "Numeric", "Double", "DateTimeOffset", "Boolean", "Guid", "ListItem", "Object"];
+
+    /// <summary>A CREATE INDEX statement as sqlite_master keeps it, reduced to one spelling.</summary>
+    private static string NormalizeIndexSql(string sql)
+        => System.Text.RegularExpressions.Regex.Replace(sql, @"\s+", " ").Trim()
+            .Replace("CREATE INDEX IF NOT EXISTS ", "CREATE INDEX ", StringComparison.OrdinalIgnoreCase);
 
     private Task StampSchemaVersionAsync() => Context.ExecuteAsync($"PRAGMA user_version = {SchemaVersion}");
 

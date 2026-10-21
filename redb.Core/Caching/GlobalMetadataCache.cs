@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -43,8 +45,29 @@ internal class DomainCache
     // Per-domain CLR type projection. scheme_id is a per-database fact, so this must stay isolated
     // per connection/domain. The database-independent schemeName↔Type mapping lives process-globally
     // in ClrSchemeTypeIndex (one scan serves all domains; self-healing on assembly load).
-    public readonly ConcurrentDictionary<long, Type> SchemeIdToClrType = new();
-    public readonly ConcurrentDictionary<Type, long> ClrTypeToSchemeId = new();
+    // Both directions hold the type weakly, as ClrSchemeTypeIndex does: the type of a module loaded into a
+    // collectible AssemblyLoadContext must not keep that context alive. A dead entry reads as a miss and is
+    // re-derived lazily; a type of the default context never dies, so its entry behaves as a strong one.
+    public readonly ConcurrentDictionary<long, WeakReference<Type>> SchemeIdToClrType = new();
+    public readonly ConditionalWeakTable<Type, StrongBox<long>> ClrTypeToSchemeId = new();
+
+    public void MapClrType(long schemeId, Type type)
+    {
+        SchemeIdToClrType[schemeId] = new WeakReference<Type>(type);
+        ClrTypeToSchemeId.AddOrUpdate(type, new StrongBox<long>(schemeId));
+    }
+
+    public bool TryGetClrType(long schemeId, [NotNullWhen(true)] out Type? type)
+    {
+        if (SchemeIdToClrType.TryGetValue(schemeId, out var weak))
+        {
+            if (weak.TryGetTarget(out type))
+                return true;
+            SchemeIdToClrType.TryRemove(new KeyValuePair<long, WeakReference<Type>>(schemeId, weak));
+        }
+        type = null;
+        return false;
+    }
     public bool ClrTypeRegistryInitialized = false;   // per-domain warm-up done (optimization only; resolution is lazy)
     
     // Statistics
@@ -329,10 +352,7 @@ public class GlobalMetadataCache
 
                 var scheme = await schemeProvider.GetSchemeByNameAsync(schemeName);
                 if (scheme != null)
-                {
-                    cache.SchemeIdToClrType[scheme.Id] = type;
-                    cache.ClrTypeToSchemeId[type] = scheme.Id;
-                }
+                    cache.MapClrType(scheme.Id, type);
             }
             catch (Exception ex)
             {
@@ -360,7 +380,7 @@ public class GlobalMetadataCache
     public Type? GetClrType(long schemeId)
     {
         var cache = GetCache();
-        if (cache.SchemeIdToClrType.TryGetValue(schemeId, out var type))
+        if (cache.TryGetClrType(schemeId, out var type))
             return type;
 
         // Lazy derive: scheme_id → (this domain's cached scheme name) → (global name↔Type).
@@ -369,8 +389,7 @@ public class GlobalMetadataCache
             var t = ClrSchemeTypeIndex.Resolve(scheme.Name);
             if (t != null)
             {
-                cache.SchemeIdToClrType[schemeId] = t;
-                cache.ClrTypeToSchemeId[t] = schemeId;
+                cache.MapClrType(schemeId, t);
                 return t;
             }
         }
@@ -423,11 +442,7 @@ public class GlobalMetadataCache
 
         var type = ClrSchemeTypeIndex.Resolve(scheme.Name);
         if (type != null)
-        {
-            var cache = GetCache();
-            cache.SchemeIdToClrType[schemeId] = type;
-            cache.ClrTypeToSchemeId[type] = schemeId;
-        }
+            GetCache().MapClrType(schemeId, type);
         return type;
     }
 
@@ -438,9 +453,7 @@ public class GlobalMetadataCache
     public void RegisterClrType(string schemeName, long schemeId, Type type)
     {
         ClrSchemeTypeIndex.Register(schemeName, type);   // global (shared across domains/connections)
-        var cache = GetCache();
-        cache.SchemeIdToClrType[schemeId] = type;        // per-domain (scheme_id is per-database)
-        cache.ClrTypeToSchemeId[type] = schemeId;
+        GetCache().MapClrType(schemeId, type);           // per-domain (scheme_id is per-database)
     }
 
     /// <summary>
@@ -448,7 +461,7 @@ public class GlobalMetadataCache
     /// </summary>
     public long? GetSchemeIdByClrType(Type type)
     {
-        return GetCache().ClrTypeToSchemeId.TryGetValue(type, out var schemeId) ? schemeId : null;
+        return GetCache().ClrTypeToSchemeId.TryGetValue(type, out var schemeId) ? schemeId.Value : null;
     }
 
     /// <summary>

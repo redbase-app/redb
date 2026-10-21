@@ -6,11 +6,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>RedbApp</RootNamespace>
+    <!-- One place for the RedBase version. -->
+    <RedbVersion>4.3.0</RedbVersion>
+    <!-- Versions live in this file: the project is created where no central Directory.Packages.props applies. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.3" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
   </ItemGroup>
 
   <!-- Provider packages. Exactly one group below is generated, matching the db option you picked.
@@ -21,32 +25,32 @@
        and uncomment the matching .Use*() line in Program.cs. -->
   <!--#if (UsePostgres && pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.Postgres.Pro" Version="4.3.0" />
+    <PackageReference Include="redb.Postgres.Pro" Version="$(RedbVersion)" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UsePostgres && !pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.Postgres" Version="4.3.0" />
+    <PackageReference Include="redb.Postgres" Version="$(RedbVersion)" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UseMsSql && pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.MSSql.Pro" Version="4.3.0" />
+    <PackageReference Include="redb.MSSql.Pro" Version="$(RedbVersion)" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UseMsSql && !pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.MSSql" Version="4.3.0" />
+    <PackageReference Include="redb.MSSql" Version="$(RedbVersion)" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UseSqlite && pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.SQLite.Pro" Version="4.3.0" />
+    <PackageReference Include="redb.SQLite.Pro" Version="$(RedbVersion)" />
   </ItemGroup>
   <!--#endif -->
   <!--#if (UseSqlite && !pro) -->
   <ItemGroup>
-    <PackageReference Include="redb.SQLite" Version="4.3.0" />
+    <PackageReference Include="redb.SQLite" Version="$(RedbVersion)" />
   </ItemGroup>
   <!--#endif -->
 

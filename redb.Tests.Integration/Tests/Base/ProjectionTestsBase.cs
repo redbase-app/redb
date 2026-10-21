@@ -556,4 +556,106 @@ public abstract class ProjectionTestsBase : IAsyncLifetime
         objects[0].Props.N.Should().Be(11, "a projection run earlier over the same query must not strip its objects");
         objects[0].Props.Flag.Should().BeTrue();
     }
+
+    // ============================================================
+    // === Ordering after Select: the source sorts, Select only shapes ===
+    // ============================================================
+
+    [Fact]
+    public async Task OrderByAfterSelect_ThenTakeSkip_PagesInOrder()
+    {
+        // Select(...).OrderBy(...).Take(...) runs as OrderBy(...).Take(...).Select(...): the source sorts and
+        // cuts the page, the projection shapes only the page.
+        await SyncAsync();
+        foreach (var n in new[] { 7, 3, 9, 1, 5, 8, 2, 6, 4 })
+            await SeedAsync(new ProjectionProbeProps { S = $"p{n}", N = n });
+
+        var top = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { x.Props.N, x.Props.S })
+            .OrderByDescending(r => r.N)
+            .Take(3)
+            .ToListAsync();
+        top.Select(r => r.N).Should().Equal(9, 8, 7);
+
+        var second = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { x.Props.N })
+            .OrderBy(r => r.N)
+            .Skip(3)
+            .Take(3)
+            .ToListAsync();
+        second.Select(r => r.N).Should().Equal(4, 5, 6);
+    }
+
+    [Fact]
+    public async Task ThenByAfterSelect_AddsAKey()
+    {
+        await SyncAsync();
+        await SeedAsync(new ProjectionProbeProps { S = "b", N = 1 });
+        await SeedAsync(new ProjectionProbeProps { S = "c", N = 2 });
+        await SeedAsync(new ProjectionProbeProps { S = "a", N = 1 });
+
+        var asc = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { x.Props.N, x.Props.S })
+            .OrderBy(r => r.N)
+            .ThenBy(r => r.S)
+            .ToListAsync();
+        asc.Select(r => $"{r.N}{r.S}").Should().Equal("1a", "1b", "2c");
+
+        var desc = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { x.Props.N, x.Props.S })
+            .OrderBy(r => r.N)
+            .ThenByDescending(r => r.S)
+            .Take(2)
+            .ToListAsync();
+        desc.Select(r => $"{r.N}{r.S}").Should().Equal("1b", "1a");
+    }
+
+    [Fact]
+    public async Task OrderByAfterSelect_ObjectFieldAndNestedMember()
+    {
+        await SyncAsync();
+        var ids = new List<long>();
+        foreach (var city in new[] { "Omsk", "Kazan", "Perm" })
+            ids.Add(await SeedAsync(new ProjectionProbeProps { S = city, Nested = new ProjectionProbeNested { City = city } }));
+
+        var byId = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { x.Id, x.Props.S })
+            .OrderByDescending(r => r.Id)
+            .Take(2)
+            .ToListAsync();
+        byId.Select(r => r.Id).Should().Equal(ids.OrderByDescending(i => i).Take(2));
+
+        var byCity = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { City = x.Props.Nested!.City })
+            .OrderBy(r => r.City)
+            .Take(2)
+            .ToListAsync();
+        byCity.Select(r => r.City).Should().Equal("Kazan", "Omsk");
+    }
+
+    [Fact]
+    public async Task OrderByAfterSelect_ComputedKey_SortsInMemory()
+    {
+        // A key computed over Props members is not sent to the source; it sorts in memory, as before.
+        await SyncAsync();
+        foreach (var n in new[] { 4, 1, 3, 2 })
+            await SeedAsync(new ProjectionProbeProps { S = $"p{n}", N = n });
+
+        var rs = await Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { Twice = x.Props.N * 2 })
+            .OrderByDescending(r => r.Twice)
+            .Take(2)
+            .ToListAsync();
+        rs.Select(r => r.Twice).Should().Equal(8, 6);
+    }
+
+    [Fact]
+    public async Task ThenByAfterSelect_WithoutOrderBy_Throws()
+    {
+        await SyncAsync();
+        var act = () => Redb.Query<ProjectionProbeProps>()
+            .Select(x => new { x.Props.N })
+            .ThenBy(r => r.N);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*OrderBy*");
+    }
 }

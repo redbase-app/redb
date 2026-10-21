@@ -47,6 +47,9 @@ public sealed class FlatModelBuilder
             BuildSchemeTable(propsType, roots, tables);
         }
 
+        foreach (var table in tables)
+            AddForeignKeyIndexes(table);
+
         return new FlatDatabaseModel(tables);
     }
 
@@ -80,7 +83,8 @@ public sealed class FlatModelBuilder
         table.Add(Header("_value_bytes", typeof(byte[]), nullable: true));
 
         // The parent of an object may be of any scheme; the header table holds them all.
-        table.Add(ForeignKey(table, "_id_parent", FlatNaming.ObjectsTable));
+        // redb deletes the children of an object with it (FK__objects__objects).
+        table.Add(ForeignKey(table, "_id_parent", FlatNaming.ObjectsTable, FlatDeleteRule.Cascade));
         return table;
     }
 
@@ -104,8 +108,8 @@ public sealed class FlatModelBuilder
         table.Add(Header("_alias", typeof(string), nullable: true));
         table.Add(Header("_id_object", typeof(long), nullable: true));
 
-        table.Add(ForeignKey(table, "_id_list", FlatNaming.ListsTable));
-        table.Add(ForeignKey(table, "_id_object", FlatNaming.ObjectsTable));
+        table.Add(ForeignKey(table, "_id_list", FlatNaming.ListsTable, FlatDeleteRule.Cascade));
+        table.Add(ForeignKey(table, "_id_object", FlatNaming.ObjectsTable, FlatDeleteRule.SetNull));
         return table;
     }
 
@@ -124,7 +128,8 @@ public sealed class FlatModelBuilder
 
         // The key of a scheme row is the object id, and the header of that object lives in `objects`.
         table.Add(Service(FlatNaming.IdColumn, FlatColumnRole.PrimaryKey, typeof(long)));
-        table.Add(ForeignKey(table, FlatNaming.IdColumn, FlatNaming.ObjectsTable));
+        // The Props of an object go with its header, as its _values rows go with it in redb.
+        table.Add(ForeignKey(table, FlatNaming.IdColumn, FlatNaming.ObjectsTable, FlatDeleteRule.Cascade));
         tables.Add(table);
 
         AddMembers(table, propsType, roots, propsType, path: null, [], tables);
@@ -173,12 +178,12 @@ public sealed class FlatModelBuilder
             {
                 var target = propertyType.GetGenericArguments()[0];
                 table.Add(Payload(property.Name, FlatColumnRole.ObjectReference, typeof(long), FlatValueSource.Object, structureId));
-                table.Add(ForeignKey(table, property.Name, target.Name, target));
+                table.Add(ForeignKey(table, property.Name, target.Name, FlatDeleteRule.NoAction, target));
             }
             else if (FlatTypeClassifier.IsListItem(propertyType))
             {
                 table.Add(Payload(property.Name, FlatColumnRole.ListItemReference, typeof(long), FlatValueSource.ListItem, structureId));
-                table.Add(ForeignKey(table, property.Name, FlatNaming.ListItemsTable));
+                table.Add(ForeignKey(table, property.Name, FlatNaming.ListItemsTable, FlatDeleteRule.NoAction));
             }
             else if (FlatTypeClassifier.IsBusinessClass(propertyType))
             {
@@ -292,12 +297,12 @@ public sealed class FlatModelBuilder
             case FlatElementKind.ObjectReference:
                 var target = elementType.GetGenericArguments()[0];
                 table.Add(Payload(FlatNaming.ValueColumn, FlatColumnRole.ObjectReference, typeof(long), FlatValueSource.Object, structureId));
-                table.Add(ForeignKey(table, FlatNaming.ValueColumn, target.Name, target));
+                table.Add(ForeignKey(table, FlatNaming.ValueColumn, target.Name, FlatDeleteRule.NoAction, target));
                 break;
 
             case FlatElementKind.ListItemReference:
                 table.Add(Payload(FlatNaming.ValueColumn, FlatColumnRole.ListItemReference, typeof(long), FlatValueSource.ListItem, structureId));
-                table.Add(ForeignKey(table, FlatNaming.ValueColumn, FlatNaming.ListItemsTable));
+                table.Add(ForeignKey(table, FlatNaming.ValueColumn, FlatNaming.ListItemsTable, FlatDeleteRule.NoAction));
                 break;
 
             case FlatElementKind.Class:
@@ -333,11 +338,33 @@ public sealed class FlatModelBuilder
     // Pieces
     // ---------------------------------------------------------------------------------------
 
+    /// <summary>
+    /// An index for every foreign key column that no key already leads with, as EF Core creates by
+    /// convention. The primary key covers a scheme table's link to <c>objects</c>; the unique constraints
+    /// of nested and collection tables lead with <c>_owner_id</c> and cover the owner link.
+    /// </summary>
+    private static void AddForeignKeyIndexes(FlatTable table)
+    {
+        foreach (var column in table.ForeignKeys.Select(f => f.Column).Distinct())
+        {
+            var covered = column == table.PrimaryKey
+                          || table.UniqueConstraints.Any(u => u.Columns.Count > 0 && u.Columns[0] == column);
+            if (covered)
+                continue;
+
+            table.Add(new FlatIndex
+            {
+                Name = FlatNaming.Shorten($"IX_{table.FullName}_{column}"),
+                Columns = [column]
+            });
+        }
+    }
+
     private static void AddKeyAndOwner(FlatTable table, FlatTable owner)
     {
         table.Add(Service(FlatNaming.IdColumn, FlatColumnRole.PrimaryKey, typeof(long)));
         table.Add(Service(FlatNaming.OwnerColumn, FlatColumnRole.Owner, typeof(long)));
-        table.Add(ForeignKey(table, FlatNaming.OwnerColumn, owner.FullName));
+        table.Add(ForeignKey(table, FlatNaming.OwnerColumn, owner.FullName, FlatDeleteRule.Cascade));
     }
 
     private static FlatColumn Header(string name, Type clrType, bool nullable, FlatColumnRole role = FlatColumnRole.Header) => new()
@@ -367,13 +394,14 @@ public sealed class FlatModelBuilder
         StructureId = structureId
     };
 
-    private static FlatForeignKey ForeignKey(FlatTable table, string column, string targetFullName, Type? targetPropsType = null) => new()
+    private static FlatForeignKey ForeignKey(FlatTable table, string column, string targetFullName, FlatDeleteRule onDelete, Type? targetPropsType = null) => new()
     {
         Name = FlatNaming.Shorten($"FK_{table.FullName}_{column}"),
         Column = FlatNaming.Shorten(column),
         TargetTable = FlatNaming.Shorten(targetFullName),
         TargetColumn = FlatNaming.IdColumn,
-        TargetPropsType = targetPropsType
+        TargetPropsType = targetPropsType,
+        OnDelete = onDelete
     };
 
     private static FlatUniqueConstraint Unique(FlatTable table, params string[] columns) => new()

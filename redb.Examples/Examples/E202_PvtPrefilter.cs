@@ -65,9 +65,9 @@ public class E202_PvtPrefilter : ExampleBase
 
             log.AppendLine(sql);
 
-            Console.WriteLine();
-            Console.WriteLine($"--- {label} (expected when enabled: {expectation}) ---");
-            Console.WriteLine(sql);
+            // Console.WriteLine();
+            // Console.WriteLine($"--- {label} (expected when enabled: {expectation}) ---");
+            // Console.WriteLine(sql);
 
             // "pf" is the alias the planner gives the prefilter scan. The Row form is the extra
             // parenthesised group spliced into the _values scan; note it may hold a SINGLE branch

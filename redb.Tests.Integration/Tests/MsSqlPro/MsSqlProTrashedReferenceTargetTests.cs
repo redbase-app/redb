@@ -12,6 +12,8 @@ public class MsSqlProTrashedReferenceTargetTests : TrashedReferenceTargetTestsBa
     protected override void Register(IServiceCollection services, Action<RedbOptionsBuilder> configure)
         => services.AddRedbPro(configure);
 
+    protected override bool ProPropsCache => true;
+
     protected override void UseProvider(RedbOptionsBuilder options)
     {
         var cs = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build().GetConnectionString("MSSql")!;

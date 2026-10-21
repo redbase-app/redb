@@ -26,10 +26,13 @@ public class E072_AnyWithPredicate : ExampleBase
         
         var anyHighEarners = await query.AnyAsync(e => e.Salary > 100_000m);
 
+        // Predicate over a field one nested class deep and a field two nested classes deep
+        var anyBerlinHighFloor = await query.AnyAsync(e => e.HomeAddress!.City == "Berlin" && e.HomeAddress!.Building!.Floor > 25);
+
         sw.Stop();
 
-        return Ok("E072", "AnyAsync - With Predicate", ExampleTier.Free, sw.ElapsedMilliseconds, 
+        return Ok("E072", "AnyAsync - With Predicate", ExampleTier.Free, sw.ElapsedMilliseconds,
             anyHighEarners ? 1 : 0,
-            [$"Any with Salary > 100k: {anyHighEarners}"]);
+            [$"Any with Salary > 100k: {anyHighEarners}", $"Any in Berlin above floor 25: {anyBerlinHighFloor}"]);
     }
 }

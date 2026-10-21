@@ -9,7 +9,7 @@ namespace redb.Examples.Examples;
 
 /// <summary>
 /// Demonstrates using generic RedbObject&lt;TProps&gt; with Props=null.
-/// Useful when you need scheme association but don't need EAV values.
+/// Useful when you need scheme association but don't need Props values.
 /// Only base fields are stored - Props is explicitly null.
 /// </summary>
 [ExampleMeta("E166", "Generic with Props=null", "Core",
@@ -32,7 +32,7 @@ public class E166_GenericNullProps : ExampleBase
             value_long = 999,
             value_bool = true
         };
-        obj.Props = null!; // Explicitly null - no EAV values
+        obj.Props = null!; // Explicitly null - no Props values
 
         // Save via interface (triggers non-Props save path)
         var id = await redb.SaveAsync((IRedbObject)obj);
@@ -51,7 +51,7 @@ public class E166_GenericNullProps : ExampleBase
         var result = Ok("E166", "Generic with Props=null", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
             [$"ID: {id}, SchemeId: {loaded.SchemeId}",
              $"value_string: {loaded.ValueString}",
-             $"value_long: {loaded.ValueLong} (no EAV values)"]);
+             $"value_long: {loaded.ValueLong} (no Props values)"]);
 
         // Cleanup
         await redb.DeleteAsync(id);

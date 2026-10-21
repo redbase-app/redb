@@ -21,6 +21,9 @@ public sealed class FlatExportService
     // Objects of a scheme read by one statement.
     private const int ObjectsPerRead = 1000;
 
+    // Largest key copied so far, in any table.
+    private long _maxKey;
+
     private readonly IDataProvider _source;
     private readonly IDataProvider _target;
     private readonly bool _verbose;
@@ -93,6 +96,10 @@ public sealed class FlatExportService
         await _target.BeginImportAsync(ct);
         try
         {
+            var createSequence = ddl.CreateSequence();
+            if (createSequence != null)
+                await _target.ExecuteAsync(createSequence, ct);
+
             Log($"Creating {model.Tables.Count} tables...");
             foreach (var table in model.Tables)
                 await _target.ExecuteAsync(ddl.CreateTable(table), ct);
@@ -107,8 +114,18 @@ public sealed class FlatExportService
                 await CopySchemeAsync(reader, schemeIds[propsType], schemeTables, buffers, targetDialect, ct);
             }
 
+            // New rows written later, by EF or by hand, take their keys from the sequence: it has to
+            // start above every key copied from redb.
+            var restartSequence = ddl.RestartSequence(_maxKey + 1);
+            if (restartSequence != null)
+                await _target.ExecuteAsync(restartSequence, ct);
+
             Log("Adding foreign keys...");
             foreach (var statement in model.Tables.SelectMany(table => ddl.AddForeignKeys(table)))
+                await _target.ExecuteAsync(statement, ct);
+
+            Log("Creating foreign key indexes...");
+            foreach (var statement in model.Tables.SelectMany(table => ddl.CreateIndexes(table)))
                 await _target.ExecuteAsync(statement, ct);
 
             await _target.CommitImportAsync(ct);
@@ -137,6 +154,10 @@ public sealed class FlatExportService
 
         await foreach (var values in reader.ReadServiceRowsAsync(sourceTable, table, ct))
         {
+            // The first column of a service table is its key.
+            if (values[0] is long key && key > _maxKey)
+                _maxKey = key;
+
             var row = buffer.Data.NewRow();
             for (var i = 0; i < values.Length; i++)
                 row[i] = values[i] == null ? DBNull.Value : dialect.ToDbValue(values[i]!, buffer.StorageTypes[i]);
@@ -194,6 +215,7 @@ public sealed class FlatExportService
         foreach (var table in schemeTables)
             await FlushAsync(buffers[table.Name], dialect, ct);
 
+        _maxKey = Math.Max(_maxKey, assembler.MaxRowId);
         LogCount(schemeTable.FullName, count);
     }
 

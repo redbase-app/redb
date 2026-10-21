@@ -536,18 +536,31 @@ CREATE INDEX [IX__values__structure_object_lookup] ON [dbo].[_values](
 )
 -- Partial indexes for NOT NULL values (EXISTS with value conditions)
 CREATE INDEX [IX__values__String_not_null] ON [dbo].[_values]([_id_structure], [_id_object]) WHERE [_String] IS NOT NULL
-CREATE INDEX [IX__values__Long_not_null] ON [dbo].[_values]([_id_structure], [_id_object], [_Long]) WHERE [_Long] IS NOT NULL
-CREATE INDEX [IX__values__DateTimeOffset_not_null] ON [dbo].[_values]([_id_structure], [_id_object], [_DateTimeOffset]) WHERE [_DateTimeOffset] IS NOT NULL
-CREATE INDEX [IX__values__Numeric_not_null] ON [dbo].[_values]([_id_structure], [_id_object], [_Numeric]) WHERE [_Numeric] IS NOT NULL
--- Indexes for EXISTS/PVT queries - filter by value type
-CREATE INDEX [IX__values__Long_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Long]) WHERE [_Long] IS NOT NULL
-CREATE INDEX [IX__values__Guid_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Guid]) WHERE [_Guid] IS NOT NULL
-CREATE INDEX [IX__values__Double_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Double]) WHERE [_Double] IS NOT NULL
-CREATE INDEX [IX__values__DateTimeOffset_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_DateTimeOffset]) WHERE [_DateTimeOffset] IS NOT NULL
-CREATE INDEX [IX__values__Boolean_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Boolean]) WHERE [_Boolean] IS NOT NULL
-CREATE INDEX [IX__values__Numeric_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Numeric]) WHERE [_Numeric] IS NOT NULL
-CREATE INDEX [IX__values__ListItem_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_ListItem]) WHERE [_ListItem] IS NOT NULL
-CREATE INDEX [IX__values__Object_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Object]) WHERE [_Object] IS NOT NULL
+-- Values found by value: (_id_structure, <value>, _id_object), one per value column but the string, which as
+-- NVARCHAR(MAX) cannot be an index key (PVT module 0.2.30). A filter on a field reads one range of its index and
+-- gets the objects that pass. _array_index in INCLUDE: a query on a scalar field checks it as IS NULL in the index.
+-- REMOVED (2026-10-16): the object-leading forms these replace, (_id_structure, _id_object, <value>), eleven of them,
+-- three of which (*_not_null) were exact duplicates of three others (*_filter):
+--   CREATE INDEX [IX__values__Long_not_null] ON [dbo].[_values]([_id_structure], [_id_object], [_Long]) WHERE [_Long] IS NOT NULL;
+--   CREATE INDEX [IX__values__DateTimeOffset_not_null] ON [dbo].[_values]([_id_structure], [_id_object], [_DateTimeOffset]) WHERE [_DateTimeOffset] IS NOT NULL;
+--   CREATE INDEX [IX__values__Numeric_not_null] ON [dbo].[_values]([_id_structure], [_id_object], [_Numeric]) WHERE [_Numeric] IS NOT NULL;
+--   CREATE INDEX [IX__values__Long_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Long]) WHERE [_Long] IS NOT NULL;
+--   CREATE INDEX [IX__values__Guid_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Guid]) WHERE [_Guid] IS NOT NULL;
+--   CREATE INDEX [IX__values__Double_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Double]) WHERE [_Double] IS NOT NULL;
+--   CREATE INDEX [IX__values__DateTimeOffset_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_DateTimeOffset]) WHERE [_DateTimeOffset] IS NOT NULL;
+--   CREATE INDEX [IX__values__Boolean_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Boolean]) WHERE [_Boolean] IS NOT NULL;
+--   CREATE INDEX [IX__values__Numeric_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Numeric]) WHERE [_Numeric] IS NOT NULL;
+--   CREATE INDEX [IX__values__ListItem_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_ListItem]) WHERE [_ListItem] IS NOT NULL;
+--   CREATE INDEX [IX__values__Object_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Object]) WHERE [_Object] IS NOT NULL;
+CREATE INDEX [IX__values__structure_long_object] ON [dbo].[_values]([_id_structure], [_Long], [_id_object]) INCLUDE ([_array_index]) WHERE [_Long] IS NOT NULL
+CREATE INDEX [IX__values__structure_numeric_object] ON [dbo].[_values]([_id_structure], [_Numeric], [_id_object]) INCLUDE ([_array_index]) WHERE [_Numeric] IS NOT NULL
+CREATE INDEX [IX__values__structure_double_object] ON [dbo].[_values]([_id_structure], [_Double], [_id_object]) INCLUDE ([_array_index]) WHERE [_Double] IS NOT NULL
+CREATE INDEX [IX__values__structure_datetimeoffset_object] ON [dbo].[_values]([_id_structure], [_DateTimeOffset], [_id_object]) INCLUDE ([_array_index]) WHERE [_DateTimeOffset] IS NOT NULL
+CREATE INDEX [IX__values__structure_boolean_object] ON [dbo].[_values]([_id_structure], [_Boolean], [_id_object]) INCLUDE ([_array_index]) WHERE [_Boolean] IS NOT NULL
+CREATE INDEX [IX__values__structure_guid_object] ON [dbo].[_values]([_id_structure], [_Guid], [_id_object]) INCLUDE ([_array_index]) WHERE [_Guid] IS NOT NULL
+CREATE INDEX [IX__values__structure_listitem_object] ON [dbo].[_values]([_id_structure], [_ListItem], [_id_object]) INCLUDE ([_array_index]) WHERE [_ListItem] IS NOT NULL
+CREATE INDEX [IX__values__structure_object_object] ON [dbo].[_values]([_id_structure], [_Object], [_id_object]) INCLUDE ([_array_index]) WHERE [_Object] IS NOT NULL
+
 
 
 -- Индекс для быстрого LEFT JOIN nested Dictionary полей (AddressBook[home].City)

@@ -38,18 +38,15 @@ public sealed class ImportService
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
-    /// <summary>
-    /// Initializes a new instance of <see cref="ImportService"/>.
-    /// </summary>
-    /// <param name="provider">An opened <see cref="IDataProvider"/>.</param>
-    /// <param name="verbose">When <c>true</c>, progress is written to <see cref="Console"/>.</param>
-    /// <param name="batchSize">Number of records per bulk-insert batch.</param>
     private readonly int _parallelism;
     private ParallelImportWriter? _writer;
     private CountingStream? _progress;
     private long _totalBytes;
     private DateTime _loadStarted;
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="ImportService"/>.
+    /// </summary>
     /// <param name="provider">Connection the import runs on.</param>
     /// <param name="verbose">Print progress.</param>
     /// <param name="batchSize">Rows per bulk insert.</param>

@@ -73,6 +73,10 @@ no CORS.
 comment next to it shows the three lines that turn it on. On Tsak the same settings are environment
 variables of the worker (`Tsak__Redb__...`, see `deploy/docker-compose.tsak.yml`).
 
+The compose file sets no `Tsak__Cluster__NodeId`: a worker is named after its container's host name, so every
+replica of `docker compose up --scale` is a Tsak node of its own. Set an explicit id only for a single instance or a
+StatefulSet; two live workers with one id are refused.
+
 ## Another database
 
 1. In `RedbApp.Host.csproj` replace `redb.SQLite.Pro` with `redb.Postgres.Pro` or `redb.MSSql.Pro`.

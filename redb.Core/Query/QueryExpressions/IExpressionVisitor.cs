@@ -193,7 +193,15 @@ public enum LogicalOperator
 {
     And,
     Or,
-    Not
+    Not,
+
+    /// <summary>
+    /// The single operand is not TRUE: false, or unknown because a value it reads is absent. The counterexample of
+    /// AllAsync: an object with no value for the field fails the check, as it does in the two counts AllAsync is
+    /// otherwise answered by. Built only by AllAsync, and only for a provider that compiles it
+    /// (<see cref="Base.QueryProviderBase.CompilesNotTrue"/>).
+    /// </summary>
+    NotTrue
 }
 
 /// <summary>

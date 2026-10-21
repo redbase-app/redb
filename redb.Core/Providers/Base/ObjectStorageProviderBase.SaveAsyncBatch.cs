@@ -357,9 +357,12 @@ namespace redb.Core.Providers.Base
             // price is EF's too: objects this save creates still show Id == 0 (temporary-key
             // semantics) - their final ids arrive in SavedAsync. An exception here cancels the
             // save cleanly: no id was burned, nothing touched the database.
+            // One snapshot for the whole save: Saving and Saved reach the same interceptors even when a run-time
+            // subscription comes or goes meanwhile, and the change feed is collected exactly when they listen.
             InterceptorChangeSink = null;
             List<IRedbObject>? newObjectRefs = null;
-            if (HasSaveInterceptors)
+            var interceptors = SnapshotSaveInterceptors();
+            if (interceptors.Count > 0)
             {
                 if (_configuration.PropsSaveStrategy == PropsSaveStrategy.ChangeTracking)
                     InterceptorChangeSink = new List<Interception.RedbValueChange>();
@@ -367,7 +370,7 @@ namespace redb.Core.Providers.Base
                 // their final ids once assigned below (SavedAsync reads them then).
                 newObjectRefs = allObjectsToSave.Where(o => o.Id == 0).ToList();
 
-                await InvokeSavingInterceptorsAsync(new Interception.RedbSavingContext
+                await InvokeSavingInterceptorsAsync(interceptors, new Interception.RedbSavingContext
                 {
                     RootObjects = objList,
                     AllObjects = allObjectsToSave,
@@ -500,7 +503,12 @@ namespace redb.Core.Providers.Base
             }
             if (_configuration.EnablePropsCache && PropsCache.Instance != null)
             {
-                var toCache = savedGeneric.Where(o => o.Hash.HasValue).ToList();
+                // Not a graph holding a hand-made reference without its header ({ id = 42 }): served from the cache, its
+                // lazy load would fill Props only. The next load reads it from the database with the header.
+                var toCache = savedGeneric
+                    .Where(o => o.Hash.HasValue && !Utils.LoadedGraphInspector.HasHeaderlessReference(
+                        o.GetType().GetMethod("GetPropsDirectly")?.Invoke(o, null)))
+                    .ToList();
                 if (toCache.Count > 0)
                 {
                     Caching.CachePublication.AfterCommit(_context, () =>
@@ -519,11 +527,11 @@ namespace redb.Core.Providers.Base
 
             // Saved runs AFTER the commit: the data is in, and (EF-style) an exception from an
             // interceptor propagates to the caller - but cannot un-commit anything.
-            if (HasSaveInterceptors)
+            if (interceptors.Count > 0)
             {
                 var changes = InterceptorChangeSink;
                 InterceptorChangeSink = null;
-                await InvokeSavedInterceptorsAsync(new Interception.RedbSavedContext
+                await InvokeSavedInterceptorsAsync(interceptors, new Interception.RedbSavedContext
                 {
                     RootObjects = objList,
                     AllObjects = allObjectsToSave,

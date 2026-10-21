@@ -17,8 +17,10 @@ namespace redb.Core.Interception;
 ///   un-committed from here.</item>
 /// </list>
 /// Register any number via DI (<c>services.AddSingleton&lt;IRedbSaveInterceptor, ...&gt;()</c>);
-/// they run in registration order. With none registered the pipeline pays nothing — the change
-/// feed below is not even collected.
+/// they run in registration order. Code that cannot reach that container (a module in its own
+/// AssemblyLoadContext) subscribes at run time through <see cref="IRedbSaveInterceptorRegistry"/>;
+/// those run after the DI ones. With none registered and none subscribed the pipeline pays nothing —
+/// the change feed below is not even collected.
 /// <para>
 /// Both hooks run INSIDE the SaveAsync call, and one scope is one save (the CT-4 guard): an
 /// interceptor that writes its journal as redb objects through the SAME service scope will trip

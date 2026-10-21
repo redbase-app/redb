@@ -7,7 +7,8 @@ namespace redb.Examples.Examples;
 
 /// <summary>
 /// Calculates sum of a numeric field using SumAsync.
-/// Server-side aggregation without loading objects.
+/// Server-side aggregation without loading objects, over a field of the employee and over a field
+/// two nested classes deep (HomeAddress.Building.Floor).
 /// </summary>
 [ExampleMeta("E124", "SumAsync - Total", "Analytics",
     ExampleTier.Free, 124, "Sum", "Aggregation", "Analytics", RelatedApis = ["IRedbQueryable.SumAsync"])]
@@ -24,10 +25,11 @@ public class E124_SumAsync : ExampleBase
         // Console.WriteLine(sql);
 
         var totalSalary = await query.SumAsync(e => e.Salary);
+        var totalFloor = await query.SumAsync(e => e.HomeAddress!.Building!.Floor);
 
         sw.Stop();
 
-        return Ok("E124", "SumAsync - Total", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
-            [$"SUM(Salary) = {totalSalary:N0}", "Server-side aggregation"]);
+        return Ok("E124", "SumAsync - Total", ExampleTier.Free, sw.ElapsedMilliseconds, 2,
+            [$"SUM(Salary) = {totalSalary:N0}", $"SUM(HomeAddress.Building.Floor) = {totalFloor:N0}", "Server-side aggregation"]);
     }
 }

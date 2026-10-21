@@ -205,7 +205,11 @@ BEGIN
     --   * `_array_index IS NULL` filter for scalars (NOT `_array_parent_id IS NULL`).
     --   * `0$:` base-field prefix stripping in pvt_normalize_base_field_name.
     --   * full collection / nested / dictionary / ListItem.Value/Alias / array-op support.
-    RETURN '0.7.14';
+    -- 0.7.16 - block 0: value-leading indexes (_id_structure, <value>, _id_object) for every value column
+    --          replace the object-leading IX__values__{String,Long,DateTimeOffset,Numeric}_not_null and
+    --          ix__values__array_null_structure (2026-10-16), with _array_index in INCLUDE. Restore statements:
+    --          00_module_init.sql. (0.7.15 was a development build of the same, without the INCLUDE.)
+    RETURN '0.7.16';
 END;
 $BODY$;
 

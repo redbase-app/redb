@@ -6,5 +6,5 @@ namespace redb.Tests.Integration.Tests.SqlitePro;
 [Collection("SqlitePro")]
 public class SqliteProAggregationTests : AggregationTestsBase
 {
-    public SqliteProAggregationTests(SqliteProFixture fixture) : base(fixture.Redb) { }
+    public SqliteProAggregationTests(SqliteProFixture fixture) : base(fixture.Redb, isPro: true) { }
 }

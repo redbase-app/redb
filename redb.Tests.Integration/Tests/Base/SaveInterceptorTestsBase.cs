@@ -216,8 +216,111 @@ public abstract class SaveInterceptorTestsBase
         count.Should().Be(0, "Deleted runs after the SQL - the row is gone whatever the interceptor throws");
     }
 
+    [Fact]
+    public async Task RegistrySubscription_InALiveScope_RunsAfterDi_AndStopsOnDispose()
+    {
+        // A module subscribes after the service exists (its scope is open, the DI interceptors fixed): the very next
+        // save reaches it after the DI one; once disposed, nothing reaches it, while the DI interceptor goes on.
+        var journal = new List<string>();
+        var fromDi = new RecordingInterceptor { Tag = "di", Journal = journal };
+        await using var sp = Build(fromDi);
+        var redb = sp.GetRequiredService<IRedbService>();
+        await redb.SyncSchemeAsync<SimpleProps>();
+        await CleanupNameAsync(redb, "interceptor-registry");
+
+        var module = new RecordingInterceptor { Tag = "module", Journal = journal };
+        var subscription = sp.GetRequiredService<IRedbSaveInterceptorRegistry>().Add(module);
+
+        var obj = TestDataFactory.CreateSimple("interceptor-registry", 5m);
+        obj.id = await redb.SaveAsync(obj);
+        journal.Should().Equal("di:saving", "module:saving", "di:saved", "module:saved");
+        module.SavedContexts.Should().ContainSingle().Which.SavedIds.Should().Equal(obj.id);
+
+        subscription.Dispose();
+        journal.Clear();
+        obj.Props.Title = "interceptor-registry-2";
+        await redb.SaveAsync(obj);
+        await redb.DeleteAsync(obj.id);
+
+        journal.Should().Equal("di:saving", "di:saved", "di:deleting", "di:deleted");
+        module.SavedContexts.Should().HaveCount(1, "a disposed subscription is not called again");
+    }
+
+    [Fact]
+    public async Task RegistrySubscription_SeesDeletes_AndItsVetoCancelsAnySave()
+    {
+        var recorderFromDi = new RecordingInterceptor();
+        await using var sp = Build(recorderFromDi);
+        var redb = sp.GetRequiredService<IRedbService>();
+        await redb.SyncSchemeAsync<SimpleProps>();
+        await CleanupNameAsync(redb, "interceptor-registry-delete");
+        await CleanupNameAsync(redb, "interceptor-registry-veto");
+        var registry = sp.GetRequiredService<IRedbSaveInterceptorRegistry>();
+
+        var obj = TestDataFactory.CreateSimple("interceptor-registry-delete", 5m);
+        obj.id = await redb.SaveAsync(obj);
+
+        var module = new RecordingInterceptor();
+        using (registry.Add(module))
+            (await redb.DeleteAsync(obj)).Should().BeTrue();
+
+        module.DeletingContexts.Should().ContainSingle().Which.ObjectIds.Should().Equal(obj.id);
+        module.DeletedContexts.Should().ContainSingle();
+
+        var veto = new RecordingInterceptor { ThrowInSaving = true };
+        using (registry.Add(veto))
+        {
+            var act = async () => await redb.SaveAsync(TestDataFactory.CreateSimple("interceptor-registry-veto", 5m));
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*saving-veto*");
+        }
+
+        var count = await redb.Context.ExecuteScalarAsync<long>(
+            "SELECT COUNT(*) FROM _objects WHERE _name = 'interceptor-registry-veto'");
+        count.Should().Be(0, "a registry interceptor vetoes like a DI one: nothing reaches the database");
+    }
+
+    [Fact]
+    public async Task RegistrySubscription_MadeDuringASave_WaitsForTheNextOne()
+    {
+        // One snapshot per operation: an interceptor subscribed while a save runs must not get a Saved without its
+        // Saving. The next save sees it from the start.
+        var registry = default(IRedbSaveInterceptorRegistry);
+        var late = new RecordingInterceptor { Tag = "late" };
+        IDisposable? lateSubscription = null;
+        var fromDi = new RecordingInterceptor
+        {
+            OnSaving = () => lateSubscription ??= registry!.Add(late),
+        };
+        await using var sp = Build(fromDi);
+        registry = sp.GetRequiredService<IRedbSaveInterceptorRegistry>();
+        var redb = sp.GetRequiredService<IRedbService>();
+        await redb.SyncSchemeAsync<SimpleProps>();
+        await CleanupNameAsync(redb, "interceptor-registry-late");
+
+        var obj = TestDataFactory.CreateSimple("interceptor-registry-late", 5m);
+        obj.id = await redb.SaveAsync(obj);
+
+        late.SavingContexts.Should().BeEmpty();
+        late.SavedContexts.Should().BeEmpty("the save had started without it");
+
+        obj.Props.Title = "interceptor-registry-late-2";
+        await redb.SaveAsync(obj);
+        late.Order.Should().Equal("saving", "saved");
+
+        lateSubscription!.Dispose();
+    }
+
     private sealed class RecordingInterceptor : IRedbSaveInterceptor
     {
+        /// <summary>Prefix of the entries this recorder writes into <see cref="Journal"/>.</summary>
+        public string Tag { get; init; } = "";
+
+        /// <summary>A journal shared with other recorders, to see their relative order.</summary>
+        public List<string>? Journal { get; init; }
+
+        /// <summary>Runs inside SavingAsync, before the recording.</summary>
+        public Action? OnSaving { get; init; }
+
         public List<RedbSavingContext> SavingContexts { get; } = new();
         public List<RedbSavedContext> SavedContexts { get; } = new();
         public List<RedbDeletingContext> DeletingContexts { get; } = new();
@@ -228,10 +331,17 @@ public abstract class SaveInterceptorTestsBase
         public bool ThrowInDeleting { get; init; }
         public bool ThrowInDeleted { get; init; }
 
+        private void Record(string hook)
+        {
+            Order.Add(hook);
+            Journal?.Add($"{Tag}:{hook}");
+        }
+
         public Task SavingAsync(RedbSavingContext context, CancellationToken cancellationToken = default)
         {
+            OnSaving?.Invoke();
             SavingContexts.Add(context);
-            Order.Add("saving");
+            Record("saving");
             if (ThrowInSaving) throw new InvalidOperationException("saving-veto");
             return Task.CompletedTask;
         }
@@ -239,7 +349,7 @@ public abstract class SaveInterceptorTestsBase
         public Task SavedAsync(RedbSavedContext context, CancellationToken cancellationToken = default)
         {
             SavedContexts.Add(context);
-            Order.Add("saved");
+            Record("saved");
             if (ThrowInSaved) throw new InvalidOperationException("saved-veto");
             return Task.CompletedTask;
         }
@@ -247,7 +357,7 @@ public abstract class SaveInterceptorTestsBase
         public Task DeletingAsync(RedbDeletingContext context, CancellationToken cancellationToken = default)
         {
             DeletingContexts.Add(context);
-            Order.Add("deleting");
+            Record("deleting");
             if (ThrowInDeleting) throw new InvalidOperationException("deleting-veto");
             return Task.CompletedTask;
         }
@@ -255,7 +365,7 @@ public abstract class SaveInterceptorTestsBase
         public Task DeletedAsync(RedbDeletedContext context, CancellationToken cancellationToken = default)
         {
             DeletedContexts.Add(context);
-            Order.Add("deleted");
+            Record("deleted");
             if (ThrowInDeleted) throw new InvalidOperationException("deleted-veto");
             return Task.CompletedTask;
         }

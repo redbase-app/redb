@@ -28,7 +28,7 @@ namespace redb.SQLite.Providers
             RedbServiceConfiguration configuration,
             IListProvider? listProvider = null,
             ILogger? logger = null,
-            IEnumerable<redb.Core.Interception.IRedbSaveInterceptor>? saveInterceptors = null)
+            redb.Core.Interception.RedbSaveInterceptorPipeline? saveInterceptors = null)
             : base(context, serializer, permissionProvider, securityContext, 
                    schemeSync, configuration, new SqliteDialect(), listProvider, logger, saveInterceptors)
         {

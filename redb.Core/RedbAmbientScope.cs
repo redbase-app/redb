@@ -51,6 +51,9 @@ internal static class RedbAmbientScope
 
     private static readonly AsyncLocal<Frame?> Current = new();
 
+    /// <summary>The cache domain of the nearest live service of the calling flow; null when none is current.</summary>
+    public static string? CurrentDomain => FirstLive(Current.Value)?.Domain;
+
     /// <summary>Makes <paramref name="service"/> current for the rest of the calling flow.</summary>
     public static void Enter(RedbServiceBase service)
         => Current.Value = new Frame(service, FirstLive(Current.Value));

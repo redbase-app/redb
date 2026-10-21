@@ -46,4 +46,16 @@ internal sealed class MssqlFlatDialect : IFlatDialect
     };
 
     public IsolationLevel SnapshotIsolation => IsolationLevel.Snapshot;
+
+    public string? CreateSequence(string sequence) => $"CREATE SEQUENCE {Quote(sequence)} AS bigint START WITH 1";
+
+    public string? RestartSequence(string sequence, long next) =>
+        $"ALTER SEQUENCE {Quote(sequence)} RESTART WITH {next.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+
+    public string? KeyDefault(string sequence) => $"DEFAULT (NEXT VALUE FOR {Quote(sequence)})";
+
+    public string Report(string message) => $"PRINT N'{message.Replace("'", "''")}'";
+
+    // redb's own SQL Server schema declares FK__objects__objects with NO ACTION for the same reason.
+    public bool AllowsSelfCascade => false;
 }

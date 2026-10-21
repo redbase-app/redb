@@ -1,5 +1,6 @@
 using redb.Core;
 using redb.Core.Exceptions;
+using redb.Core.Query;
 using redb.Core.Query.Aggregation;
 using redb.Tests.Integration.Helpers;
 using redb.Tests.Integration.Models;
@@ -129,6 +130,44 @@ public abstract class AggregationTestsBase
         result!.TotalSalary.Should().BeGreaterThan(0m);
         result.Count.Should().BeGreaterThanOrEqualTo(15);
         result.MinSalary.Should().BeLessThanOrEqualTo(result.MaxSalary);
+    }
+
+    /// <summary>
+    /// A base field in a batch next to Props fields is a property of the object, not of a value row.
+    /// The batch statement ranged over the rows of _values, so an object came once per aggregated
+    /// structure and SUM(Id) came out doubled with two Props fields. Checked against the loaded objects,
+    /// with and without a Props filter. Pro only: the Free SQL Server module and the SQLite extension
+    /// refuse a base field in a batch.
+    /// </summary>
+    [Fact]
+    public async Task AggregateAsync_BaseFieldNextToPropsFields_CountsEachObjectOnce()
+    {
+        if (!IsPro) return;
+        var ids = await SeedAsync();
+
+        foreach (var withPropsFilter in new[] { false, true })
+        {
+            var query = Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+            if (withPropsFilter)
+                query = query.Where(e => e.Age >= 30);
+
+            var result = await query.AggregateAsync(x => new
+            {
+                SumId = Agg.Sum(x.Id),
+                Count = Agg.Count(),
+                SumSalary = Agg.Sum(x.Props.Salary),
+                MaxAge = Agg.Max(x.Props.Age),
+            });
+            var rows = await query.ToListAsync();
+
+            result.Should().NotBeNull();
+            rows.Should().NotBeEmpty();
+            Convert.ToDecimal(result!.SumId).Should().Be(rows.Sum(o => (decimal)o.Id),
+                $"SUM(Id) is taken once per object (Props filter: {withPropsFilter})");
+            Convert.ToDecimal(result.Count).Should().Be(rows.Count);
+            Convert.ToDecimal(result.SumSalary).Should().Be(rows.Sum(o => o.Props.Salary));
+            Convert.ToDecimal(result.MaxAge).Should().Be(rows.Max(o => o.Props.Age));
+        }
     }
 
     [Fact]

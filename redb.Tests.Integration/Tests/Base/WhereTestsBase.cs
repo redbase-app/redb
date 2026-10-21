@@ -1,5 +1,6 @@
 using redb.Core;
 using redb.Core.Models.Entities;
+using redb.Core.Query.Aggregation;
 using redb.Tests.Integration.Helpers;
 using redb.Tests.Integration.Models;
 
@@ -673,6 +674,252 @@ public abstract class WhereTestsBase
         for (int i = 1; i < results.Count; i++)
         {
             results[i].Props.Salary.Should().BeGreaterThanOrEqualTo(results[i - 1].Props.Salary);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    //  String equality and membership on values longer than the string index holds
+    // ──────────────────────────────────────────────────────────────────
+    [Fact]
+    public async Task Where_StringEquality_FindsValuesLongerThanTheIndexBound()
+    {
+        // PostgreSQL writes a string equality with the byte bound of its partial string index
+        // (octet_length < 2000) so the planner can use it. The bound is added only for a short
+        // value: a long one must still be found, through equality, membership and Any alike.
+        // 1500 Cyrillic characters are 3000 bytes.
+        var tag = Guid.NewGuid().ToString("N");
+        var longText = tag + new string('ж', 1500);
+        var shortText = "short-" + tag;
+
+        var longObj = TestDataFactory.CreateSimple("long-string-" + tag);
+        longObj.Props.Description = longText;
+        var shortObj = TestDataFactory.CreateSimple("short-string-" + tag);
+        shortObj.Props.Description = shortText;
+        var ids = new[] { await Redb.SaveAsync(longObj), await Redb.SaveAsync(shortObj) };
+
+        try
+        {
+            (await Redb.Query<SimpleProps>().Where(p => p.Description == longText).CountAsync())
+                .Should().Be(1, "a value longer than the index bound is not covered by it and must still match");
+            (await Redb.Query<SimpleProps>().AnyAsync(p => p.Description == longText)).Should().BeTrue();
+            (await Redb.Query<SimpleProps>().WhereIn(p => p.Description, new[] { longText, shortText }).CountAsync())
+                .Should().Be(2, "membership with a long value among short ones takes no bound");
+            (await Redb.Query<SimpleProps>().Where(p => p.Description == shortText).CountAsync())
+                .Should().Be(1);
+            (await Redb.Query<SimpleProps>().WhereIn(p => p.Description, new[] { shortText, "absent-" + tag }).CountAsync())
+                .Should().Be(1);
+            (await Redb.Query<SimpleProps>().Where(p => p.Description != shortText && p.Description!.StartsWith(tag)).CountAsync())
+                .Should().Be(1, "NOT of a bounded equality keeps the long value");
+        }
+        finally
+        {
+            await Redb.DeleteAsync(ids);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    //  AllAsync: the answer of every form, absent values included
+    // ──────────────────────────────────────────────────────────────────
+    [Fact]
+    public async Task AllAsync_CounterexampleSemantics_AbsentValueFails()
+    {
+        // PostgreSQL Pro answers AllAsync as "no counterexample" (NOT EXISTS of an object for which the predicate is
+        // not TRUE), the other providers by two counts. Both must agree: an object without a value for the field
+        // fails the check, an empty set passes it, and Take/Skip do not narrow it.
+        var tag = "all-" + Guid.NewGuid().ToString("N");
+        var objects = new[]
+        {
+            (Price: 10m, Active: true, Description: (string?)"x"),
+            (Price: 20m, Active: true, Description: (string?)null),
+            (Price: 30m, Active: false, Description: (string?)"y"),
+        }.Select((d, i) =>
+        {
+            var o = TestDataFactory.CreateSimple($"{tag}-{i}", d.Price);
+            o.Props.IsActive = d.Active;
+            o.Props.Description = d.Description;
+            return o;
+        }).ToList();
+        var ids = new List<long>();
+        foreach (var o in objects)
+            ids.Add(await Redb.SaveAsync(o));
+
+        try
+        {
+            var set = Redb.Query<SimpleProps>().Where(p => p.Title.StartsWith(tag));
+
+            (await set.AllAsync(p => p.Price > 5m)).Should().BeTrue();
+            (await set.AllAsync(p => p.Price > 10m)).Should().BeFalse("one object has Price 10");
+            (await set.AllAsync(p => p.Description != null)).Should().BeFalse("one object has no Description");
+            (await set.AllAsync(p => p.Description == "x" || p.Description == "y"))
+                .Should().BeFalse("the object without a Description is a counterexample of a condition on it");
+            (await set.AllAsync(p => p.Price >= 10m && p.Price <= 30m)).Should().BeTrue();
+            (await set.AllAsync(p => p.Price >= 10m && p.IsActive)).Should().BeFalse("one object is not active");
+            (await set.Where(p => p.IsActive).AllAsync(p => p.Price < 25m)).Should().BeTrue();
+            (await set.Take(1).AllAsync(p => p.Price > 10m)).Should().BeFalse("Take does not narrow the checked set");
+
+            var noneTitle = tag + "-none";
+            var empty = Redb.Query<SimpleProps>().Where(p => p.Title == noneTitle);
+            (await empty.AllAsync(p => p.Price > 100m)).Should().BeTrue("every element of an empty set satisfies anything");
+        }
+        finally
+        {
+            await Redb.DeleteAsync(ids);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    //  Soft-deleted objects stay out of counts and checks until the purge
+    // ──────────────────────────────────────────────────────────────────
+    [Fact]
+    public async Task CountAnyAll_ByValue_LeaveOutSoftDeletedObjectsBeforeThePurge()
+    {
+        // PostgreSQL Pro reads a count or an existence check filtered by Props values off the index of values and
+        // subtracts the trash: the soft delete moves an object to the trash scheme and leaves its values until the
+        // purge, so they still match the filter. The other providers check the scheme of every object.
+        var tag = "trash-" + Guid.NewGuid().ToString("N");
+        var objects = new[] { 10m, 20m, 30m }.Select((price, i) =>
+        {
+            var o = TestDataFactory.CreateSimple($"{tag}-{i}", price);
+            o.Props.Description = tag;
+            return o;
+        }).ToList();
+        var ids = new List<long>();
+        foreach (var o in objects)
+            ids.Add(await Redb.SaveAsync(o));
+
+        try
+        {
+            await Redb.SoftDeleteAsync(new[] { ids[1] });
+            (await Redb.Context.ExecuteScalarAsync<long>(
+                    $"SELECT COUNT(*) FROM _objects WHERE _id = {ids[1]} AND _id_scheme = -10"))
+                .Should().Be(1, "the object waits in the trash with its values, which is the case under test");
+
+            (await Redb.Query<SimpleProps>().Where(p => p.Description == tag).CountAsync())
+                .Should().Be(2, "the soft-deleted object is not counted");
+            (await Redb.Query<SimpleProps>().AnyAsync(p => p.Description == tag && p.Price == 20m))
+                .Should().BeFalse("the soft-deleted object is not found");
+            (await Redb.Query<SimpleProps>().Where(p => p.Description == tag).AllAsync(p => p.Price != 20m))
+                .Should().BeTrue("the soft-deleted object is not a counterexample");
+            (await Redb.Query<SimpleProps>().Where(p => p.Description == tag).SumAsync(p => p.Price))
+                .Should().Be(40m, "the soft-deleted object is not summed");
+            var groups = await Redb.Query<SimpleProps>().Where(p => p.Description == tag)
+                .GroupBy(p => p.Description)
+                .SelectAsync(g => new { Key = g.Key, Count = Agg.Count(g), Total = Agg.Sum(g, p => p.Price) });
+            groups.Should().ContainSingle().Which.Count.Should().Be(2, "the soft-deleted object is not grouped");
+            groups[0].Total.Should().Be(40m);
+            var page = await Redb.Query<SimpleProps>().Where(p => p.Description == tag).OrderBy(p => p.Price).Take(2).ToListAsync();
+            page.Select(o => o.Props.Price).Should().Equal(new[] { 10m, 30m },
+                "the soft-deleted object takes no place in the page: the page is still full");
+        }
+        finally
+        {
+            await Redb.DeleteAsync(ids);
+        }
+    }
+
+    [Fact]
+    public async Task Count_NullCheckAlone_AddsUpAndLeavesOutSoftDeletedObjects()
+    {
+        // PostgreSQL Pro counts Field == null alone as the objects of the scheme less the rows with a value outside
+        // the trash, and Field != null off the rows of the field it drives from. Both answers must add up to the
+        // objects of the scheme, and a soft-deleted object leaves the count it was in, whether it had a value or not.
+        var tag = "nullcount-" + Guid.NewGuid().ToString("N");
+        var withValue = TestDataFactory.CreateSimple($"{tag}-value");
+        withValue.Props.OptionalNumber = 42;
+        var withoutValue = TestDataFactory.CreateSimple($"{tag}-none");
+        withoutValue.Props.OptionalNumber = null;
+        var ids = new List<long> { await Redb.SaveAsync(withValue), await Redb.SaveAsync(withoutValue) };
+
+        async Task<(int Nulls, int Values, int All)> CountsAsync() => (
+            await Redb.Query<SimpleProps>().Where(p => p.OptionalNumber == null).CountAsync(),
+            await Redb.Query<SimpleProps>().Where(p => p.OptionalNumber != null).CountAsync(),
+            await Redb.Query<SimpleProps>().CountAsync());
+
+        try
+        {
+            var before = await CountsAsync();
+            (before.Nulls + before.Values).Should().Be(before.All, "every object either has the value or has not");
+
+            await Redb.SoftDeleteAsync(new[] { ids[1] });
+            var afterNone = await CountsAsync();
+            afterNone.Nulls.Should().Be(before.Nulls - 1, "the soft-deleted object without a value is not counted");
+            afterNone.Values.Should().Be(before.Values);
+
+            await Redb.SoftDeleteAsync(new[] { ids[0] });
+            var afterValue = await CountsAsync();
+            afterValue.Nulls.Should().Be(afterNone.Nulls, "a soft-deleted object with a value never was among the nulls");
+            afterValue.Values.Should().Be(afterNone.Values - 1, "the soft-deleted object with a value is not counted");
+            (afterValue.Nulls + afterValue.Values).Should().Be(afterValue.All);
+        }
+        finally
+        {
+            await Redb.DeleteAsync(ids);
+        }
+    }
+
+    [Fact]
+    public async Task Page_NullCheckInTheTopLevelAnd_ReturnsOnlyTheObjectsWithoutAValue()
+    {
+        // SQL Server Pro checks Field == null in the top-level AND with NOT EXISTS instead of joining the field and
+        // testing its column; the page must hold exactly the objects without a value, a field of a nested class too.
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var full = TestDataFactory.CreateEmployee(9101, firstName: $"absent-{tag}-full");
+        full.Props.EmployeeCode = "EMP-FULL";
+        var empty = TestDataFactory.CreateEmployee(9102, firstName: $"absent-{tag}-empty");
+        empty.Props.EmployeeCode = null;
+        empty.Props.HomeAddress = null;
+        var ids = new List<long> { await Redb.SaveAsync(full), await Redb.SaveAsync(empty) };
+        var prefix = $"absent-{tag}-";
+
+        try
+        {
+            var byCode = await Redb.Query<EmployeeProps>()
+                .Where(e => e.FirstName.StartsWith(prefix) && e.EmployeeCode == null)
+                .OrderByRedb(o => o.Id).Take(10).ToListAsync();
+            byCode.Select(o => o.Id).Should().Equal(new[] { ids[1] });
+            byCode[0].Props.EmployeeCode.Should().BeNull();
+
+            var byCity = await Redb.Query<EmployeeProps>()
+                .Where(e => e.FirstName.StartsWith(prefix) && e.HomeAddress!.City == null)
+                .OrderByRedb(o => o.Id).Take(10).ToListAsync();
+            byCity.Select(o => o.Id).Should().Equal(new[] { ids[1] });
+
+            (await Redb.Query<EmployeeProps>().Where(e => e.FirstName.StartsWith(prefix) && e.EmployeeCode == null).CountAsync())
+                .Should().Be(1);
+            (await Redb.Query<EmployeeProps>().Where(e => e.FirstName.StartsWith(prefix) && e.EmployeeCode != null).CountAsync())
+                .Should().Be(1);
+        }
+        finally
+        {
+            await Redb.DeleteAsync(ids);
+        }
+    }
+
+    [Fact]
+    public async Task Count_NullCheckAlone_FieldOfANestedClass()
+    {
+        // A field of a nested class hangs off its parent row (_array_parent_id set): counting Field == null alone must
+        // see those rows as values. An employee without a home address has no City; one with an address has it.
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var withAddress = TestDataFactory.CreateEmployee(9001, firstName: $"nested-{tag}-a");
+        var withoutAddress = TestDataFactory.CreateEmployee(9002, firstName: $"nested-{tag}-b");
+        withoutAddress.Props.HomeAddress = null;
+        var ids = new List<long> { await Redb.SaveAsync(withAddress), await Redb.SaveAsync(withoutAddress) };
+
+        try
+        {
+            var nulls = await Redb.Query<EmployeeProps>().Where(e => e.HomeAddress!.City == null).CountAsync();
+            var values = await Redb.Query<EmployeeProps>().Where(e => e.HomeAddress!.City != null).CountAsync();
+            var all = await Redb.Query<EmployeeProps>().CountAsync();
+            var nullsTheLongWay = await Redb.Query<EmployeeProps>().Where(e => e.HomeAddress!.City == null && e.Age >= 0).CountAsync();
+
+            nulls.Should().Be(nullsTheLongWay, "the count of the null check alone and the count with a second condition agree");
+            nulls.Should().BeGreaterThan(0, "the employee without an address has no City");
+            (nulls + values).Should().Be(all);
+        }
+        finally
+        {
+            await Redb.DeleteAsync(ids);
         }
     }
 }

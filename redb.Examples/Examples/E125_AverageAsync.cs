@@ -7,7 +7,8 @@ namespace redb.Examples.Examples;
 
 /// <summary>
 /// Calculates average of a numeric field using AverageAsync.
-/// Server-side aggregation without loading objects.
+/// Server-side aggregation without loading objects, over a field of the employee and over a field
+/// two nested classes deep (HomeAddress.Building.Floor).
 /// </summary>
 [ExampleMeta("E125", "AverageAsync - Mean", "Analytics",
     ExampleTier.Free, 125, "Average", "Avg", "Aggregation", "Analytics", RelatedApis = ["IRedbQueryable.AverageAsync"])]
@@ -24,10 +25,11 @@ public class E125_AverageAsync : ExampleBase
         // Console.WriteLine(sql);
 
         var avgAge = await query.AverageAsync(e => e.Age);
+        var avgFloor = await query.AverageAsync(e => e.HomeAddress!.Building!.Floor);
 
         sw.Stop();
 
-        return Ok("E125", "AverageAsync - Mean", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
-            [$"AVG(Age) = {avgAge:F2}", "Server-side aggregation"]);
+        return Ok("E125", "AverageAsync - Mean", ExampleTier.Free, sw.ElapsedMilliseconds, 2,
+            [$"AVG(Age) = {avgAge:F2}", $"AVG(HomeAddress.Building.Floor) = {avgFloor:F2}", "Server-side aggregation"]);
     }
 }

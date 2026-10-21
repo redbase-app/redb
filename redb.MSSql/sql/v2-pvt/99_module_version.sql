@@ -196,7 +196,10 @@ BEGIN
     -- 0.2.29 - block 0: the indexes another index of the same table fully replaces are dropped,
     --          the set PostgreSQL dropped in 0.7.13 (2026-10-14). The statements that bring them
     --          back are in the comment above the DROP block of 00_module_init.sql.
-    RETURN N'0.2.29';
+    -- 0.2.30 - block 0: value-leading indexes (_id_structure, <value>, _id_object) INCLUDE (_array_index) for every
+    --          value column but the string replace the eleven object-leading *_not_null / *_filter ones (2026-10-16).
+    --          Restore statements: 00_module_init.sql.
+    RETURN N'0.2.30';
 END;
 GO
 

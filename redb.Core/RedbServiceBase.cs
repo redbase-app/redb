@@ -41,7 +41,8 @@ public abstract class RedbServiceBase : IRedbService
     private readonly IRoleProvider _roleProvider;
     private readonly IListProvider _listProvider;
     private readonly IServiceProvider _serviceProvider;
-    private RedbServiceConfiguration _configuration;
+    // readonly: the providers hold this instance, so it is only ever changed in place (UpdateConfiguration).
+    private readonly RedbServiceConfiguration _configuration;
     private readonly IRedbObjectSerializer _serializer;
     private readonly ILogger? _logger;
     
@@ -119,12 +120,16 @@ public abstract class RedbServiceBase : IRedbService
         IRedbContext context, RedbServiceConfiguration config, ISchemeSyncProvider schemeSync, ILogger? logger);
     
     /// <summary>
-    /// Save-pipeline interceptors from DI (discussion #12) - resolved once, handed to the
-    /// storage provider. Pro services building their own storage call this too.
+    /// Save-pipeline interceptors (discussion #12) handed to the storage provider: the DI registrations, resolved
+    /// once, and the run-time subscriptions of the <see cref="Interception.IRedbSaveInterceptorRegistry"/>, read on
+    /// every save. Pro services building their own storage call this too.
     /// </summary>
-    protected IEnumerable<Interception.IRedbSaveInterceptor>? ResolveSaveInterceptors()
-        => _serviceProvider.GetService(typeof(IEnumerable<Interception.IRedbSaveInterceptor>))
-            as IEnumerable<Interception.IRedbSaveInterceptor>;
+    protected Interception.RedbSaveInterceptorPipeline ResolveSaveInterceptors()
+        => new(
+            _serviceProvider.GetService(typeof(IEnumerable<Interception.IRedbSaveInterceptor>))
+                as IEnumerable<Interception.IRedbSaveInterceptor>,
+            _serviceProvider.GetService(typeof(Interception.IRedbSaveInterceptorRegistry))
+                as Interception.IRedbSaveInterceptorRegistry);
 
     /// <summary>
     /// Password hasher for the user provider: a DI registration wins, the fallback is bcrypt.
@@ -143,7 +148,7 @@ public abstract class RedbServiceBase : IRedbService
         IRedbContext context, IRedbObjectSerializer serializer, IPermissionProvider permissionProvider,
         IRedbSecurityContext securityContext, ISchemeSyncProvider schemeSync,
         RedbServiceConfiguration config, IListProvider listProvider, ILogger? logger,
-        IEnumerable<Interception.IRedbSaveInterceptor>? saveInterceptors);
+        Interception.RedbSaveInterceptorPipeline? saveInterceptors);
     
     /// <summary>
     /// Create tree provider.
@@ -202,6 +207,8 @@ public abstract class RedbServiceBase : IRedbService
             throw new InvalidOperationException(ContextNotRegisteredError);
         _serializer = serviceProvider.GetService<IRedbObjectSerializer>() ?? new SystemTextJsonRedbSerializer();
         _logger = serviceProvider.GetService<ILogger<RedbServiceBase>>() as ILogger;
+        // Process-wide caches forget a collectible AssemblyLoadContext (a module) when it unloads.
+        Caching.CollectibleContextCleanup.EnsureWatching(_logger);
         _configuration = serviceProvider.GetService<RedbServiceConfiguration>() ?? new RedbServiceConfiguration();
         _securityContext = serviceProvider.GetService<IRedbSecurityContext>() ?? 
                           AmbientSecurityContext.GetOrCreateDefault();
@@ -1028,9 +1035,14 @@ public abstract class RedbServiceBase : IRedbService
 
     public void UpdateConfiguration(Action<RedbServiceConfigurationBuilder> configureBuilder)
     {
+        // The providers hold this same configuration instance, so it is changed in place and never replaced.
+        // Most builder steps edit the instance they were given, but ForIntegrationTesting starts from a fresh
+        // copy: assigned here, it left this service on the new settings and every provider on the old ones.
         var builder = new RedbServiceConfigurationBuilder(_configuration);
         configureBuilder(builder);
-        _configuration = builder.Build();
+        var built = builder.Build();
+        if (!ReferenceEquals(built, _configuration))
+            _configuration.CopyBehaviourFrom(built);
     }
 
     // === INITIALIZATION ===
@@ -1050,8 +1062,9 @@ public abstract class RedbServiceBase : IRedbService
         // 0. Verify v2-pvt SQL module is deployed (only for dialects that ship one).
         await EnsurePvtModuleDeployedAsync();
 
-        // 1. Set type resolver for serializer (for polymorphic deserialization)
-        SystemTextJsonRedbSerializer.SetTypeResolver(schemeId => _schemeSync.Cache.GetClrType(schemeId));
+        // 1. Polymorphic deserialization resolves scheme ids in this domain when no service is current for the flow
+        //    (by name: a static closure over this service kept it alive for the life of the process).
+        SystemTextJsonRedbSerializer.SetInitializedDomain(_cacheDomain);
         
         // 2. Sync all schemes with RedbSchemeAttribute
         await AutoSyncSchemesAsync(assemblies);

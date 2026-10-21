@@ -41,4 +41,13 @@ public record ExampleResult
 
     /// <summary>Error message if failed.</summary>
     public string? Error { get; init; }
+
+    /// <summary>Database round trips the example made; filled by the runner, null when not counted.</summary>
+    public int? Queries { get; init; }
+
+    /// <summary>
+    /// The library cannot do this out of the box (an EF twin of a window-function or recursive-tree example).
+    /// Not a failure: the reason is in <see cref="Output"/>, there is no time to compare.
+    /// </summary>
+    public bool NotSupported { get; init; }
 }

@@ -408,10 +408,9 @@ ALTER TABLE _users ADD CONSTRAINT FK_users_configuration FOREIGN KEY (_id_config
 ALTER TABLE _roles ADD CONSTRAINT FK_roles_configuration FOREIGN KEY (_id_configuration) REFERENCES _objects(_id) ON DELETE SET NULL;
 
 
--- PostgreSQL: partial index (only rows where _array_index IS NULL)
-CREATE INDEX ix__values__array_null_structure 
-ON _values (_id_structure, _id_object, _long) 
-WHERE _array_index IS NULL;
+-- REMOVED (2026-10-16, PVT module 0.7.16): ix__values__array_null_structure (_id_structure, _id_object, _long)
+-- WHERE _array_index IS NULL. The value of a field next to its object is read from the covering index of the
+-- streams form; searching by value goes through IX__values__structure_long_object below.
 
 
 -- Index for quickly getting all nested fields by structure_id
@@ -542,23 +541,54 @@ ON _objects (_id_scheme, _id_parent, _id);
 -- WHERE _array_index IS NOT NULL. IX__values__object_structure_lookup has the same three key columns with no
 -- predicate and the values in INCLUDE, so it answers everything this one did.
 
--- 4. 📌 Partial indexes for NOT NULL values
--- NOTE: length guard prevents btree overflow on large string values (JWT payloads > 2704 bytes)
-CREATE INDEX IF NOT EXISTS "IX__values__String_not_null" 
-ON _values (_id_structure, _id_object, _String)
-WHERE _String IS NOT NULL AND length(_String) < 2000;
+-- 4. Values found by value: (_id_structure, <value>, _id_object), one per value column (PVT module 0.7.16).
+-- A filter on a field reads one range of its index and gets the objects that pass, instead of reading
+-- every object of the scheme. The value of a field next to a known object is read from the covering index
+-- of the streams form (IX__values__structure_object_scalar, redb.Postgres.Pro/Sql/pvt_streams_indexes.sql).
+-- Strings: the bound is in BYTES, the btree entry limit is on bytes (about 2.7 kB).
+-- _array_index is in INCLUDE: a query on a scalar field checks it as IS NULL, and without it every row the
+-- index found was looked up in the table for that check (29 ms -> 11 ms on 5 000 rows found).
+-- REMOVED (2026-10-16): the object-leading forms these replace, (_id_structure, _id_object, <value>):
+--   CREATE INDEX "IX__values__String_not_null" ON _values (_id_structure, _id_object, _String) WHERE _String IS NOT NULL AND length(_String) < 2000;
+--   CREATE INDEX "IX__values__Long_not_null" ON _values (_id_structure, _id_object, _Long) WHERE _Long IS NOT NULL;
+--   CREATE INDEX "IX__values__DateTimeOffset_not_null" ON _values (_id_structure, _id_object, _DateTimeOffset) WHERE _DateTimeOffset IS NOT NULL;
+--   CREATE INDEX "IX__values__Numeric_not_null" ON _values (_id_structure, _id_object, _Numeric) WHERE _Numeric IS NOT NULL;
+--   CREATE INDEX ix__values__array_null_structure ON _values (_id_structure, _id_object, _long) WHERE _array_index IS NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_string_object"
+ON _values (_id_structure, _String, _id_object) INCLUDE (_array_index)
+WHERE _String IS NOT NULL AND octet_length(_String) < 2000;
 
-CREATE INDEX IF NOT EXISTS "IX__values__Long_not_null" 
-ON _values (_id_structure, _id_object, _Long)
+CREATE INDEX IF NOT EXISTS "IX__values__structure_long_object"
+ON _values (_id_structure, _Long, _id_object) INCLUDE (_array_index)
 WHERE _Long IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS "IX__values__DateTimeOffset_not_null" 
-ON _values (_id_structure, _id_object, _DateTimeOffset)
+CREATE INDEX IF NOT EXISTS "IX__values__structure_numeric_object"
+ON _values (_id_structure, _Numeric, _id_object) INCLUDE (_array_index)
+WHERE _Numeric IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_double_object"
+ON _values (_id_structure, _Double, _id_object) INCLUDE (_array_index)
+WHERE _Double IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_datetimeoffset_object"
+ON _values (_id_structure, _DateTimeOffset, _id_object) INCLUDE (_array_index)
 WHERE _DateTimeOffset IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS "IX__values__Numeric_not_null" 
-ON _values (_id_structure, _id_object, _Numeric)
-WHERE _Numeric IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_boolean_object"
+ON _values (_id_structure, _Boolean, _id_object) INCLUDE (_array_index)
+WHERE _Boolean IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_guid_object"
+ON _values (_id_structure, _Guid, _id_object) INCLUDE (_array_index)
+WHERE _Guid IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_listitem_object"
+ON _values (_id_structure, _ListItem, _id_object) INCLUDE (_array_index)
+WHERE _ListItem IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_object_object"
+ON _values (_id_structure, _Object, _id_object) INCLUDE (_array_index)
+WHERE _Object IS NOT NULL;
 
 -- 5. 🔍 Text search (requires pg_trgm)
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -609,8 +639,8 @@ ON _objects (_id_scheme, _name, _id);
 COMMENT ON INDEX "IX__objects__scheme_parent" IS 
 'Composite index for fast filtering of objects by scheme and parent. CRITICAL for tree queries and searching direct children';
 
-COMMENT ON INDEX "IX__values__String_not_null" IS 
-'Partial index for fast search of objects with NOT NULL string values. Optimizes queries with {"field": {"$ne": null}} and {"field": {"$exists": true}}';
+COMMENT ON INDEX "IX__values__structure_string_object" IS 
+'A string field searched by value: equality and ranges, and NOT NULL checks through the structure prefix';
 
 COMMENT ON INDEX "IX__values__String_pattern" IS 
 'GIN index for fast text search via LIKE/ILIKE. Requires pg_trgm extension. Optimizes $contains, $startsWith, $endsWith, $matches (regex)';

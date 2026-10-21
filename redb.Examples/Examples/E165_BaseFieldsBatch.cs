@@ -9,7 +9,7 @@ namespace redb.Examples.Examples;
 /// <summary>
 /// Demonstrates batch save/load of non-generic RedbObject with base fields.
 /// Efficient for bulk operations on simple objects without Props.
-/// All data stored in _objects table - no EAV overhead.
+/// All data stored in _objects table - no props rows.
 /// </summary>
 [ExampleMeta("E165", "Base Fields - Batch Operations", "Core",
     ExampleTier.Free, 165, "BaseFields", "Batch", "NonGeneric", RelatedApis = ["RedbObject", "IRedbService.SaveAsync"])]
@@ -23,7 +23,7 @@ public class E165_BaseFieldsBatch : ExampleBase
         var objects = new List<RedbObject>();
         var batchId = DateTime.UtcNow.Ticks;
         
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 1000; i++)
         {
             objects.Add(new RedbObject
             {
@@ -42,7 +42,7 @@ public class E165_BaseFieldsBatch : ExampleBase
 
         sw.Stop();
 
-        if (loaded.Count != 10)
+        if (loaded.Count != 1000)
         {
             return Fail("E165", "Base Fields - Batch Operations", ExampleTier.Free, sw.ElapsedMilliseconds,
                 $"Expected 10 objects, got {loaded.Count}.");

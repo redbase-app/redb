@@ -26,9 +26,14 @@ public class E071_AnyAsync : ExampleBase
         
         var anyExist = await query.AnyAsync();
 
+        // Existence within a set filtered by a field two nested classes deep
+        var anyOnTopFloor = await redb.Query<EmployeeProps>()
+            .Where(e => e.HomeAddress!.Building!.Floor == 30)
+            .AnyAsync();
+
         sw.Stop();
 
         return Ok("E071", "AnyAsync - Check Existence", ExampleTier.Free, sw.ElapsedMilliseconds, anyExist ? 1 : 0,
-            [$"Any employees exist: {anyExist}"]);
+            [$"Any employees exist: {anyExist}", $"Any living on floor 30: {anyOnTopFloor}"]);
     }
 }

@@ -13,18 +13,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
     <!-- Версия точная, а не плавающая 4.*, и совпадает с redb.Doc.Web и redb.Lk.
          С плавающей библиотека собиралась под свежую 4.x, а в образ приложения
          клалась 4.13.2 из его собственной ссылки: PropsGrid падал при отрисовке
          с FileNotFoundException, и весь раздел /admin/props отдавал 500.
          Компилятор такое не ловит, поломка выстреливала сама при выходе новой
          4.x, без единой правки в репозитории. -->
-    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.13.2" />
+    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="redb.Core" Version="$(Version)" />
+    <PackageReference Include="redb.Core" />
   </ItemGroup>
 
 </Project>

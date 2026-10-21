@@ -26,7 +26,7 @@ public class E015_WhereTripleAnd : ExampleBase
         var phase = Stopwatch.StartNew();
         var sql = await query.ToSqlStringAsync();
         var compileMs = phase.ElapsedMilliseconds;
-        Console.WriteLine(sql);
+        // Console.WriteLine(sql);
 
         // Phase 0: query and materialization in one call, before anything else has touched
         // these objects (nothing of them is in the Props cache yet).

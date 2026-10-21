@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using redb.MSSql.Sql;
 using redb.Postgres.Sql;
 using redb.SQLite.Sql;

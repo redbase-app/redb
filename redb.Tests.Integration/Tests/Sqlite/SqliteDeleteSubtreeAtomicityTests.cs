@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using redb.Core;
 using redb.Core.Models.Entities;
 using redb.Tests.Integration.Fixtures;

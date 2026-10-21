@@ -134,3 +134,22 @@ public enum FlatValueSource
     /// <summary><c>_Object</c>.</summary>
     Object
 }
+
+/// <summary>
+/// Delete rule of a flat foreign key. The rules mirror redb's own schema: what redb removes together
+/// with an object, the flat database removes together with its row.
+/// </summary>
+public enum FlatDeleteRule
+{
+    /// <summary>The referenced row cannot be deleted while it is referenced: references between objects.</summary>
+    NoAction,
+
+    /// <summary>
+    /// Deleted together with the referenced row: the Props of an object, the elements of a collection,
+    /// the fields of a nested class, the children in a tree, the items of a list.
+    /// </summary>
+    Cascade,
+
+    /// <summary>Kept, with the reference cleared: a list item that points to a deleted object.</summary>
+    SetNull
+}

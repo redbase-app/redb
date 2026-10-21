@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using redb.Core.Models.Entities;
@@ -13,27 +14,41 @@ namespace redb.Core.Serialization
     public class SystemTextJsonRedbSerializer : IRedbObjectSerializer
     {
         /// <summary>
-        /// Static type resolver for polymorphic deserialization.
-        /// Set via SetTypeResolver during service initialization.
+        /// A type resolver set by the application, if any: it takes precedence over the per-domain resolution.
         /// </summary>
         private static Func<long, Type?>? _typeResolver;
 
+        /// <summary>The cache domain of the redb service initialized last; a name, never the service itself.</summary>
+        private static string? _lastInitializedDomain;
+
         /// <summary>
-        /// Set the type resolver function for polymorphic deserialization.
-        /// Should be called once during service initialization.
+        /// Set the type resolver function for polymorphic deserialization. Without one, a scheme id resolves in the
+        /// cache domain of the redb service current for the calling flow, else of the service initialized last.
         /// </summary>
         public static void SetTypeResolver(Func<long, Type?> resolver)
         {
             _typeResolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
         }
 
+        /// <summary>Records the domain of a service that has just initialized (the fallback of <see cref="ResolveType"/>).</summary>
+        internal static void SetInitializedDomain(string domain) => Volatile.Write(ref _lastInitializedDomain, domain);
+
         /// <summary>
-        /// Resolve CLR type by scheme ID using configured resolver.
+        /// Resolve CLR type by scheme ID: a scheme id is a per-database fact, so it resolves in the domain of the
+        /// service the calling flow reads through. Held as a domain name, the resolution keeps no service alive.
         /// </summary>
         internal static Type? ResolveType(long schemeId)
         {
-            return _typeResolver?.Invoke(schemeId);
+            if (_typeResolver is { } resolver)
+                return resolver(schemeId);
+
+            var domain = RedbAmbientScope.CurrentDomain ?? Volatile.Read(ref _lastInitializedDomain);
+            return domain == null ? null : new GlobalMetadataCache(domain).GetClrType(schemeId);
         }
+
+        // The options cache the metadata of every type they handled, Props types of modules included: the caches of
+        // System.Text.Json are cleared when a collectible AssemblyLoadContext unloads (CollectibleContextCleanup).
+        static SystemTextJsonRedbSerializer() => CollectibleContextCleanup.EnsureWatching();
 
         /// <summary>
         /// Public serialization options for use in other components

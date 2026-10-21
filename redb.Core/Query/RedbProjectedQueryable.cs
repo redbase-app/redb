@@ -39,6 +39,10 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
     // запрещён - иначе фильтр применился бы ДО лимита и порядок вызовов был бы нарушен.
     private readonly bool _sourcePaged;
 
+    // The ordering after Select went to the source (OrderBy of a member the source can sort by, nothing in memory
+    // before it): a ThenBy continues it there, and a later Take/Skip stays a LIMIT/OFFSET of the source.
+    private readonly bool _sourceOrdered;
+
     // Extracted structure_ids for optimized loading
     private HashSet<long>? _projectedStructureIds;
     // Text field paths for SQL function search_objects_with_projection_by_paths
@@ -80,8 +84,10 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
         long schemeId,
         bool isDistinct = false,
         List<(bool IsSkip, int Count)>? pagingOps = null,
-        bool sourcePaged = false)
+        bool sourcePaged = false,
+        bool sourceOrdered = false)
     {
+        _sourceOrdered = sourceOrdered;
         _sourceQuery = sourceQuery;
         _projection = projection;
         _wherePredicates = new List<Expression<Func<TResult, bool>>>(wherePredicates);
@@ -135,7 +141,8 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
                 _schemeId,
                 _isDistinct,
                 _pagingOps,
-                _sourcePaged);
+                _sourcePaged,
+                _sourceOrdered);
         }
 
         var newWherePredicates = new List<Expression<Func<TResult, bool>>>(_wherePredicates) { predicate };
@@ -151,7 +158,8 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             _schemeId,
             _isDistinct,
             _pagingOps,
-            _sourcePaged);
+            _sourcePaged,
+            _sourceOrdered);
     }
 
     /// <summary>
@@ -165,22 +173,7 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
     {
         pushed = _sourceQuery;
 
-        Dictionary<string, Expression>? map = null;
-        if (_projection.Body is NewExpression ne && ne.Members != null)
-        {
-            map = new Dictionary<string, Expression>();
-            for (int i = 0; i < ne.Members.Count; i++)
-                map[ne.Members[i].Name] = ne.Arguments[i];
-        }
-        else if (_projection.Body is MemberInitExpression mi && mi.NewExpression.Arguments.Count == 0)
-        {
-            map = new Dictionary<string, Expression>();
-            foreach (var binding in mi.Bindings)
-            {
-                if (binding is not MemberAssignment assignment) return false;
-                map[assignment.Member.Name] = assignment.Expression;
-            }
-        }
+        var map = ProjectionMembers();
         if (map == null) return false;
 
         var pParam = Expression.Parameter(typeof(TProps), "p");
@@ -265,46 +258,156 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
     }
 
 
+    // The ordering after Select is the ordering of the objects the projection reads: a key that is a projected Props
+    // member or one of the object's own fields sorts the source, in SQL, and
+    // a later Take/Skip stays a LIMIT/OFFSET there. Select only shapes what the page materializes. A key the source
+    // cannot sort by, or an ordering after operations that run in memory, sorts in memory as before (S-4).
     public IRedbProjectedQueryable<TResult> OrderBy<TKey>(Expression<Func<TResult, TKey>> keySelector)
-    {
-        if (keySelector == null)
-            throw new ArgumentNullException(nameof(keySelector));
-
-        var newOrderByExpressions = new List<(Expression, bool)> { (keySelector, false) };
-
-        return new RedbProjectedQueryable<TProps, TResult>(
-            _sourceQuery,
-            _projection,
-            _wherePredicates,
-            newOrderByExpressions,
-            _projectedStructureIds,
-            _projectedFieldPaths,
-            _provider,
-            _schemeId,
-            _isDistinct,
-            _pagingOps,
-            _sourcePaged);
-    }
+        => Order(keySelector, descending: false, thenBy: false);
 
     public IRedbProjectedQueryable<TResult> OrderByDescending<TKey>(Expression<Func<TResult, TKey>> keySelector)
+        => Order(keySelector, descending: true, thenBy: false);
+
+    public IRedbProjectedQueryable<TResult> ThenBy<TKey>(Expression<Func<TResult, TKey>> keySelector)
+        => Order(keySelector, descending: false, thenBy: true);
+
+    public IRedbProjectedQueryable<TResult> ThenByDescending<TKey>(Expression<Func<TResult, TKey>> keySelector)
+        => Order(keySelector, descending: true, thenBy: true);
+
+    private IRedbProjectedQueryable<TResult> Order<TKey>(Expression<Func<TResult, TKey>> keySelector, bool descending, bool thenBy)
     {
         if (keySelector == null)
             throw new ArgumentNullException(nameof(keySelector));
+        if (thenBy && _orderByExpressions.Count == 0 && !_sourceOrdered)
+            throw new InvalidOperationException("ThenBy continues an ordering: call OrderBy or OrderByDescending first.");
 
-        var newOrderByExpressions = new List<(Expression, bool)> { (keySelector, true) };
+        // OrderBy starts an ordering, ThenBy continues the one that exists: in the source or in memory.
+        var inSource = !thenBy || _orderByExpressions.Count == 0;
+        if (inSource && !_sourcePaged && !HasInMemoryOps && TryPushOrdering(keySelector, descending, thenBy, out var ordered))
+            return Copy(source: ordered, sourceOrdered: true);
 
-        return new RedbProjectedQueryable<TProps, TResult>(
-            _sourceQuery,
+        if (thenBy && _orderByExpressions.Count == 0)
+            throw new InvalidOperationException(
+                "This ThenBy cannot continue the ordering the database applies (its key is not a projected Props member " +
+                "or field of the object, or Take/Skip/Distinct came in between): put the ordering before Select.");
+
+        // In memory, as before: OrderBy replaces the ordering, ThenBy adds a key to it.
+        var keys = thenBy ? new List<(Expression, bool)>(_orderByExpressions) : new List<(Expression, bool)>();
+        keys.Add((keySelector, descending));
+        return Copy(orderBy: keys, sourceOrdered: false);
+    }
+
+    private RedbProjectedQueryable<TProps, TResult> Copy(
+        IRedbQueryable<TProps>? source = null,
+        List<(Expression KeySelector, bool IsDescending)>? orderBy = null,
+        bool? sourceOrdered = null)
+        => new(
+            source ?? _sourceQuery,
             _projection,
             _wherePredicates,
-            newOrderByExpressions,
+            orderBy ?? _orderByExpressions,
             _projectedStructureIds,
             _projectedFieldPaths,
             _provider,
             _schemeId,
             _isDistinct,
             _pagingOps,
-            _sourcePaged);
+            _sourcePaged,
+            sourceOrdered ?? _sourceOrdered);
+
+    /// <summary>Members of the projection by name, mapped to their expressions over the object; null for another shape.</summary>
+    private Dictionary<string, Expression>? ProjectionMembers()
+    {
+        if (_projection.Body is NewExpression ne && ne.Members != null)
+        {
+            var map = new Dictionary<string, Expression>();
+            for (int i = 0; i < ne.Members.Count; i++)
+                map[ne.Members[i].Name] = ne.Arguments[i];
+            return map;
+        }
+        if (_projection.Body is MemberInitExpression mi && mi.NewExpression.Arguments.Count == 0)
+        {
+            var map = new Dictionary<string, Expression>();
+            foreach (var binding in mi.Bindings)
+            {
+                if (binding is not MemberAssignment assignment) return null;
+                map[assignment.Member.Name] = assignment.Expression;
+            }
+            return map;
+        }
+        return null;
+    }
+
+    // Fields of the object the source sorts by (OrderByRedb), by their IRedbObject property names.
+    private static readonly HashSet<string> SortableObjectFields = new(StringComparer.Ordinal)
+    {
+        "Id", "Name", "ParentId", "SchemeId", "DateCreate", "DateModify",
+        "ValueLong", "ValueString", "ValueGuid", "ValueBool", "ValueDouble", "ValueNumeric", "ValueDatetime"
+    };
+
+    /// <summary>
+    /// The ordering of a projected member sent to the source: OrderByRedb for a field of the object, OrderBy over
+    /// TProps for a member that reads a Props path (rewritten as Where after Select is).
+    /// </summary>
+    private bool TryPushOrdering<TKey>(
+        Expression<Func<TResult, TKey>> keySelector, bool descending, bool thenBy, out IRedbQueryable<TProps> ordered)
+    {
+        ordered = _sourceQuery;
+        // Only a provider whose ordering matches the in-memory one: Free drops objects without a value for the key
+        // and does not apply ThenBy everywhere, so its projections keep sorting in memory.
+        if (_provider is not Base.QueryProviderBase { SortsByPropsLikeLinq: true }) return false;
+        var map = ProjectionMembers();
+        if (map == null) return false;
+        var sorted = _sourceQuery as IOrderedRedbQueryable<TProps>;
+        if (thenBy && sorted == null) return false;
+
+        if (keySelector.Body is MemberExpression member && member.Expression == keySelector.Parameters[0]
+            && map.TryGetValue(member.Member.Name, out var mapped)
+            && ObjectField(mapped) is { } field && field.PropertyType == typeof(TKey))
+        {
+            var o = Expression.Parameter(typeof(redb.Core.Models.Contracts.IRedbObject), "o");
+            var byField = Expression.Lambda<Func<redb.Core.Models.Contracts.IRedbObject, TKey>>(Expression.Property(o, field), o);
+            ordered = thenBy
+                ? descending ? sorted!.ThenByDescendingRedb(byField) : sorted!.ThenByRedb(byField)
+                : descending ? _sourceQuery.OrderByDescendingRedb(byField) : _sourceQuery.OrderByRedb(byField);
+            return true;
+        }
+
+        var p = Expression.Parameter(typeof(TProps), "p");
+        var rewriter = new ProjectedPredicateRewriter(keySelector.Parameters[0], map, _projection.Parameters[0], p);
+        var body = rewriter.Visit(keySelector.Body);
+        if (!rewriter.Success || body == null || body.Type != typeof(TKey) || !IsMemberChainOf(body, p))
+            return false;
+
+        var byProps = Expression.Lambda<Func<TProps, TKey>>(body, p);
+        ordered = thenBy
+            ? descending ? sorted!.ThenByDescending(byProps) : sorted!.ThenBy(byProps)
+            : descending ? _sourceQuery.OrderByDescending(byProps) : _sourceQuery.OrderBy(byProps);
+        return true;
+    }
+
+    /// <summary>
+    /// A plain path of Props fields (p.HomeAddress.City): the ordering of the source sorts by such a path. A key
+    /// computed over Props members is not sent there, the ordering parser need not translate it; it sorts in memory.
+    /// </summary>
+    private static bool IsMemberChainOf(Expression expr, ParameterExpression p)
+    {
+        while (expr is MemberExpression m)
+            expr = m.Expression!;
+        return expr == p;
+    }
+
+    /// <summary>The field of the object a projected member reads (x.DateCreate), if the source can sort by it.</summary>
+    private System.Reflection.PropertyInfo? ObjectField(Expression mapped)
+    {
+        while (mapped is UnaryExpression u && (u.NodeType == ExpressionType.Convert || u.NodeType == ExpressionType.ConvertChecked))
+            mapped = u.Operand;
+        if (mapped is not MemberExpression m || m.Expression != _projection.Parameters[0] || !SortableObjectFields.Contains(m.Member.Name))
+            return null;
+
+        var contract = typeof(redb.Core.Models.Contracts.IRedbObject);
+        return contract.GetProperty(m.Member.Name)
+               ?? contract.GetInterfaces().Select(i => i.GetProperty(m.Member.Name)).FirstOrDefault(pi => pi != null);
     }
 
     public IRedbProjectedQueryable<TResult> Take(int count)
@@ -325,7 +428,8 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             _schemeId,
             _isDistinct,
             _pagingOps,
-            sourcePaged: true);
+            sourcePaged: true,
+            sourceOrdered: _sourceOrdered);
     }
 
     public IRedbProjectedQueryable<TResult> Skip(int count)
@@ -344,7 +448,8 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             _schemeId,
             _isDistinct,
             _pagingOps,
-            sourcePaged: true);
+            sourcePaged: true,
+            sourceOrdered: _sourceOrdered);
     }
 
     private bool HasInMemoryOps =>
@@ -363,7 +468,8 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             _schemeId,
             _isDistinct,
             _pagingOps,
-            _sourcePaged);
+            _sourcePaged,
+            _sourceOrdered);
         copy._pagingOps.Add((isSkip, count));
         return copy;
     }
@@ -382,7 +488,8 @@ public class RedbProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
             _schemeId,
             isDistinct: true,
             pagingOps: _pagingOps,
-            sourcePaged: _sourcePaged);
+            sourcePaged: _sourcePaged,
+            sourceOrdered: _sourceOrdered);
     }
 
     public async Task<List<TResult>> ToListAsync(CancellationToken cancellationToken = default)

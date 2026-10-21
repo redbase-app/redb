@@ -62,7 +62,7 @@ namespace redb.Core.Providers.Base
             ISqlDialect sql,
             IListProvider? listProvider = null,
             ILogger? logger = null,
-            IEnumerable<Interception.IRedbSaveInterceptor>? saveInterceptors = null)
+            Interception.RedbSaveInterceptorPipeline? saveInterceptors = null)
         {
             _context = context;
             _serializer = serializer;
@@ -73,15 +73,18 @@ namespace redb.Core.Providers.Base
             _sql = sql;
             _listProvider = listProvider;
             _logger = logger;
-            // Materialized once: interceptors run on every save, in registration order.
-            _saveInterceptors = saveInterceptors?.ToArray() ?? [];
+            _saveInterceptors = saveInterceptors ?? Interception.RedbSaveInterceptorPipeline.Empty;
         }
 
-        /// <summary>Save-pipeline interceptors (discussion #12, п.3-4). Empty array = zero cost.</summary>
-        private readonly Interception.IRedbSaveInterceptor[] _saveInterceptors;
+        /// <summary>
+        /// Save-pipeline interceptors (discussion #12, п.3-4): DI registrations plus run-time subscriptions. Every save
+        /// and delete takes ONE snapshot at its start and uses it for both of its hooks, so a subscription that comes
+        /// or goes meanwhile never gets a Saved without its Saving. An empty snapshot = zero cost: nothing is collected.
+        /// </summary>
+        private readonly Interception.RedbSaveInterceptorPipeline _saveInterceptors;
 
-        /// <summary>True when at least one interceptor is registered — gates the change-feed collection.</summary>
-        protected bool HasSaveInterceptors => _saveInterceptors.Length > 0;
+        /// <summary>The interceptors of the operation that starts now. Empty when nobody listens.</summary>
+        protected IReadOnlyList<Interception.IRedbSaveInterceptor> SnapshotSaveInterceptors() => _saveInterceptors.Snapshot();
 
         /// <summary>
         /// The change feed for the current save, or null when nobody listens. The base opens it
@@ -91,27 +94,31 @@ namespace redb.Core.Providers.Base
         /// </summary>
         protected List<Interception.RedbValueChange>? InterceptorChangeSink;
 
-        protected async Task InvokeSavingInterceptorsAsync(Interception.RedbSavingContext ctx, CancellationToken cancellationToken)
+        protected static async Task InvokeSavingInterceptorsAsync(
+            IReadOnlyList<Interception.IRedbSaveInterceptor> interceptors, Interception.RedbSavingContext ctx, CancellationToken cancellationToken)
         {
-            foreach (var interceptor in _saveInterceptors)
+            foreach (var interceptor in interceptors)
                 await interceptor.SavingAsync(ctx, cancellationToken);
         }
 
-        protected async Task InvokeSavedInterceptorsAsync(Interception.RedbSavedContext ctx, CancellationToken cancellationToken)
+        protected static async Task InvokeSavedInterceptorsAsync(
+            IReadOnlyList<Interception.IRedbSaveInterceptor> interceptors, Interception.RedbSavedContext ctx, CancellationToken cancellationToken)
         {
-            foreach (var interceptor in _saveInterceptors)
+            foreach (var interceptor in interceptors)
                 await interceptor.SavedAsync(ctx, cancellationToken);
         }
 
-        private async Task InvokeDeletingInterceptorsAsync(Interception.RedbDeletingContext ctx, CancellationToken cancellationToken)
+        private static async Task InvokeDeletingInterceptorsAsync(
+            IReadOnlyList<Interception.IRedbSaveInterceptor> interceptors, Interception.RedbDeletingContext ctx, CancellationToken cancellationToken)
         {
-            foreach (var interceptor in _saveInterceptors)
+            foreach (var interceptor in interceptors)
                 await interceptor.DeletingAsync(ctx, cancellationToken);
         }
 
-        private async Task InvokeDeletedInterceptorsAsync(Interception.RedbDeletedContext ctx, CancellationToken cancellationToken)
+        private static async Task InvokeDeletedInterceptorsAsync(
+            IReadOnlyList<Interception.IRedbSaveInterceptor> interceptors, Interception.RedbDeletedContext ctx, CancellationToken cancellationToken)
         {
-            foreach (var interceptor in _saveInterceptors)
+            foreach (var interceptor in interceptors)
                 await interceptor.DeletedAsync(ctx, cancellationToken);
         }
 
@@ -253,6 +260,11 @@ namespace redb.Core.Providers.Base
             if (_configuration.EnablePropsCache && !_configuration.SkipHashValidationOnCacheCheck && PropsCache.Instance != null && objectHash.HasValue)
             {
                 var cachedObj = PropsCache.Get<TProps>(objectId, objectHash.Value);
+                if (cachedObj != null && !await IsCachedGraphCurrentAsync(cachedObj, sync: false, cancellationToken))
+                {
+                    PropsCache.Remove(objectId);
+                    cachedObj = null;
+                }
                 if (cachedObj != null)
                 {
                     // Cache HIT - the hash vouches for header and Props alike (cluster review,
@@ -404,6 +416,11 @@ namespace redb.Core.Providers.Base
             if (_configuration.EnablePropsCache && !_configuration.SkipHashValidationOnCacheCheck && PropsCache.Instance != null && objectHash.HasValue)
             {
                 var cachedObj = PropsCache.Get<TProps>(objectId, objectHash.Value);
+                if (cachedObj != null && !IsCachedGraphCurrentAsync(cachedObj, sync: true, CancellationToken.None).GetAwaiter().GetResult())
+                {
+                    PropsCache.Remove(objectId);
+                    cachedObj = null;
+                }
                 if (cachedObj != null)
                     return cachedObj;
             }
@@ -412,108 +429,19 @@ namespace redb.Core.Providers.Base
         }
 
         /// <summary>
-        /// Recursively caches all nested RedbObject found in Props
+        /// Whether a cached object whose own hash matched its row may be served with the graph it holds. Its hash does
+        /// not move when an object it references changes or leaves for the trash, on this node or any other, so a
+        /// provider that caches whole graphs checks the loaded references against their rows. With <paramref name="sync"/>
+        /// every database call runs on the calling thread and the task is complete on return.
         /// </summary>
-        protected void CacheNestedObjects(object obj)
-        {
-            var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
-            CacheNestedObjectsInternal(obj, visited);
-        }
+        protected virtual Task<bool> IsCachedGraphCurrentAsync(IRedbObject cached, bool sync, CancellationToken cancellationToken)
+            => Task.FromResult(true);
 
         /// <summary>
-        /// Internal method for recursive caching with tracking of visited objects
+        /// Recursively caches all nested RedbObject found in Props
         /// </summary>
-        private void CacheNestedObjectsInternal(object obj, HashSet<object> visited)
-        {
-            if (obj == null) return;
+        protected void CacheNestedObjects(object obj) => PropsCache.SetNested(obj);
 
-            var objType = obj.GetType();
-
-            // CRITICAL: Check TYPE IMMEDIATELY before visited.Add()!
-            // This prevents infinite boxing for value types (DateTime, int, etc.)
-            if (objType.IsPrimitive || objType.IsValueType || objType.Namespace?.StartsWith("System") == true)
-            {
-                return;
-            }
-
-            // A list item is a leaf: reading its lazy Object property IS a database load, so the
-            // reflective property walk below must never descend into one (stand, 2026-09-09).
-            if (redb.Core.Utils.LazyReferenceInstaller.IsWalkLeaf(obj))
-            {
-                return;
-            }
-
-            // Only AFTER type check add to visited (protection against circular references)
-            if (!visited.Add(obj))
-            {
-                return;
-            }
-
-            // If this is a RedbObject<T> (or a TreeRedbObject<T>) → cache it
-            var genericObjType = Utils.RedbObjectTypes.GenericOf(objType);
-            if (genericObjType != null)
-            {
-                var redbObj = obj as IRedbObject;
-                // V4 (L.3): a reference stub is neither cached nor walked - reading its Props here
-                // would BE the lazy load: synchronous, and for the whole reachable graph (review).
-                if (redbObj != null && redbObj.Hash.HasValue && obj is RedbObject { IsPropsLoaded: true })
-                {
-                    // The entry only: the Set of the root marked the whole graph shared already, and a nested Set
-                    // through GlobalPropsCache walked the subtree again for every nested object (review after 4.0.0).
-                    var propsType = genericObjType.GetGenericArguments()[0];
-                    var setMethod = typeof(IRedbObjectCache).GetMethod("Set")?.MakeGenericMethod(propsType);
-                    setMethod?.Invoke(PropsCache.Instance, new[] { obj });
-
-                    // Raw Props, never the getter
-                    var propsValue = objType.GetMethod("GetPropsDirectly")?.Invoke(obj, null);
-                    if (propsValue != null)
-                    {
-                        CacheNestedObjectsInternal(propsValue, visited);
-                    }
-                }
-                return;
-            }
-
-            // Process arrays
-            if (obj is Array array)
-            {
-                foreach (var item in array)
-                {
-                    if (item != null)
-                    {
-                        CacheNestedObjectsInternal(item, visited);
-                    }
-                }
-                return;
-            }
-
-            // Process collections (IEnumerable, except string)
-            if (obj is System.Collections.IEnumerable enumerable && obj is not string)
-            {
-                foreach (var item in enumerable)
-                {
-                    if (item != null)
-                    {
-                        CacheNestedObjectsInternal(item, visited);
-                    }
-                }
-                return;
-            }
-
-            // Process business class properties (Address, Contact, Details, etc.)
-            var properties = objType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            foreach (var prop in properties)
-            {
-                // The save's property set: not an indexer, not [RedbIgnore].
-                if (!Utils.LazyReferenceInstaller.IsWalkedProperty(prop)) continue;
-
-                var propValue = prop.GetValue(obj);
-                if (propValue != null)
-                {
-                    CacheNestedObjectsInternal(propValue, visited);
-                }
-            }
-        }
 
 
         /// <summary>
@@ -565,9 +493,10 @@ namespace redb.Core.Providers.Base
 
             // Interceptors (owner decision: deletes are covered too). Deleting before the SQL -
             // an exception cancels the delete; Deleted after it, only when a row actually went.
-            if (HasSaveInterceptors)
+            var interceptors = SnapshotSaveInterceptors();
+            if (interceptors.Count > 0)
             {
-                await InvokeDeletingInterceptorsAsync(new Interception.RedbDeletingContext
+                await InvokeDeletingInterceptorsAsync(interceptors, new Interception.RedbDeletingContext
                 {
                     ObjectIds = [obj.Id],
                     KnownObjects = [obj],
@@ -584,9 +513,9 @@ namespace redb.Core.Providers.Base
                 return false;  // Object did not exist or was already deleted
             }
 
-            if (HasSaveInterceptors)
+            if (interceptors.Count > 0)
             {
-                await InvokeDeletedInterceptorsAsync(new Interception.RedbDeletedContext
+                await InvokeDeletedInterceptorsAsync(interceptors, new Interception.RedbDeletedContext
                 {
                     ObjectIds = [obj.Id],
                     KnownObjects = [obj],
@@ -669,9 +598,10 @@ namespace redb.Core.Providers.Base
                 }
             }
 
-            if (HasSaveInterceptors)
+            var interceptors = SnapshotSaveInterceptors();
+            if (interceptors.Count > 0)
             {
-                await InvokeDeletingInterceptorsAsync(new Interception.RedbDeletingContext
+                await InvokeDeletingInterceptorsAsync(interceptors, new Interception.RedbDeletingContext
                 {
                     ObjectIds = ids,
                     KnownObjects = knownObjects,
@@ -692,9 +622,9 @@ namespace redb.Core.Providers.Base
                 }
             }
 
-            if (HasSaveInterceptors && deletedCount > 0)
+            if (interceptors.Count > 0 && deletedCount > 0)
             {
-                await InvokeDeletedInterceptorsAsync(new Interception.RedbDeletedContext
+                await InvokeDeletedInterceptorsAsync(interceptors, new Interception.RedbDeletedContext
                 {
                     ObjectIds = ids,
                     KnownObjects = knownObjects,

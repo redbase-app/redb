@@ -511,10 +511,10 @@ CREATE INDEX IF NOT EXISTS "IX__users_roles__users"      ON _users_roles (_id_us
 CREATE INDEX IF NOT EXISTS "IX__users__id_configuration" ON _users (_id_configuration) WHERE _id_configuration IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__roles__id_configuration" ON _roles (_id_configuration) WHERE _id_configuration IS NOT NULL;
 
--- Partial index (only rows where _array_index IS NULL)
-CREATE INDEX IF NOT EXISTS "ix__values__array_null_structure"
-    ON _values (_id_structure, _id_object, _Long)
-    WHERE _array_index IS NULL;
+-- REMOVED (2026-10-17): "ix__values__array_null_structure" (_id_structure, _id_object, _Long) WHERE _array_index IS NULL.
+-- Its predicate matches the term every stream states, so SQLite drove pages from it, from a boolean field
+-- of 390 thousand rows instead of a value range of 410 (1.4 s against 26-38 ms). Reading a value by object
+-- is covered by IX__values__structure_object_lookup. Removed by schema step 11 of RedbService.
 
 -- Nested fields by structure_id (INCLUDE cols folded into key)
 CREATE INDEX IF NOT EXISTS "IX__values__structure_parent_batch"
@@ -552,23 +552,46 @@ CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent"
 -- REMOVED (2026-10-14): "IX__values__object_structure_array_index" (_id_object, _id_structure, _array_index)
 -- WHERE _array_index IS NOT NULL is a prefix of IX__values__object_structure_lookup above, which has no predicate.
 
--- Partial NOT NULL value indexes
--- NOTE: unlike PostgreSQL there is NO length guard here, and that is deliberate.
--- The guard in redbPostgre.sql exists because a btree key over ~2700 bytes overflows the page;
--- SQLite has no such limit. Copying it across made the index unusable for string prefilters:
--- SQLite does not prove implications between a query and a partial index predicate, it looks
--- for a matching term, and "length(_String) < 2000" is a term no query states. Measured on
--- 100100 objects, a LIKE prefilter went from 1230 ms to 294 ms once the guard was dropped
--- (see docs/PVT_PREFILTER_PLAN.md). The prefilter must also spell out "IS NOT NULL", because
--- SQLite derives it from a range comparison but never from LIKE.
-CREATE INDEX IF NOT EXISTS "IX__values__String_not_null"
-    ON _values (_id_structure, _id_object, _String) WHERE _String IS NOT NULL;
-CREATE INDEX IF NOT EXISTS "IX__values__Long_not_null"
-    ON _values (_id_structure, _id_object, _Long) WHERE _Long IS NOT NULL;
-CREATE INDEX IF NOT EXISTS "IX__values__DateTimeOffset_not_null"
-    ON _values (_id_structure, _id_object, _DateTimeOffset) WHERE _DateTimeOffset IS NOT NULL;
-CREATE INDEX IF NOT EXISTS "IX__values__Numeric_not_null"
-    ON _values (_id_structure, _id_object, _Numeric) WHERE _Numeric IS NOT NULL;
+-- Value-leading indexes (2026-10-17), the set PostgreSQL and SQL Server have: a filter on a field reads
+-- one range of its index, and the objects come out of it. SQLite has no INCLUDE, so _array_index is the
+-- last key column: a query that states _array_index IS NULL checks it inside the index.
+-- The predicate names the value only. SQLite does not prove implications between a query and a partial
+-- index predicate, it looks for a matching term: "_array_index IS NULL" there kept a prefilter that does
+-- not state it off the index, and PostgreSQL lost a prefilter the same way (7 ms -> 1.2 s). It derives
+-- "IS NOT NULL" from a comparison but never from LIKE, so the prefilter spells it out for LIKE branches.
+-- Unlike PostgreSQL there is NO length guard on the string: an SQLite index entry has no size limit, and
+-- "length(_String) < 2000" is a term no query states (a LIKE prefilter 294 ms without it, 1230 ms with it).
+-- They replace IX__values__{String,Long,DateTimeOffset,Numeric}_not_null, (_id_structure, _id_object,
+-- <value>), which only served reading the value of a known object. Schema step 11 of RedbService builds
+-- these and drops those on an existing file. To bring the old ones back:
+--   CREATE INDEX "IX__values__String_not_null" ON _values (_id_structure, _id_object, _String) WHERE _String IS NOT NULL;
+--   CREATE INDEX "IX__values__Long_not_null" ON _values (_id_structure, _id_object, _Long) WHERE _Long IS NOT NULL;
+--   CREATE INDEX "IX__values__DateTimeOffset_not_null" ON _values (_id_structure, _id_object, _DateTimeOffset) WHERE _DateTimeOffset IS NOT NULL;
+--   CREATE INDEX "IX__values__Numeric_not_null" ON _values (_id_structure, _id_object, _Numeric) WHERE _Numeric IS NOT NULL;
+--   CREATE INDEX "ix__values__array_null_structure" ON _values (_id_structure, _id_object, _Long) WHERE _array_index IS NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_string_object"
+    ON _values (_id_structure, _String, _id_object, _array_index) WHERE _String IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_long_object"
+    ON _values (_id_structure, _Long, _id_object, _array_index) WHERE _Long IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_numeric_object"
+    ON _values (_id_structure, _Numeric, _id_object, _array_index) WHERE _Numeric IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_double_object"
+    ON _values (_id_structure, _Double, _id_object, _array_index) WHERE _Double IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_datetimeoffset_object"
+    ON _values (_id_structure, _DateTimeOffset, _id_object, _array_index) WHERE _DateTimeOffset IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_boolean_object"
+    ON _values (_id_structure, _Boolean, _id_object, _array_index) WHERE _Boolean IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_guid_object"
+    ON _values (_id_structure, _Guid, _id_object, _array_index) WHERE _Guid IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_listitem_object"
+    ON _values (_id_structure, _ListItem, _id_object, _array_index) WHERE _ListItem IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_object_object"
+    ON _values (_id_structure, _Object, _id_object, _array_index) WHERE _Object IS NOT NULL;
+-- Which objects hold a text value of a field, without the text: the text column is in no other index by object.
+-- A filter Field == null over a text field checks it with NOT EXISTS (SQLite Pro names it, INDEXED BY: the planner
+-- prefers IX__values__structure_object_lookup and reads the text from the table). Schema step 12 of RedbService.
+CREATE INDEX IF NOT EXISTS "IX__values__structure_object_string"
+    ON _values (_id_structure, _id_object) WHERE _String IS NOT NULL;
 
 -- Hierarchy / tree
 CREATE INDEX IF NOT EXISTS "IX__objects__parent_scheme_id"

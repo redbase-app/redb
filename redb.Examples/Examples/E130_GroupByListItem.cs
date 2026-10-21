@@ -30,13 +30,13 @@ public class E130_GroupByListItem : ExampleBase
         try
         {
             var q1 = redb.Query<PersonProps>().GroupBy(p => p.Status!.Id);
-            var sql1 = await q1.ToSqlStringAsync(g => new
-            {
-                StatusId = g.Key,
-                Count = Agg.Count(g),
-                AvgAge = Agg.Average(g, x => x.Age)
-            });
-            Console.WriteLine("[E130-SQL-1]\n" + sql1);
+            // var sql1 = await q1.ToSqlStringAsync(g => new
+            // {
+                // StatusId = g.Key,
+                // Count = Agg.Count(g),
+                // AvgAge = Agg.Average(g, x => x.Age)
+            // });
+            // Console.WriteLine("[E130-SQL-1]\n" + sql1);
             var byId = await q1.SelectAsync(g => new
                 {
                     StatusId = g.Key,
@@ -55,12 +55,12 @@ public class E130_GroupByListItem : ExampleBase
         try
         {
             var q2 = redb.Query<PersonProps>().GroupBy(p => p.Status!.Value);
-            var sql2 = await q2.ToSqlStringAsync(g => new
-            {
-                StatusValue = g.Key,
-                Count = Agg.Count(g)
-            });
-            Console.WriteLine("[E130-SQL-2]\n" + sql2);
+            // var sql2 = await q2.ToSqlStringAsync(g => new
+            // {
+                // StatusValue = g.Key,
+                // Count = Agg.Count(g)
+            // });
+            // Console.WriteLine("[E130-SQL-2]\n" + sql2);
             var byValue = await q2.SelectAsync(g => new
                 {
                     StatusValue = g.Key,
@@ -78,12 +78,12 @@ public class E130_GroupByListItem : ExampleBase
         try
         {
             var q3 = redb.Query<PersonProps>().GroupBy(p => p.Status);
-            var sql3 = await q3.ToSqlStringAsync(g => new
-            {
-                Status = g.Key,
-                Count = Agg.Count(g)
-            });
-            Console.WriteLine("[E130-SQL-3]\n" + sql3);
+            // var sql3 = await q3.ToSqlStringAsync(g => new
+            // {
+                // Status = g.Key,
+                // Count = Agg.Count(g)
+            // });
+            // Console.WriteLine("[E130-SQL-3]\n" + sql3);
             var byBare = await q3.SelectAsync(g => new
                 {
                     Status = g.Key,

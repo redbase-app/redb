@@ -175,6 +175,22 @@ namespace redb.Core.Caching
             }
         }
 
+        /// <inheritdoc />
+        public void RemoveObjectsOfTypes(Func<Type, bool> unloading)
+        {
+            lock (_sync)
+            {
+                var node = _lru.First;
+                while (node != null)
+                {
+                    var next = node.Next;
+                    if (unloading(node.Value.RedbObject.GetType()))
+                        RemoveLocked(node);
+                    node = next;
+                }
+            }
+        }
+
         public void Clear()
         {
             lock (_sync)

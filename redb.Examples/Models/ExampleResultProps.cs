@@ -16,6 +16,9 @@ public class PlatformResult
 
     /// <summary>Status: "OK", "FAIL", or error message.</summary>
     public string? Status { get; set; }
+
+    /// <summary>Database round trips the example made.</summary>
+    public int? Queries { get; set; }
 }
 
 /// <summary>

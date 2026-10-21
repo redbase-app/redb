@@ -29,6 +29,32 @@ internal interface IFlatDialect
 
     /// <summary>Isolation level under which a source of this provider is read as one snapshot.</summary>
     IsolationLevel SnapshotIsolation { get; }
+
+    /// <summary>
+    /// Statement that creates the key sequence, starting at 1; null when the provider has no sequences.
+    /// </summary>
+    string? CreateSequence(string sequence);
+
+    /// <summary>Statement that makes the sequence hand out <paramref name="next"/> next; null without sequences.</summary>
+    string? RestartSequence(string sequence, long next);
+
+    /// <summary>
+    /// <c>DEFAULT</c> clause of a key column that takes its value from the sequence when a writer leaves
+    /// it out; null when the provider generates such keys by itself.
+    /// </summary>
+    string? KeyDefault(string sequence);
+
+    /// <summary>
+    /// A statement whose only effect is that the provider's command-line client prints
+    /// <paramref name="message"/>: the last line of a script, so that a run that got that far says so.
+    /// </summary>
+    string Report(string message);
+
+    /// <summary>
+    /// False when the provider refuses a cascading foreign key from a table to itself (SQL Server: "may
+    /// cause cycles or multiple cascade paths"). Such a key is then declared without the cascade.
+    /// </summary>
+    bool AllowsSelfCascade { get; }
 }
 
 /// <summary>Resolves the dialect of a provider by its <c>IDataProvider.Name</c>.</summary>

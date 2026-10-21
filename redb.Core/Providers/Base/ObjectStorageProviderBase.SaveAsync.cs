@@ -14,6 +14,7 @@ using System.Text.Json.Serialization;
 
 using System.Reflection;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
@@ -295,17 +296,30 @@ namespace redb.Core.Providers.Base
         }
 
         // Answered once per type: every predicate below reflects over the interfaces of the type, and the save asked
-        // them for every property of every object (review after 4.0.0).
-        private static readonly ConcurrentDictionary<Type, bool> RedbObjectTypeByType = new();
-        private static readonly ConcurrentDictionary<Type, bool> RedbObjectArrayTypeByType = new();
-        private static readonly ConcurrentDictionary<Type, bool> DictionaryWithRedbObjectValueByType = new();
-        private static readonly ConcurrentDictionary<Type, bool> BusinessClassTypeByType = new();
+        // them for every property of every object (review after 4.0.0). Keyed weakly: a Props type of a module in a
+        // collectible AssemblyLoadContext must not keep that context alive once the module unloads.
+        private static readonly ConditionalWeakTable<Type, object> RedbObjectTypeByType = new();
+        private static readonly ConditionalWeakTable<Type, object> RedbObjectArrayTypeByType = new();
+        private static readonly ConditionalWeakTable<Type, object> DictionaryWithRedbObjectValueByType = new();
+        private static readonly ConditionalWeakTable<Type, object> BusinessClassTypeByType = new();
+
+        private static readonly object CachedTrue = true;
+        private static readonly object CachedFalse = false;
+
+        private static bool CachedPredicate(ConditionalWeakTable<Type, object> table, Type type, Func<Type, bool> compute)
+        {
+            if (table.TryGetValue(type, out var answer))
+                return (bool)answer;
+            answer = compute(type) ? CachedTrue : CachedFalse;
+            table.AddOrUpdate(type, answer);
+            return (bool)answer;
+        }
 
         /// <summary>
         /// IRedbObject type check
         /// </summary>
         private static bool IsRedbObjectType(Type type)
-            => RedbObjectTypeByType.GetOrAdd(type, static t => IsRedbObjectTypeCore(t));
+            => CachedPredicate(RedbObjectTypeByType, type, static t => IsRedbObjectTypeCore(t));
 
         private static bool IsRedbObjectTypeCore(Type type)
         {
@@ -326,7 +340,7 @@ namespace redb.Core.Providers.Base
         /// saved (foreign key failure); an edit to a loaded one was lost.
         /// </summary>
         private static bool IsRedbObjectArrayType(Type type)
-            => RedbObjectArrayTypeByType.GetOrAdd(type, static t => IsRedbObjectArrayTypeCore(t));
+            => CachedPredicate(RedbObjectArrayTypeByType, type, static t => IsRedbObjectArrayTypeCore(t));
 
         private static bool IsRedbObjectArrayTypeCore(Type type)
         {
@@ -344,7 +358,7 @@ namespace redb.Core.Providers.Base
         /// Checking Dictionary with IRedbObject values
         /// </summary>
         private static bool IsDictionaryWithRedbObjectValue(Type type)
-            => DictionaryWithRedbObjectValueByType.GetOrAdd(type, static t => IsDictionaryWithRedbObjectValueCore(t));
+            => CachedPredicate(DictionaryWithRedbObjectValueByType, type, static t => IsDictionaryWithRedbObjectValueCore(t));
 
         private static bool IsDictionaryWithRedbObjectValueCore(Type type)
         {
@@ -647,7 +661,7 @@ namespace redb.Core.Providers.Base
         /// Check if the type is a business class (not a primitive or an array)
         /// </summary>
         private static bool IsBusinessClassType(Type type)
-            => BusinessClassTypeByType.GetOrAdd(type, static t => IsBusinessClassTypeCore(t));
+            => CachedPredicate(BusinessClassTypeByType, type, static t => IsBusinessClassTypeCore(t));
 
         private static bool IsBusinessClassTypeCore(Type type)
         {

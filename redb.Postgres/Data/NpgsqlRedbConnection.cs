@@ -120,7 +120,7 @@ namespace redb.Postgres.Data
             if (string.IsNullOrEmpty(connectionString))
                 throw new ArgumentNullException(nameof(connectionString));
             
-            _dataSource = NpgsqlDataSource.Create(connectionString);
+            _dataSource = NpgsqlDataSource.Create(NpgsqlDataSourceFactory.WithJitOff(connectionString));
         }
 
         // === CONNECTION MANAGEMENT ===
@@ -403,8 +403,22 @@ namespace redb.Postgres.Data
             }
 
             // Convert for numeric types etc.
-            return (T)Convert.ChangeType(result, targetType);
+            return (T)ChangeType(result, targetType);
         }
+
+        /// <summary>
+        /// <see cref="Convert.ChangeType(object, Type)"/>, plus the two conversions Npgsql 10 took away. An untyped read
+        /// of a <c>date</c> or <c>time</c> column (GetValue, ExecuteScalar) returns <see cref="DateOnly"/> and
+        /// <see cref="TimeOnly"/> since Npgsql 10, DateTime and TimeSpan before; neither implements IConvertible, so a
+        /// caller asking for DateTime or TimeSpan, as it did on Npgsql 9, got InvalidCastException. redb's own SQL
+        /// returns no date or time; the raw SQL of the caller can.
+        /// </summary>
+        internal static object ChangeType(object value, Type targetType) => value switch
+        {
+            DateOnly d when targetType == typeof(DateTime) => d.ToDateTime(TimeOnly.MinValue),
+            TimeOnly t when targetType == typeof(TimeSpan) => t.ToTimeSpan(),
+            _ => Convert.ChangeType(value, targetType)
+        };
 
         // === ORPHAN TRANSACTION HYGIENE ===
 
@@ -669,7 +683,7 @@ namespace redb.Postgres.Data
                 else
                 {
                     var value = reader.GetValue(0);
-                    results.Add((T)Convert.ChangeType(value, targetType));
+                    results.Add((T)ChangeType(value, targetType));
                 }
             }
             
@@ -1127,7 +1141,7 @@ namespace redb.Postgres.Data
                             continue;
                         }
                         
-                        var convertedValue = Convert.ChangeType(value, targetType);
+                        var convertedValue = NpgsqlRedbConnection.ChangeType(value, targetType);
                         property.SetValue(obj, convertedValue);
                     }
                     catch

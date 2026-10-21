@@ -8,7 +8,8 @@ namespace redb.Examples.Examples;
 
 /// <summary>
 /// Groups objects by a field and calculates aggregates per group.
-/// SQL: GROUP BY Department with SUM, AVG, COUNT.
+/// SQL: GROUP BY Department with SUM, AVG, COUNT, plus AVG over a field two nested classes deep
+/// (HomeAddress.Building.Floor).
 /// </summary>
 [ExampleMeta("E128", "GroupBy - Simple", "Analytics",
     ExampleTier.Free, 128, "GroupBy", "Aggregation", "Analytics", RelatedApis = ["IRedbQueryable.GroupBy", "IGroupedQueryable.SelectAsync"])]
@@ -31,6 +32,7 @@ public class E128_GroupBySimple : ExampleBase
                 Department = g.Key,
                 TotalSalary = Agg.Sum(g, x => x.Salary),
                 AvgAge = Agg.Average(g, x => x.Age),
+                AvgFloor = Agg.Average(g, x => x.HomeAddress!.Building!.Floor),
                 Count = Agg.Count(g)
             });
 
@@ -38,6 +40,6 @@ public class E128_GroupBySimple : ExampleBase
 
         var first = byDept.FirstOrDefault();
         return Ok("E128", "GroupBy - Simple", ExampleTier.Free, sw.ElapsedMilliseconds, byDept.Count,
-            [$"Groups: {byDept.Count}", $"First: {first?.Department ?? "N/A"}, Count: {first?.Count ?? 0}"]);
+            [$"Groups: {byDept.Count}", $"First: {first?.Department ?? "N/A"}, Count: {first?.Count ?? 0}, Avg home floor: {first?.AvgFloor:F2}"]);
     }
 }

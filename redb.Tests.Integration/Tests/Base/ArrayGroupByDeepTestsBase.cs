@@ -1,4 +1,5 @@
 using redb.Core;
+using redb.Core.Models.Entities;
 using redb.Core.Query.Aggregation;
 using redb.Tests.Integration.Helpers;
 using redb.Tests.Integration.Models;
@@ -26,6 +27,12 @@ public abstract class ArrayGroupByDeepTestsBase
     protected ArrayGroupByDeepTestsBase(IRedbService redb) => Redb = redb;
 
     private async Task SeedAsync() => await TestDataFactory.SeedEmployees(Redb, 20);
+
+    // What a group of an array unnest counts: one row per contact of that type, over the employees the outer Where
+    // matched. The database is shared by the whole collection, and other tests store employees of the same
+    // departments with no contacts at all, so "one row per matched employee" held only while they ran later.
+    private static int ContactsOfType(IEnumerable<RedbObject<EmployeeProps>> employees, string? type)
+        => employees.Sum(e => e.Props.Contacts?.Count(c => c.Type == type) ?? 0);
 
     // ──────────────────────────────────────────────────────────────────
     //  Composite array key (anonymous { Type, IsVerified })
@@ -96,11 +103,11 @@ public abstract class ArrayGroupByDeepTestsBase
         // Seed has 20 employees, departments cycled through 5 deps, IsRemote = (i%2==0).
         // (Department == "Engineering" && IsRemote) OR (Department == "Sales" && !IsRemote)
         // produces a non-empty subset; assert non-empty groups + each group count > 0.
-        var matched = (await Redb.Query<EmployeeProps>()
+        var matched = await Redb.Query<EmployeeProps>()
             .Where(e => (e.Department == "Engineering" && e.IsRemote)
                      || (e.Department == "Sales" && !e.IsRemote))
-            .ToListAsync()).Count;
-        matched.Should().BeGreaterThan(0, "seed must produce some matches for the compound filter");
+            .ToListAsync();
+        matched.Should().NotBeEmpty("seed must produce some matches for the compound filter");
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => (e.Department == "Engineering" && e.IsRemote)
@@ -109,8 +116,8 @@ public abstract class ArrayGroupByDeepTestsBase
             .SelectAsync(g => new { Type = g.Key, C = Agg.Count(g) });
 
         results.Should().NotBeEmpty();
-        results.Should().AllSatisfy(r => r.C.Should().Be(matched,
-            "every contact type must produce exactly matched-employee rows after array unnest"));
+        results.Should().AllSatisfy(r => r.C.Should().Be(ContactsOfType(matched, r.Type),
+            "every contact type must produce exactly one row per such contact of a matched employee after array unnest"));
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -121,10 +128,10 @@ public abstract class ArrayGroupByDeepTestsBase
     {
         await SeedAsync();
 
-        var matched = (await Redb.Query<EmployeeProps>()
+        var matched = await Redb.Query<EmployeeProps>()
             .Where(e => e.Department.Contains("ing"))   // Engineering, Marketing
-            .ToListAsync()).Count;
-        matched.Should().BeGreaterThan(0);
+            .ToListAsync();
+        matched.Should().NotBeEmpty();
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.Department.Contains("ing"))
@@ -133,7 +140,7 @@ public abstract class ArrayGroupByDeepTestsBase
 
         results.Should().NotBeEmpty();
         results.Select(r => r.Type).Should().BeEquivalentTo(new[] { "email", "phone" });
-        results.Should().AllSatisfy(r => r.C.Should().Be(matched));
+        results.Should().AllSatisfy(r => r.C.Should().Be(ContactsOfType(matched, r.Type)));
     }
 
     [Fact]

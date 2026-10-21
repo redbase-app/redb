@@ -183,6 +183,33 @@ public abstract class AbsentFieldConsistencyTestsBase
         });
     }
 
+    /// <summary>
+    /// Where the objects without a value go: first when ascending, last when descending, as LINQ to
+    /// objects puts null. SQL Server and SQLite do that by default; PostgreSQL did the opposite until
+    /// its sort keys spelled out NULLS FIRST / NULLS LAST.
+    /// </summary>
+    [Fact]
+    public async Task OrderBy_NullableKey_PutsObjectsWithoutValueWhereLinqDoes()
+    {
+        var all = await SeedAndLoadAsync("AbsentField_NullOrder");
+        var withoutStatus = all.Count(p => p.Props.Status == null);
+        withoutStatus.Should().BeGreaterThan(0, "the seed must hold objects without the key");
+
+        await EachFormAsync(async form =>
+        {
+            var ascending = await Redb.Query<PersonProps>().OrderBy(p => p.Status!.Id).ThenByRedb(o => o.Id).ToListAsync();
+            ascending.Take(withoutStatus).Should().OnlyContain(p => p.Props.Status == null,
+                $"ascending puts null first, as LINQ does, {form}");
+
+            var descending = await Redb.Query<PersonProps>().OrderByDescending(p => p.Status!.Id).ThenByRedb(o => o.Id).ToListAsync();
+            descending.Skip(descending.Count - withoutStatus).Should().OnlyContain(p => p.Props.Status == null,
+                $"descending puts null last, as LINQ does, {form}");
+
+            var page = await Redb.Query<PersonProps>().OrderBy(p => p.Status!.Id).ThenByRedb(o => o.Id).Take(withoutStatus).ToListAsync();
+            page.Should().OnlyContain(p => p.Props.Status == null, $"the first page of an ascending sort is the objects without a value, {form}");
+        });
+    }
+
     [Fact]
     public async Task Window_PartitionByNullableField_KeepsObjectsWithoutValue()
     {

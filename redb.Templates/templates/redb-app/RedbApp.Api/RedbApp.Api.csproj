@@ -15,7 +15,7 @@
     <PackageReference Include="redb.Route.Core" Version="$(RedbVersion)" />
     <PackageReference Include="redb.Route.Http" Version="$(RedbVersion)" />
     <!-- Issues and checks the sign-in tokens. The version the Tsak worker ships. -->
-    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.16.0" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.23.0" />
   </ItemGroup>
 
   <ItemGroup>

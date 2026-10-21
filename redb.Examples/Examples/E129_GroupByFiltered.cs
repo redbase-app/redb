@@ -8,7 +8,8 @@ namespace redb.Examples.Examples;
 
 /// <summary>
 /// GroupBy with Where filter applied before grouping.
-/// Filter employees by salary, then group by department.
+/// Filter employees by salary, then group by department; one aggregate reads a field two nested
+/// classes deep (HomeAddress.Building.Floor).
 /// </summary>
 [ExampleMeta("E129", "GroupBy - With Filter", "Analytics",
     ExampleTier.Free, 129, "GroupBy", "Where", "Filter", "Analytics", RelatedApis = ["IRedbQueryable.GroupBy", "IRedbQueryable.Where"])]
@@ -32,6 +33,7 @@ public class E129_GroupByFiltered : ExampleBase
             {
                 Department = g.Key,
                 TotalSalary = Agg.Sum(g, x => x.Salary),
+                MaxFloor = Agg.Max(g, x => x.HomeAddress!.Building!.Floor),
                 Count = Agg.Count(g)
             });
 
@@ -39,6 +41,6 @@ public class E129_GroupByFiltered : ExampleBase
 
         var first = byDeptFiltered.FirstOrDefault();
         return Ok("E129", "GroupBy - With Filter", ExampleTier.Free, sw.ElapsedMilliseconds, byDeptFiltered.Count,
-            [$"Filter: Salary > 50k", $"Groups: {byDeptFiltered.Count}, First: {first?.Department ?? "N/A"}"]);
+            [$"Filter: Salary > 50k", $"Groups: {byDeptFiltered.Count}, First: {first?.Department ?? "N/A"}, Max home floor: {first?.MaxFloor}"]);
     }
 }

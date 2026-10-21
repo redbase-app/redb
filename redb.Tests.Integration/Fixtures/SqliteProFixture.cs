@@ -33,6 +33,14 @@ public sealed class SqliteProFixture : IAsyncLifetime
             @"Data Sources*=s*[^;]+", "Data Source=redb_tests_sqlite_pro.db");
         var license = config["Redb:License"];
 
+        // The native extension path is static for the whole process, and several tests set it (every
+        // Free fixture, and Pro tests built on Free ones). Once it is set, InitializeAsync checks the
+        // extension's version on the connection it is given; a connection this fixture had opened while
+        // the path was still empty carried no extension, and that check failed with "no
+        // pvt_module_version() function" for whichever Pro test happened to run after such a test. Set
+        // here, before the first connection, every connection of the fixture loads the extension - harmless
+        // for Pro, which does not call it - and the order of the tests no longer matters.
+        redb.SQLite.Data.SqliteDataSource.NativeExtensionPath ??= SqliteTestSupport.ResolveNativeExtension();
         SqliteTestSupport.DeleteDbFiles(cs);
 
         var services = new ServiceCollection();

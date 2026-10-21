@@ -52,7 +52,7 @@ namespace redb.Postgres.Data
         /// </summary>
         /// <param name="connectionString">PostgreSQL connection string.</param>
         public NpgsqlRedbContext(string connectionString)
-            : this(NpgsqlDataSource.Create(connectionString))
+            : this(NpgsqlDataSource.Create(NpgsqlDataSourceFactory.WithJitOff(connectionString)))
         {
         }
 

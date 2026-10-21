@@ -1,0 +1,128 @@
+<Project>
+  <!--
+    Central package versions of the repository (RELEASE_ARTIFACTS.md, E28 and E29).
+
+    Central management is on for every project that reaches this file, except the folders listed in
+    RedbCentralExcludedDirs directly under the folder of this file: redbase-app/ (public mirrors, they carry their own
+    copy), TGChatLmm/ (not ours), probe-serena/ and tmp/ (not part of the build). A project of an excluded folder keeps
+    the versions in its own csproj. A module with a Directory.Packages.props of its own (redb.Identity, and redb.Route
+    and redb.Tsak when they get one) never reaches this file. A project that sets ManagePackageVersionsCentrally itself
+    keeps its own value (the templates set false). Copied by a mirror script to the root of a mirror, the file works
+    there too.
+
+    The packages guarded by the security baseline (MessagePack, MailKit, MimeKit, SignalR, System.Security.Cryptography
+    .Xml and .Pkcs) are NOT listed here: Directory.Build.targets gives them their PackageVersion, and listing one here
+    again fails the build (NU1506 as an error).
+  -->
+
+  <PropertyGroup>
+    <RedbCentralExcludedDirs>redbase-app;TGChatLmm;probe-serena;tmp</RedbCentralExcludedDirs>
+    <!-- First folder of the project path below the folder of this file. -->
+    <_RedbCentralRoot>$([MSBuild]::EnsureTrailingSlash('$(MSBuildThisFileDirectory)'))</_RedbCentralRoot>
+    <_RedbProjectRel>$([MSBuild]::MakeRelative('$(_RedbCentralRoot)', '$(MSBuildProjectDirectory)').Replace('/', '\'))</_RedbProjectRel>
+    <_RedbProjectTop>$(_RedbProjectRel.Split('\')[0])</_RedbProjectTop>
+    <!-- Version of the redb packages for the projects that take them from NuGet (the UI projects); captured here,
+         before a project can set a Version of its own. -->
+    <RedbPackageVersion>$(Version)</RedbPackageVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(ManagePackageVersionsCentrally)' == ''
+                            and !$([System.String]::Copy(';$(RedbCentralExcludedDirs.ToLowerInvariant());').Contains(';$(_RedbProjectTop.ToLowerInvariant());'))">
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <!-- Database drivers. Npgsql 10 is required by Npgsql.EntityFrameworkCore.PostgreSQL 10; one Npgsql per process. -->
+  <ItemGroup>
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+    <!--
+      The native SQLite library, pinned directly: Microsoft.Data.Sqlite pulls it transitively through
+      SQLitePCLRaw.bundle_e_sqlite3, and the old transitive line was vulnerable (GHSA-2m69-gcr7-jv3q, NU1903).
+      The 3.x numbering follows the SQLite version. Do not remove the pin.
+    -->
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13" />
+  </ItemGroup>
+
+  <!-- redb packages taken from NuGet instead of a ProjectReference (redb.Lk, redb.Doc.*, redb.PropsEditor). -->
+  <ItemGroup>
+    <PackageVersion Include="redb.Core" Version="$(RedbPackageVersion)" />
+    <PackageVersion Include="redb.Core.Pro" Version="$(RedbPackageVersion)" />
+    <PackageVersion Include="redb.Postgres" Version="$(RedbPackageVersion)" />
+    <PackageVersion Include="redb.Postgres.Pro" Version="$(RedbPackageVersion)" />
+    <PackageVersion Include="redb.MSSql" Version="$(RedbPackageVersion)" />
+    <PackageVersion Include="redb.MSSql.Pro" Version="$(RedbPackageVersion)" />
+    <PackageVersion Include="redb.Export" Version="$(RedbPackageVersion)" />
+  </ItemGroup>
+
+  <!-- UI projects (redb.Lk, redb.Doc.*, redb.PropsEditor). -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.13.2" />
+    <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components.Icons" Version="4.13.2" />
+    <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
+    <PackageVersion Include="Markdig" Version="1.4.1" />
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
+    <PackageVersion Include="Stripe.net" Version="53.0.0" />
+  </ItemGroup>
+
+  <!-- redb.CLI. The same line as the Tsak CLI (redb.Tsak/Directory.Packages.props). -->
+  <ItemGroup>
+    <PackageVersion Include="System.CommandLine" Version="2.0.13" />
+  </ItemGroup>
+
+  <!-- Microsoft.Extensions: one patch for every package of the family. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.13" />
+  </ItemGroup>
+
+  <!-- Shared with the other modules: the same versions are written in their own files (E28). -->
+  <ItemGroup>
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.1" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Abstractions" Version="8.23.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Logging" Version="8.23.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.23.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.23.0" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="BCrypt.Net-Next" Version="4.2.1" />
+  </ItemGroup>
+
+  <!-- Tests. AwesomeAssertions replaces FluentAssertions, which is under a commercial license from 8.0 on. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
+  </ItemGroup>
+
+  <!-- redb packages: the monorepo ProjectReferences, rewritten for the public repository. -->
+  <ItemGroup>
+    <PackageVersion Include="redb.SQLite.Pro" Version="4.4.0" />
+  </ItemGroup>
+</Project>
+

@@ -8,7 +8,8 @@ namespace redb.Examples.Examples;
 
 /// <summary>
 /// GroupBy with composite key (multiple fields).
-/// Group by Department AND Position for detailed breakdown.
+/// Group by Department AND Position for detailed breakdown; one aggregate reads a field two nested
+/// classes deep (HomeAddress.Building.Floor).
 /// </summary>
 [ExampleMeta("E130", "GroupBy - Composite Key", "Analytics",
     ExampleTier.Free, 130, "GroupBy", "Composite", "MultiKey", "Analytics", RelatedApis = ["IRedbQueryable.GroupBy"])]
@@ -31,6 +32,7 @@ public class E130_GroupByMultiKey : ExampleBase
                 g.Key.Department,
                 g.Key.Position,
                 TotalSalary = Agg.Sum(g, x => x.Salary),
+                AvgFloor = Agg.Average(g, x => x.HomeAddress!.Building!.Floor),
                 Count = Agg.Count(g)
             });
 
@@ -38,6 +40,6 @@ public class E130_GroupByMultiKey : ExampleBase
 
         var first = byDeptPosition.FirstOrDefault();
         return Ok("E130", "GroupBy - Composite Key", ExampleTier.Free, sw.ElapsedMilliseconds, byDeptPosition.Count,
-            [$"Groups: {byDeptPosition.Count}", $"First: {first?.Department ?? "N/A"}/{first?.Position ?? "N/A"}"]);
+            [$"Groups: {byDeptPosition.Count}", $"First: {first?.Department ?? "N/A"}/{first?.Position ?? "N/A"}, Avg home floor: {first?.AvgFloor:F2}"]);
     }
 }

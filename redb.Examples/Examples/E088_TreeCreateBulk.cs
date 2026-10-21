@@ -27,10 +27,10 @@ namespace redb.Examples.Examples;
     ExampleTier.Free, 3, "Tree", "Bulk", "AddNewObjectsAsync", "Pro", Order = 88)]
 public class E088_TreeCreateBulk : ExampleBase
 {
-    private const int OfficeCount = 10;
-    private const int DeptPerOffice = 5;
-    private const int TeamsForFirstDepts = 10; // Teams only for first 10 departments
-    private const int TeamsPerDept = 4;
+    internal const int OfficeCount = 10;
+    internal const int DeptPerOffice = 5;
+    internal const int TeamsForFirstDepts = 10; // Teams only for first 10 departments
+    internal const int TeamsPerDept = 4;
 
     // Total: 1 + 10 + 50 + 40 = 101 nodes
 
@@ -107,9 +107,9 @@ public class E088_TreeCreateBulk : ExampleBase
         return nodes;
     }
 
-    private static readonly string[] Cities = ["Moscow", "SPB", "Kazan", "Novosibirsk", "Yekaterinburg", "Nizhny", "Samara", "Omsk", "Chelyabinsk", "Rostov"];
-    private static readonly string[] Departments = ["IT", "Sales", "HR", "Finance", "Marketing"];
-    private static readonly string[] Teams = ["Alpha", "Beta", "Gamma", "Delta"];
+    internal static readonly string[] Cities = ["Moscow", "SPB", "Kazan", "Novosibirsk", "Yekaterinburg", "Nizhny", "Samara", "Omsk", "Chelyabinsk", "Rostov"];
+    internal static readonly string[] Departments = ["IT", "Sales", "HR", "Finance", "Marketing"];
+    internal static readonly string[] Teams = ["Alpha", "Beta", "Gamma", "Delta"];
 
     private static TreeRedbObject<DepartmentProps> CreateNode(long id, long? parentId, string name, string code, string desc, decimal budget)
         => new()

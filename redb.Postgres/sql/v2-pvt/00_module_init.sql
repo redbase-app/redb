@@ -103,6 +103,87 @@ DROP INDEX IF EXISTS "IX__structures__not_collection";
 -- This file drops it again whenever the module version changes, so report the case.
 DROP INDEX IF EXISTS "IX__values__structure_object_lookup";
 
+-- Value-leading indexes (0.7.16, 2026-10-16): a filter on a field finds its objects by value. Measured on
+-- 100 000 employees: three matching rows 6 ms -> 0 ms, 5 % of the scheme 36 -> 10 ms, with the streams form
+-- that pushes the filter down. They replace the object-leading forms (_id_structure, _id_object, <value>),
+-- which only served reading the value of a known object; the covering index of the streams form does that.
+-- Built inside the module transaction, so not CONCURRENTLY: writes to _values wait while they are built, about
+-- a minute per index on 38 million rows. Created before the old ones are dropped, so no moment is left without.
+-- IF QUERIES GOT SLOWER AFTER THIS UPGRADE (the aggregate form, with EnablePvtPrefilter off, read the old ones),
+-- these bring the old ones back; the module drops them again on its next version change, so report the case:
+--   CREATE INDEX "IX__values__String_not_null" ON _values (_id_structure, _id_object, _String) WHERE _String IS NOT NULL AND length(_String) < 2000;
+--   CREATE INDEX "IX__values__Long_not_null" ON _values (_id_structure, _id_object, _Long) WHERE _Long IS NOT NULL;
+--   CREATE INDEX "IX__values__DateTimeOffset_not_null" ON _values (_id_structure, _id_object, _DateTimeOffset) WHERE _DateTimeOffset IS NOT NULL;
+--   CREATE INDEX "IX__values__Numeric_not_null" ON _values (_id_structure, _id_object, _Numeric) WHERE _Numeric IS NOT NULL;
+--   CREATE INDEX ix__values__array_null_structure ON _values (_id_structure, _id_object, _long) WHERE _array_index IS NULL;
+-- An index of one of these names whose definition differs in anything (key columns or their order, INCLUDE, the
+-- WHERE clause, uniqueness) or that is invalid (an interrupted CREATE INDEX CONCURRENTLY) is dropped and built
+-- again below: IF NOT EXISTS alone would keep it. A development build of 0.7.15 left them without INCLUDE.
+DO $$
+DECLARE r record;
+BEGIN
+    FOR r IN SELECT c.relname FROM (VALUES
+        ('IX__values__structure_string_object', 'USING btree (_id_structure, _string, _id_object) INCLUDE (_array_index) WHERE ((_string IS NOT NULL) AND (octet_length(_string) < 2000))'),
+        ('IX__values__structure_long_object', 'USING btree (_id_structure, _long, _id_object) INCLUDE (_array_index) WHERE (_long IS NOT NULL)'),
+        ('IX__values__structure_numeric_object', 'USING btree (_id_structure, _numeric, _id_object) INCLUDE (_array_index) WHERE (_numeric IS NOT NULL)'),
+        ('IX__values__structure_double_object', 'USING btree (_id_structure, _double, _id_object) INCLUDE (_array_index) WHERE (_double IS NOT NULL)'),
+        ('IX__values__structure_datetimeoffset_object', 'USING btree (_id_structure, _datetimeoffset, _id_object) INCLUDE (_array_index) WHERE (_datetimeoffset IS NOT NULL)'),
+        ('IX__values__structure_boolean_object', 'USING btree (_id_structure, _boolean, _id_object) INCLUDE (_array_index) WHERE (_boolean IS NOT NULL)'),
+        ('IX__values__structure_guid_object', 'USING btree (_id_structure, _guid, _id_object) INCLUDE (_array_index) WHERE (_guid IS NOT NULL)'),
+        ('IX__values__structure_listitem_object', 'USING btree (_id_structure, _listitem, _id_object) INCLUDE (_array_index) WHERE (_listitem IS NOT NULL)'),
+        ('IX__values__structure_object_object', 'USING btree (_id_structure, _object, _id_object) INCLUDE (_array_index) WHERE (_object IS NOT NULL)')
+             ) x(name, def)
+             JOIN pg_class c ON c.relname = x.name
+             JOIN pg_index i ON i.indexrelid = c.oid AND i.indrelid = '_values'::regclass
+             WHERE NOT i.indisvalid OR i.indisunique
+                OR substring(pg_get_indexdef(c.oid) from 'USING .*') IS DISTINCT FROM x.def
+    LOOP
+        EXECUTE format('DROP INDEX %I', r.relname);
+    END LOOP;
+END $$;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_string_object"
+ON _values (_id_structure, _String, _id_object) INCLUDE (_array_index)
+WHERE _String IS NOT NULL AND octet_length(_String) < 2000;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_long_object"
+ON _values (_id_structure, _Long, _id_object) INCLUDE (_array_index)
+WHERE _Long IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_numeric_object"
+ON _values (_id_structure, _Numeric, _id_object) INCLUDE (_array_index)
+WHERE _Numeric IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_double_object"
+ON _values (_id_structure, _Double, _id_object) INCLUDE (_array_index)
+WHERE _Double IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_datetimeoffset_object"
+ON _values (_id_structure, _DateTimeOffset, _id_object) INCLUDE (_array_index)
+WHERE _DateTimeOffset IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_boolean_object"
+ON _values (_id_structure, _Boolean, _id_object) INCLUDE (_array_index)
+WHERE _Boolean IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_guid_object"
+ON _values (_id_structure, _Guid, _id_object) INCLUDE (_array_index)
+WHERE _Guid IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_listitem_object"
+ON _values (_id_structure, _ListItem, _id_object) INCLUDE (_array_index)
+WHERE _ListItem IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__structure_object_object"
+ON _values (_id_structure, _Object, _id_object) INCLUDE (_array_index)
+WHERE _Object IS NOT NULL;
+DROP INDEX IF EXISTS "IX__values__String_not_null";
+DROP INDEX IF EXISTS "IX__values__Long_not_null";
+DROP INDEX IF EXISTS "IX__values__DateTimeOffset_not_null";
+DROP INDEX IF EXISTS "IX__values__Numeric_not_null";
+DROP INDEX IF EXISTS ix__values__array_null_structure;
+
+
 -- ---------- 1. System infrastructure check ------------------------------
 DO $$
 BEGIN

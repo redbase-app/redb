@@ -63,6 +63,7 @@ namespace redb.Core.Caching
         /// </summary>
         public GlobalListCache(string? domain = null, bool? enabled = null)
         {
+            CollectibleContextCleanup.EnsureWatching();
             _domain = domain ?? "default";
             var cache = GetCache();
             if (enabled.HasValue)
@@ -70,6 +71,26 @@ namespace redb.Core.Caching
         }
         
         private ListCacheDomain GetCache() => _domains.GetOrAdd(_domain, _ => new ListCacheDomain());
+
+        /// <summary>
+        /// Drops, in every domain, the cached items whose loaded object is of a type <paramref name="unloading"/>
+        /// answers true for, and the item lists that hold one: the types of a collectible AssemblyLoadContext that
+        /// unloads (<see cref="CollectibleContextCleanup"/>). Such an item comes back from the database on next read.
+        /// </summary>
+        internal static void RemoveObjectsOfTypes(Func<Type, bool> unloading)
+        {
+            bool Holds(RedbListItem item) => item.LoadedObject is { } loaded && unloading(loaded.GetType());
+
+            foreach (var domain in _domains.Values)
+            {
+                foreach (var entry in domain.ItemsById)
+                    if (Holds(entry.Value.Value))
+                        domain.ItemsById.TryRemove(entry);
+                foreach (var entry in domain.ItemsByListId)
+                    if (entry.Value.Value.Any(Holds))
+                        domain.ItemsByListId.TryRemove(entry);
+            }
+        }
         
         /// <summary>
         /// Enable or disable cache for this domain.

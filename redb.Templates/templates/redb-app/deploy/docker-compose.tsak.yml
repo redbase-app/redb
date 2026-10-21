@@ -27,7 +27,8 @@ services:
 
       - Tsak__Modules__AssemblyPaths__0=/app/modules
       - Tsak__Cluster__ApiEndpoint=http://api:9090
-      - Tsak__Cluster__NodeId=redbapp-1
+      # No Tsak__Cluster__NodeId: a node is named after its container's host name, so each replica of
+      # `docker compose up --scale` is a node of its own. A fixed id suits one instance or a StatefulSet only.
 
       # The worker's API requires a key; the dashboard in the same container calls it with the service key.
       # The worker stores only the key's hash: HMAC-SHA256 of the key with Tsak:Auth:Secret (see .env.example).

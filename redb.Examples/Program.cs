@@ -1,5 +1,10 @@
 using System.Reflection;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
+using redb.Examples.Ef;
+using redb.Examples.ExamplesEf;
 using Microsoft.Extensions.Logging;
 using redb.Core;
 using redb.Core.Pro.Extensions;
@@ -31,9 +36,12 @@ class Program
     // Test license for Pro features
     //private const string TestLicense = "...";
 
-    // Connection string for results storage (separate DB for all platforms)
-    // Set via environment variable or replace with your own connection string
-    // private const string RedbDocConnection = "Server=localhost;Database=redbDoc;User Id=sa;Password=YourPassword;TrustServerCertificate=true;Command Timeout=600;";
+    /// <summary>
+    /// Results storage, a SQLite file of its own (created on first use), whatever provider the examples run
+    /// on: one object per example, every platform and pass of every run under its key, so results of
+    /// different runs and databases sit side by side.
+    /// </summary>
+    private const string ResultsConnection = "Data Source=redb_examples_results.db";
 
     static async Task Main(string[] args)
     {
@@ -60,7 +68,24 @@ class Program
             : ctxName.Contains("Sqlite") ? "SQLite"   // check before "Sql": "Sqlite".Contains("Sql") == true
             : "SQL Server";
         var platformKey = GetPlatformKey(redb);
+
+        // --results [--platform <key>] [E...]: print the saved results and run nothing. The platform decides which
+        // passes come first and what EF is compared with; by default the configured provider's, as in a run.
+        if (args.Contains("--results", StringComparer.OrdinalIgnoreCase))
+        {
+            var platformAt = Array.FindIndex(args, a => a.Equals("--platform", StringComparison.OrdinalIgnoreCase));
+            if (platformAt >= 0 && platformAt + 1 < args.Length)
+                platformKey = args[platformAt + 1].ToLowerInvariant();
+
+            var requested = args.Where(a => a.StartsWith('E') || a.StartsWith('e')).Select(a => BaseId(a.ToUpperInvariant())).ToHashSet();
+            Console.WriteLine($"Saved results ({ResultsConnection}) | Platform: {platformKey}");
+            await WithResultsDbAsync(resultsDb => PrintSavedResultsAsync(resultsDb, requested.Count > 0 ? requested : null, platformKey));
+            return;
+        }
+
         Console.WriteLine($"DB: {dbType} | Platform: {platformKey} | redb.Examples");
+        Console.WriteLine($"redb {VersionOf(typeof(IRedbService))} | EF Core {VersionOf(typeof(DbContext))} | " +
+                          $"Npgsql EF {VersionOf(typeof(NpgsqlDbContextOptionsBuilder))} | Npgsql {VersionOf(typeof(NpgsqlConnection))}");
         Console.WriteLine();
 
         // Initialize REDB for tests
@@ -85,12 +110,26 @@ class Program
         // Examples that behave differently when asked for by name (E203 seeds only then).
         ExampleBase.ExplicitlyRequestedIds = exampleIds;
 
-        // Filter examples
-        var toRun = exampleIds == null
-            ? examples
-            : examples.Where(e => e.meta != null && exampleIds.Contains(e.meta.Id.ToUpperInvariant())).ToList();
+        // redb examples and their EF Core twins (*_ef). Naming an example runs its twin with it; naming a
+        // twin runs the twin alone (E203_ef seeds the flat database by itself).
+        bool Selected(ExampleMetaAttribute meta) =>
+            exampleIds == null
+            || exampleIds.Contains(meta.Id.ToUpperInvariant())
+            || exampleIds.Contains(BaseId(meta.Id).ToUpperInvariant());
 
-        if (toRun.Count == 0)
+        var redbToRun = examples.Where(e => e.example is not EfExampleBase && Selected(e.meta!)).ToList();
+        var efToRun = examples.Where(e => e.example is EfExampleBase && Selected(e.meta!)).ToList();
+
+        // The EF twins work on the flat PostgreSQL database only: next to redb on another provider their
+        // numbers would compare different databases, so they do not run.
+        if (efToRun.Count > 0 && !RunsOnEfProvider(platformKey))
+        {
+            Console.WriteLine($"EF Core twins skipped: they run on PostgreSQL only ({EfPlatformKey}), redb runs on {platformKey}.");
+            Console.WriteLine();
+            efToRun.Clear();
+        }
+
+        if (redbToRun.Count == 0 && efToRun.Count == 0)
         {
             Console.WriteLine("No examples to run. Available:");
             foreach (var (ex, meta) in examples.Where(e => e.meta != null))
@@ -98,9 +137,100 @@ class Program
             return;
         }
 
-        // Run examples
-        var results = new List<ExampleResult>();
-        var total = toRun.Count;
+        // EF Core twins work on the flat database. Like redb.InitializeAsync above, the EF model is built
+        // and a pooled connection opened here, before any example is timed. Only when a twin is selected,
+        // so a redb-only run does not need the flat database.
+        if (efToRun.Count > 0)
+        {
+            var efContexts = scope.ServiceProvider.GetRequiredService<IDbContextFactory<FlatContext>>();
+            EfExampleBase.Contexts = efContexts;
+
+            Console.WriteLine("=== EF CORE INITIALIZATION ===");
+            var efInitSw = System.Diagnostics.Stopwatch.StartNew();
+            await using (var warm = await efContexts.CreateDbContextAsync())
+            {
+                _ = warm.Model;
+                await warm.Database.OpenConnectionAsync();
+                await warm.Database.CloseConnectionAsync();
+            }
+            efInitSw.Stop();
+            Console.WriteLine($"EF Core initialization complete: {efInitSw.ElapsedMilliseconds} ms");
+            Console.WriteLine();
+        }
+
+        // Round trips are counted on both sides: redb through its ActivitySource, EF through an interceptor.
+        CommandCounters.StartRedb();
+
+        var efKey = EfPlatformKey;
+        var runs = new List<(string Platform, ExampleResult Result)>();
+
+        // Pass 1: redb, default settings. Pass 2: EF Core.
+        await RunPassAsync(platformKey, redbToRun, redb, () => CommandCounters.Redb, runs);
+        await RunPassAsync(efKey, efToRun, redb, () => CommandCounters.Ef, runs);
+
+        // Passes 3 to 5 repeat the same examples. Setup examples (seeding, bulk insert) are not repeated:
+        // they would only add the same data again.
+        var redbRepeat = redbToRun.Where(e => e.meta!.Category != "Setup").ToList();
+        var efRepeat = efToRun.Where(e => e.meta!.Category != "Setup").ToList();
+
+        if (redbRepeat.Count > 0)
+        {
+            // redb with the props cache: a service of its own, initialized outside the measurement. Its
+            // first pass is a repeat that fills the cache, its second pass reads through it.
+            var cacheServices = new ServiceCollection();
+            ConfigureServices(cacheServices, enablePropsCache: true);
+            await using var cacheProvider = cacheServices.BuildServiceProvider();
+            await using var cacheScope = cacheProvider.CreateAsyncScope();
+            var cachedRedb = cacheScope.ServiceProvider.GetRequiredService<IRedbService>();
+            await cachedRedb.InitializeAsync();
+
+            await RunPassAsync($"{platformKey}.repeat", redbRepeat, cachedRedb, () => CommandCounters.Redb, runs);
+            await RunPassAsync($"{platformKey}.cache", redbRepeat, cachedRedb, () => CommandCounters.Redb, runs);
+        }
+
+        await RunPassAsync($"{efKey}.repeat", efRepeat, redb, () => CommandCounters.Ef, runs);
+
+        Console.WriteLine();
+
+        // The direct table of the run, kept for reference; the results now come from the results database.
+        // PrintResults(runs.Where(r => r.Platform == platformKey).Select(r => r.Result).ToList());
+
+        // Save results to the separate results database and print them from there
+        await WithResultsDbAsync(async resultsDb =>
+        {
+            await SaveResultsAsync(resultsDb, runs);
+            await PrintSavedResultsAsync(resultsDb, runs.Select(r => BaseId(r.Result.Id)).ToHashSet(), platformKey);
+        });
+    }
+
+    /// <summary>Opens the results storage (<see cref="ResultsConnection"/>, created on first use) for one unit of work.</summary>
+    private static async Task WithResultsDbAsync(Func<IRedbService, Task> work)
+    {
+        var resultsServices = new ServiceCollection();
+        resultsServices.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
+        resultsServices.AddRedbPro(options => options.WithLicense("").UseSqlite(ResultsConnection));
+        await using var resultsProvider = resultsServices.BuildServiceProvider();
+        await using var resultsScope = resultsProvider.CreateAsyncScope();
+        var resultsDb = resultsScope.ServiceProvider.GetRequiredService<IRedbService>();
+        await resultsDb.InitializeAsync(ensureCreated: true);
+        await work(resultsDb);
+    }
+
+    /// <summary>
+    /// Runs one pass over <paramref name="toRun"/> and adds each result, with the round trips it made, to
+    /// <paramref name="runs"/> under <paramref name="platform"/>.
+    /// </summary>
+    private static async Task RunPassAsync(
+        string platform,
+        List<(ExampleBase example, ExampleMetaAttribute? meta)> toRun,
+        IRedbService redb,
+        Func<long> commands,
+        List<(string Platform, ExampleResult Result)> runs)
+    {
+        if (toRun.Count == 0)
+            return;
+
+        Console.WriteLine($"=== PASS {platform} ===");
         var current = 0;
 
         foreach (var (example, meta) in toRun.OrderBy(e => e.meta?.Id))
@@ -109,17 +239,18 @@ class Program
             current++;
 
             // Progress indicator
-            Console.Write($"[{current}/{total}] {meta.Id} {meta.Title}...");
+            Console.Write($"[{current}/{toRun.Count}] {meta.Id} {meta.Title}...");
 
+            var before = commands();
             try
             {
                 var result = await example.RunAsync(redb);
-                results.Add(result);
-                Console.WriteLine(result.Success ? " OK" : " FAIL");
+                runs.Add((platform, result with { Queries = result.NotSupported ? null : (int)(commands() - before) }));
+                Console.WriteLine(result.NotSupported ? " N/A" : result.Success ? " OK" : " FAIL");
             }
             catch (Exception ex)
             {
-                results.Add(new ExampleResult
+                runs.Add((platform, new ExampleResult
                 {
                     Id = meta.Id,
                     Title = meta.Title,
@@ -128,37 +259,64 @@ class Program
                     ElapsedMs = 0,
                     Output = [],
                     Error = ex.Message
-                });
+                }));
                 Console.WriteLine($" ERROR: {ex.Message}");
             }
         }
 
         Console.WriteLine();
-
-        PrintResults(results);
-        // Save results to separate redbDoc database
-        // var redbDoc = await CreateRedbDocServiceAsync();
-        // await SaveResultsAsync(redbDoc, results, platformKey);
     }
 
-    // /// <summary>
-    // /// Creates separate IRedbService for results storage in redbDoc database.
-    // /// </summary>
-    // private static async Task<IRedbService> CreateRedbDocServiceAsync()
-    // {
-    //     var services = new ServiceCollection();
-    //     services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
-    //     services.AddRedb(options => options.UseMsSql(RedbDocConnection));
-    //     
-    //     var provider = services.BuildServiceProvider();
-    //     var redbDoc = provider.GetRequiredService<IRedbService>();
-    //     await redbDoc.InitializeAsync();
-    //     
-    //     return redbDoc;
-    // }
+    /// <summary>The id of the redb example a twin belongs to: <c>E010_ef</c> gives <c>E010</c>.</summary>
+    private static string BaseId(string id) => IsTwin(id) ? id[..^3] : id;
 
-    private static void ConfigureServices(ServiceCollection services)
+    private static bool IsTwin(string id) => id.EndsWith("_ef", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Platform key of the EF Core passes. The EF context works on the flat PostgreSQL database
+    /// (<see cref="FlatEfConnection"/>) whatever provider redb runs on, so the key names that database.
+    /// </summary>
+    private const string EfPlatformKey = "postgres.ef";
+
+    /// <summary>
+    /// The kind of a pass from its platform key: <c>first</c> for <c>postgres.pro</c> or <c>postgres.ef</c>,
+    /// otherwise the last part (<c>repeat</c>, <c>cache</c>).
+    /// </summary>
+    private static string PassKind(string platformKey)
     {
+        var parts = platformKey.Split('.');
+        return parts.Length > 2 ? parts[^1] : "first";
+    }
+
+    /// <summary>Whether redb runs on the provider of the EF twins, so that the two sides are comparable.</summary>
+    private static bool RunsOnEfProvider(string platformKey) =>
+        platformKey.StartsWith("postgres.", StringComparison.OrdinalIgnoreCase);
+
+
+    /// <summary>
+    /// The flat database of the EF Core twins (redb.Export/doc/PLAN_EF_BENCHMARK.md): the schema from
+    /// `redb flat --ddl-only`, the data seeded by EF itself (E203_ef). Same server and session options as
+    /// the redb database below, so both sides run under the same settings.
+    /// </summary>
+    private const string FlatEfConnection =
+        "Host=localhost;Port=5432;Username=postgres;Password=1;Database=redb_examples_flat_ef;Pooling=true;Timeout=600;Command Timeout=600;Include Error Detail=true;Options=-c jit=off";
+
+    /// <summary>Product version of the assembly that defines <paramref name="type"/>, without the commit suffix.</summary>
+    private static string VersionOf(Type type) =>
+        type.Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+        ?? type.Assembly.GetName().Version?.ToString()
+        ?? "?";
+
+    /// <param name="services">Container to fill.</param>
+    /// <param name="enablePropsCache">Turns redb's props cache on: the pass that shows what the cache gives.</param>
+    private static void ConfigureServices(ServiceCollection services, bool enablePropsCache = false)
+    {
+        // EF Core side: a context factory, so every EF unit of work gets a new context, as EF recommends.
+        // The interceptor only counts round trips for the comparison table.
+        services.AddDbContextFactory<FlatContext>(options => options
+            .UseNpgsql(FlatEfConnection)
+            .AddInterceptors(CommandCounters.EfInterceptor));
+
         services.AddLogging(b => b
             .AddConsole()
             .SetMinimumLevel(LogLevel.Warning));
@@ -183,10 +341,10 @@ class Program
             .WithLicense(TestLicense)
             .Configure(c =>
             {
-                c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert; // FREE tier: DeleteInsert (ChangeTracking is a Pro feature). Flip to ChangeTracking for the Pro run.
+                c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking; // FREE tier: DeleteInsert (ChangeTracking is a Pro feature). Flip to ChangeTracking for the Pro run.
                 //c.SkipHashValidationOnCacheCheck = false;
-                //c.EnablePropsCache = false;
-                //c.PropsCacheMaxSize = 10000;
+                c.EnablePropsCache = enablePropsCache;
+                c.PropsCacheMaxSize = 100000;
                 //c.PropsCacheTtl = TimeSpan.FromMinutes(60);
                 // PVT prefilter (Pro + PostgreSQL, opt-in). Flip to true and re-run E202 to
                 // diff the SQL with and without the cutting step. See docs/PVT_PREFILTER_PLAN.md.
@@ -196,9 +354,9 @@ class Program
             // `redb`: the integration-test fixtures wipe their database CLEAN on start, and a
             // seeded 8M-row _values under the cascade trigger turns that wipe into hours
             // (2026-09-10: a seeded database was lost to exactly this).
-            //.UsePostgres("Host=localhost;Port=5432;Username=postgres;Password=1;Database=redb_examples;Pooling=true;Timeout=600;Command Timeout=600;Include Error Detail=true;Options=-c jit=off")
+            .UsePostgres("Host=localhost;Port=5432;Username=postgres;Password=1;Database=redb_examples;Pooling=true;Timeout=600;Command Timeout=600;Include Error Detail=true;Options=-c jit=off")
             //.UseMsSql("Server=127.0.0.1,1433;Database=redb_examples;User Id=sa;Password=1;TrustServerCertificate=true;Command Timeout=600;")  // 127.0.0.1 (not localhost): localhost->::1 hits docker [::]:1433 and hangs ~63s
-            .UseSqlite(@"Data Source=redb_examples.db")
+            //.UseSqlite(@"Data Source=redb_examples.db")
             );
     }
 
@@ -253,182 +411,210 @@ class Program
         return isPro ? $"{db}.pro" : db;
     }
 
-    // /// <summary>
-    // /// Saves or updates test results in redb database.
-    // /// Creates new objects for new examples, updates existing ones.
-    // /// Uses batch operations for efficiency.
-    // /// </summary>
-    // private static async Task SaveResultsAsync(IRedbService redb, List<ExampleResult> results, string platformKey)
-    // {
-    //     Console.WriteLine();
-    //     Console.WriteLine($"=== SAVING RESULTS ({platformKey}) ===");
-    //
-    //     // Load all existing results at once (with Props)
-    //     var existingResults = await redb.Query<ExampleResultProps>()
-    //         .ToListAsync();
-    //
-    //     var existingByKey = existingResults.ToDictionary(r => r.ValueString ?? "", r => r);
-    //
-    //     var toSave = new List<RedbObject<ExampleResultProps>>();
-    //     var saved = 0;
-    //     var updated = 0;
-    //
-    //     foreach (var result in results)
-    //     {
-    //         var tierString = result.Tier switch
-    //         {
-    //             ExampleTier.Free => "Free",
-    //             ExampleTier.Pro => "Pro",
-    //             ExampleTier.Enterprise => "Enterprise",
-    //             _ => "Free"
-    //         };
-    //
-    //         var platformResult = new PlatformResult
-    //         {
-    //             Count = result.Count,
-    //             Time = (int)result.ElapsedMs,
-    //             Status = result.Success ? "OK" : (result.Error ?? "FAIL")
-    //         };
-    //
-    //         if (existingByKey.TryGetValue(result.Id, out var existing))
-    //         {
-    //             // Update existing object - preserve other platforms!
-    //             existing.Props ??= new ExampleResultProps();
-    //             existing.Props.Tier = tierString;
-    //             existing.Props.Results ??= new Dictionary<string, PlatformResult>();
-    //             existing.Props.Results[platformKey] = platformResult;
-    //
-    //             toSave.Add(existing);
-    //             updated++;
-    //         }
-    //         else
-    //         {
-    //             // Create new object
-    //             var newResult = new RedbObject<ExampleResultProps>
-    //             {
-    //                 Name = result.Title,
-    //                 ValueString = result.Id,
-    //                 Props = new ExampleResultProps
-    //                 {
-    //                     Tier = tierString,
-    //                     Results = new Dictionary<string, PlatformResult>
-    //                     {
-    //                         [platformKey] = platformResult
-    //                     }
-    //                 }
-    //             };
-    //
-    //             toSave.Add(newResult);
-    //             saved++;
-    //         }
-    //     }
-    //
-    //     // Batch save all at once
-    //     if (toSave.Count > 0)
-    //     {
-    //         await redb.SaveAsync(toSave);
-    //     }
-    //
-    //     Console.WriteLine($"Results saved: {saved} new, {updated} updated (batch)");
-    //
-    //     // Print all saved results from database
-    //     await PrintSavedResultsAsync(redb);
-    // }
+    /// <summary>
+    /// Saves or updates the results of this run in the results database, one object per example: its
+    /// key (E001, E002...) in ValueString, its title in Name, every pass under its platform key. An EF
+    /// twin (E010_ef) is stored with its redb example (E010), under the EF platform key, so both sides
+    /// sit in one object. Other platforms already stored for an example are kept.
+    /// </summary>
+    private static async Task SaveResultsAsync(IRedbService redb, List<(string Platform, ExampleResult Result)> runs)
+    {
+        Console.WriteLine();
+        Console.WriteLine("=== SAVING RESULTS ===");
 
-    // /// <summary>
-    // /// Loads and prints all saved results from database with all platforms.
-    // /// Shows each platform on separate line for easy comparison.
-    // /// </summary>
-    // private static async Task PrintSavedResultsAsync(IRedbService redb)
-    // {
-    //     Console.WriteLine();
-    //     Console.WriteLine("=== ALL SAVED RESULTS ===");
-    //
-    //     var allResults = await redb.Query<ExampleResultProps>()
-    //         .OrderByRedb(r => r.ValueString)
-    //         .ToListAsync();
-    //
-    //     if (allResults.Count == 0)
-    //     {
-    //         Console.WriteLine("No saved results in database.");
-    //         return;
-    //     }
-    //
-    //     // Table with platforms as subrows for easy comparison
-    //     var table = new TablePrinter(6, 40, 6, 8, 10, 30);
-    //     table.Header("ID", "TITLE", "TIER", "COUNT", "TIME", "PLATFORM: STATUS");
-    //
-    //     var platforms = new[] { "mssql", "mssql.pro", "postgres", "postgres.pro" };
-    //
-    //     for (int i = 0; i < allResults.Count; i++)
-    //     {
-    //         var r = allResults[i];
-    //         var id = r.ValueString ?? "-";
-    //         var title = r.Name ?? "-";
-    //         var tier = r.Props?.Tier ?? "-";
-    //
-    //         // First row: ID, Title, Tier
-    //         table.Row(
-    //             new TableCell(id),
-    //             new TableCell(title),
-    //             new TableCell(tier),
-    //             new TableCell(""),
-    //             new TableCell(""),
-    //             new TableCell("")
-    //         );
-    //
-    //         // Platform subrows
-    //         foreach (var platform in platforms)
-    //         {
-    //             var pr = r.Props?.Results?.GetValueOrDefault(platform);
-    //             if (pr == null)
-    //             {
-    //                 table.Row(
-    //                     new TableCell(""),
-    //                     new TableCell(""),
-    //                     new TableCell(""),
-    //                     new TableCell("-", ConsoleColor.DarkGray),
-    //                     new TableCell("-", ConsoleColor.DarkGray),
-    //                     new TableCell($"  {platform,-12}: -", ConsoleColor.DarkGray)
-    //                 );
-    //             }
-    //             else
-    //             {
-    //                 var count = pr.Count?.ToString() ?? "-";
-    //                 var time = pr.Time != null ? $"{pr.Time}ms" : "-";
-    //                 var status = pr.Status ?? "-";
-    //                 var color = status == "OK" ? ConsoleColor.Green : ConsoleColor.Red;
-    //
-    //                 table.Row(
-    //                     new TableCell(""),
-    //                     new TableCell(""),
-    //                     new TableCell(""),
-    //                     new TableCell(count, color),
-    //                     new TableCell(time, color),
-    //                     new TableCell($"  {platform,-12}: {status}", color)
-    //                 );
-    //             }
-    //         }
-    //
-    //         // Separator between examples (except last)
-    //         if (i < allResults.Count - 1)
-    //             table.Separator();
-    //     }
-    //
-    //     Console.WriteLine();
-    //     table.Print();
-    //
-    //     // Summary by platform
-    //     Console.WriteLine();
-    //     foreach (var platform in platforms)
-    //     {
-    //         var total = allResults.Count(r => r.Props?.Results?.ContainsKey(platform) == true);
-    //         var ok = allResults.Count(r => r.Props?.Results?.GetValueOrDefault(platform)?.Status == "OK");
-    //         var fail = total - ok;
-    //         if (total > 0)
-    //             Console.WriteLine($"  {platform,-12}: {ok} OK, {fail} FAIL (of {total})");
-    //     }
-    // }
+        // Load all existing results at once (with Props)
+        var existingResults = await redb.Query<ExampleResultProps>()
+            .ToListAsync();
+
+        var existingByKey = existingResults.ToDictionary(r => r.ValueString ?? "", r => r);
+
+        var toSave = new List<RedbObject<ExampleResultProps>>();
+        var saved = 0;
+        var updated = 0;
+
+        foreach (var example in runs.GroupBy(r => BaseId(r.Result.Id)))
+        {
+            // Title and tier come from the redb example when it ran, from the twin otherwise.
+            var lead = example.FirstOrDefault(r => !IsTwin(r.Result.Id)).Result ?? example.First().Result;
+            var title = IsTwin(lead.Id) && lead.Title.StartsWith("EF: ", StringComparison.Ordinal) ? lead.Title[4..] : lead.Title;
+            var tierString = lead.Tier switch
+            {
+                ExampleTier.Free => "Free",
+                ExampleTier.Pro => "Pro",
+                ExampleTier.Enterprise => "Enterprise",
+                _ => "Free"
+            };
+
+            if (!existingByKey.TryGetValue(example.Key, out var target))
+            {
+                target = new RedbObject<ExampleResultProps>
+                {
+                    Name = title,
+                    ValueString = example.Key,
+                    Props = new ExampleResultProps()
+                };
+                existingByKey[example.Key] = target;
+                saved++;
+            }
+            else
+            {
+                updated++;
+            }
+
+            // Update existing object - preserve other platforms!
+            target.Props ??= new ExampleResultProps();
+            target.Props.Tier = tierString;
+            target.Props.Results ??= new Dictionary<string, PlatformResult>();
+
+            foreach (var (platform, result) in example)
+            {
+                target.Props.Results[platform] = new PlatformResult
+                {
+                    Count = result.Count,
+                    Time = result.NotSupported ? null : (int)result.ElapsedMs,
+                    Queries = result.Queries,
+                    Status = result.NotSupported ? $"N/A: {result.Output.FirstOrDefault()}"
+                        : result.Success ? "OK" : (result.Error ?? "FAIL")
+                };
+            }
+
+            toSave.Add(target);
+        }
+
+        // Batch save all at once
+        if (toSave.Count > 0)
+        {
+            await redb.SaveAsync(toSave);
+        }
+
+        Console.WriteLine($"Results saved: {saved} new, {updated} updated (batch)");
+    }
+
+    /// <summary>
+    /// Loads the results of the given examples from the results database and prints them, each pass on a
+    /// line of its own: redb, redb with the props cache, EF Core. An EF line also shows how its time
+    /// compares with redb's (EF against the first redb pass, EF repeat against redb with the cache).
+    /// </summary>
+    private static async Task PrintSavedResultsAsync(IRedbService redb, IReadOnlySet<string>? exampleKeys, string platformKey)
+    {
+        Console.WriteLine();
+        Console.WriteLine("=== RESULTS ===");
+
+        // exampleKeys null: every saved example.
+        var allResults = (await redb.Query<ExampleResultProps>()
+                .OrderByRedb(r => r.ValueString)
+                .ToListAsync())
+            .Where(r => r.ValueString != null && (exampleKeys == null || exampleKeys.Contains(r.ValueString)))
+            .ToList();
+
+        if (allResults.Count == 0)
+        {
+            Console.WriteLine("No saved results in database.");
+            return;
+        }
+
+        // Passes of this platform first, in the order they run; whatever else an example carries after.
+        var efKey = EfPlatformKey;
+        var order = new[] { platformKey, $"{platformKey}.repeat", $"{platformKey}.cache", efKey, $"{efKey}.repeat" };
+
+        // The ratio to EF only where redb ran on the same provider.
+        var compareWithEf = RunsOnEfProvider(platformKey);
+
+        // Table with platforms as subrows for easy comparison
+        // No TIER column: the tier is redb's licence tier and says nothing about an EF line.
+        var table = new TablePrinter(8, 44, 8, 10, 7, 50);
+        table.Header("ID", "TITLE", "COUNT", "TIME", "SQL", "PLATFORM: STATUS");
+
+        for (int i = 0; i < allResults.Count; i++)
+        {
+            var r = allResults[i];
+            var id = r.ValueString ?? "-";
+            var title = r.Name ?? "-";
+            var platforms = r.Props?.Results ?? new Dictionary<string, PlatformResult>();
+
+            // First row: ID, Title
+            table.Row(
+                new TableCell(id),
+                new TableCell(title),
+                new TableCell(""),
+                new TableCell(""),
+                new TableCell(""),
+                new TableCell("")
+            );
+
+            // The fastest and the slowest within each kind of pass (first, repeat, cache), across providers and
+            // libraries: yellow and red. A cold first pass is never set against a pass over a warm cache.
+            var best = new HashSet<string>();
+            var worst = new HashSet<string>();
+            var byKind = platforms
+                .Where(p => p.Value.Time is > 0 && p.Value.Status?.StartsWith("OK", StringComparison.Ordinal) == true)
+                .GroupBy(p => PassKind(p.Key));
+            foreach (var kind in byKind.Where(g => g.Count() > 1))
+            {
+                best.Add(kind.MinBy(p => p.Value.Time)!.Key);
+                worst.Add(kind.MaxBy(p => p.Value.Time)!.Key);
+            }
+
+            // Platform subrows
+            foreach (var platform in order.Where(platforms.ContainsKey).Concat(platforms.Keys.Except(order).Order()))
+            {
+                var pr = platforms[platform];
+                var count = pr.Count?.ToString() ?? "-";
+                var time = pr.Time != null ? $"{pr.Time}ms" : "-";
+                var queries = pr.Queries?.ToString() ?? "-";
+                var status = pr.Status ?? "-";
+
+                // EF against redb pass for pass: the first EF pass against the first redb pass, the EF repeat
+                // against the redb repeat.
+                var against = !compareWithEf ? null
+                    : platform == efKey ? platformKey
+                    : platform == $"{efKey}.repeat" ? $"{platformKey}.repeat"
+                    : null;
+                if (against != null && pr.Time is > 0 && platforms.GetValueOrDefault(against)?.Time is > 0 and var redbTime)
+                {
+                    // The pass without the provider prefix keeps the line inside the column; a ratio below 1
+                    // keeps two decimals, so a fast EF line does not print as x0.0.
+                    var ratio = (double)pr.Time.Value / redbTime;
+                    var pass = against[(against.IndexOf('.') + 1)..];
+                    status += $"  x{ratio.ToString(ratio < 1 ? "F2" : "F1")} vs {pass}";
+                }
+
+                var color = status.StartsWith("N/A", StringComparison.Ordinal) ? ConsoleColor.DarkYellow
+                    : !status.StartsWith("OK", StringComparison.Ordinal) ? ConsoleColor.Red
+                    : best.Contains(platform) ? ConsoleColor.Yellow
+                    : worst.Contains(platform) ? ConsoleColor.Red
+                    : ConsoleColor.Green;
+
+                table.Row(
+                    new TableCell(""),
+                    new TableCell(""),
+                    new TableCell(count, color),
+                    new TableCell(time, color),
+                    new TableCell(queries, color),
+                    new TableCell($"  {platform,-20}: {status}", color)
+                );
+            }
+
+            // Separator between examples (except last)
+            if (i < allResults.Count - 1)
+                table.Separator();
+        }
+
+        Console.WriteLine();
+        table.Print();
+
+        // Summary by platform
+        Console.WriteLine();
+        foreach (var platform in allResults.SelectMany(r => r.Props?.Results?.Keys ?? Enumerable.Empty<string>()).Distinct()
+                     .OrderBy(p => Array.IndexOf(order, p) is var index and >= 0 ? index : int.MaxValue).ThenBy(p => p))
+        {
+            var statuses = allResults.Select(r => r.Props?.Results?.GetValueOrDefault(platform)?.Status).Where(s => s != null).ToList();
+            var ok = statuses.Count(s => s == "OK");
+            var notSupported = statuses.Count(s => s!.StartsWith("N/A", StringComparison.Ordinal));
+            var fail = statuses.Count - ok - notSupported;
+            Console.WriteLine($"  {platform,-20}: {ok} OK, {fail} FAIL, {notSupported} N/A (of {statuses.Count})");
+        }
+    }
 
     private static void PrintResults(List<ExampleResult> results)
     {

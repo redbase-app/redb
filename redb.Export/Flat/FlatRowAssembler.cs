@@ -55,6 +55,9 @@ internal sealed class FlatRowAssembler
         _tablesByOwner = schemeTables.ToLookup(t => t.OwnerTable);
     }
 
+    /// <summary>Largest row key appended so far, in any table.</summary>
+    public long MaxRowId { get; private set; }
+
     /// <summary>Appends the rows of one object to the buffers.</summary>
     public void Append(FlatTable schemeTable, long objectId, List<FlatSourceValue> values)
     {
@@ -70,6 +73,9 @@ internal sealed class FlatRowAssembler
         FlatSourceValue? element,
         ILookup<(long Parent, long Structure), FlatSourceValue> index)
     {
+        if (rowId > MaxRowId)
+            MaxRowId = rowId;
+
         var buffer = _buffers[table.Name];
         var row = buffer.Data.NewRow();
         object? key = null;

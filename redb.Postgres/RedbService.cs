@@ -68,7 +68,7 @@ public class RedbService : RedbServiceBase
         IRedbContext context, IRedbObjectSerializer serializer, IPermissionProvider permissionProvider,
         IRedbSecurityContext securityContext, ISchemeSyncProvider schemeSync,
         RedbServiceConfiguration config, IListProvider listProvider, ILogger? logger,
-        IEnumerable<redb.Core.Interception.IRedbSaveInterceptor>? saveInterceptors)
+        redb.Core.Interception.RedbSaveInterceptorPipeline? saveInterceptors)
         => new PostgresObjectStorageProvider(context, serializer, permissionProvider, 
             securityContext, schemeSync, config, listProvider, logger, saveInterceptors);
     

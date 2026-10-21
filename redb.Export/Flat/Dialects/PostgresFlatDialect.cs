@@ -50,4 +50,17 @@ internal sealed class PostgresFlatDialect : IFlatDialect
     };
 
     public IsolationLevel SnapshotIsolation => IsolationLevel.RepeatableRead;
+
+    public string? CreateSequence(string sequence) => $"CREATE SEQUENCE {Quote(sequence)} AS bigint START WITH 1";
+
+    public string? RestartSequence(string sequence, long next) =>
+        $"ALTER SEQUENCE {Quote(sequence)} RESTART WITH {next.ToString(CultureInfo.InvariantCulture)}";
+
+    // nextval takes the name as text; the quotes inside keep it exact.
+    public string? KeyDefault(string sequence) => $"DEFAULT nextval('{Quote(sequence).Replace("'", "''")}')";
+
+    public bool AllowsSelfCascade => true;
+
+    // psql prints a NOTICE as "NOTICE:  <message>".
+    public string Report(string message) => $"DO $$ BEGIN RAISE NOTICE '{message.Replace("'", "''")}'; END $$";
 }

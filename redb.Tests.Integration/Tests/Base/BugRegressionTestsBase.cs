@@ -174,7 +174,7 @@ public abstract class BugRegressionTestsBase
             });
 
         results.Select(r => r.Type).Should().Contain(new[] { "email", "phone" });
-        results.Should().AllSatisfy(r => r.Count.Should().BeGreaterOrEqualTo(20));
+        results.Should().AllSatisfy(r => r.Count.Should().BeGreaterThanOrEqualTo(20));
     }
 
     [Fact]
@@ -238,10 +238,10 @@ public abstract class BugRegressionTestsBase
     {
         await SeedEmployeesAsync();
 
-        var matched = (await Redb.Query<EmployeeProps>()
+        var matched = await Redb.Query<EmployeeProps>()
             .Where(e => e.IsRemote == true)
-            .ToListAsync()).Count;
-        matched.Should().BeGreaterThan(0);
+            .ToListAsync();
+        matched.Should().NotBeEmpty();
 
         var results = await Redb.Query<EmployeeProps>()
             .Where(e => e.IsRemote == true)
@@ -253,9 +253,12 @@ public abstract class BugRegressionTestsBase
                 Count = Agg.Count(g)
             });
 
+        // One row per contact of that type over the matched employees: the database is shared, and other tests store
+        // remote employees with no contacts, so "one row per matched employee" held only while they ran later.
         results.Should().NotBeEmpty();
         results.Select(r => r.Type).Should().Contain(new[] { "email", "phone" });
-        results.Should().AllSatisfy(r => r.Count.Should().Be(matched),
+        results.Should().AllSatisfy(r => r.Count.Should().Be(
+                matched.Sum(e => e.Props.Contacts?.Count(c => c.Type == r.Type) ?? 0)),
             "outer Where filter must be applied before array aggregation");
     }
 

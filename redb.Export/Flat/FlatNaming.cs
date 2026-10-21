@@ -32,6 +32,12 @@ public static class FlatNaming
     /// <summary>Primary key column of every flat table.</summary>
     public const string IdColumn = "_id";
 
+    /// <summary>
+    /// The one sequence of the flat database, the counterpart of redb's <c>global_identity</c>. Every key
+    /// a writer leaves out is taken from it, so new rows of any table never collide.
+    /// </summary>
+    public const string IdentitySequence = "flat_identity";
+
     /// <summary>Reference from a nested or collection table to the row that owns it.</summary>
     public const string OwnerColumn = "_owner_id";
 

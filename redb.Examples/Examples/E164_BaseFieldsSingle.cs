@@ -6,7 +6,7 @@ using redb.Examples.Output;
 namespace redb.Examples.Examples;
 
 /// <summary>
-/// Demonstrates using RedbObject base fields without Props (EAV values).
+/// Demonstrates using RedbObject base fields without Props (no props rows).
 /// Base fields are stored directly in _objects table for fast access:
 /// value_string, value_long, value_bool, value_double, value_datetime, value_guid, value_numeric, value_bytes.
 /// Useful for simple objects, lookups, metadata without dynamic properties.
@@ -19,7 +19,7 @@ public class E164_BaseFieldsSingle : ExampleBase
     {
         var sw = Stopwatch.StartNew();
 
-        // Create non-generic RedbObject with base fields only (no Props/EAV)
+        // Create non-generic RedbObject with base fields only (no Props rows)
         var obj = new RedbObject
         {
             name = $"BaseFields_Example_{DateTime.UtcNow.Ticks}",

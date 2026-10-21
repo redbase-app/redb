@@ -8,6 +8,7 @@ public sealed class FlatTable
     private readonly List<FlatColumn> _columns = [];
     private readonly List<FlatForeignKey> _foreignKeys = [];
     private readonly List<FlatUniqueConstraint> _uniqueConstraints = [];
+    private readonly List<FlatIndex> _indexes = [];
 
     /// <summary>Creates a table; <paramref name="fullName"/> is shortened to the identifier limit when needed.</summary>
     public FlatTable(string fullName)
@@ -79,7 +80,12 @@ public sealed class FlatTable
 
     internal void Add(FlatForeignKey foreignKey) => _foreignKeys.Add(foreignKey);
 
+    /// <summary>Plain indexes. Like foreign keys, they are meant to be created after the data is loaded.</summary>
+    public IReadOnlyList<FlatIndex> Indexes => _indexes;
+
     internal void Add(FlatUniqueConstraint uniqueConstraint) => _uniqueConstraints.Add(uniqueConstraint);
+
+    internal void Add(FlatIndex index) => _indexes.Add(index);
 }
 
 /// <summary>

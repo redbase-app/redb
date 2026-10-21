@@ -94,6 +94,23 @@ public class TreeProjectedQueryable<TProps, TResult> : IRedbProjectedQueryable<T
         return With(orderByExpressions: new List<(Expression, bool)> { (keySelector, true) });
     }
 
+    public IRedbProjectedQueryable<TResult> ThenBy<TKey>(Expression<Func<TResult, TKey>> keySelector)
+        => AddThenBy(keySelector, descending: false);
+
+    public IRedbProjectedQueryable<TResult> ThenByDescending<TKey>(Expression<Func<TResult, TKey>> keySelector)
+        => AddThenBy(keySelector, descending: true);
+
+    // A tree is loaded whole and sorted in memory: ThenBy adds a key to that ordering.
+    private IRedbProjectedQueryable<TResult> AddThenBy(LambdaExpression keySelector, bool descending)
+    {
+        if (keySelector == null)
+            throw new ArgumentNullException(nameof(keySelector));
+        if (_orderByExpressions.Count == 0)
+            throw new InvalidOperationException("ThenBy continues an ordering: call OrderBy or OrderByDescending first.");
+
+        return With(orderByExpressions: new List<(Expression, bool)>(_orderByExpressions) { (keySelector, descending) });
+    }
+
     public IRedbProjectedQueryable<TResult> Take(int count)
     {
         if (HasInMemoryOps)

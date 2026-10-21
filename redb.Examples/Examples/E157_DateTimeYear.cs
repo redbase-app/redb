@@ -29,8 +29,8 @@ public class E157_DateTimeYear : ExampleBase
             .Take(100);
 
         // Uncomment to see generated SQL (contains EXTRACT):
-        var sql = await query.ToSqlStringAsync();
-        Console.WriteLine("Generated SQL:\n" + sql);
+        // var sql = await query.ToSqlStringAsync();
+        // Console.WriteLine("Generated SQL:\n" + sql);
 
         var results = await query.ToListAsync();
         var totalCount = await redb.Query<EmployeeProps>()

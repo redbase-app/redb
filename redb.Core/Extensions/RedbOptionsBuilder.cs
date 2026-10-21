@@ -135,7 +135,12 @@ public class RedbOptionsBuilder : IRedbOptionsBuilderInfrastructure
         // fall back to salted SHA256 (external security report, 2026-09-08).
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions
             .TryAddSingleton<Security.IPasswordHasher, Security.BcryptPasswordHasher>(_services);
-        
+
+        // Save interceptors subscribed at run time. TryAdd: a registry put in before AddRedb is kept, so containers
+        // that receive the same instance (a host and the named instances it builds) share one set of subscriptions.
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions
+            .TryAddSingleton<Interception.IRedbSaveInterceptorRegistry, Interception.RedbSaveInterceptorRegistry>(_services);
+
         // Schema init hosted service — must be registered BEFORE provider services
         // so it runs before BackgroundDeletionService that queries _objects table
         _services.AddHostedService<RedbInitHostedService>();

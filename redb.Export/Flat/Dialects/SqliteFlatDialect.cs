@@ -39,4 +39,17 @@ internal sealed class SqliteFlatDialect : IFlatDialect
 
     // The only level SQLite has; a read transaction sees one snapshot of the file.
     public IsolationLevel SnapshotIsolation => IsolationLevel.Serializable;
+
+    // SQLite has no sequences. An INTEGER PRIMARY KEY is the rowid, and a row inserted without it gets
+    // the next free one of its own table: keys are generated, though per table, not database-wide.
+    public string? CreateSequence(string sequence) => null;
+
+    public string? RestartSequence(string sequence, long next) => null;
+
+    public string? KeyDefault(string sequence) => null;
+
+    public bool AllowsSelfCascade => true;
+
+    // The sqlite3 shell prints the row.
+    public string Report(string message) => $"SELECT '{message.Replace("'", "''")}' AS result";
 }

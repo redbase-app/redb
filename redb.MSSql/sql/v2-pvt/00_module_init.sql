@@ -132,6 +132,97 @@ IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._users_ro
     DROP INDEX [IX__users_roles__roles] ON [dbo].[_users_roles];
 GO
 
+-- Value-leading indexes (0.2.30, 2026-10-16), the set PostgreSQL got in 0.7.16: a filter on a field finds its
+-- objects by value. They replace eleven object-leading forms (_id_structure, _id_object, <value>), three of them
+-- duplicates of three others. The string has none: NVARCHAR(MAX) cannot be a key. Built before the old ones are
+-- dropped. Without ONLINE = ON (Enterprise only) writes to _values wait while they are built.
+-- An index of one of these names whose definition differs in anything (key columns or their order, INCLUDE, filter,
+-- uniqueness, disabled) is dropped and built again: IF NOT EXISTS alone would keep it. A research build left such
+-- indexes with _array_index in the filter, which a query that does not state _array_index IS NULL cannot use.
+-- IF QUERIES GOT SLOWER AFTER THIS UPGRADE, these bring the old ones back; this block drops them again on the next
+-- version change, so report the case:
+--   CREATE INDEX [IX__values__Long_not_null] ON [dbo].[_values]([_id_structure], [_id_object], [_Long]) WHERE [_Long] IS NOT NULL;
+--   CREATE INDEX [IX__values__DateTimeOffset_not_null] ON [dbo].[_values]([_id_structure], [_id_object], [_DateTimeOffset]) WHERE [_DateTimeOffset] IS NOT NULL;
+--   CREATE INDEX [IX__values__Numeric_not_null] ON [dbo].[_values]([_id_structure], [_id_object], [_Numeric]) WHERE [_Numeric] IS NOT NULL;
+--   CREATE INDEX [IX__values__Long_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Long]) WHERE [_Long] IS NOT NULL;
+--   CREATE INDEX [IX__values__Guid_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Guid]) WHERE [_Guid] IS NOT NULL;
+--   CREATE INDEX [IX__values__Double_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Double]) WHERE [_Double] IS NOT NULL;
+--   CREATE INDEX [IX__values__DateTimeOffset_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_DateTimeOffset]) WHERE [_DateTimeOffset] IS NOT NULL;
+--   CREATE INDEX [IX__values__Boolean_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Boolean]) WHERE [_Boolean] IS NOT NULL;
+--   CREATE INDEX [IX__values__Numeric_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Numeric]) WHERE [_Numeric] IS NOT NULL;
+--   CREATE INDEX [IX__values__ListItem_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_ListItem]) WHERE [_ListItem] IS NOT NULL;
+--   CREATE INDEX [IX__values__Object_filter] ON [dbo].[_values]([_id_structure], [_id_object], [_Object]) WHERE [_Object] IS NOT NULL;
+DECLARE @drop NVARCHAR(MAX);
+SELECT @drop = STRING_AGG(CAST(N'DROP INDEX ' + QUOTENAME(i.name) + N' ON [dbo].[_values];' AS NVARCHAR(MAX)), N' ')
+FROM (VALUES
+    (N'IX__values__structure_long_object', N'_Long'),
+    (N'IX__values__structure_numeric_object', N'_Numeric'),
+    (N'IX__values__structure_double_object', N'_Double'),
+    (N'IX__values__structure_datetimeoffset_object', N'_DateTimeOffset'),
+    (N'IX__values__structure_boolean_object', N'_Boolean'),
+    (N'IX__values__structure_guid_object', N'_Guid'),
+    (N'IX__values__structure_listitem_object', N'_ListItem'),
+    (N'IX__values__structure_object_object', N'_Object')
+) x(name, col)
+JOIN sys.indexes i ON i.object_id = OBJECT_ID(N'dbo._values') AND i.name = x.name
+WHERE i.is_disabled = 1 OR i.is_unique = 1 OR i.type <> 2
+   OR ISNULL(i.filter_definition, N'') <> N'([' + x.col + N'] IS NOT NULL)'
+   OR ISNULL((SELECT STRING_AGG(c.name + CASE WHEN ic.is_descending_key = 1 THEN N' DESC' ELSE N'' END, N',') WITHIN GROUP (ORDER BY ic.key_ordinal)
+              FROM sys.index_columns ic JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+              WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id AND ic.is_included_column = 0), N'')
+      <> N'_id_structure,' + x.col + N',_id_object'
+   OR ISNULL((SELECT STRING_AGG(c.name, N',')
+              FROM sys.index_columns ic JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+              WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id AND ic.is_included_column = 1), N'') <> N'_array_index';
+-- Only a role that may alter _values rebuilds an index. A role without the right (the DBA took owner rights back
+-- after the installation) may not see the whole definition of an index, takes a correct one for a wrong one, and
+-- its DROP fails with 1088 ("does not exist or you do not have permissions"), which is no privilege error to the
+-- caller: the start-up died with a driver error instead of RedbSchemaOutdatedException. Without the right the
+-- check is skipped, and the first DDL below reports the missing right as before.
+IF @drop IS NOT NULL AND HAS_PERMS_BY_NAME(N'dbo._values', N'OBJECT', N'ALTER') = 1
+    EXEC sp_executesql @drop;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__structure_long_object')
+    CREATE INDEX [IX__values__structure_long_object] ON [dbo].[_values]([_id_structure], [_Long], [_id_object]) INCLUDE ([_array_index]) WHERE [_Long] IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__structure_numeric_object')
+    CREATE INDEX [IX__values__structure_numeric_object] ON [dbo].[_values]([_id_structure], [_Numeric], [_id_object]) INCLUDE ([_array_index]) WHERE [_Numeric] IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__structure_double_object')
+    CREATE INDEX [IX__values__structure_double_object] ON [dbo].[_values]([_id_structure], [_Double], [_id_object]) INCLUDE ([_array_index]) WHERE [_Double] IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__structure_datetimeoffset_object')
+    CREATE INDEX [IX__values__structure_datetimeoffset_object] ON [dbo].[_values]([_id_structure], [_DateTimeOffset], [_id_object]) INCLUDE ([_array_index]) WHERE [_DateTimeOffset] IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__structure_boolean_object')
+    CREATE INDEX [IX__values__structure_boolean_object] ON [dbo].[_values]([_id_structure], [_Boolean], [_id_object]) INCLUDE ([_array_index]) WHERE [_Boolean] IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__structure_guid_object')
+    CREATE INDEX [IX__values__structure_guid_object] ON [dbo].[_values]([_id_structure], [_Guid], [_id_object]) INCLUDE ([_array_index]) WHERE [_Guid] IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__structure_listitem_object')
+    CREATE INDEX [IX__values__structure_listitem_object] ON [dbo].[_values]([_id_structure], [_ListItem], [_id_object]) INCLUDE ([_array_index]) WHERE [_ListItem] IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__structure_object_object')
+    CREATE INDEX [IX__values__structure_object_object] ON [dbo].[_values]([_id_structure], [_Object], [_id_object]) INCLUDE ([_array_index]) WHERE [_Object] IS NOT NULL;
+GO
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__Long_not_null')
+    DROP INDEX [IX__values__Long_not_null] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__DateTimeOffset_not_null')
+    DROP INDEX [IX__values__DateTimeOffset_not_null] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__Numeric_not_null')
+    DROP INDEX [IX__values__Numeric_not_null] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__Long_filter')
+    DROP INDEX [IX__values__Long_filter] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__Guid_filter')
+    DROP INDEX [IX__values__Guid_filter] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__Double_filter')
+    DROP INDEX [IX__values__Double_filter] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__DateTimeOffset_filter')
+    DROP INDEX [IX__values__DateTimeOffset_filter] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__Boolean_filter')
+    DROP INDEX [IX__values__Boolean_filter] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__Numeric_filter')
+    DROP INDEX [IX__values__Numeric_filter] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__ListItem_filter')
+    DROP INDEX [IX__values__ListItem_filter] ON [dbo].[_values];
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._values') AND name = N'IX__values__Object_filter')
+    DROP INDEX [IX__values__Object_filter] ON [dbo].[_values];
+GO
+
 -- ---------- 1. System infrastructure check ------------------------------
 -- NOTE: dbo.get_object_json (and its helpers) is now OWNED by this module
 -- (defined in 09_core_object_json.sql), so it is no longer guarded as an

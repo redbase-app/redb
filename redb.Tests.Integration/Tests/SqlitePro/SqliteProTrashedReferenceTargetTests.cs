@@ -11,6 +11,8 @@ public class SqliteProTrashedReferenceTargetTests : TrashedReferenceTargetTestsB
     protected override void Register(IServiceCollection services, Action<RedbOptionsBuilder> configure)
         => services.AddRedbPro(configure);
 
+    protected override bool ProPropsCache => true;
+
     protected override void UseProvider(RedbOptionsBuilder options)
     {
         // A fresh file per host.

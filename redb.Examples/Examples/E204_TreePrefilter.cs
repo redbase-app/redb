@@ -78,9 +78,9 @@ public class E204_TreePrefilter : ExampleBase
             }
 
             log.AppendLine(sql);
-            Console.WriteLine();
-            Console.WriteLine($"--- {label} (expected when enabled: {expectation}) ---");
-            Console.WriteLine(sql);
+            // Console.WriteLine();
+            // Console.WriteLine($"--- {label} (expected when enabled: {expectation}) ---");
+            // Console.WriteLine(sql);
 
             var hasRow = sql.Contains("AND ((v._id_structure");
             // Dropping _objects oo is the second half of the change and only fires together

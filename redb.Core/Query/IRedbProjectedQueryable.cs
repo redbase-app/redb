@@ -25,7 +25,19 @@ public interface IRedbProjectedQueryable<TResult>
     /// Sort projected results descending.
     /// </summary>
     IRedbProjectedQueryable<TResult> OrderByDescending<TKey>(Expression<Func<TResult, TKey>> keySelector);
-    
+
+    /// <summary>
+    /// Adds a key to the ordering started by OrderBy or OrderByDescending.
+    /// </summary>
+    IRedbProjectedQueryable<TResult> ThenBy<TKey>(Expression<Func<TResult, TKey>> keySelector)
+        => throw new NotSupportedException($"{GetType().Name} does not implement ThenBy.");
+
+    /// <summary>
+    /// Adds a descending key to the ordering started by OrderBy or OrderByDescending.
+    /// </summary>
+    IRedbProjectedQueryable<TResult> ThenByDescending<TKey>(Expression<Func<TResult, TKey>> keySelector)
+        => throw new NotSupportedException($"{GetType().Name} does not implement ThenByDescending.");
+
     /// <summary>
     /// Limit number of results.
     /// </summary>
@@ -89,6 +101,22 @@ public static class RedbProjectedQueryableTaskExtensions
     {
         var query = await queryTask;
         return query.OrderByDescending(keySelector);
+    }
+
+    public static async Task<IRedbProjectedQueryable<TResult>> ThenBy<TResult, TKey>(
+        this Task<IRedbProjectedQueryable<TResult>> queryTask,
+        Expression<Func<TResult, TKey>> keySelector)
+    {
+        var query = await queryTask;
+        return query.ThenBy(keySelector);
+    }
+
+    public static async Task<IRedbProjectedQueryable<TResult>> ThenByDescending<TResult, TKey>(
+        this Task<IRedbProjectedQueryable<TResult>> queryTask,
+        Expression<Func<TResult, TKey>> keySelector)
+    {
+        var query = await queryTask;
+        return query.ThenByDescending(keySelector);
     }
     
     public static async Task<IRedbProjectedQueryable<TResult>> Take<TResult>(

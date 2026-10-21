@@ -62,6 +62,9 @@ public abstract class PropsCacheTransactionKeepTestsBase
             name = $"keep-root-{tag}",
             Props = new LazyNodeProps { Label = "root", Next = new RedbObject<LazyNodeProps> { id = nextId } }
         });
+        // The save does not cache a graph holding a hand-made reference ({ id = nextId }, no header); the load does,
+        // with the reference as a stub that carries its header.
+        await redb.LoadAsync<LazyNodeProps>(rootId, depth: 1);
         return (rootId, nextId);
     }
 
