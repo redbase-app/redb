@@ -57,11 +57,26 @@ public static class ClrSchemeTypeIndex
     {
         if (string.IsNullOrEmpty(schemeName)) return null;
         EnsureFresh();
-        return TryResolveLive(schemeName);
+        var type = TryResolveLive(schemeName, out var dead);
+        if (type != null || !dead)
+            return type;
+
+        // The entry pointed at a type whose ALC has unloaded. The same name may still belong to a live type: the
+        // scan writes the last type that carries a name, and a module that loaded a copy of the host's own
+        // assembly took the host's names; once it unloaded they resolved to null, and no assembly load came to
+        // bring a rescan. Unloading is no load event, so the rescan is made here, once.
+        lock (_scanLock)
+        {
+            var gen = Interlocked.Read(ref _assemblyGeneration);
+            Rescan();
+            Volatile.Write(ref _scannedGeneration, gen);
+        }
+        return TryResolveLive(schemeName, out _);
     }
 
-    private static Type? TryResolveLive(string schemeName)
+    private static Type? TryResolveLive(string schemeName, out bool dead)
     {
+        dead = false;
         if (!_nameToType.TryGetValue(schemeName, out var weak))
             return null;
 
@@ -72,6 +87,7 @@ public static class ClrSchemeTypeIndex
         // a concurrent Register may have replaced it with a live one).
         ((System.Collections.Generic.ICollection<KeyValuePair<string, WeakReference<Type>>>)_nameToType)
             .Remove(new KeyValuePair<string, WeakReference<Type>>(schemeName, weak));
+        dead = true;
         return null;
     }
 

@@ -430,8 +430,13 @@ WHERE _array_parent_id IS NOT NULL;
 -- 🔥 CRITICAL #1: Covering index for ORDER BY by structure name
 -- Eliminates: Seq Scan on _structures s (Filter: (_name)::text = 'Auction.Baskets')
 -- Cost reduction: 6.10 → 4.29 (-30%)
-CREATE INDEX IF NOT EXISTS "IX__structures__name" 
-ON _structures (_name) 
+-- One root field name once per scheme. IX__structures counts two NULL parents as distinct, so it does not hold
+-- for root structures; PostgreSQL 14 has no NULLS NOT DISTINCT, hence a partial index. Existing databases get it
+-- from RootStructureKey (redb.Core) at the next module upgrade.
+CREATE UNIQUE INDEX IF NOT EXISTS "UX__structures__root" ON _structures (_id_scheme, _name) WHERE _id_parent IS NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__structures__name"
+ON _structures (_name)
 INCLUDE (_id, _id_type, _collection_type, _id_scheme)
 WITH (deduplicate_items=True);
 

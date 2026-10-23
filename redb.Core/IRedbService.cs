@@ -2,6 +2,7 @@
 using redb.Core.Providers;
 using redb.Core.Data;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -159,6 +160,22 @@ namespace redb.Core
         /// the database file belongs to the process).
         /// </summary>
         string? GetUpgradeScript();
+
+        /// <summary>
+        /// Problems of the database schema that do not stop the service but need a person, as found by the last
+        /// <see cref="InitializeAsync"/>, <see cref="CheckSchemaAsync"/> or scheme synchronization: each is logged as
+        /// an error when found, at every start until resolved. Empty when the schema is sound. Shared by every instance
+        /// of the service on one database (cache domain): a scoped instance of a health check sees what the start found
+        /// in its own scope. Meant for a health check (Degraded while not empty); cheap, reads no database.
+        /// </summary>
+        IReadOnlyList<Models.RedbSchemaProblem> SchemaProblems => Array.Empty<Models.RedbSchemaProblem>();
+
+        /// <summary>
+        /// Looks for schema problems in the database again (read only, no schema lock) and returns the current list,
+        /// the one <see cref="SchemaProblems"/> holds from then on.
+        /// </summary>
+        Task<IReadOnlyList<Models.RedbSchemaProblem>> CheckSchemaAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(SchemaProblems);
 
         /// <summary>
         /// Initialize REDB system at application startup, optionally creating the database schema first.

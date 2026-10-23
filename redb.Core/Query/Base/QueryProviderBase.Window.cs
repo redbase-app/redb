@@ -104,5 +104,24 @@ public abstract partial class QueryProviderBase
         return await ExecuteWindowQueryAsync(schemeId, selectFields, windowFuncs, partitionBy, orderBy, filterJson, frameJson, take, skip);
     }
 
+    /// <summary>
+    /// SQL preview for window query with FilterExpression (Pro version).
+    /// Free: converts FilterExpression to facet-JSON, as the execution does.
+    /// </summary>
+    public virtual Task<string> GetWindowSqlPreviewAsync(
+        long schemeId,
+        IEnumerable<WindowFieldRequest> selectFields,
+        IEnumerable<WindowFuncRequest> windowFuncs,
+        IEnumerable<WindowFieldRequest> partitionBy,
+        IEnumerable<WindowOrderRequest> orderBy,
+        FilterExpression? filter,
+        string? frameJson = null,
+        int? take = null,
+        int? skip = null, CancellationToken cancellationToken = default)
+    {
+        var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
+        return GetWindowSqlPreviewAsync(schemeId, selectFields, windowFuncs, partitionBy, orderBy, filterJson, frameJson, take, skip, cancellationToken);
+    }
+
     private class WindowResult { public string? result { get; set; } }
 }

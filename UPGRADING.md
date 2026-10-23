@@ -3,6 +3,56 @@
 What to check and change when moving to a new version. Each section lists the changes that need action;
 [CHANGELOG.md](CHANGELOG.md) has the full list of what changed.
 
+## 4.4.2
+
+### Duplicate root structures
+
+Nodes that synchronized one scheme at the same moment could write one root field of the scheme twice on PostgreSQL
+and SQLite (SQL Server refused it). Scheme synchronization now runs under the schema lock, and a new unique index,
+`UX__structures__root`, keeps one root field name per scheme. New databases get the index at creation. An existing
+database gets it at the next module upgrade (PostgreSQL) or at the next start (SQLite), and duplicates are handled first:
+
+- A duplicate that nothing points to (no value, no child structure with a value, no migration record) is removed
+  with its child structures. The log names the scheme, the field and the removed ids.
+- A field whose copies hold values on more than one copy is left alone, and the index is not built. The service
+  keeps working, logs an error naming the scheme, the field and the structure ids at every start, and lists the field
+  in `IRedbService.SchemaProblems` (a health check can show the service as degraded). Scheme synchronization never
+  removes such a copy; it reports it the same way. The index is built by the first upgrade (PostgreSQL) or start
+  (SQLite) after the duplicates are resolved.
+
+Nothing is needed when no such error appears. To find the duplicates and the values on each copy:
+
+```sql
+SELECT s._id_scheme, s._name, s._id,
+       (SELECT COUNT(*) FROM _values v WHERE v._id_structure = s._id) AS values_count
+FROM _structures s
+JOIN (SELECT _id_scheme, _name FROM _structures WHERE _id_parent IS NULL
+      GROUP BY _id_scheme, _name HAVING COUNT(*) > 1) d
+  ON d._id_scheme = s._id_scheme AND d._name = s._name
+WHERE s._id_parent IS NULL
+ORDER BY s._id_scheme, s._name, s._id;
+```
+
+Each object normally has its value on one copy only: the copy the node that saved it had in its cache. To resolve a
+field, keep one copy (`:keep`) and move to it the values the other copy (`:dup`) holds for objects that have none on
+`:keep`. Then delete `:dup`; deleting a structure deletes the values still on it. Make a backup first, and stop the
+nodes of versions before this one: they may still write into the copy they cached.
+
+```sql
+-- objects with a value on both copies: decide for each which value is right before going on
+SELECT d._id_object FROM _values d JOIN _values k ON k._id_object = d._id_object
+WHERE d._id_structure = :dup AND k._id_structure = :keep;
+
+UPDATE _values SET _id_structure = :keep
+WHERE _id_structure = :dup
+  AND _id_object NOT IN (SELECT _id_object FROM _values WHERE _id_structure = :keep);
+
+DELETE FROM _structures WHERE _id = :dup;
+```
+
+For a field that is a nested class, an array or a dictionary, the values hang on the child structures and on the
+element rows of each copy: move them child by child with the same statements before the copy is deleted.
+
 ## 4.4
 
 ### Npgsql 10

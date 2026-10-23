@@ -141,4 +141,53 @@ public class RedbService : RedbServiceBase
     {
         await Context.ExecuteAsync(sql);
     }
+
+    /// <inheritdoc />
+    protected override async Task<SchemaLockHandle> OpenSchemaLockAsync(CancellationToken cancellationToken)
+    {
+        if (Context is not NpgsqlRedbContext npgsql)
+            return SchemaLockHandle.None;
+        return new AdvisoryLock(await npgsql.DataSource.OpenConnectionAsync(cancellationToken));
+    }
+
+    /// <summary>
+    /// The schema lock of PostgreSQL: a session advisory lock on a connection of its own, outside any transaction.
+    /// Taken with pg_try_advisory_lock, never pg_advisory_lock: a backend blocked in pg_advisory_lock holds the
+    /// snapshot of its statement, and CREATE INDEX CONCURRENTLY of the node that holds the lock waits for every such
+    /// snapshot, so the two would wait for each other. Advisory locks are per database, so one key serves all of them.
+    /// </summary>
+    private sealed class AdvisoryLock(Npgsql.NpgsqlConnection connection) : SchemaLockHandle
+    {
+        // "redb_sch" in ASCII.
+        private const long Key = 0x726564625F736368;
+        private bool _held;
+
+        public override string Name => $"pg_advisory_lock({Key})";
+
+        public override async Task<bool> TryAcquireAsync(CancellationToken cancellationToken)
+        {
+            await using var command = new Npgsql.NpgsqlCommand(_dialect.SchemaLock_TryAcquire(), connection);
+            command.Parameters.Add(new Npgsql.NpgsqlParameter { Value = Key });
+            _held = (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+            return _held;
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            try
+            {
+                if (_held)
+                {
+                    await using var command = new Npgsql.NpgsqlCommand(_dialect.SchemaLock_Release(), connection);
+                    command.Parameters.Add(new Npgsql.NpgsqlParameter { Value = Key });
+                    await command.ExecuteScalarAsync();
+                }
+            }
+            finally
+            {
+                // Closing ends the session too, and the session takes its advisory locks with it.
+                await connection.DisposeAsync();
+            }
+        }
+    }
 }

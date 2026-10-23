@@ -93,6 +93,8 @@ public abstract partial class SchemeSyncProviderBase
         if (current == wantUnique && structure.UniqueScope == wantScope)
             return;
 
+        BeforeSchemeWrite();
+
         if (wantUnique)
         {
             // Version stays NULL until the keys are actually computed: EnsureUniqueKeysAsync sees the
@@ -154,6 +156,7 @@ public abstract partial class SchemeSyncProviderBase
             if (!needsRecompute)
                 continue;
 
+            BeforeSchemeWrite();
             var report = await RecomputeUniqueForStructureAsync(scheme, structure);
             if (report.HasDuplicates && Logger != null)
             {

@@ -27,9 +27,15 @@ public class E193_AverageAsyncFiltered : ExampleBase
         var avgSalaryAll = await redb.Query<EmployeeProps>()
             .AverageAsync(x => x.Salary);
 
+        // Filter and average on nested classes: home city one level deep, floor two levels deep
+        var avgFloorLondon = await redb.Query<EmployeeProps>()
+            .Where(x => x.HomeAddress!.City == "London")
+            .AverageAsync(x => x.HomeAddress!.Building!.Floor);
+
         sw.Stop();
 
         return Ok("E193", "AverageAsync - With Filter", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
-            [$"Age 30-40 AVG: {avgSalaryMiddle:N0}", $"All AVG: {avgSalaryAll:N0}"]);
+            [$"Age 30-40 AVG: {avgSalaryMiddle:N0}", $"All AVG: {avgSalaryAll:N0}",
+             $"London AVG(HomeAddress.Building.Floor): {avgFloorLondon:F2}"]);
     }
 }

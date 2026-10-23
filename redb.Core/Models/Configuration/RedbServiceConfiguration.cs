@@ -238,6 +238,15 @@ namespace redb.Core.Models.Configuration
         public bool AutoApplyDatabaseUpgrades { get; set; } = true;
 
         /// <summary>
+        /// How long start-up waits for the schema lock that another process holds. Processes starting against one
+        /// database (the nodes of a cluster, the replicas of a service) take it in turn to create or upgrade the schema
+        /// and to synchronize the schemes; the one that waits finds the work done when it gets the lock. The default
+        /// covers building the indexes of a large table. Past it start-up stops with
+        /// <see cref="Exceptions.RedbSchemaLockTimeoutException"/>.
+        /// </summary>
+        public TimeSpan SchemaLockTimeout { get; set; } = TimeSpan.FromMinutes(15);
+
+        /// <summary>
         /// Enable transparent whole-object (Props) caching, validated by object hash.
         /// Default is false.
         /// </summary>
@@ -495,6 +504,7 @@ namespace redb.Core.Models.Configuration
             LazyReferenceAccess = source.LazyReferenceAccess;
             LazyLoadWithoutScope = source.LazyLoadWithoutScope;
             AutoApplyDatabaseUpgrades = source.AutoApplyDatabaseUpgrades;
+            SchemaLockTimeout = source.SchemaLockTimeout;
             EnablePropsCache = source.EnablePropsCache;
             PreloadListItemLinkedObjects = source.PreloadListItemLinkedObjects;
             MaintenanceAnalysisLimit = source.MaintenanceAnalysisLimit;

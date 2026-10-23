@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using redb.Core.Data;
 using redb.Core.Extensions;
@@ -130,4 +131,64 @@ public class PostgresSchemaUpgradeTests : SchemaUpgradeTestsBase
             """);
         return Convert.ToInt64(present) == 10;
     }
+
+    [Fact]
+    public async Task RootDuplicates_EmptyOnesRemoved_OneWithValuesWaitsForTheHandFix()
+    {
+        // A database written before the schema lock holds root fields twice. The module upgrade removes the empty
+        // copies (a nested class with its child among them), keeps the copy with values and leaves the unique key of
+        // root structures unbuilt with a warning; once the copy is resolved by hand, the next upgrade builds it.
+        await using var owner = Build(OwnerConnectionString, autoApply: true, cacheDomain: $"root-dup-{Guid.NewGuid():N}");
+        var redb = owner.GetRequiredService<redb.Core.IRedbService>();
+        await redb.InitializeAsync(ensureCreated: true);
+        var context = owner.GetRequiredService<IRedbContext>();
+        var scenario = await RootDuplicatesScenario.PlantAsync(redb, context);
+        try
+        {
+            var logs = new CollectingLoggerProvider();
+            await SetDeployedModuleVersionAsync("0.0.0-test");
+            await using (var sp = Build(OwnerConnectionString, autoApply: true, cacheDomain: $"root-dup-{Guid.NewGuid():N}", logs: logs))
+            {
+                var started = sp.GetRequiredService<redb.Core.IRedbService>();
+                await started.InitializeAsync(ensureCreated: true);
+                scenario.ShouldReportCountOnly(started, logs);
+            }
+
+            (await RootDuplicatesScenario.StructureExistsAsync(context, scenario.TitleDuplicate)).Should().BeFalse();
+            (await RootDuplicatesScenario.StructureExistsAsync(context, scenario.PartDuplicate)).Should().BeFalse();
+            (await RootDuplicatesScenario.StructureExistsAsync(context, scenario.PartDuplicateChild)).Should().BeFalse();
+            (await RootDuplicatesScenario.StructureExistsAsync(context, scenario.CountDuplicate)).Should().BeTrue("it holds a value");
+            (await RootKeyExistsAsync()).Should().BeFalse();
+
+            // A plain start, no module upgrade: the error again, the same list.
+            var again = new CollectingLoggerProvider();
+            await using (var sp = Build(OwnerConnectionString, autoApply: true, cacheDomain: $"root-dup-{Guid.NewGuid():N}", logs: again))
+            {
+                var started = sp.GetRequiredService<redb.Core.IRedbService>();
+                await started.InitializeAsync(ensureCreated: true);
+                scenario.ShouldReportCountOnly(started, again);
+            }
+
+            await scenario.ResolveByHandAsync(context);
+            await SetDeployedModuleVersionAsync("0.0.0-test");
+            await using (var sp = Build(OwnerConnectionString, autoApply: true, cacheDomain: $"root-dup-{Guid.NewGuid():N}"))
+            {
+                var started = sp.GetRequiredService<redb.Core.IRedbService>();
+                await started.InitializeAsync(ensureCreated: true);
+                started.SchemaProblems.Should().BeEmpty();
+            }
+            (await RootKeyExistsAsync()).Should().BeTrue();
+        }
+        finally
+        {
+            await context.ExecuteAsync($"DELETE FROM _objects WHERE _id = {scenario.ObjectId}");
+            await scenario.ResolveByHandAsync(context);
+            await context.ExecuteAsync(
+                $"CREATE UNIQUE INDEX IF NOT EXISTS \"{RootStructureKey.IndexName}\" ON _structures (_id_scheme, _name) WHERE _id_parent IS NULL");
+        }
+    }
+
+    private async Task<bool> RootKeyExistsAsync()
+        => await ScalarAdminAsync<object>(DatabaseName,
+            $"SELECT 1 FROM pg_indexes WHERE indexname = '{RootStructureKey.IndexName}'") != null;
 }

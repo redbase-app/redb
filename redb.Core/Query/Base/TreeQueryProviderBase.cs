@@ -351,6 +351,10 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
             {
                 return await ExecuteCountAsyncGeneric(constantExpr.Value, cancellationToken);
             }
+            else if (elementType == typeof(bool))
+            {
+                return await ExecuteAnyAsyncGeneric(constantExpr.Value, cancellationToken);
+            }
             else if (elementType.IsGenericType)
             {
                 var genericType = elementType.GetGenericTypeDefinition();
@@ -400,6 +404,51 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         }
 
         throw new NotSupportedException($"Unsupported context type: {contextType.Name}");
+    }
+
+    // ===== ANY QUERY EXECUTION =====
+
+    private async Task<bool> ExecuteAnyAsyncGeneric(object contextObj, CancellationToken cancellationToken)
+    {
+        var contextType = contextObj.GetType();
+        if (contextType.IsGenericType && contextType.GetGenericTypeDefinition() == typeof(TreeQueryContext<>))
+        {
+            // this.GetType(): the Pro provider overrides the method
+            var propsType = contextType.GetGenericArguments()[0];
+            var method = this.GetType().GetMethod(nameof(ExecuteTreeAnyAsync), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var genericMethod = method!.MakeGenericMethod(propsType);
+            return await (Task<bool>)genericMethod.Invoke(this, new object[] { contextObj, cancellationToken })!;
+        }
+
+        throw new NotSupportedException($"Unsupported context type for Any: {contextType.Name}");
+    }
+
+    /// <summary>
+    /// Is there at least one node the query returns (no Take or Skip: the queryable answers a page by its count).
+    /// The default is the count compared with zero; a provider that can stop at the first node overrides it.
+    /// </summary>
+    protected virtual async Task<bool> ExecuteTreeAnyAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken = default) where TProps : class, new()
+    {
+#pragma warning disable CS0618 // the count is the default answer until a provider overrides this
+        return await ExecuteTreeCountAsync(context, cancellationToken) > 0;
+#pragma warning restore CS0618
+    }
+
+    /// <summary>
+    /// The query cut to its first node, for <see cref="ExecuteTreeAnyAsync{TProps}"/>: Take 1, and neither the
+    /// ordering nor the distinct, which change which nodes come back but not whether any does.
+    /// </summary>
+    protected static TreeQueryContext<TProps> FirstNodeProbe<TProps>(TreeQueryContext<TProps> context) where TProps : class, new()
+    {
+        var probe = context.Clone();
+        probe.Orderings = [];
+        probe.IsDistinct = false;
+        probe.IsDistinctRedb = false;
+        probe.DistinctByField = null;
+        probe.DistinctByIsBaseField = false;
+        probe.Limit = 1;
+        probe.Offset = null;
+        return probe;
     }
 
     // ===== TOLIST QUERY EXECUTION =====
@@ -1211,13 +1260,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
 
         try
         {
-            // Use dialect-specific SQL for recursive CTE
-            var idsString = string.Join(",", filteredIds);
-            var sql = _sql.Query_GetIdsWithAncestorsSql(idsString);
-
-            var idsResult = await _context.QueryScalarListAsync<long>(sql, System.Array.Empty<object>(), cancellationToken);
-
-            return idsResult;
+            return await _context.QueryScalarListAsync<long>(_sql.Tree_SelectIdsWithAncestors(),
+                new object[] { filteredIds.ToArray(), redb.Core.Providers.Base.TreeProviderBase.MaxAncestorDepth }, cancellationToken);
         }
         catch (Exception ex)
         {

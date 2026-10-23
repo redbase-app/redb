@@ -20,7 +20,14 @@ public class E149_SelectProjection_ef : EfExampleBase
 
         var projected = await db.EmployeeProps
             .Take(100)
-            .Select(x => new { x._id, x.FirstName, x.Salary })
+            .Select(x => new
+            {
+                x._id,
+                x.FirstName,
+                x.Salary,
+                HomeCity = x.EmployeeProps_HomeAddress!.City,
+                HomeFloor = x.EmployeeProps_HomeAddress!.EmployeeProps_HomeAddress_Building!.Floor
+            })
             .ToListAsync();
 
         // OrderBy(_id) is EF's own need: with split queries and Take, every child query must pick the same rows.
@@ -32,8 +39,8 @@ public class E149_SelectProjection_ef : EfExampleBase
 
         var first = projected.FirstOrDefault();
         return Ok("E149_ef", "EF: Select - Projection", ExampleTier.Free, sw.ElapsedMilliseconds, projected.Count,
-            [$"Projected 3 fields: {sw.ElapsedMilliseconds - swFull.ElapsedMilliseconds}ms",
+            [$"Projected 5 fields, 2 of them nested: {sw.ElapsedMilliseconds - swFull.ElapsedMilliseconds}ms",
              $"Full load: {swFull.ElapsedMilliseconds}ms ({full.Count} objects)",
-             first != null ? $"First: {first.FirstName} ${first.Salary:N0}" : "No data"]);
+             first != null ? $"First: {first.FirstName} ${first.Salary:N0}, home {first.HomeCity}, floor {first.HomeFloor}" : "No data"]);
     }
 }

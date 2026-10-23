@@ -62,6 +62,63 @@ public class ClrSchemeTypeIndexAlcTests
         }
     }
 
+    // The whole assembly of the host's types loaded again into a collectible ALC (SqliteProModuleUnloadTests does
+    // exactly this), scanned while it lives, then unloaded.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference ScanHostAssemblyFromCollectibleAlc()
+    {
+        var alc = new AssemblyLoadContext("c1-host-copy", isCollectible: true);
+        var copy = alc.LoadFromAssemblyPath(typeof(NamingByTypeProps).Assembly.Location).GetType(typeof(NamingByTypeProps).FullName!)!;
+        copy.Should().NotBeSameAs(typeof(NamingByTypeProps));
+
+        // Scanned last, right before the unload: an assembly loaded after the scan would bring a rescan of its own,
+        // and that one would no longer see the copy. In a long run every assembly is long loaded and none comes.
+        var weak = new WeakReference(alc);
+        ClrSchemeTypeIndex.EnsureFresh();
+        alc.Unload();
+        return weak;
+    }
+
+    [Fact]
+    public void CopyInAnUnloadedAlc_LeavesTheNamesToTheLiveType()
+    {
+        // The scan let the copy overwrite the entries of the host's own type (same names, last write wins); once the
+        // copy was collected they resolved to null, though the host's type was alive. The order of the integration
+        // run decided whether ClrSchemeTypeIndex_ResolvesAliasToo came after such a module test and failed.
+        ClrSchemeTypeIndex.Clear();
+        try
+        {
+            // Everything the assertions load is loaded now, before the scan.
+            typeof(NamingByTypeProps).Should().Be(typeof(NamingByTypeProps));
+            false.Should().BeFalse();
+            ClrSchemeTypeIndex.EnsureFresh();
+
+            var weakAlc = ScanHostAssemblyFromCollectibleAlc();
+            var alive = true;
+            for (var i = 0; i < 15 && (alive = weakAlc.IsAlive); i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+
+            // As in a long run, where no assembly loads any more: whatever the runner loaded meanwhile on its own
+            // threads is taken as scanned, so the lookups below get no rescan from a load.
+            var index = typeof(ClrSchemeTypeIndex);
+            var generation = (long)index.GetField("_assemblyGeneration", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+            index.GetField("_scannedGeneration", BindingFlags.NonPublic | BindingFlags.Static)!.SetValue(null, generation);
+
+            var alias = ClrSchemeTypeIndex.Resolve("Именование: по типу");
+            var pinned = ClrSchemeTypeIndex.Resolve("naming.pinned");
+            alive.Should().BeFalse("precondition: the copy is gone");
+            alias.Should().Be(typeof(NamingByTypeProps), "the alias of the host's type");
+            pinned.Should().Be(typeof(NamingPinnedProps), "an explicit scheme name of the host's type");
+        }
+        finally
+        {
+            ClrSchemeTypeIndex.Clear();
+        }
+    }
+
     [Fact]
     public void SameTypeReloadedInNewAlc_IsNotReportedAsConflict()
     {

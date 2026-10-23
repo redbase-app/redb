@@ -66,7 +66,9 @@ public class E004_SubtreeAndElementKeys : ExampleBase
         // 5. Element keys, Scheme scope: a MAC address belongs to one device in the whole scheme,
         //    and the holder is found by the element value.
         var mac = $"02:{run[..2]}:{run[2..4]}:{run[4..6]}:00:01";
-        var epsilonId = await redb.SaveAsync(Device("epsilon", d => d.MacAddresses = [mac, $"02:{run[..2]}:00:00:00:02"]));
+        // The second address comes from the same run characters as the first: the key is unique across the
+        // scheme, and two characters alone (256 values) collide with earlier runs of this example.
+        var epsilonId = await redb.SaveAsync(Device("epsilon", d => d.MacAddresses = [mac, $"02:{run[..2]}:{run[2..4]}:{run[4..6]}:00:02"]));
         var macDup = await Rejected(() => redb.SaveAsync(Device("epsilon-dup", d => d.MacAddresses = [mac])));
         var byMac = await redb.GetByUniqueAsync<DeviceProps>(d => d.MacAddresses, mac);
 

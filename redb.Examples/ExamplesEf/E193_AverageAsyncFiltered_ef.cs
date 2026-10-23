@@ -17,10 +17,14 @@ public class E193_AverageAsyncFiltered_ef : EfExampleBase
 
         var avgSalaryMiddle = await db.EmployeeProps.Where(x => x.Age >= 30 && x.Age <= 40).AverageAsync(x => x.Salary);
         var avgSalaryAll = await db.EmployeeProps.AverageAsync(x => x.Salary);
+        var avgFloorLondon = await db.EmployeeProps
+            .Where(x => x.EmployeeProps_HomeAddress!.City == "London")
+            .AverageAsync(x => x.EmployeeProps_HomeAddress!.EmployeeProps_HomeAddress_Building!.Floor);
 
         sw.Stop();
 
         return Ok("E193_ef", "EF: AverageAsync - With Filter", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
-            [$"Age 30-40 AVG: {avgSalaryMiddle:N0}", $"All AVG: {avgSalaryAll:N0}"]);
+            [$"Age 30-40 AVG: {avgSalaryMiddle:N0}", $"All AVG: {avgSalaryAll:N0}",
+             $"London AVG(HomeAddress.Building.Floor): {avgFloorLondon:F2}"]);
     }
 }

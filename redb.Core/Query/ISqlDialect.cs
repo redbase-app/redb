@@ -237,6 +237,13 @@ public interface ISqlDialect
     /// Params: $1=objectId, $2=userId
     /// </summary>
     string Permissions_GetEffectiveForObject();
+
+    /// <summary>
+    /// The rows of <see cref="Permissions_GetEffectiveForObject"/> for many objects in one statement, by the same rule
+    /// (the same function or view), with object_id the requested id. An object may have no row, as with the single
+    /// query. Params: $1=objectIds (array), $2=userId
+    /// </summary>
+    string Permissions_GetEffectiveForObjects();
     
     /// <summary>
     /// SELECT readable object IDs for user. Params: $1=userId
@@ -581,6 +588,52 @@ public interface ISqlDialect
     /// </summary>
     string Structures_DeleteByIds(IEnumerable<long> ids);
 
+    // ============================================================
+    // === ROOT STRUCTURE KEY (Data.RootStructureKey) ===
+    // One root field name once per scheme: a partial unique index over the root rows on engines whose structure key
+    // counts two NULL parents as distinct (PostgreSQL 14+, SQLite). SQL Server counts NULLs as equal, so its structure
+    // key holds for root rows already: there Structures_RootKeyExists returns null and the other members of this
+    // group are not called (they throw NotSupportedException).
+    // ============================================================
+
+    /// <summary>
+    /// SELECT returning a row when the unique key of root structures exists. No params. <c>null</c>: the engine needs
+    /// no such key (SQL Server), and none of the members below applies.
+    /// </summary>
+    string? Structures_RootKeyExists();
+
+    /// <summary>CREATE the unique key of root structures. No params.</summary>
+    string Structures_CreateRootKey();
+
+    /// <summary>
+    /// SELECT the root structures whose (_id_scheme, _name) occurs more than once, as structure rows
+    /// (_id, _id_parent, _id_scheme, _name), ordered by scheme, name and id. No params.
+    /// </summary>
+    string Structures_SelectRootDuplicates();
+
+    /// <summary>
+    /// Locks a structure and every structure below it against writers until the transaction ends, so that a value
+    /// inserted into it meanwhile waits and then fails on the foreign key instead of being cascaded away by a delete.
+    /// Params: $1 = structure id. <c>null</c>: the engine has one writer at a time and the schema lock is that writer
+    /// (SQLite).
+    /// </summary>
+    string? Structures_LockSubtree();
+
+    /// <summary>
+    /// SELECT 1 when anything points to a structure or a structure below it (a value, an overriding structure and, with
+    /// <paramref name="withMigrations"/>, a record of <c>_migrations</c>), else 0. Params: $1 = structure id.
+    /// </summary>
+    string Structures_SubtreeIsReferenced(bool withMigrations);
+
+    /// <summary>DELETE the metadata cache rows of a structure and every structure below it. Params: $1 = structure id.</summary>
+    string Structures_DeleteSubtreeMetadataCache();
+
+    /// <summary>DELETE a structure; its children go by the cascade of _id_parent. Params: $1 = structure id.</summary>
+    string Structures_DeleteById();
+
+    /// <summary>SELECT the number of metadata cache rows of a scheme as BIGINT. Params: $1 = scheme id.</summary>
+    string Schemes_CountMetadataCache();
+
     /// <summary>
     /// UPDATE the unique-key flag, encoder version and element-key scope of a structure.
     /// Params: $1=unique (bool), $2=unique_version (long, nullable),
@@ -793,6 +846,29 @@ public interface ISqlDialect
     /// DELETE objects by IDs. Params: $1=objectIds (array)
     /// </summary>
     string Tree_DeleteObjectsByIds();
+
+    /// <summary>
+    /// The subtree under an object in one statement: every descendant down to a depth, as rows
+    /// (Id, IdParent, IdScheme, Depth; the children of the object have depth 1), ordered by _name, _id as the children
+    /// queries order them, so that the children of each parent come in that order. With a scheme, the walk keeps to
+    /// objects of that scheme (a child of another scheme and what hangs below it are not reached).
+    /// Params: $1=objectId, $2=schemeId or NULL for any scheme, $3=maxDepth. A cycle in _id_parent repeats rows up to
+    /// the depth; the caller detects it.
+    /// </summary>
+    string Tree_SelectSubtreeRows();
+
+    /// <summary>
+    /// An object and its ancestors in one statement, as rows (Id, IdParent, IdScheme, Depth; the object itself has
+    /// depth 0, its parent 1), ordered by depth. Params: $1=objectId, $2=maxDepth. A cycle repeats rows up to the
+    /// depth; the caller detects it.
+    /// </summary>
+    string Tree_SelectAncestorRows();
+
+    /// <summary>
+    /// The ids of the given objects and of all their ancestors, each once, in one statement (ToTreeListAsync,
+    /// ToRootListAsync, LoadWithParentsAsync). Params: $1=object ids (long[]), $2=maxDepth: how far up a chain is read.
+    /// </summary>
+    string Tree_SelectIdsWithAncestors();
     
     // ============================================================
     // === OBJECT STORAGE SQL ===
@@ -1331,14 +1407,6 @@ public interface ISqlDialect
     /// MSSQL: temp table + JSON_VALUE
     /// </summary>
     string Query_TreeCountWithParentIdsSql(string functionName);
-    
-    /// <summary>
-    /// SQL for getting all IDs with their ancestors using recursive CTE.
-    /// Used by ToTreeListAsync to build parent chains.
-    /// PostgreSQL: WITH RECURSIVE parent_chain AS (...)
-    /// MSSQL: WITH parent_chain AS (...)
-    /// </summary>
-    string Query_GetIdsWithAncestorsSql(string idsString);
     
     /// <summary>
     /// SQL for loading objects by IDs as JSON.

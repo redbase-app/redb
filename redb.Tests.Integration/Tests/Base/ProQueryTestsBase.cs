@@ -1,4 +1,5 @@
 using redb.Core;
+using redb.Core.Query;
 using redb.Tests.Integration.Helpers;
 using redb.Tests.Integration.Models;
 
@@ -166,5 +167,33 @@ public abstract class ProQueryTestsBase
 
         results.Should().AllSatisfy(r =>
             r.Props.LastName.Length.Should().BeGreaterThan(6));
+    }
+
+    [Fact]
+    public async Task DistinctBy_KeepsTheOrderingByTheKeyAndByAnotherField_PagesAndCounts()
+    {
+        // OrderByDescending(key).DistinctBy(key) came back ascending on SQLite and in no order on SQL Server, and an
+        // ordering by another Props field failed there ("pvt_cte.Salary"). Nine employees, three departments.
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        await Redb.SaveAsync(Enumerable.Range(0, 9)
+            .Select(i => TestDataFactory.CreateEmployee(i, salary: 100m * (i + 1), department: $"{tag}-D{i % 3}")).ToList());
+        IRedbQueryable<EmployeeProps> Tagged() => Redb.Query<EmployeeProps>().Where(e => e.Department.StartsWith(tag));
+        string D(int k) => $"{tag}-D{k}";
+        async Task<List<string>> Departments(IRedbQueryable<EmployeeProps> q) =>
+            (await q.ToListAsync()).Select(e => e.Props.Department).ToList();
+
+        (await Departments(Tagged().OrderByDescending(e => e.Department).DistinctBy(e => e.Department)))
+            .Should().Equal(new[] { D(2), D(1), D(0) }, "the key descending");
+        (await Departments(Tagged().OrderBy(e => e.Department).DistinctBy(e => e.Department)))
+            .Should().Equal(new[] { D(0), D(1), D(2) }, "the key ascending");
+        (await Departments(Tagged().OrderBy(e => e.Salary).DistinctBy(e => e.Department)))
+            .Should().Equal(new[] { D(0), D(1), D(2) }, "ordered by another field: DistinctBy sorts by its key first");
+        (await Departments(Tagged().Where(e => e.Salary > 700m).OrderByDescending(e => e.Department).DistinctBy(e => e.Department)))
+            .Should().Equal(new[] { D(2), D(1) }, "the filter keeps employees 8 and 9 only");
+        (await Departments(Tagged().OrderByDescending(e => e.Department).DistinctBy(e => e.Department).Skip(1).Take(1)))
+            .Should().Equal(new[] { D(1) }, "the page of the distinct rows");
+
+        (await Tagged().DistinctBy(e => e.Department).CountAsync()).Should().Be(3);
+        (await Tagged().Where(e => e.Salary > 700m).DistinctBy(e => e.Department).CountAsync()).Should().Be(2);
     }
 }

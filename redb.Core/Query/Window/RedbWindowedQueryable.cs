@@ -89,9 +89,12 @@ public class RedbWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
         var orderBy = ParseOrderBy();
         var frameJson = SerializeFrame();
 
-        // Use filterJson for preview (Pro handles this separately)
-        return await _provider.GetWindowSqlPreviewAsync(
-            _schemeId, selectFields, windowFuncs, partitionBy, orderBy, _filterJson, frameJson, _take, _skip, cancellationToken: cancellationToken);
+        // The same filter as SelectAsync: the preview is the SQL that runs.
+        return _filter != null
+            ? await _provider.GetWindowSqlPreviewAsync(
+                _schemeId, selectFields, windowFuncs, partitionBy, orderBy, _filter, frameJson, _take, _skip, cancellationToken: cancellationToken)
+            : await _provider.GetWindowSqlPreviewAsync(
+                _schemeId, selectFields, windowFuncs, partitionBy, orderBy, _filterJson, frameJson, _take, _skip, cancellationToken: cancellationToken);
     }
 
     private string? SerializeFrame()

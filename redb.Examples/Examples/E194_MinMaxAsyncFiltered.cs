@@ -29,12 +29,19 @@ public class E194_MinMaxAsyncFiltered : ExampleBase
         var minAll = await redb.Query<EmployeeProps>().MinAsync(x => x.Salary);
         var maxAll = await redb.Query<EmployeeProps>().MaxAsync(x => x.Salary);
 
+        // Filter and range on nested classes: home city one level deep, floor two levels deep
+        var berlin = redb.Query<EmployeeProps>()
+            .Where(x => x.HomeAddress!.City == "Berlin");
+        var minFloor = await berlin.MinAsync(x => x.HomeAddress!.Building!.Floor);
+        var maxFloor = await berlin.MaxAsync(x => x.HomeAddress!.Building!.Floor);
+
         sw.Stop();
 
         return Ok("E194", "MinMaxAsync - With Filter", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
         [
             $"Sales: {minSalary:N0} - {maxSalary:N0}",
-            $"All: {minAll:N0} - {maxAll:N0}"
+            $"All: {minAll:N0} - {maxAll:N0}",
+            $"Berlin HomeAddress.Building.Floor: {minFloor} - {maxFloor}"
         ]);
     }
 }

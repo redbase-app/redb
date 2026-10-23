@@ -11,7 +11,8 @@
     behind.
 
     Before a release is on nuget.org, pass -LocalFeed with the folder that holds the freshly built
-    redb.* packages: a nuget.config pointing at it is written next to the generated projects.
+    redb.* packages: a nuget.config pointing at it is written next to the generated projects, and the
+    restored packages go to <WorkDir>/packages instead of the global NuGet cache.
 
 .EXAMPLE
     ./smoke-templates.ps1 -PackagePath ../../nupkg/redb.Templates.4.2.1.nupkg -LocalFeed ../../nupkg
@@ -97,10 +98,18 @@ if ($LocalFeed) {
   </packageSources>
 </configuration>
 "@ | Set-Content -Path (Join-Path $WorkDir 'nuget.config') -Encoding utf8
+    # The packages restored from the local feed must not land in the global cache: there they would stand in
+    # for the published packages of the same version on every later restore of this machine. They go to a
+    # folder of the work directory, which the next run removes with it. Restored paths run to ~190
+    # characters below this folder, so a long -WorkDir hits MAX_PATH and the build loses its references.
+    $env:NUGET_PACKAGES = Join-Path $WorkDir 'packages'
 }
 
-# `dotnet new install` over an already installed pack of the same id replaces it.
-Invoke-Checked "dotnet new install" { dotnet new install $PackagePath --force }
+# `dotnet new install --force` over an installed pack of the same id adds a second entry instead of replacing
+# it, and every `dotnet new` of its templates then fails with "Sequence contains more than one matching
+# element" (exit 70). Every entry of the id goes first; it is redb.Templates, whichever source it came from.
+for ($i = 0; $i -lt 5; $i++) { dotnet new uninstall redb.Templates *> $null; if ($LASTEXITCODE -ne 0) { break } }
+Invoke-Checked "dotnet new install" { dotnet new install $PackagePath }
 
 function Wait-ForUrl([string] $url, [int] $TimeoutSeconds = 90) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -165,8 +174,10 @@ foreach ($case in $Cases) {
         if ($case.Web) {
             $projectDir = if ($case.WebProject -eq '.') { $out } else { Join-Path $out $case.WebProject }
             $env:ASPNETCORE_ENVIRONMENT = 'Development'
+            # -NoNewWindow: without it Windows gives the site a console window of its own, which pops up on the
+            # desktop of whoever runs the smoke. The output goes to the two logs either way.
             $site = Start-Process dotnet -ArgumentList @('run', '-c', 'Release', '--no-build', '--project', $projectDir) -PassThru `
-                -RedirectStandardOutput (Join-Path $out 'smoke.out.log') -RedirectStandardError (Join-Path $out 'smoke.err.log')
+                -NoNewWindow -RedirectStandardOutput (Join-Path $out 'smoke.out.log') -RedirectStandardError (Join-Path $out 'smoke.err.log')
             try {
                 $answer = Wait-ForUrl $case.Web
                 & $case.Assert $answer

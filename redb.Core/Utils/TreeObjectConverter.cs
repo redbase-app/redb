@@ -111,8 +111,10 @@ public static class TreeObjectConverter
             var treeType = typeof(TreeRedbObject<>).MakeGenericType(propsType);
             var treeObj = Activator.CreateInstance(treeType) as ITreeRedbObject;
 
-            // Copy base properties
-            if (treeObj is TreeRedbObject treeBase && source is RedbObject redbBase)
+            // Copy base properties. TreeRedbObject<TProps> derives from RedbObject<TProps>, not from TreeRedbObject:
+            // tested against TreeRedbObject, nothing was copied and every object came back with id 0, so
+            // LoadWithParentsAsync failed on the second object with "same key" while linking parents.
+            if (treeObj is RedbObject treeBase && source is RedbObject redbBase)
             {
                 CopyBaseProperties(redbBase, treeBase);
             }
@@ -182,7 +184,7 @@ public static class TreeObjectConverter
     /// <summary>
     /// Copy base properties from RedbObject to TreeRedbObject.
     /// </summary>
-    private static void CopyBaseProperties(RedbObject source, TreeRedbObject target)
+    private static void CopyBaseProperties(RedbObject source, RedbObject target)
     {
         target.id = source.id;
         target.parent_id = source.parent_id;
@@ -202,6 +204,7 @@ public static class TreeObjectConverter
         target.value_numeric = source.value_numeric;
         target.value_datetime = source.value_datetime;
         target.value_bytes = source.value_bytes;
+        target.value_unique = source.value_unique;
         target.name = source.name;
         target.note = source.note;
         target.hash = source.hash;

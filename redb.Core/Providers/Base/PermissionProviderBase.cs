@@ -253,11 +253,56 @@ public abstract class PermissionProviderBase : IPermissionProvider
     public virtual async Task<bool> CanUserSelectObject(long objectId, long userId, CancellationToken cancellationToken = default)
     {
         if (userId == 0) return true;
-        
+
         var permission = await GetEffectivePermissionViaSqlAsync(objectId, userId);
         if (permission == null)
             throw new InvalidOperationException($"Cannot get permissions for object {objectId} and user {userId}.");
         return permission.CanSelect;
+    }
+
+    /// <inheritdoc />
+    public virtual async Task<IReadOnlySet<long>> GetSelectableObjectIdsAsync(IReadOnlyCollection<long> objectIds, long userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (userId == 0) return objectIds.ToHashSet();
+
+        // The cache of the single check answers first; the rest is one query, by the same rule (Permissions_GetEffectiveForObjects),
+        // and lands in the same cache.
+        var now = DateTimeOffset.UtcNow;
+        var permissions = new Dictionary<long, UserPermissionResult>();
+        var missing = new List<long>();
+        foreach (var objectId in objectIds.Distinct())
+        {
+            Interlocked.Increment(ref _cacheRequests);
+            if (PermissionCache.TryGetValue(CacheKey(userId, objectId), out var cached) && now - cached.cachedAt <= CacheLifetime)
+            {
+                Interlocked.Increment(ref _cacheHits);
+                permissions[objectId] = cached.result;
+            }
+            else
+            {
+                missing.Add(objectId);
+            }
+        }
+
+        if (missing.Count > 0)
+        {
+            var rows = await Context.QueryAsync<UserPermissionResult>(
+                Sql.Permissions_GetEffectiveForObjects(), new object[] { missing.ToArray(), userId }, cancellationToken);
+            foreach (var row in rows)
+                if (permissions.TryAdd(row.ObjectId, row))   // the first row of an object, as the single query's LIMIT 1
+                    PermissionCache[CacheKey(userId, row.ObjectId)] = (row, now);
+        }
+
+        var selectable = new HashSet<long>();
+        foreach (var objectId in objectIds)
+        {
+            if (!permissions.TryGetValue(objectId, out var permission))
+                throw new InvalidOperationException($"Cannot get permissions for object {objectId} and user {userId}.");
+            if (permission.CanSelect)
+                selectable.Add(objectId);
+        }
+        return selectable;
     }
 
     /// <inheritdoc />

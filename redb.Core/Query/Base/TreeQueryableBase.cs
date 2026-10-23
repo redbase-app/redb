@@ -591,8 +591,14 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
 
     public override async Task<bool> AnyAsync(CancellationToken cancellationToken = default)
     {
-        var count = await CountAsync(cancellationToken: cancellationToken);
-        return count > 0;
+        // A paged query has rows only if the page has: Take(0) has none, Skip(n) only past the n-th.
+        if (IsPaged(_treeContext))
+            return await CountAsync(cancellationToken: cancellationToken) > 0;
+
+        // Asked of the provider as its own operation, as in the flat query: one that can stop at the first node does
+        // not count the whole subtree.
+        var result = await _treeProvider.ExecuteAsync(BuildCountExpression(), typeof(bool), cancellationToken: cancellationToken);
+        return (bool)result;
     }
 
     public override async Task<bool> AnyAsync(Expression<Func<TProps, bool>> predicate, CancellationToken cancellationToken = default)
@@ -636,7 +642,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var filteredIds = filteredObjects.Select(o => o.id).ToList();
 
         // 2. Get IDs of all parents to root
-        var allIds = await _treeProvider.GetIdsWithAncestorsAsync<TProps>(filteredIds);
+        var allIds = await _treeProvider.GetIdsWithAncestorsAsync<TProps>(filteredIds, cancellationToken);
 
         // 3. FIX: Calculate IDs of ONLY parents (that aren't already loaded)
         var parentIds = allIds.Except(filteredIds).ToList();
@@ -662,9 +668,11 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         // 6. Establish Parent/Children relationships
         BuildRelationshipsUntyped(allObjectsUntyped);
 
-        // 7. Return only filtered objects (filter by TProps type)
+        // 7. Return only filtered objects (filter by TProps type). A set: Contains on the list was a scan per object,
+        // quadratic over a large subtree.
+        var filteredIdSet = filteredIds.ToHashSet();
         var matchingByIdAndType = allObjectsUntyped
-            .Where(o => filteredIds.Contains(o.Id) && o is TreeRedbObject<TProps>)
+            .Where(o => filteredIdSet.Contains(o.Id) && o is TreeRedbObject<TProps>)
             .Cast<TreeRedbObject<TProps>>()
             .ToList();
 
@@ -686,7 +694,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         var filteredIds = filteredObjects.Select(o => o.id).ToList();
 
         // 2. Get IDs of all parents to root
-        var allIds = await _treeProvider.GetIdsWithAncestorsAsync<TProps>(filteredIds);
+        var allIds = await _treeProvider.GetIdsWithAncestorsAsync<TProps>(filteredIds, cancellationToken);
 
         // 3. FIX: Calculate IDs of ONLY parents (that aren't already loaded)
         var parentIds = allIds.Except(filteredIds).ToList();

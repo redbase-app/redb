@@ -4,7 +4,7 @@ using redb.Tests.Integration.Tests.Base;
 namespace redb.Tests.Integration.Tests.SqlitePro;
 
 [Collection("SqlitePro")]
-public class SqliteProTreeTests : TreeTestsBase
+public class SqliteProTreeTests : ProTreeTestsBase
 {
     public SqliteProTreeTests(SqliteProFixture fixture) : base(fixture.Redb) { }
 }

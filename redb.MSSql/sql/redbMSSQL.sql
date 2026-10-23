@@ -8,7 +8,10 @@
 -- Enable row-versioning for READ COMMITTED to eliminate reader/writer deadlocks
 DECLARE @dbname NVARCHAR(256) = DB_NAME();
 DECLARE @rcsi NVARCHAR(500) = N'ALTER DATABASE ' + QUOTENAME(@dbname) + N' SET READ_COMMITTED_SNAPSHOT ON;';
-EXEC sp_executesql @rcsi;
+-- Only when it is off: ALTER DATABASE waits until it is the only session in the database, and a script run again on
+-- a database in use (an upgrade, a second node) would wait for every other connection.
+IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = @dbname AND is_read_committed_snapshot_on = 1)
+    EXEC sp_executesql @rcsi;
 GO
 
 -- =====================================================

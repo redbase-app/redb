@@ -198,6 +198,14 @@ public class PostgreSqlDialect : ISqlDialect
     public string Permissions_GetEffectiveForObject() =>
         "SELECT * FROM get_user_permissions_for_object($1, $2)";
 
+    public string Permissions_GetEffectiveForObjects() =>
+        """
+        SELECT ids.id AS object_id, p.user_id, p.permission_source_id, p.permission_type, p._id_role, p._id_user,
+               p.can_select, p.can_insert, p.can_update, p.can_delete
+        FROM unnest($1::bigint[]) AS ids(id)
+        CROSS JOIN LATERAL get_user_permissions_for_object(ids.id, $2) p
+        """;
+
     public string Permissions_SelectReadableObjectIds() =>
         """
         SELECT DISTINCT object_id FROM v_user_permissions
@@ -585,6 +593,62 @@ public class PostgreSqlDialect : ISqlDialect
     public string Structures_DeleteByIds(IEnumerable<long> ids) =>
         $"DELETE FROM _structures WHERE _id IN ({string.Join(",", ids)})";
 
+    // === SCHEMA LOCK ===
+    // Not part of ISqlDialect: the lock runs on a connection of its own (RedbService.OpenSchemaLockAsync), outside the
+    // context. A session advisory lock, never waited for in the server (see RedbService.AdvisoryLock).
+
+    /// <summary>One attempt at the session advisory lock of the schema; returns a boolean. Params: $1 = key (bigint).</summary>
+    public string SchemaLock_TryAcquire() => "SELECT pg_try_advisory_lock($1)";
+
+    /// <summary>Releases the session advisory lock of the schema. Params: $1 = key (bigint).</summary>
+    public string SchemaLock_Release() => "SELECT pg_advisory_unlock($1)";
+
+    // === ROOT STRUCTURE KEY ===
+    // PostgreSQL 14 has no NULLS NOT DISTINCT: a partial unique index over the root rows.
+
+    private const string RootKeyName = "UX__structures__root";
+
+    // The structure $1 and every structure below it, as CTE t.
+    private const string SubtreeCte =
+        "WITH RECURSIVE t(_id) AS (SELECT _id FROM _structures WHERE _id = $1 " +
+        "UNION ALL SELECT c._id FROM _structures c JOIN t ON c._id_parent = t._id)";
+
+    public string? Structures_RootKeyExists() =>
+        $"SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND indexname = '{RootKeyName}'";
+
+    public string Structures_CreateRootKey() =>
+        $"CREATE UNIQUE INDEX \"{RootKeyName}\" ON _structures (_id_scheme, _name) WHERE _id_parent IS NULL";
+
+    public string Structures_SelectRootDuplicates() =>
+        """
+        SELECT s._id, s._id_parent, s._id_scheme, s._name
+        FROM _structures s
+        JOIN (SELECT _id_scheme, _name FROM _structures WHERE _id_parent IS NULL
+              GROUP BY _id_scheme, _name HAVING COUNT(*) > 1) d
+          ON d._id_scheme = s._id_scheme AND d._name = s._name
+        WHERE s._id_parent IS NULL
+        ORDER BY s._id_scheme, s._name, s._id
+        """;
+
+    public string? Structures_LockSubtree() =>
+        SubtreeCte + " SELECT s._id FROM _structures s JOIN t ON s._id = t._id FOR UPDATE OF s";
+
+    public string Structures_SubtreeIsReferenced(bool withMigrations) =>
+        SubtreeCte + " SELECT CASE WHEN " +
+        "EXISTS (SELECT 1 FROM _values v JOIN t ON v._id_structure = t._id) OR " +
+        "EXISTS (SELECT 1 FROM _structures o JOIN t ON o._id_override = t._id)" +
+        (withMigrations ? " OR EXISTS (SELECT 1 FROM _migrations m JOIN t ON m._structure_id = t._id)" : "") +
+        " THEN 1 ELSE 0 END";
+
+    public string Structures_DeleteSubtreeMetadataCache() =>
+        $"DELETE FROM _scheme_metadata_cache WHERE _structure_id IN ({SubtreeCte} SELECT _id FROM t)";
+
+    public string Structures_DeleteById() =>
+        "DELETE FROM _structures WHERE _id = $1";
+
+    public string Schemes_CountMetadataCache() =>
+        "SELECT COUNT(*)::bigint FROM _scheme_metadata_cache WHERE _scheme_id = $1";
+
     // ============================================================
     // === TYPES SQL ===
     // ============================================================
@@ -688,6 +752,55 @@ public class PostgreSqlDialect : ISqlDialect
 
     public string Tree_DeleteObjectsByIds() =>
         "DELETE FROM _objects WHERE _id = ANY($1)";
+
+    public string Tree_SelectSubtreeRows() =>
+        """
+        WITH RECURSIVE sub AS (
+            SELECT o._id, o._id_parent, o._id_scheme, o._name, 1 AS depth
+            FROM _objects o
+            WHERE o._id_parent = $1 AND ($2::bigint IS NULL OR o._id_scheme = $2::bigint)
+            UNION ALL
+            SELECT o._id, o._id_parent, o._id_scheme, o._name, s.depth + 1
+            FROM _objects o
+            JOIN sub s ON o._id_parent = s._id
+            WHERE s.depth < $3 AND ($2::bigint IS NULL OR o._id_scheme = $2::bigint)
+        )
+        SELECT _id AS Id, _id_parent AS IdParent, _id_scheme AS IdScheme, depth AS Depth
+        FROM sub
+        ORDER BY _name, _id
+        """;
+
+    public string Tree_SelectAncestorRows() =>
+        """
+        WITH RECURSIVE up AS (
+            SELECT o._id, o._id_parent, o._id_scheme, 0 AS depth
+            FROM _objects o
+            WHERE o._id = $1
+            UNION ALL
+            SELECT o._id, o._id_parent, o._id_scheme, u.depth + 1
+            FROM _objects o
+            JOIN up u ON o._id = u._id_parent
+            WHERE u.depth < $2
+        )
+        SELECT _id AS Id, _id_parent AS IdParent, _id_scheme AS IdScheme, depth AS Depth
+        FROM up
+        ORDER BY depth
+        """;
+
+    public string Tree_SelectIdsWithAncestors() =>
+        """
+        WITH RECURSIVE up AS (
+            SELECT o._id, o._id_parent, 0 AS depth
+            FROM _objects o
+            WHERE o._id = ANY($1)
+            UNION ALL
+            SELECT o._id, o._id_parent, u.depth + 1
+            FROM _objects o
+            JOIN up u ON o._id = u._id_parent
+            WHERE u.depth < $2
+        )
+        SELECT DISTINCT _id FROM up
+        """;
 
     // ============================================================
     // === OBJECT STORAGE SQL ===
@@ -1177,21 +1290,6 @@ public class PostgreSqlDialect : ISqlDialect
     /// </summary>
     public string Query_TreeCountWithParentIdsSql(string functionName) =>
         $"SELECT (result->>'total_count')::int as \"Value\" FROM {functionName}($1, $2, $3::jsonb, 1, 0, NULL::jsonb, $4, $5) as result";
-
-    /// <summary>
-    /// PostgreSQL: Get all IDs with their ancestors using recursive CTE.
-    /// </summary>
-    public string Query_GetIdsWithAncestorsSql(string idsString) =>
-        $@"WITH RECURSIVE parent_chain AS (
-            SELECT _id, _id_parent
-            FROM _objects
-            WHERE _id IN ({idsString})
-            UNION
-            SELECT o._id, o._id_parent
-            FROM _objects o
-            INNER JOIN parent_chain pc ON pc._id_parent = o._id
-        )
-        SELECT DISTINCT _id FROM parent_chain";
 
     /// <summary>
     /// PostgreSQL: Load objects by IDs as JSON using get_object_json function.

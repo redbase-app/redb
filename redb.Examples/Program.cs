@@ -614,6 +614,66 @@ class Program
             var fail = statuses.Count - ok - notSupported;
             Console.WriteLine($"  {platform,-20}: {ok} OK, {fail} FAIL, {notSupported} N/A (of {statuses.Count})");
         }
+
+        PrintAverageHistogram(allResults);
+    }
+
+    /// <summary>
+    /// Average time per platform as a bar chart, fastest first. Only the examples every platform finished with
+    /// OK and a time count, so each average is taken over the same set of tasks.
+    /// </summary>
+    private static void PrintAverageHistogram(List<RedbObject<ExampleResultProps>> results)
+    {
+        static bool Timed(PlatformResult? pr) =>
+            pr?.Time is > 0 && pr.Status?.StartsWith("OK", StringComparison.Ordinal) == true;
+
+        var platforms = results.SelectMany(r => r.Props?.Results?.Keys ?? Enumerable.Empty<string>()).Distinct().ToList();
+        var common = results
+            .Where(r => r.Props?.Results is { } byPlatform && platforms.All(p => Timed(byPlatform.GetValueOrDefault(p))))
+            .ToList();
+
+        if (common.Count == 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== AVERAGE TIME ===");
+            Console.WriteLine("  No example was finished by every platform.");
+            return;
+        }
+
+        var times = platforms.ToDictionary(p => p, p => common.Select(r => (double)r.Props!.Results![p].Time!.Value).Order().ToList());
+
+        // The mean follows the heavy examples (seeding, bulk inserts); the median shows the typical one.
+        PrintBars($"AVERAGE TIME, fastest first ({common.Count} examples finished by every platform)",
+            times.Select(t => (t.Key, t.Value.Average())));
+        PrintBars($"MEDIAN TIME, fastest first (same {common.Count} examples)",
+            times.Select(t => (t.Key, Median(t.Value))));
+    }
+
+    /// <summary>The middle value of an ordered list; the mean of the two middle values when the count is even.</summary>
+    private static double Median(List<double> ordered) => ordered.Count % 2 == 1
+        ? ordered[ordered.Count / 2]
+        : (ordered[ordered.Count / 2 - 1] + ordered[ordered.Count / 2]) / 2;
+
+    /// <summary>One bar per platform, shortest first: the fastest yellow, the slowest red.</summary>
+    private static void PrintBars(string title, IEnumerable<(string Platform, double Ms)> values)
+    {
+        var sorted = values.OrderBy(v => v.Ms).ToList();
+
+        Console.WriteLine();
+        Console.WriteLine($"=== {title} ===");
+
+        const int barWidth = 50;
+        var max = sorted[^1].Ms;
+        for (var i = 0; i < sorted.Count; i++)
+        {
+            var (platform, ms) = sorted[i];
+            var bar = new string('█', Math.Max(1, (int)Math.Round(ms / max * barWidth)));
+            Console.ForegroundColor = i == 0 ? ConsoleColor.Yellow
+                : i == sorted.Count - 1 ? ConsoleColor.Red
+                : ConsoleColor.Green;
+            Console.WriteLine($"  {platform,-20}: {bar} {ms:F0} ms");
+            Console.ResetColor();
+        }
     }
 
     private static void PrintResults(List<ExampleResult> results)

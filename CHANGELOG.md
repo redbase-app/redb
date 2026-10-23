@@ -25,6 +25,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Pending changes live in `changelog/unreleased/` until the release; `pwsh scripts/changelog.ps1 -Preview` shows them.
 
+## [4.4.2] — 2026-10-23
+
+### Changed
+
+- **`AnyAsync` over a tree stops at the first node.** `TreeQuery(...).AnyAsync()` used to count the whole subtree; Pro
+  now asks for one node. On PostgreSQL and SQLite a large subtree with matching nodes answers many times faster. Packages: `redb.Core`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **Tree services read a subtree in one query.** `LoadTreeAsync`, `GetDescendantsAsync`, `GetPathToRootAsync`, their
+  polymorphic forms, `DeleteSubtreeAsync` and the cycle check of `MoveObjectAsync` no longer query once per node: the
+  shape comes in one statement and the objects in one batch (11 thousand descendants: tens of seconds before). A cycle in
+  the parent links now raises an error naming the object instead of being walked to the depth limit. Packages: `redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`.
+- **`DistinctBy` over a tree is faster on SQL Server and SQLite.** On a subtree of 100 thousand nodes it takes about
+  2 s instead of 5 to 17 s on SQL Server and 1.6 s instead of 2.7 to 3.4 s on SQLite; on smaller subtrees SQLite answers
+  in a tenth of the time it took before. Packages: `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **A window over a large tree is several times faster on SQL Server.** The result is no longer built as one value on
+  the server before it is sent: a window over 100 thousand nodes takes about 5 s instead of 25 to 40 s. Packages: `redb.MSSql.Pro`.
+- **Window queries with `Take` are faster.** The window is computed over the fields it needs (partition, ordering,
+  function arguments, filter), and the other selected fields are read only for the rows returned: on 100 thousand objects
+  a ranked page of 50 takes about 210 ms instead of up to 1 s on SQL Server, and about half the time on PostgreSQL. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **A window over a tree honours `Take`, `Skip` and `OrderBy`.** `TreeQuery(...).OrderBy(...).Skip(...).Take(...).WithWindow(...)`
+  returned every node of the subtree; it now returns the requested page, in the requested order, with the window computed
+  over the whole filtered subtree. With `Take`, the selected fields the window does not need are read for the returned rows only. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+
+### Fixed
+
+- **PostgreSQL and SQLite keep one root field name per scheme.** A new unique index stops a root field being written
+  twice; existing databases get it at the next module upgrade (PostgreSQL) or start (SQLite), after empty duplicates are
+  removed. Duplicates holding values are logged as errors at every start and listed by `IRedbService.SchemaProblems`;
+  `IRedbService.CheckSchemaAsync()` looks again without a restart. Packages: `redb.Core`, `redb.Postgres`, `redb.Postgres.Pro`, `redb.SQLite`, `redb.SQLite.Pro`. Upgrade: [UPGRADING.md](UPGRADING.md#duplicate-root-structures).
+- **Nodes sharing one database no longer fail on each other's schema work.** Creating the schema, deploying the SQL
+  module, building the Pro indexes, upgrading a SQLite file and every scheme sync that has something to write (at start-up
+  or at run time) now run under a schema lock: one node writes, the others wait (`SchemaLockTimeout`, 15 minutes by
+  default) and find it done. A database already in step takes no lock, so limited logins keep starting as before. Packages: `redb.Core`, `redb.Postgres`, `redb.Postgres.Pro`, `redb.MSSql`, `redb.MSSql.Pro`, `redb.SQLite`, `redb.SQLite.Pro`.
+- **The SQL preview of a window query shows its filter.** `ToSqlStringAsync` of `WithWindow(...)` after `Where(...)`
+  returned the SQL without the filter; it now returns the statement `SelectAsync` runs. Packages: `redb.Core`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **`ToTreeListAsync`, `ToRootListAsync` and `LoadWithParentsAsync` work on SQL Server trees deeper than 100 levels.**
+  Reading the ancestors stopped there with a recursion limit error; the object ids now also go to the server as a
+  parameter instead of being written into the statement. Packages: `redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`.
+- **`LoadWithParentsAsync` works for an object that has a parent.** It failed with "An item with the same key has already
+  been added" whenever an ancestor was loaded along with the object. Packages: `redb.Core`.
+- **A scheme keeps its CLR type after a module that carried the same types unloads.** When a collectible
+  `AssemblyLoadContext` loaded a copy of an assembly the host also uses and was then unloaded, the host's schemes of that
+  assembly could no longer be matched to their types by name: polymorphic loads read such objects without their Props type. Packages: `redb.Core`.
+- **`DistinctBy` keeps the ordering of the query on SQL Server and SQLite.** `OrderByDescending(x => x.Key).DistinctBy(x => x.Key)`
+  came back ascending on SQLite and in no order on SQL Server, and an ordering by another field, as in
+  `OrderBy(x => x.Salary).DistinctBy(x => x.Department)`, failed with "pvt_cte" in the error. Packages: `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **`CountAsync` after `DistinctBy` counts the distinct keys.** `Query<T>().DistinctBy(x => x.Key).CountAsync()` counted
+  every object, not one per key. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **Several tree filters in one query all apply.** Only the first of `WhereChildrenOf`, `WhereRoots`, `WhereLeaves` and
+  `WhereDescendantsOf` was used and the others were silently dropped: `WhereChildrenOf(a).WhereLeaves()` returned every
+  child of `a`. Each filter now narrows the result, in any order. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **`Win.Ntile(n)` over a tree uses `n`.** A window over a tree always split the rows into 4 buckets, whatever was asked. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **`DistinctBy` over a tree keeps the direction of the ordering by its key on SQLite.**
+  `OrderByDescending(x => x.Key).DistinctBy(x => x.Key)` returned the rows in ascending order. Packages: `redb.SQLite.Pro`.
+
 ## [4.4.1] — 2026-10-21
 
 ### Changed

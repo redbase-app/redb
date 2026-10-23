@@ -4,7 +4,7 @@ using redb.Tests.Integration.Tests.Base;
 namespace redb.Tests.Integration.Tests.PostgresPro;
 
 [Collection("PostgresPro")]
-public class PostgresProWindowTests : WindowTestsBase
+public class PostgresProWindowTests : ProWindowTestsBase
 {
     public PostgresProWindowTests(PostgresProFixture fixture) : base(fixture.Redb) { }
 }

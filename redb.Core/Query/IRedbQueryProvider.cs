@@ -177,7 +177,28 @@ public interface IRedbQueryProvider
         int? take = null,
         int? skip = null,
         CancellationToken cancellationToken = default);
-    
+
+    /// <summary>
+    /// Get SQL preview for window query with FilterExpression (Pro version): the SQL that
+    /// <see cref="ExecuteWindowQueryAsync(long, IEnumerable{Window.WindowFieldRequest}, IEnumerable{Window.WindowFuncRequest}, IEnumerable{Window.WindowFieldRequest}, IEnumerable{Window.WindowOrderRequest}, QueryExpressions.FilterExpression?, string?, int?, int?, CancellationToken)"/>
+    /// runs for the same arguments.
+    /// </summary>
+    Task<string> GetWindowSqlPreviewAsync(
+        long schemeId,
+        IEnumerable<Window.WindowFieldRequest> selectFields,
+        IEnumerable<Window.WindowFuncRequest> windowFuncs,
+        IEnumerable<Window.WindowFieldRequest> partitionBy,
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        QueryExpressions.FilterExpression? filter,
+        string? frameJson = null,
+        int? take = null,
+        int? skip = null,
+        CancellationToken cancellationToken = default)
+        // A default body keeps implementations outside redb compiling; QueryProviderBase overrides it.
+        => throw new NotSupportedException(
+            $"{GetType().Name} has no SQL preview of a window query with a FilterExpression; implement this overload " +
+            "of GetWindowSqlPreviewAsync.");
+
     // ===== GROUPED WINDOW (GroupBy + Window Functions) =====
     
     /// <summary>

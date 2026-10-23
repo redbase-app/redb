@@ -24,7 +24,9 @@ public class E149_SelectProjection : ExampleBase
             {
                 x.id,
                 x.Props.FirstName,
-                x.Props.Salary
+                x.Props.Salary,
+                HomeCity = x.Props.HomeAddress!.City,
+                HomeFloor = x.Props.HomeAddress!.Building!.Floor
             })
             .ToListAsync();
 
@@ -38,8 +40,8 @@ public class E149_SelectProjection : ExampleBase
         var first = projected.FirstOrDefault();
 
         return Ok("E149", "Select - Projection", ExampleTier.Free, sw.ElapsedMilliseconds, projected.Count,
-            [$"Projected 3 fields: {sw.ElapsedMilliseconds}ms",
+            [$"Projected 5 fields, 2 of them nested: {sw.ElapsedMilliseconds}ms",
              $"Full load 20+ fields: {swFull.ElapsedMilliseconds}ms",
-             first != null ? $"First: {first.FirstName} ${first.Salary:N0}" : "No data"]);
+             first != null ? $"First: {first.FirstName} ${first.Salary:N0}, home {first.HomeCity}, floor {first.HomeFloor}" : "No data"]);
     }
 }

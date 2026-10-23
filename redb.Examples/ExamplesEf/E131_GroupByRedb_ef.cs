@@ -19,14 +19,27 @@ public class E131_GroupByRedb_ef : EfExampleBase
         await using var db = await contexts.CreateDbContextAsync();
 
         var byOwner = await db.EmployeeProps
-            .GroupBy(e => e.objects._id_owner)
-            .Select(g => new { OwnerId = g.Key, TotalSalary = g.Sum(e => e.Salary), Count = g.Count() })
+            .Select(e => new
+            {
+                e.objects._id_owner,
+                e.Salary,
+                Floor = e.EmployeeProps_HomeAddress!.EmployeeProps_HomeAddress_Building!.Floor
+            })
+            .GroupBy(e => e._id_owner)
+            .Select(g => new
+            {
+                OwnerId = g.Key,
+                TotalSalary = g.Sum(e => e.Salary),
+                AvgFloor = g.Average(e => e.Floor),
+                Count = g.Count()
+            })
             .ToListAsync();
 
         sw.Stop();
 
         var first = byOwner.FirstOrDefault();
         return Ok("E131_ef", "EF: GroupByRedb - Base Fields", ExampleTier.Free, sw.ElapsedMilliseconds, byOwner.Count,
-            ["SQL: GROUP BY objects._id_owner (join to the header)", $"Groups: {byOwner.Count}, First owner: {first?.OwnerId ?? 0}"]);
+            ["SQL: GROUP BY objects._id_owner (join to the header)", $"Groups: {byOwner.Count}, First owner: {first?.OwnerId ?? 0}",
+             $"Avg home floor of the first owner: {first?.AvgFloor:F2}"]);
     }
 }

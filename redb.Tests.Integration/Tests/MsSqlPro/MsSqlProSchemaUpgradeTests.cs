@@ -17,6 +17,7 @@ public class MsSqlProSchemaUpgradeTests : redb.Tests.Integration.Tests.MsSql.MsS
     protected override string DatabaseName => "redb_upgrade_pro";
     protected override string FreshDatabaseName => "redb_upgrade_pro_fresh";
     protected override string RestrictedLogin => "redb_noddl_pro";
+    protected override string ContainedDatabaseName => "redb_upgrade_pro_contained";
 
     protected override void AddRedbServices(IServiceCollection services, Action<RedbOptionsBuilder> configure)
         => services.AddRedbPro(configure);

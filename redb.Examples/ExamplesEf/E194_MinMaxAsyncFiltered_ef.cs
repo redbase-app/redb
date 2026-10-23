@@ -20,13 +20,17 @@ public class E194_MinMaxAsyncFiltered_ef : EfExampleBase
         var maxSalary = await sales.MaxAsync(x => x.Salary);
         var minAll = await db.EmployeeProps.MinAsync(x => x.Salary);
         var maxAll = await db.EmployeeProps.MaxAsync(x => x.Salary);
+        var berlin = db.EmployeeProps.Where(x => x.EmployeeProps_HomeAddress!.City == "Berlin");
+        var minFloor = await berlin.MinAsync(x => x.EmployeeProps_HomeAddress!.EmployeeProps_HomeAddress_Building!.Floor);
+        var maxFloor = await berlin.MaxAsync(x => x.EmployeeProps_HomeAddress!.EmployeeProps_HomeAddress_Building!.Floor);
 
         sw.Stop();
 
         return Ok("E194_ef", "EF: MinMaxAsync - With Filter", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
         [
             $"Sales: {minSalary:N0} - {maxSalary:N0}",
-            $"All: {minAll:N0} - {maxAll:N0}"
+            $"All: {minAll:N0} - {maxAll:N0}",
+            $"Berlin HomeAddress.Building.Floor: {minFloor} - {maxFloor}"
         ]);
     }
 }

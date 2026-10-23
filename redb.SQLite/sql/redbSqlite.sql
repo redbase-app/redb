@@ -498,6 +498,9 @@ CREATE INDEX IF NOT EXISTS "IX__objects__value_numeric"  ON _objects (_value_num
 -- constraint IX__dependencies (_id_scheme_1, _id_scheme_2). The index on _id_scheme_2 below stays.
 CREATE INDEX IF NOT EXISTS "IX__dependencies__schemes_2" ON _dependencies (_id_scheme_2);
 CREATE INDEX IF NOT EXISTS "IX__structures__structures"  ON _structures (_id_parent);
+-- One root field name once per scheme: IX__structures counts two NULL parents as distinct. Existing files get it from
+-- RootStructureKey (redb.Core) in the upgrade pass at start-up.
+CREATE UNIQUE INDEX IF NOT EXISTS "UX__structures__root" ON _structures (_id_scheme, _name) WHERE _id_parent IS NULL;
 CREATE INDEX IF NOT EXISTS "IX__structures__schemes"     ON _structures (_id_scheme);
 CREATE INDEX IF NOT EXISTS "IX__structures__types"       ON _structures (_id_type);
 CREATE INDEX IF NOT EXISTS "IX__structures__lists"       ON _structures (_id_list);

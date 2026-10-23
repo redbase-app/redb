@@ -156,6 +156,66 @@ public class MsSqlSchemaUpgradeTests : SchemaUpgradeTestsBase
         }
     }
 
+    protected virtual string ContainedDatabaseName => "redb_upgrade_contained";
+    private const string ContainedUser = "redb_contained";
+    private const string ContainedPassword = "Contained!12345";
+
+    [Fact]
+    public async Task ContainedUser_DeployedDatabase_Starts_AndSchemaWorkNamesTheWayOut()
+    {
+        // The DBA scenario: the schema is deployed by a privileged login, the application connects as a user of the
+        // database alone, with no access to master where the schema lock lives. A database in step needs no lock, so
+        // the start goes through; schema work stops with an error that names both ways out.
+        // A server setting, not the test's to change: checked, and a server without it fails the test loudly.
+        var containedAuth = await ScalarAdminAsync<object>("master",
+            "SELECT CAST(value_in_use AS int) FROM sys.configurations WHERE name = 'contained database authentication'");
+        Convert.ToInt32(containedAuth).Should().Be(1,
+            "this test needs contained database authentication on the test server; enable it once with " +
+            "EXEC sp_configure 'contained database authentication', 1; RECONFIGURE;");
+
+        await ExecAdminAsync("master",
+            $"IF DB_ID(N'{ContainedDatabaseName}') IS NOT NULL BEGIN " +
+            $"ALTER DATABASE [{ContainedDatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; " +
+            $"DROP DATABASE [{ContainedDatabaseName}]; END");
+        await ExecAdminAsync("master", $"CREATE DATABASE [{ContainedDatabaseName}] CONTAINMENT = PARTIAL");
+
+        var ownerCs = new SqlConnectionStringBuilder(AdminBase) { InitialCatalog = ContainedDatabaseName }.ConnectionString;
+        await using (var sp = Build(ownerCs, autoApply: true, cacheDomain: $"contained-owner-{Guid.NewGuid():N}"))
+            await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+
+        await ExecAdminAsync(ContainedDatabaseName, $"""
+            CREATE USER [{ContainedUser}] WITH PASSWORD = '{ContainedPassword}';
+            ALTER ROLE db_datareader ADD MEMBER [{ContainedUser}];
+            ALTER ROLE db_datawriter ADD MEMBER [{ContainedUser}];
+            GRANT EXECUTE TO [{ContainedUser}];
+            """);
+        var userCs = new SqlConnectionStringBuilder(AdminBase)
+        {
+            InitialCatalog = ContainedDatabaseName, UserID = ContainedUser, Password = ContainedPassword
+        }.ConnectionString;
+
+        var openMaster = async () =>
+        {
+            await using var master = new SqlConnection(new SqlConnectionStringBuilder(userCs) { InitialCatalog = "master" }.ConnectionString);
+            await master.OpenAsync();
+        };
+        await openMaster.Should().ThrowAsync<SqlException>("the user exists in its database only");
+
+        await using (var sp = Build(userCs, autoApply: true, cacheDomain: $"contained-user-{Guid.NewGuid():N}"))
+            await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+
+        await ExecAdminAsync(ContainedDatabaseName, """
+            ALTER FUNCTION dbo.pvt_module_version() RETURNS nvarchar(50) WITH SCHEMABINDING
+            AS BEGIN RETURN N'0.0.0-test'; END
+            """);
+        await using (var sp = Build(userCs, autoApply: true, cacheDomain: $"contained-user-{Guid.NewGuid():N}"))
+        {
+            var start = () => sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+            (await start.Should().ThrowAsync<InvalidOperationException>())
+                .Which.Message.Should().Contain("access to master").And.Contain("GetUpgradeScript");
+        }
+    }
+
     [Fact]
     public async Task Upgrade_RefusesToNarrowValueString_WhileLongValuesExist()
     {

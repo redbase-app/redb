@@ -5,6 +5,36 @@ unfolding redb objects into ordinary relational tables.
 
 ## Installation
 
+Two ways: a standalone executable that needs no .NET on the machine, or a .NET tool.
+
+### Standalone executable
+
+Every release of [redbase-app/redb](https://github.com/redbase-app/redb/releases) carries the CLI as one
+self-contained file for `win-x64`, `linux-x64` and `linux-arm64`, signed with cosign:
+
+```bash
+VER=4.4.1
+BASE=https://github.com/redbase-app/redb/releases/download/v$VER
+curl -LO $BASE/redb-cli-$VER-linux-x64.tar.gz
+curl -LO $BASE/redb-cli-$VER-linux-x64.tar.gz.bundle
+curl -LO $BASE/cosign.pub
+
+# Check the signature (https://docs.sigstore.dev/cosign/system_config/installation/)
+cosign verify-blob --key cosign.pub --bundle redb-cli-$VER-linux-x64.tar.gz.bundle redb-cli-$VER-linux-x64.tar.gz
+
+tar -xzf redb-cli-$VER-linux-x64.tar.gz
+sudo install -m 755 redb /usr/local/bin/redb
+redb --version
+```
+
+On Windows take `redb-cli-<version>-win-x64.zip` and its `.bundle`, check it the same way, unpack it and put the
+folder with `redb.exe` on `PATH`. `checksums.txt` of the release lists the SHA-256 of every archive.
+
+The CLI works on the schema and the data directly, so it does not need the native SQLite extension that
+applications on `redb.SQLite` load.
+
+### .NET tool
+
 **Requires the .NET 10 runtime.** From 3.7.1 the tool targets `net10.0`; earlier versions targeted
 `net8.0` and installed on any .NET 8 or newer runtime. Roll-forward only moves up, never down, so a
 machine carrying only .NET 8 or .NET 9 cannot install this version — install .NET 10 there.

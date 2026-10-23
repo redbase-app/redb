@@ -218,7 +218,13 @@ public abstract class RedbServiceBase : IRedbService
         
         // Create providers using abstract factory methods (passing cacheDomain)
         _schemeSync = CreateSchemeSyncProvider(_context, _configuration, _cacheDomain, _logger);
-        _permissionProvider = CreatePermissionProvider(_context, _securityContext, _logger);
+        // A scheme sync that has to write takes the schema lock of this service (see SchemeSyncProviderBase).
+        if (_schemeSync is Providers.Base.SchemeSyncProviderBase schemeSyncBase)
+        {
+            schemeSyncBase.RunUnderSchemaLock = RunUnderSchemaLockAsync;
+            schemeSyncBase.SchemaProblemFound = ReportSchemaProblem;
+        }
+        _permissionProvider =CreatePermissionProvider(_context, _securityContext, _logger);
         // Permission cache keys carry the database: ids are per database (review 2026-09-24, C-1).
         if (_permissionProvider is Providers.Base.PermissionProviderBase permissionBase)
             permissionBase.CacheDomain = _cacheDomain;
@@ -1066,10 +1072,12 @@ public abstract class RedbServiceBase : IRedbService
         //    (by name: a static closure over this service kept it alive for the life of the process).
         SystemTextJsonRedbSerializer.SetInitializedDomain(_cacheDomain);
         
-        // 2. Sync all schemes with RedbSchemeAttribute
-        await AutoSyncSchemesAsync(assemblies);
+        // 1a. Problems of the schema that need a person: logged as errors at every start, listed by SchemaProblems.
+        await CheckSchemaCoreAsync(logAll: true, CancellationToken.None);
 
-        // 3. Sync UserConfigurationProps scheme
+        // 2-3. Sync all schemes with RedbSchemeAttribute, then the UserConfigurationProps scheme. Each sync takes the
+        //      schema lock itself, and only when it has something to write: a start with nothing changed takes no lock.
+        await AutoSyncSchemesAsync(assemblies);
         await SyncSchemeAsync<Models.Configuration.UserConfigurationProps>();
 
         // 4. Initialize default user configuration
@@ -1146,25 +1154,194 @@ public abstract class RedbServiceBase : IRedbService
                 "(redb.Postgres/sql/v2-pvt/*.sql for PostgreSQL or redb.MSSql/sql/v2-pvt/pvt_bundle.sql for SQL Server).");
         }
 
-        _logger?.LogInformation(
-            "v2-pvt module {State} (deployed='{Deployed}', required='{Required}'); applying embedded bundle...",
-            string.IsNullOrEmpty(deployed) ? "missing" : "out of date",
-            deployed ?? "<none>", required);
+        // Under the schema lock, and the version asked again under it: another node that met the same old database
+        // may have deployed the bundle while this one waited.
+        await using (await AcquireSchemaLockAsync())
+        {
+            deployed = await ReadPvtModuleVersionAsync(versionFn);
+            if (string.Equals(deployed, required, StringComparison.Ordinal))
+            {
+                _logger?.LogInformation("v2-pvt module {Required} was deployed by another process while this one waited.", required);
+                return;
+            }
 
+            _logger?.LogInformation(
+                "v2-pvt module {State} (deployed='{Deployed}', required='{Required}'); applying embedded bundle...",
+                string.IsNullOrEmpty(deployed) ? "missing" : "out of date",
+                deployed ?? "<none>", required);
+
+            try
+            {
+                await ExecuteSchemaScriptAsync(bundleSql);
+            }
+            catch (Exception ex) when (Data.DbErrorClassifier.IsInsufficientPrivilege(ex))
+            {
+                // The connected role may run the application but not change the schema: the DBA granted
+                // owner rights for the initial installation and took them back. That is a supported
+                // deployment, not a fault, and it deserves an instruction rather than a driver error.
+                // Any other failure of the bundle propagates as is — it is a defect, not a policy.
+                throw new Exceptions.RedbSchemaOutdatedException(DatabaseTypeName, deployed, required, cause: ex);
+            }
+            catch (Exception ex)
+            {
+                // A process that does not take the schema lock (a build before it) finished the same bundle meanwhile.
+                // The database is at the required version, which is all start-up needs. Anything else is a defect.
+                if (!string.Equals(await TryReadPvtModuleVersionAsync(versionFn), required, StringComparison.Ordinal))
+                    throw;
+                _logger?.LogWarning(ex, "v2-pvt module bundle failed, but the database reports the required version {Required}: " +
+                    "another process deployed it concurrently. Start-up goes on.", required);
+                return;
+            }
+
+            _logger?.LogInformation("v2-pvt module bundle applied.");
+
+            // With every module upgrade, under the same lock.
+            await EnsureRootStructureKeyAsync();
+        }
+    }
+
+    // The list lives per database (SchemaProblemRegistry), not per instance: the service is scoped, and the instance of
+    // a health check is not the one that ran the start.
+
+    /// <inheritdoc />
+    public IReadOnlyList<Models.RedbSchemaProblem> SchemaProblems => SchemaProblemRegistry.Get(_cacheDomain);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Models.RedbSchemaProblem>> CheckSchemaAsync(CancellationToken cancellationToken = default)
+        // Asked again (a health check): only problems new to the database are logged.
+        => CheckSchemaCoreAsync(logAll: false, cancellationToken);
+
+    private async Task<IReadOnlyList<Models.RedbSchemaProblem>> CheckSchemaCoreAsync(bool logAll, CancellationToken cancellationToken)
+    {
+        var found = new List<Models.RedbSchemaProblem>();
+        if (await IsRootStructureKeyMissingAsync())
+            found.AddRange(await Data.RootStructureKey.FindDuplicatesAsync(_context, SqlDialect, cancellationToken));
+        return SchemaProblemRegistry.Replace(_cacheDomain, found, logAll, _logger);
+    }
+
+    /// <summary>A problem met by a scheme sync: logged and listed unless already known for the database.</summary>
+    private void ReportSchemaProblem(Models.RedbSchemaProblem problem)
+        => SchemaProblemRegistry.Report(_cacheDomain, problem, _logger);
+
+    /// <summary>
+    /// Whether the engine needs the unique key of root structures (<see cref="Data.RootStructureKey"/>) and the
+    /// database lacks it. False on SQL Server, whose structure key holds for root rows already.
+    /// </summary>
+    protected async Task<bool> IsRootStructureKeyMissingAsync()
+    {
+        var existsSql = SqlDialect.Structures_RootKeyExists();
+        return existsSql != null && await _context.ExecuteScalarAsync<object>(existsSql) == null;
+    }
+
+    /// <summary>
+    /// Builds the unique key of root structures when it is missing, removing empty duplicates first. Called under the
+    /// schema lock: by the module pass after the bundle (PostgreSQL), by the upgrade pass of the file (SQLite).
+    /// </summary>
+    protected async Task EnsureRootStructureKeyAsync()
+    {
+        if (!await IsRootStructureKeyMissingAsync())
+            return;
+
+        await Data.RootStructureKey.EnsureAsync(_context, SqlDialect, await TableExistsAsync("_migrations"), _logger);
+    }
+
+    private async Task<string?> ReadPvtModuleVersionAsync(string versionFn)
+    {
         try
         {
-            await ExecuteSchemaScriptAsync(bundleSql);
+            return await _context.ExecuteScalarAsync<string>($"SELECT {versionFn}()");
         }
-        catch (Exception ex) when (Data.DbErrorClassifier.IsInsufficientPrivilege(ex))
+        catch (Exception ex) when (Data.DbErrorClassifier.IsUndefinedFunction(ex))
         {
-            // The connected role may run the application but not change the schema: the DBA granted
-            // owner rights for the initial installation and took them back. That is a supported
-            // deployment, not a fault, and it deserves an instruction rather than a driver error.
-            // Any other failure of the bundle propagates as is — it is a defect, not a policy.
-            throw new Exceptions.RedbSchemaOutdatedException(DatabaseTypeName, deployed, required, cause: ex);
+            return null;
+        }
+    }
+
+    private async Task<string?> TryReadPvtModuleVersionAsync(string versionFn)
+    {
+        try
+        {
+            return await ReadPvtModuleVersionAsync(versionFn);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    // === SCHEMA LOCK ===
+
+    /// <summary>
+    /// The schema lock of this database, not yet taken (see <see cref="Data.SchemaLockHandle"/>). A provider that has
+    /// no way to lock returns a handle that always succeeds.
+    /// </summary>
+    protected abstract Task<Data.SchemaLockHandle> OpenSchemaLockAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Takes the schema lock, waiting while another process holds it: one attempt every half second, a line in the log
+    /// when the wait starts and every thirty seconds after, <see cref="Exceptions.RedbSchemaLockTimeoutException"/>
+    /// past <see cref="RedbServiceConfiguration.SchemaLockTimeout"/>. The work done under it asks its own precondition
+    /// again: the process that held the lock has usually done it already. Disposing releases the lock.
+    /// </summary>
+    protected async Task<IAsyncDisposable> AcquireSchemaLockAsync(CancellationToken cancellationToken = default)
+    {
+        // Asked again inside work already under the lock (RunUnderSchemaLockAsync), the lock is already this flow's:
+        // a second one on a connection of its own would wait for the first.
+        if (_holdsSchemaLock.Value)
+            return Data.SchemaLockHandle.None;
+
+        var handle = await OpenSchemaLockAsync(cancellationToken);
+        try
+        {
+            var timeout = _configuration.SchemaLockTimeout;
+            var waited = System.Diagnostics.Stopwatch.StartNew();
+            var nextReport = TimeSpan.Zero;
+            while (!await handle.TryAcquireAsync(cancellationToken))
+            {
+                if (waited.Elapsed >= timeout)
+                    throw new Exceptions.RedbSchemaLockTimeoutException(DatabaseTypeName, handle.Name, waited.Elapsed);
+                if (waited.Elapsed >= nextReport)
+                {
+                    _logger?.LogInformation(
+                        "The schema lock '{Lock}' is held by another process, most likely upgrading this database; " +
+                        "waiting ({Waited:mm\\:ss} of {Timeout}).", handle.Name, waited.Elapsed, timeout);
+                    nextReport = waited.Elapsed + TimeSpan.FromSeconds(30);
+                }
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+            }
+            if (waited.Elapsed > TimeSpan.FromSeconds(1))
+                _logger?.LogInformation("The schema lock '{Lock}' taken after {Waited:mm\\:ss}.", handle.Name, waited.Elapsed);
+            return handle;
+        }
+        catch
+        {
+            await handle.DisposeAsync();
+            throw;
+        }
+    }
+
+    // True in the flow of work running under RunUnderSchemaLockAsync: the lock is held there, not to be taken again.
+    private readonly AsyncLocal<bool> _holdsSchemaLock = new();
+
+    /// <summary>
+    /// Runs <paramref name="work"/> under the schema lock (<see cref="AcquireSchemaLockAsync"/>). Reentrant: called
+    /// again from inside the work, it runs the inner work directly instead of waiting for the lock this flow holds.
+    /// The schema sync of the schemes takes the lock through it when it has something to write.
+    /// </summary>
+    protected async Task RunUnderSchemaLockAsync(Func<Task> work, CancellationToken cancellationToken = default)
+    {
+        if (_holdsSchemaLock.Value)
+        {
+            await work();
+            return;
         }
 
-        _logger?.LogInformation("v2-pvt module bundle applied.");
+        await using (await AcquireSchemaLockAsync(cancellationToken))
+        {
+            // Set inside this method, the flag reaches the work it awaits and is gone when the method returns.
+            _holdsSchemaLock.Value = true;
+            await work();
+        }
     }
 
     // === DATABASE SCHEMA MANAGEMENT ===
@@ -1198,21 +1375,64 @@ public abstract class RedbServiceBase : IRedbService
     /// <inheritdoc />
     public virtual async Task EnsureDatabaseAsync()
     {
-        // Check if the core table '_schemes' already exists
-        if (await TableExistsAsync("_schemes"))
+        // Asked first without the lock: a database already created, nearly every start, takes no lock at all, and a
+        // login that may not take it (a schema deployed by a DBA) starts. Only a missing schema goes to the lock, and
+        // the question is asked again under it: nodes starting together against an empty database would otherwise all
+        // run the creation script, and every one but the first fail on the tables it found.
+        Exception? unreadable = null;
+        bool exists;
+        try
         {
-            _logger?.LogInformation("REDB schema already exists, skipping creation.");
-            await EnsurePvtModuleDeployedAsync();
-            return;
+            exists = await TableExistsAsync("_schemes");
+        }
+        catch (Exception ex) when (IsDatabaseClosedForSchemaWork(ex))
+        {
+            // Another node is creating the schema and holds the database alone for a moment (SQL Server turning on
+            // READ_COMMITTED_SNAPSHOT): the answer comes under the lock, once that node is done.
+            unreadable = ex;
+            exists = false;
         }
 
-        _logger?.LogInformation("REDB schema not found. Creating database schema...");
+        if (!exists)
+        {
+            IAsyncDisposable schemaLock;
+            try
+            {
+                schemaLock = await AcquireSchemaLockAsync();
+            }
+            catch when (unreadable != null)
+            {
+                // The lock could not be reached either: the first error says more (a wrong password fails both).
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(unreadable).Throw();
+                throw;
+            }
 
-        var sql = ReadEmbeddedSql();
-        await ExecuteSchemaScriptAsync(sql);
+            await using (schemaLock)
+            {
+                if (!await TableExistsAsync("_schemes"))
+                {
+                    _logger?.LogInformation("REDB schema not found. Creating database schema...");
 
-        _logger?.LogInformation("REDB database schema created successfully.");
+                    var sql = ReadEmbeddedSql();
+                    await ExecuteSchemaScriptAsync(sql);
+
+                    _logger?.LogInformation("REDB database schema created successfully.");
+                    return;
+                }
+            }
+        }
+
+        // The module pass asks its own question first and takes the lock only when the module is behind.
+        _logger?.LogInformation("REDB schema already exists, skipping creation.");
+        await EnsurePvtModuleDeployedAsync();
     }
+
+    /// <summary>
+    /// Whether an error of the first look at the database means that another process holds it alone for schema work,
+    /// so the look is to be repeated under the schema lock. SQL Server refuses logins while
+    /// <c>ALTER DATABASE ... SET READ_COMMITTED_SNAPSHOT</c> of a node creating the schema runs.
+    /// </summary>
+    protected virtual bool IsDatabaseClosedForSchemaWork(Exception exception) => false;
 
     /// <inheritdoc />
     public string GetSchemaScript() => ReadEmbeddedSql();

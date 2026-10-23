@@ -86,6 +86,7 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.13" />
@@ -122,7 +123,7 @@
 
   <!-- redb packages: the monorepo ProjectReferences, rewritten for the public repository. -->
   <ItemGroup>
-    <PackageVersion Include="redb.SQLite.Pro" Version="4.4.1" />
+    <PackageVersion Include="redb.SQLite.Pro" Version="4.4.2" />
   </ItemGroup>
 </Project>
 

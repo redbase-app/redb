@@ -33,9 +33,15 @@ public class E190_SumAsyncFiltered : ExampleBase
         var totalSalary = await redb.Query<EmployeeProps>()
             .SumAsync(x => x.Salary);
 
+        // Filter and sum on nested classes: home city one level deep, floor two levels deep
+        var berlinFloors = await redb.Query<EmployeeProps>()
+            .Where(x => x.HomeAddress!.City == "Berlin")
+            .SumAsync(x => x.HomeAddress!.Building!.Floor);
+
         sw.Stop();
 
         return Ok("E190", "SumAsync - With Filter", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
-            [$"Engineering SUM: {engineeringSalary:N0}", $"Total SUM: {totalSalary:N0}", $"Ratio: {(totalSalary > 0 ? engineeringSalary / totalSalary * 100 : 0):F1}%"]);
+            [$"Engineering SUM: {engineeringSalary:N0}", $"Total SUM: {totalSalary:N0}", $"Ratio: {(totalSalary > 0 ? engineeringSalary / totalSalary * 100 : 0):F1}%",
+             $"Berlin SUM(HomeAddress.Building.Floor): {berlinFloors:N0}"]);
     }
 }

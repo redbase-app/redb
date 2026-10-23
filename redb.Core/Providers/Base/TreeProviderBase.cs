@@ -220,10 +220,19 @@ public abstract class TreeProviderBase : ITreeProvider
         var baseObject = await ObjectStorage.LoadAsync<TProps>(rootId, 1);
         if (baseObject == null)
             throw new InvalidOperationException($"Object with ID {rootId} not found");
-        
+
         var treeObject = ConvertToTreeObject(baseObject);
-        await LoadChildrenRecursively(treeObject, maxDepth, userId, checkPermissions);
-        
+
+        // The nodes come in walk order, a parent before its children.
+        var byId = new Dictionary<long, TreeRedbObject<TProps>> { [rootId] = treeObject };
+        foreach (var node in await LoadTypedSubtreeAsync<TProps>(rootId, maxDepth, userId, checkPermissions, cancellationToken))
+        {
+            var parent = byId[node.parent_id!.Value];
+            node.Parent = parent;
+            parent.Children.Add(node);
+            byId[node.id] = node;
+        }
+
         return treeObject;
     }
 
@@ -268,51 +277,64 @@ public abstract class TreeProviderBase : ITreeProvider
     protected virtual async Task<IEnumerable<TreeRedbObject<TProps>>> GetPathToRootWithUserAsync<TProps>(
         long objectId, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default) where TProps : class, new()
     {
-        var path = new List<TreeRedbObject<TProps>>();
-        var visited = new HashSet<long>();
-        long? currentId = objectId;
-        
-        while (currentId.HasValue)
+        // One statement for the chain, one batch for the objects. The path ends where the load of an ancestor one by
+        // one used to stop: at an ancestor of another scheme (or the RedbSchemeMismatchException under
+        // ThrowOnSchemeMismatch), one the reader may not see, or one that is missing.
+        var reader = SecurityContext.GetEffectiveUser();
+        var chain = await SelectAncestorsAsync(objectId, cancellationToken);
+        if (chain.Count == 0)
         {
-            if (visited.Contains(currentId.Value))
-                break;
-            
-            visited.Add(currentId.Value);
-            
-            try
-            {
-                var effectiveUser = SecurityContext.GetEffectiveUser();
-                var obj = await ObjectStorage.LoadAsync<TProps>(currentId.Value, effectiveUser, 1);
-                if (obj == null) break;
-                
-                var treeObj = ConvertToTreeObject(obj);
-                path.Insert(0, treeObj);
-                currentId = obj.parent_id;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                break;
-            }
-            catch
-            {
-                throw;
-            }
+            if (Configuration.ThrowOnObjectNotFound)
+                throw new InvalidOperationException($"Object with ID {objectId} not found");
+            return [];
         }
-        
+
+        var expectedScheme = Cache.GetSchemeIdByClrType(typeof(TProps)) ?? (await SchemeSyncProvider.GetSchemeByTypeAsync<TProps>())?.Id;
+
+        // Asked one by one from the object up and only until the first refusal, as before: an ancestor above it is
+        // never asked (the single check throws for an object with no permission row). A path is a few levels.
+        var kept = new List<TreeWalkRow>();
+        foreach (var row in chain)
+        {
+            if (expectedScheme.HasValue && row.IdScheme != expectedScheme.Value)
+            {
+                if (Configuration.ThrowOnSchemeMismatch)
+                    throw new Exceptions.RedbSchemeMismatchException(row.Id, typeof(TProps), expectedScheme.Value, row.IdScheme);
+                break;
+            }
+            if (Configuration.DefaultCheckPermissionsOnLoad && !await PermissionProvider.CanUserSelectObject(row.Id, reader.Id, cancellationToken))
+                break;
+            kept.Add(row);
+        }
+        if (kept.Count == chain.Count && chain[^1].IdParent is { } dangling && chain[^1].Depth < MaxAncestorDepth
+            && Configuration.ThrowOnObjectNotFound)
+            throw new InvalidOperationException($"Object with ID {dangling} not found");
+
+        if (expectedScheme.HasValue)
+            EnsureClrTypeRegistered<TProps>(expectedScheme.Value);
+        var loaded = await LoadNodesAsync(kept.Select(r => r.Id).ToList(), reader, 1, cancellationToken);
+
+        var path = new List<TreeRedbObject<TProps>>();
+        foreach (var row in kept)
+        {
+            if (!loaded.TryGetValue(row.Id, out var obj))
+                break;
+            path.Insert(0, ConvertToTreeObject(AsTyped<TProps>(obj)));
+        }
+
         for (int i = 0; i < path.Count - 1; i++)
         {
             path[i + 1].Parent = path[i];
         }
-        
+
         return path;
     }
 
     protected virtual async Task<IEnumerable<TreeRedbObject<TProps>>> GetDescendantsWithUserAsync<TProps>(
         long parentId, int maxDepth = 50, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default) where TProps : class, new()
     {
-        var descendants = new List<TreeRedbObject<TProps>>();
-        await CollectDescendants(parentId, descendants, maxDepth, 0, userId, checkPermissions);
-        return descendants;
+        // In walk order: a child, everything below it, then the next child.
+        return await LoadTypedSubtreeAsync<TProps>(parentId, maxDepth, userId, checkPermissions, cancellationToken);
     }
 
     protected virtual async Task MoveObjectWithUserAsync(long objectId, long? newParentId, long userId, bool checkPermissions = true, CancellationToken cancellationToken = default)
@@ -375,8 +397,8 @@ public abstract class TreeProviderBase : ITreeProvider
                 throw new UnauthorizedAccessException($"User {user.Id} does not have permission to delete subtree of object {parentId}");
         }
 
-        var objectIds = new List<long>();
-        await CollectDescendantIds(parentId, objectIds, 100, 0);
+        // Every descendant of any scheme, down to the same 100 levels the walk one parent at a time went to.
+        var objectIds = (await SelectSubtreeAsync(parentId, null, 100, cancellationToken)).Select(r => r.Id).ToList();
         objectIds.Add(parentId);
 
         // One transaction for both statements. They used to run in sequence, and a failure in the
@@ -395,20 +417,6 @@ public abstract class TreeProviderBase : ITreeProvider
         // deleting the parent, so changes() under-counts them (it equals rows-affected on PG/MSSql,
         // which have no such cascade on _id_parent).
         return objectIds.Count;
-    }
-
-    private async Task CollectDescendantIds(long parentId, List<long> ids, int maxDepth, int currentDepth, CancellationToken cancellationToken = default)
-    {
-        if (currentDepth >= maxDepth) return;
-        
-        // Id-only: no get_object_json materialization (lighter, and works on tiers without that
-        // function such as SQLite Pro, where the heavier polymorphic recipe is unavailable).
-        var childIds = await Context.QueryScalarListAsync<long>(Sql.Tree_SelectChildrenIds(), new object[] { parentId }, cancellationToken);
-        foreach (var childId in childIds)
-        {
-            ids.Add(childId);
-            await CollectDescendantIds(childId, ids, maxDepth, currentDepth + 1);
-        }
     }
 
     // ============================================================
@@ -439,9 +447,17 @@ public abstract class TreeProviderBase : ITreeProvider
         var user = userId.HasValue ? await GetUserByIdAsync(userId.Value) : null;
         var baseObject = await LoadDynamicObjectAsync(rootId, user);
         var treeObject = ConvertToPolymorphicTreeObjectWithProps(baseObject);
-        
-        await LoadPolymorphicChildrenRecursively(treeObject, maxDepth, userId, checkPermissions);
-        
+
+        // The nodes come in walk order, a parent before its children.
+        var byId = new Dictionary<long, ITreeRedbObject> { [rootId] = treeObject };
+        foreach (var node in await LoadPolymorphicSubtreeAsync(rootId, maxDepth, userId, checkPermissions, cancellationToken))
+        {
+            var parent = byId[node.ParentId!.Value];
+            node.Parent = parent;
+            parent.Children.Add(node);
+            byId[node.Id] = node;
+        }
+
         return treeObject;
     }
 
@@ -481,136 +497,261 @@ public abstract class TreeProviderBase : ITreeProvider
     protected virtual async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicPathToRootWithUserAsync(
         long objectId, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default)
     {
-        var path = new List<ITreeRedbObject>();
-        var visited = new HashSet<long>();
-        long? currentId = objectId;
-        
-        while (currentId.HasValue)
+        // One statement for the chain, one batch for the objects. The path ends where the load of an ancestor one by
+        // one used to stop, at one the user may not see; a missing ancestor is an error, as it was.
+        var chain = await SelectAncestorsAsync(objectId, cancellationToken);
+        if (chain.Count == 0)
+            throw new InvalidOperationException($"Object with ID {objectId} not found");
+        if (chain[^1].IdParent is { } dangling && chain[^1].Depth < MaxAncestorDepth)
+            throw new InvalidOperationException($"Object with ID {dangling} not found");
+
+        var user = userId.HasValue ? await GetUserByIdAsync(userId.Value) : null;
+        var check = userId.HasValue && (checkPermissions || Configuration.DefaultCheckPermissionsOnLoad);
+
+        // Asked one by one from the object up and only until the first refusal, as before (see the typed path).
+        var kept = new List<TreeWalkRow>();
+        foreach (var row in chain)
         {
-            if (visited.Contains(currentId.Value))
+            if (check && !await PermissionProvider.CanUserSelectObject(row.Id, userId!.Value, cancellationToken))
                 break;
-            
-            visited.Add(currentId.Value);
-            
-            try
-            {
-                var user = userId.HasValue ? await GetUserByIdAsync(userId.Value) : null;
-                var typedObject = await LoadDynamicObjectAsync(currentId.Value, user);
-                
-                if (checkPermissions && userId.HasValue)
-                {
-                    var canSelect = await PermissionProvider.CanUserSelectObject(currentId.Value, userId.Value);
-                    if (!canSelect) break;
-                }
-                
-                var treeObj = ConvertToPolymorphicTreeObjectWithProps(typedObject);
-                path.Insert(0, treeObj);
-                currentId = typedObject.ParentId;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                break;
-            }
-            catch
-            {
-                throw;
-            }
+            kept.Add(row);
         }
-        
+        var loaded = await LoadNodesAsync(kept.Select(r => r.Id).ToList(), user ?? SecurityContext.GetEffectiveUser(),
+            Configuration.DefaultLoadDepth, cancellationToken);
+
+        var path = new List<ITreeRedbObject>();
+        foreach (var row in kept)
+        {
+            if (!loaded.TryGetValue(row.Id, out var obj))
+                break;
+            path.Insert(0, ConvertToPolymorphicTreeObjectWithProps(obj));
+        }
+
         for (int i = 0; i < path.Count - 1; i++)
         {
             path[i + 1].Parent = path[i];
         }
-        
+
         return path;
     }
 
     protected virtual async Task<IEnumerable<ITreeRedbObject>> GetPolymorphicDescendantsWithUserAsync(
         long parentId, int maxDepth = 50, long? userId = null, bool checkPermissions = false, CancellationToken cancellationToken = default)
     {
-        var descendants = new List<ITreeRedbObject>();
-        await CollectPolymorphicDescendants(parentId, descendants, maxDepth, 0, userId, checkPermissions);
-        return descendants;
+        // In walk order: a child, everything below it, then the next child.
+        return await LoadPolymorphicSubtreeAsync(parentId, maxDepth, userId, checkPermissions, cancellationToken);
     }
 
     // ============================================================
     // === PRIVATE HELPER METHODS ===
     // ============================================================
 
-    private async Task LoadChildrenRecursively<TProps>(
-        TreeRedbObject<TProps> parent, int remainingDepth, long? userId, bool checkPermissions) where TProps : class, new()
+    // ============================================================
+    // === WALKS IN ONE STATEMENT ===
+    // A subtree or a chain of ancestors used to be read one parent at a time, a query or two per node (11 thousand
+    // nodes: 27-44 s). It is now one statement for the shape (Tree_SelectSubtreeRows, Tree_SelectAncestorRows), one
+    // permission batch when permissions are checked, and one batch load of the objects.
+    // ============================================================
+
+    /// <summary>A row of <see cref="ISqlDialect.Tree_SelectSubtreeRows"/> or <see cref="ISqlDialect.Tree_SelectAncestorRows"/>.</summary>
+    protected sealed class TreeWalkRow
     {
-        if (remainingDepth <= 0) return;
-        
-        var children = await GetChildrenWithUserAsync<TProps>(parent.id, userId, checkPermissions);
-        
-        foreach (var child in children)
-        {
-            child.Parent = parent;
-            parent.Children.Add(child);
-            await LoadChildrenRecursively(child, remainingDepth - 1, userId, checkPermissions);
-        }
+        public long Id { get; set; }
+        public long? IdParent { get; set; }
+        public long IdScheme { get; set; }
+        public int Depth { get; set; }
     }
 
-    private async Task CollectDescendants<TProps>(
-        long parentId, List<TreeRedbObject<TProps>> descendants, int maxDepth, int currentDepth, long? userId, bool checkPermissions) where TProps : class, new()
+    /// <summary>How far up a chain of ancestors is read: well past any real tree, short of a runaway cycle.</summary>
+    internal const int MaxAncestorDepth = 10_000;
+
+    /// <summary>
+    /// The descendants of an object down to <paramref name="maxDepth"/>, children of a parent in their order. A node
+    /// met twice means a cycle in _id_parent: an error, where the walk one parent at a time went round it to the depth.
+    /// </summary>
+    private async Task<List<TreeWalkRow>> SelectSubtreeAsync(long rootId, long? schemeId, int maxDepth, CancellationToken cancellationToken)
     {
-        if (currentDepth >= maxDepth) return;
-        
-        var children = await GetChildrenWithUserAsync<TProps>(parentId, userId, checkPermissions);
-        
-        foreach (var child in children)
+        if (maxDepth <= 0)
+            return [];
+
+        var rows = await Context.QueryAsync<TreeWalkRow>(Sql.Tree_SelectSubtreeRows(),
+            new object[] { rootId, (object?)schemeId ?? DBNull.Value, maxDepth }, cancellationToken);
+        var seen = new HashSet<long> { rootId };
+        foreach (var row in rows)
+            if (!seen.Add(row.Id))
+                throw new InvalidOperationException(
+                    $"Cyclic reference in the tree under object {rootId}: object {row.Id} is reached twice. " +
+                    "Fix _id_parent of the objects on the cycle.");
+        return rows;
+    }
+
+    /// <summary>
+    /// An object (depth 0) and its ancestors, nearest first. An object met twice means a cycle in _id_parent: an error,
+    /// where the walk up used to stop at it silently.
+    /// </summary>
+    private async Task<List<TreeWalkRow>> SelectAncestorsAsync(long objectId, CancellationToken cancellationToken)
+    {
+        var rows = await Context.QueryAsync<TreeWalkRow>(Sql.Tree_SelectAncestorRows(),
+            new object[] { objectId, MaxAncestorDepth }, cancellationToken);
+        var seen = new HashSet<long>();
+        foreach (var row in rows)
+            if (!seen.Add(row.Id))
+                throw new InvalidOperationException(
+                    $"Cyclic reference in the tree: object {row.Id} is its own ancestor (path from object {objectId}). " +
+                    "Fix _id_parent of the objects on the cycle.");
+        if (rows.Count > 0 && rows[^1].Depth >= MaxAncestorDepth && rows[^1].IdParent.HasValue)
+            throw new InvalidOperationException(
+                $"The chain of ancestors of object {objectId} is longer than {MaxAncestorDepth} levels.");
+        return rows;
+    }
+
+    /// <summary>
+    /// The rows reachable from the root through rows that pass <paramref name="keep"/>, in walk order: a child,
+    /// everything below it, then the next child. A row that does not pass is left out with its whole subtree, as the
+    /// walk one parent at a time never descended into it.
+    /// </summary>
+    private static List<TreeWalkRow> Reachable(long rootId, List<TreeWalkRow> rows, Func<TreeWalkRow, bool> keep)
+    {
+        var children = rows.ToLookup(r => r.IdParent!.Value);
+        var result = new List<TreeWalkRow>(rows.Count);
+        var stack = new Stack<IEnumerator<TreeWalkRow>>();
+        stack.Push(children[rootId].GetEnumerator());
+        while (stack.Count > 0)
         {
-            descendants.Add(child);
-            await CollectDescendants(child.id, descendants, maxDepth, currentDepth + 1, userId, checkPermissions);
+            var siblings = stack.Peek();
+            if (!siblings.MoveNext())
+            {
+                stack.Pop();
+                continue;
+            }
+            if (!keep(siblings.Current))
+                continue;
+            result.Add(siblings.Current);
+            stack.Push(children[siblings.Current.Id].GetEnumerator());
         }
+        return result;
+    }
+
+    /// <summary>
+    /// The rows of the subtree the user may read, asked level by level: one permission batch per level, for the rows
+    /// under a parent already kept that pass <paramref name="eligible"/>. A row under a refused one is never asked, as
+    /// the walk one parent at a time never asked it (the single check throws for an object with no permission row).
+    /// </summary>
+    private async Task<HashSet<long>> SelectReadableAsync(
+        long rootId, List<TreeWalkRow> rows, long userId, Func<TreeWalkRow, bool> eligible, CancellationToken cancellationToken)
+    {
+        var children = rows.ToLookup(r => r.IdParent!.Value);
+        var readable = new HashSet<long>();
+        var parents = new List<long> { rootId };
+        while (parents.Count > 0)
+        {
+            var level = parents.SelectMany(p => children[p]).Where(eligible).ToList();
+            if (level.Count == 0)
+                break;
+            var allowed = await PermissionProvider.GetSelectableObjectIdsAsync(level.Select(r => r.Id).ToList(), userId, cancellationToken);
+            parents = level.Where(r => allowed.Contains(r.Id)).Select(r => r.Id).ToList();
+            readable.UnionWith(parents);
+        }
+        return readable;
+    }
+
+    /// <summary>One batch load of objects (polymorphic: each in the type of its scheme), by id.</summary>
+    private async Task<Dictionary<long, IRedbObject>> LoadNodesAsync(List<long> ids, IRedbUser user, int depth, CancellationToken cancellationToken)
+    {
+        if (ids.Count == 0)
+            return new Dictionary<long, IRedbObject>();
+        var loaded = await ObjectStorage.LoadAsync(ids, user, depth, cancellationToken);
+        return loaded.ToDictionary(o => o.Id);
+    }
+
+    /// <summary>
+    /// Binds the scheme to <typeparamref name="TProps"/> in the type registry when nothing is bound to it yet: the
+    /// batch load picks the type of an object by its scheme, and the walk one parent at a time read the children of
+    /// this scheme as <typeparamref name="TProps"/> directly.
+    /// </summary>
+    private void EnsureClrTypeRegistered<TProps>(long schemeId) where TProps : class, new()
+    {
+        if (Cache.GetClrType(schemeId) == null)
+            Cache.RegisterClrType(typeof(TProps).FullName ?? typeof(TProps).Name, schemeId, typeof(TProps));
+    }
+
+    private static RedbObject<TProps> AsTyped<TProps>(IRedbObject obj) where TProps : class, new()
+        => obj as RedbObject<TProps>
+           ?? throw new InvalidOperationException(
+               $"Object {obj.Id} of scheme {obj.SchemeId} loads as {obj.GetType().Name}, not as RedbObject<{typeof(TProps).Name}>: " +
+               "another type is bound to that scheme.");
+
+    /// <summary>
+    /// The descendants of <paramref name="rootId"/> of the scheme of <typeparamref name="TProps"/>, in walk order, each
+    /// with its parent_id: what the walk one parent at a time returned (GetChildrenWithUserAsync per node), with the
+    /// same reader for the permission check (the effective user, as CanUserSelectObject of an object asks).
+    /// </summary>
+    private async Task<List<TreeRedbObject<TProps>>> LoadTypedSubtreeAsync<TProps>(
+        long rootId, int maxDepth, long? userId, bool checkPermissions, CancellationToken cancellationToken) where TProps : class, new()
+    {
+        var scheme = await SchemeSyncProvider.GetSchemeByTypeAsync<TProps>();
+        if (scheme == null)
+            throw new InvalidOperationException($"Scheme for type {typeof(TProps).Name} not found. Use SyncSchemeAsync<{typeof(TProps).Name}>() to create scheme.");
+
+        var rows = await SelectSubtreeAsync(rootId, scheme.Id, maxDepth, cancellationToken);
+        if (rows.Count == 0)
+            return [];
+
+        var reader = SecurityContext.GetEffectiveUser();
+        var readable = checkPermissions && userId.HasValue
+            ? await SelectReadableAsync(rootId, rows, reader.Id, _ => true, cancellationToken)
+            : null;
+        var kept = Reachable(rootId, rows, r => readable == null || readable.Contains(r.Id));
+
+        EnsureClrTypeRegistered<TProps>(scheme.Id);
+        var loaded = await LoadNodesAsync(kept.Select(r => r.Id).ToList(), reader, Configuration.DefaultLoadDepth, cancellationToken);
+
+        // An object gone between the walk and the load is left out with its subtree.
+        return Reachable(rootId, kept, r => loaded.ContainsKey(r.Id))
+            .Select(r => ConvertToTreeObject(AsTyped<TProps>(loaded[r.Id])))
+            .ToList();
+    }
+
+    /// <summary>
+    /// The descendants of <paramref name="rootId"/> of every scheme, in walk order: what the walk one parent at a time
+    /// returned (GetPolymorphicChildrenWithUserAsync per node). An object whose scheme has no CLR type is left out with
+    /// its subtree, as there.
+    /// </summary>
+    private async Task<List<ITreeRedbObject>> LoadPolymorphicSubtreeAsync(
+        long rootId, int maxDepth, long? userId, bool checkPermissions, CancellationToken cancellationToken)
+    {
+        var rows = await SelectSubtreeAsync(rootId, null, maxDepth, cancellationToken);
+        if (rows.Count == 0)
+            return [];
+
+        bool Typed(TreeWalkRow r) => Cache.GetClrType(r.IdScheme) != null;
+        var readable = checkPermissions && userId.HasValue
+            ? await SelectReadableAsync(rootId, rows, userId.Value, Typed, cancellationToken)
+            : null;
+        var kept = Reachable(rootId, rows, r => Typed(r) && (readable == null || readable.Contains(r.Id)));
+
+        var user = userId.HasValue ? await GetUserByIdAsync(userId.Value) : null;
+        var loaded = await LoadNodesAsync(kept.Select(r => r.Id).ToList(), user ?? SecurityContext.GetEffectiveUser(),
+            Configuration.DefaultLoadDepth, cancellationToken);
+
+        return Reachable(rootId, kept, r => loaded.ContainsKey(r.Id))
+            .Select(r => ConvertToPolymorphicTreeObjectWithProps(loaded[r.Id]))
+            .ToList();
     }
 
     private async Task ValidateNoCyclicReference(long objectId, long newParentId, CancellationToken cancellationToken = default)
     {
+        // The new parent and its ancestors, one statement. Read row by row, in the order the walk up used to read them.
+        var rows = await Context.QueryAsync<TreeWalkRow>(
+            Sql.Tree_SelectAncestorRows(), new object[] { newParentId, MaxAncestorDepth }, cancellationToken);
         var visited = new HashSet<long>();
-        long? currentId = newParentId;
-        
-        while (currentId.HasValue)
+        foreach (var row in rows)
         {
-            if (currentId.Value == objectId)
+            if (row.Id == objectId)
                 throw new InvalidOperationException($"Cannot move object {objectId}: this would create a cyclic reference");
-            
-            if (visited.Contains(currentId.Value))
+
+            if (!visited.Add(row.Id))
                 throw new InvalidOperationException("Cyclic reference detected in existing data structure");
-            
-            visited.Add(currentId.Value);
-            
-            var parent = await Context.ExecuteScalarAsync<long?>(Sql.Tree_SelectParentId(), new object[] { currentId.Value }, cancellationToken);
-            currentId = parent;
-        }
-    }
-
-    private async Task LoadPolymorphicChildrenRecursively(ITreeRedbObject parent, int remainingDepth, long? userId, bool checkPermissions)
-    {
-        if (remainingDepth <= 0) return;
-        
-        var children = await GetPolymorphicChildrenWithUserAsync(parent.Id, userId, checkPermissions);
-        
-        foreach (var child in children)
-        {
-            child.Parent = parent;
-            parent.Children.Add(child);
-            await LoadPolymorphicChildrenRecursively(child, remainingDepth - 1, userId, checkPermissions);
-        }
-    }
-
-    private async Task CollectPolymorphicDescendants(
-        long parentId, List<ITreeRedbObject> descendants, int maxDepth, int currentDepth, long? userId, bool checkPermissions)
-    {
-        if (currentDepth >= maxDepth) return;
-        
-        var children = await GetPolymorphicChildrenWithUserAsync(parentId, userId, checkPermissions);
-        
-        foreach (var child in children)
-        {
-            descendants.Add(child);
-            await CollectPolymorphicDescendants(child.Id, descendants, maxDepth, currentDepth + 1, userId, checkPermissions);
         }
     }
 

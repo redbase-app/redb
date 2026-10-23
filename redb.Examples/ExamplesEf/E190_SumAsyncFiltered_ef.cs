@@ -17,11 +17,15 @@ public class E190_SumAsyncFiltered_ef : EfExampleBase
 
         var engineeringSalary = await db.EmployeeProps.Where(x => x.Department == "Engineering").SumAsync(x => x.Salary) ?? 0m;
         var totalSalary = await db.EmployeeProps.SumAsync(x => x.Salary) ?? 0m;
+        var berlinFloors = await db.EmployeeProps
+            .Where(x => x.EmployeeProps_HomeAddress!.City == "Berlin")
+            .SumAsync(x => x.EmployeeProps_HomeAddress!.EmployeeProps_HomeAddress_Building!.Floor) ?? 0;
 
         sw.Stop();
 
         return Ok("E190_ef", "EF: SumAsync - With Filter", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
             [$"Engineering SUM: {engineeringSalary:N0}", $"Total SUM: {totalSalary:N0}",
-             $"Ratio: {(totalSalary > 0 ? engineeringSalary / totalSalary * 100 : 0):F1}%"]);
+             $"Ratio: {(totalSalary > 0 ? engineeringSalary / totalSalary * 100 : 0):F1}%",
+             $"Berlin SUM(HomeAddress.Building.Floor): {berlinFloors:N0}"]);
     }
 }

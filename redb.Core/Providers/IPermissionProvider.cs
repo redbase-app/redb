@@ -337,5 +337,21 @@ namespace redb.Core.Providers
 
         Task<bool> CanUserDeleteObject(long objectId, long userId,
         CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The objects of <paramref name="objectIds"/> the user may read, by the rule of
+        /// <see cref="CanUserSelectObject(long, long, CancellationToken)"/> for each, answered at once. The tree loads
+        /// check a whole subtree this way. The default asks the single check per object; the in-tree base provider
+        /// answers with one query.
+        /// </summary>
+        async Task<IReadOnlySet<long>> GetSelectableObjectIdsAsync(IReadOnlyCollection<long> objectIds, long userId,
+            CancellationToken cancellationToken = default)
+        {
+            var selectable = new HashSet<long>();
+            foreach (var objectId in objectIds)
+                if (await CanUserSelectObject(objectId, userId, cancellationToken))
+                    selectable.Add(objectId);
+            return selectable;
+        }
     }
 }

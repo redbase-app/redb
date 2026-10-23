@@ -4,7 +4,7 @@ using redb.Tests.Integration.Tests.Base;
 namespace redb.Tests.Integration.Tests.MsSqlPro;
 
 [Collection("MsSqlPro")]
-public class MsSqlProTreeTests : TreeTestsBase
+public class MsSqlProTreeTests : ProTreeTestsBase
 {
     public MsSqlProTreeTests(MsSqlProFixture fixture) : base(fixture.Redb) { }
 }

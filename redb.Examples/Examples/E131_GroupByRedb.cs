@@ -32,6 +32,7 @@ public class E131_GroupByRedb : ExampleBase
             {
                 OwnerId = g.Key,
                 TotalSalary = Agg.Sum(g, x => x.Salary),
+                AvgFloor = Agg.Average(g, x => x.HomeAddress!.Building!.Floor),
                 Count = Agg.Count(g)
             });
 
@@ -39,6 +40,7 @@ public class E131_GroupByRedb : ExampleBase
 
         var first = byOwner.FirstOrDefault();
         return Ok("E131", "GroupByRedb - Base Fields", ExampleTier.Free, sw.ElapsedMilliseconds, byOwner.Count,
-            [$"SQL: GROUP BY o._id_owner (NO JOIN!)", $"Groups: {byOwner.Count}, First owner: {first?.OwnerId ?? 0}"]);
+            [$"SQL: GROUP BY o._id_owner (NO JOIN!)", $"Groups: {byOwner.Count}, First owner: {first?.OwnerId ?? 0}",
+             $"Avg home floor of the first owner: {first?.AvgFloor:F2}"]);
     }
 }

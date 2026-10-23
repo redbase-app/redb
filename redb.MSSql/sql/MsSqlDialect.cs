@@ -195,6 +195,14 @@ public class MsSqlDialect : ISqlDialect
     /// </summary>
     public string Permissions_GetEffectiveForObject() =>
         "SELECT * FROM dbo.get_user_permissions_for_object(@p0, @p1)";
+
+    public string Permissions_GetEffectiveForObjects() =>
+        """
+        SELECT CAST(ids.value AS BIGINT) AS object_id, p.user_id, p.permission_source_id, p.permission_type, p._id_role,
+               p._id_user, p.can_select, p.can_insert, p.can_update, p.can_delete
+        FROM STRING_SPLIT(@p0, ',') ids
+        CROSS APPLY dbo.get_user_permissions_for_object(CAST(ids.value AS BIGINT), @p1) p
+        """;
     
     public string Permissions_SelectReadableObjectIds() =>
         """
@@ -587,6 +595,56 @@ public class MsSqlDialect : ISqlDialect
     
     public string Structures_DeleteByIds(IEnumerable<long> ids) =>
         $"DELETE FROM _structures WHERE _id IN ({string.Join(",", ids)})";
+
+    // === SCHEMA LOCK ===
+    // Not part of ISqlDialect: the lock runs on a connection of its own (RedbService.OpenSchemaLockAsync), in master
+    // or, on Azure SQL Database, in the database itself.
+
+    /// <summary>
+    /// One attempt at the exclusive application lock of the schema, owned by the session, with no wait; returns the
+    /// result code of sp_getapplock (0 or 1 granted, -1 held elsewhere). Params: @p0 = resource name.
+    /// </summary>
+    public string SchemaLock_TryAcquire() =>
+        "DECLARE @result int; " +
+        "EXEC @result = sp_getapplock @Resource = @p0, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = 0; " +
+        "SELECT @result;";
+
+    /// <summary>Releases the application lock of the schema. Params: @p0 = resource name.</summary>
+    public string SchemaLock_Release() =>
+        "EXEC sp_releaseapplock @Resource = @p0, @LockOwner = 'Session'";
+
+    /// <summary>SERVERPROPERTY('EngineEdition') as int (5 = Azure SQL Database). No params.</summary>
+    public string Server_EngineEdition() =>
+        "SELECT CAST(SERVERPROPERTY('EngineEdition') AS int)";
+
+    /// <summary>The name of the current database. No params.</summary>
+    public string Server_CurrentDatabase() =>
+        "SELECT DB_NAME()";
+
+    // === ROOT STRUCTURE KEY ===
+    // The UNIQUE constraint IX__structures counts NULLs as equal on SQL Server: a root field cannot be written twice,
+    // and no separate key is needed. Only the null of Structures_RootKeyExists is asked; the rest is never reached.
+
+    private const string RootKeyNotApplicable =
+        "SQL Server needs no unique key of root structures: IX__structures counts NULL parents as equal.";
+
+    public string? Structures_RootKeyExists() => null;
+
+    public string Structures_CreateRootKey() => throw new NotSupportedException(RootKeyNotApplicable);
+
+    public string Structures_SelectRootDuplicates() => throw new NotSupportedException(RootKeyNotApplicable);
+
+    public string? Structures_LockSubtree() => throw new NotSupportedException(RootKeyNotApplicable);
+
+    public string Structures_SubtreeIsReferenced(bool withMigrations) => throw new NotSupportedException(RootKeyNotApplicable);
+
+    public string Structures_DeleteSubtreeMetadataCache() => throw new NotSupportedException(RootKeyNotApplicable);
+
+    public string Structures_DeleteById() =>
+        "DELETE FROM _structures WHERE _id = @p0";
+
+    public string Schemes_CountMetadataCache() =>
+        "SELECT CAST(COUNT(*) AS BIGINT) FROM _scheme_metadata_cache WHERE _scheme_id = @p0";
     
     // ============================================================
     // === TYPES SQL ===
@@ -691,6 +749,60 @@ public class MsSqlDialect : ISqlDialect
     
     public string Tree_DeleteObjectsByIds() =>
         "DELETE FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
+
+    // MAXRECURSION 0: the depth parameter bounds the walk, which may go past the default of 100 levels.
+    public string Tree_SelectSubtreeRows() =>
+        """
+        WITH sub AS (
+            SELECT o._id, o._id_parent, o._id_scheme, o._name, 1 AS depth
+            FROM _objects o
+            WHERE o._id_parent = @p0 AND (@p1 IS NULL OR o._id_scheme = @p1)
+            UNION ALL
+            SELECT o._id, o._id_parent, o._id_scheme, o._name, s.depth + 1
+            FROM _objects o
+            JOIN sub s ON o._id_parent = s._id
+            WHERE s.depth < @p2 AND (@p1 IS NULL OR o._id_scheme = @p1)
+        )
+        SELECT _id AS Id, _id_parent AS IdParent, _id_scheme AS IdScheme, depth AS Depth
+        FROM sub
+        ORDER BY _name, _id
+        OPTION (MAXRECURSION 0)
+        """;
+
+    public string Tree_SelectAncestorRows() =>
+        """
+        WITH up AS (
+            SELECT o._id, o._id_parent, o._id_scheme, 0 AS depth
+            FROM _objects o
+            WHERE o._id = @p0
+            UNION ALL
+            SELECT o._id, o._id_parent, o._id_scheme, u.depth + 1
+            FROM _objects o
+            JOIN up u ON o._id = u._id_parent
+            WHERE u.depth < @p1
+        )
+        SELECT _id AS Id, _id_parent AS IdParent, _id_scheme AS IdScheme, depth AS Depth
+        FROM up
+        ORDER BY depth
+        OPTION (MAXRECURSION 0)
+        """;
+
+    // MAXRECURSION 0: the depth parameter bounds the walk; the default of 100 levels failed on a deeper tree.
+    public string Tree_SelectIdsWithAncestors() =>
+        """
+        WITH up AS (
+            SELECT o._id, o._id_parent, 0 AS depth
+            FROM _objects o
+            WHERE o._id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))
+            UNION ALL
+            SELECT o._id, o._id_parent, u.depth + 1
+            FROM _objects o
+            JOIN up u ON o._id = u._id_parent
+            WHERE u.depth < @p1
+        )
+        SELECT DISTINCT _id FROM up
+        OPTION (MAXRECURSION 0)
+        """;
     
     // ============================================================
     // === OBJECT STORAGE SQL ===
@@ -1222,22 +1334,6 @@ public class MsSqlDialect : ISqlDialect
         INSERT INTO #tmp_cnt EXEC {functionName} @p0, @p1, @p2, 1, 0, NULL, @p3, @p4;
         SELECT CAST(JSON_VALUE(result, '$.total_count') AS INT) AS [Value] FROM #tmp_cnt;
         DROP TABLE #tmp_cnt";
-    
-    /// <summary>
-    /// MSSQL: Get all IDs with their ancestors using recursive CTE.
-    /// MSSQL uses WITH (no RECURSIVE keyword).
-    /// </summary>
-    public string Query_GetIdsWithAncestorsSql(string idsString) =>
-        $@";WITH parent_chain AS (
-            SELECT _id, _id_parent 
-            FROM _objects 
-            WHERE _id IN ({idsString})
-            UNION ALL
-            SELECT o._id, o._id_parent 
-            FROM _objects o
-            INNER JOIN parent_chain pc ON pc._id_parent = o._id
-        )
-        SELECT DISTINCT _id FROM parent_chain";
     
     /// <summary>
     /// MSSQL: Load objects by IDs as JSON using get_object_json function.

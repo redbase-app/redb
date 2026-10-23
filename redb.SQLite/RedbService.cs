@@ -170,13 +170,83 @@ public class RedbService : RedbServiceBase
     private const int SchemaVersion = 12;
 
     /// <summary>
+    /// The schema upgrades of <see cref="ApplySchemaUpgradeStepsAsync"/> under the schema lock, the version asked again
+    /// under it: two processes opening one old file (a panel and a worker of one host) ran the same steps at once, and
+    /// a step that checks and then acts (a column, an index rebuilt under its name) failed in the second.
+    /// </summary>
+    private async Task ApplySchemaUpgradesAsync()
+    {
+        // The unique key of root structures is not a numbered step: a file with duplicates holding values goes on
+        // without it, and every start tries again until they are resolved.
+        if (await Context.ExecuteScalarAsync<long>("PRAGMA user_version") >= SchemaVersion
+            && !await IsRootStructureKeyMissingAsync())
+            return;
+
+        await using (await AcquireSchemaLockAsync())
+        {
+            if (await Context.ExecuteScalarAsync<long>("PRAGMA user_version") < SchemaVersion)
+                await ApplySchemaUpgradeStepsAsync();
+            await EnsureRootStructureKeyAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override Task<SchemaLockHandle> OpenSchemaLockAsync(CancellationToken cancellationToken)
+        // Inside a transaction of this service the write lock of the file is already ours.
+        => Task.FromResult(Context.IsInTransaction ? SchemaLockHandle.None : new WriteLock(Context));
+
+    /// <summary>
+    /// The schema lock of SQLite: the single write lock of the file, taken by an immediate transaction of the
+    /// service's own connection, and every statement of the work runs in it. A lock on a connection of its own would
+    /// make the service wait for itself. An attempt that finds the file locked past the busy time-out of the
+    /// connection gives way; disposing commits what was done, as each statement committed on its own before.
+    /// </summary>
+    private sealed class WriteLock(IRedbContext context) : SchemaLockHandle
+    {
+        private IRedbTransaction? _transaction;
+
+        public override string Name => "BEGIN IMMEDIATE";
+
+        public override async Task<bool> TryAcquireAsync(CancellationToken cancellationToken)
+        {
+            // Microsoft.Data.Sqlite retries a busy BEGIN until the command time-out of the connection (Default Timeout,
+            // 30 s unless the connection string says otherwise), so one attempt lasts up to that; the wait of the
+            // service overshoots its time-out by at most as much.
+            try
+            {
+                _transaction = await context.BeginTransactionAsync(cancellationToken: cancellationToken);
+                return true;
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode is 5 or 6)
+            {
+                // SQLITE_BUSY / SQLITE_LOCKED: another process writes.
+                return false;
+            }
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (_transaction == null) return;
+            try
+            {
+                if (_transaction.IsActive)
+                    await _transaction.CommitAsync();
+            }
+            finally
+            {
+                await _transaction.DisposeAsync();
+            }
+        }
+    }
+
+    /// <summary>
     /// Schema upgrades for a database created by an older build — the SQLite counterpart of the
     /// "0. Schema upgrades" step of the PostgreSQL/MSSQL module bundle. Every statement is idempotent,
     /// and the pass as a whole is gated by <c>PRAGMA user_version</c>: without the gate the
     /// <c>typeof()</c> checks below would scan <c>_objects</c> on every start. Runs before
     /// <see cref="ApplySeedCorrectionsAsync"/>.
     /// </summary>
-    private async Task ApplySchemaUpgradesAsync()
+    private async Task ApplySchemaUpgradeStepsAsync()
     {
         var deployed = await Context.ExecuteScalarAsync<long>("PRAGMA user_version");
         if (deployed >= SchemaVersion)

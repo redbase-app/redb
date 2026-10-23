@@ -21,7 +21,7 @@ public class E192_AggregateFiltered : ExampleBase
 
         // Aggregate only Developers
         var query = redb.Query<EmployeeProps>()
-            .Where(x => x.Position == "Developer");
+            .Where(x => x.Position == "Developer" && x.HomeAddress!.City != "Tokyo");
 
         // Uncomment to see generated SQL:
         // var sql = await query.ToSqlStringAsync();
@@ -33,6 +33,9 @@ public class E192_AggregateFiltered : ExampleBase
             AvgSalary = Agg.Average(x.Props.Salary),
             MinSalary = Agg.Min(x.Props.Salary),
             MaxSalary = Agg.Max(x.Props.Salary),
+            MinFloor = Agg.Min(x.Props.HomeAddress!.Building!.Floor),
+            MaxFloor = Agg.Max(x.Props.HomeAddress!.Building!.Floor),
+            AvgFloor = Agg.Average(x.Props.HomeAddress!.Building!.Floor),
             Count = Agg.Count()
         });
 
@@ -40,9 +43,10 @@ public class E192_AggregateFiltered : ExampleBase
 
         return Ok("E192", "AggregateAsync - With Filter", ExampleTier.Free, sw.ElapsedMilliseconds, 1,
         [
-            $"Filter: Position = 'Developer'",
+            $"Filter: Position = 'Developer' AND HomeAddress.City != 'Tokyo'",
             $"Count: {stats?.Count ?? 0}",
-            $"Salary: {stats?.MinSalary:N0} - {stats?.MaxSalary:N0} (Avg: {stats?.AvgSalary:N0})"
+            $"Salary: {stats?.MinSalary:N0} - {stats?.MaxSalary:N0} (Avg: {stats?.AvgSalary:N0})",
+            $"Home floor: {stats?.MinFloor} - {stats?.MaxFloor} (Avg: {stats?.AvgFloor:F2})"
         ]);
     }
 }

@@ -90,10 +90,16 @@ public abstract class SchemaUpgradeTestsBase : IAsyncLifetime
     protected virtual void AddRedbServices(IServiceCollection services, Action<RedbOptionsBuilder> configure)
         => services.AddRedb(configure);
 
-    protected ServiceProvider Build(string connectionString, bool autoApply)
+    protected ServiceProvider Build(string connectionString, bool autoApply, string cacheDomain = "schema-upgrade",
+        ILoggerProvider? logs = null)
     {
         var services = new ServiceCollection();
-        services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
+        services.AddLogging(b =>
+        {
+            b.SetMinimumLevel(LogLevel.Warning);
+            if (logs != null)
+                b.AddProvider(logs);
+        });
         AddRedbServices(services, options =>
         {
             UseProvider(options, connectionString);
@@ -102,12 +108,113 @@ public abstract class SchemaUpgradeTestsBase : IAsyncLifetime
                 c.AutoApplyDatabaseUpgrades = autoApply;
                 c.EnablePropsCache = false;
                 // Own cache domain: this process also holds services on the shared test database.
-                c.CacheDomain = "schema-upgrade";
+                c.CacheDomain = cacheDomain;
             });
         });
         return services.BuildServiceProvider();
     }
 
+    /// <summary>
+    /// Starts <paramref name="nodes"/> services at once against one database, each with a cache domain of its own,
+    /// as the nodes of a cluster are separate processes. Returns the failures.
+    /// </summary>
+    private async Task<List<Exception>> StartTogetherAsync(string connectionString, int nodes, bool ensureCreated)
+    {
+        var providers = Enumerable.Range(0, nodes)
+            .Select(i => Build(connectionString, autoApply: true, cacheDomain: $"schema-upgrade-node{i}-{Guid.NewGuid():N}"))
+            .ToList();
+        try
+        {
+            var starts = providers.Select(sp => Task.Run(async () =>
+            {
+                try
+                {
+                    await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated);
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    return ex;
+                }
+            }));
+            return (await Task.WhenAll(starts)).Where(e => e != null).Select(e => e!).ToList();
+        }
+        finally
+        {
+            foreach (var sp in providers)
+                await sp.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Owner_OutdatedModule_NodesStartingTogether_AllStart()
+    {
+        // FOREIGN-BUGS 7 of the AS4 stand: the panel and the worker of a Tsak cluster both met a database one module
+        // behind, both applied the bundle, and the second died on "index already exists". The schema lock makes them
+        // take turns; the one that waited finds the module deployed.
+        for (var round = 0; round < 5; round++)
+        {
+            await SetDeployedModuleVersionAsync("0.0.0-test");
+
+            var failures = await StartTogetherAsync(OwnerConnectionString, nodes: 4, ensureCreated: false);
+
+            failures.Should().BeEmpty($"every node starts (round {round})");
+            (await ReadDeployedModuleVersionAsync()).Should().Be(_requiredVersion);
+        }
+    }
+
+    [Fact]
+    public async Task FreshDatabase_NodesCreatingTheSchemaTogether_AllStart()
+    {
+        // Nodes starting together against an empty database: one creates the schema, the others find it created.
+        // The scheme synchronization that follows runs under the same lock, so they do not insert the same schemes.
+        for (var round = 0; round < 3; round++)
+        {
+            await RecreateFreshDatabaseAsync();
+
+            var failures = await StartTogetherAsync(FreshDatabaseConnectionString, nodes: 3, ensureCreated: true);
+
+            failures.Should().BeEmpty($"every node starts (round {round})");
+        }
+    }
+
+    [Fact]
+    public async Task RestrictedRole_DeployedDatabase_StartsWithoutSchemaWork()
+    {
+        // A database in step: tables there, module current, schemes synced by the owner in InitializeAsync above. A
+        // role that may not change the schema starts, since nothing is left to change and no lock is taken.
+        await using var sp = Build(RestrictedConnectionString, autoApply: true, cacheDomain: $"restricted-{Guid.NewGuid():N}");
+        await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+    }
+
+    [Fact]
+    public async Task Scheme_NodesSyncingItTogether_AllSucceed()
+    {
+        // Runtime scheme sync (outside InitializeAsync): the workers of a Tsak cluster load modules sharing a Props
+        // class, or a module version adding a field reaches every node at once. The sync that has to write takes the
+        // schema lock; the nodes that waited find the scheme in step.
+        var providers = Enumerable.Range(0, 4)
+            .Select(i => Build(OwnerConnectionString, autoApply: true, cacheDomain: $"scheme-sync-node{i}-{Guid.NewGuid():N}"))
+            .ToList();
+        try
+        {
+            var nodes = new List<IRedbService>();
+            foreach (var sp in providers)
+            {
+                var redb = sp.GetRequiredService<IRedbService>();
+                await redb.InitializeAsync(ensureCreated: true);
+                nodes.Add(redb);
+            }
+
+            var failures = await SchemeSyncRace.RunAsync(nodes, providers[0].GetRequiredService<IRedbContext>(), rounds: 8);
+            failures.Should().BeEmpty();
+        }
+        finally
+        {
+            foreach (var sp in providers)
+                await sp.DisposeAsync();
+        }
+    }
 
     [Fact]
     public async Task FreshDatabase_InitializesFromScratch_AndRoundTrips()

@@ -4,7 +4,7 @@ using redb.Tests.Integration.Tests.Base;
 namespace redb.Tests.Integration.Tests.SqlitePro;
 
 [Collection("SqlitePro")]
-public class SqliteProWindowTests : WindowTestsBase
+public class SqliteProWindowTests : ProWindowTestsBase
 {
     public SqliteProWindowTests(SqliteProFixture fixture) : base(fixture.Redb) { }
 }

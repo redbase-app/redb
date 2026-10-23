@@ -15,6 +15,12 @@ No Entity Framework. No migrations. No 40-table Include chains. Just C# classes 
 [![Website](https://img.shields.io/badge/docs-redbase.app-orange)](https://redbase.app)
 [![Website RU](https://img.shields.io/badge/docs-redb.ru-blue)](https://redb.ru)
 
+**Contents:** [Why RedBase](#why-redbase) · [Quick Start](#quick-start) · [Packages](#packages) ·
+[Installation](#installation) · [Capabilities](#capabilities) · [Architecture](#architecture) ·
+[How It Compares](#how-it-compares) · [Pro](#pro) · [Documentation](#documentation) · [License](#license)
+
+Upgrading from an earlier version: see [UPGRADING.md](UPGRADING.md) and [CHANGELOG.md](CHANGELOG.md).
+
 ---
 
 ## Why RedBase
@@ -93,10 +99,12 @@ var projected = await redb.Query<EmployeeProps>()
 
 ```bash
 dotnet new install redb.Templates
-dotnet new redb -n MyProject --provider postgres
+dotnet new redb -n MyProject --db postgres   # --db postgres | mssql | sqlite (default), --pro true (default) | false
 cd MyProject
 dotnet run
 ```
+
+Other templates: `redb-app`, `redb-worker`, `redb-razor`, `redb-blazor`, `redb-bff`, `redb-chat` (see [redb.Templates](redb.Templates/README.md)).
 
 ---
 
@@ -108,11 +116,13 @@ dotnet run
 | `redb.Postgres` | [![NuGet](https://img.shields.io/nuget/v/redb.Postgres?label=)](https://www.nuget.org/packages/redb.Postgres) | PostgreSQL provider (free, Apache 2.0) |
 | `redb.MSSql` | [![NuGet](https://img.shields.io/nuget/v/redb.MSSql?label=)](https://www.nuget.org/packages/redb.MSSql) | Microsoft SQL Server provider (free, Apache 2.0) |
 | `redb.SQLite` | [![NuGet](https://img.shields.io/nuget/v/redb.SQLite?label=)](https://www.nuget.org/packages/redb.SQLite) | SQLite provider (free, Apache 2.0) — embedded/offline, native loadable extension |
-| `redb.Core.Pro` | [![NuGet](https://img.shields.io/nuget/v/redb.Core.Pro?label=)](https://www.nuget.org/packages/redb.Core.Pro) | Pro extensions: parallel materialization, change tracking, migrations |
+| `redb.Core.Pro` | [![NuGet](https://img.shields.io/nuget/v/redb.Core.Pro?label=)](https://www.nuget.org/packages/redb.Core.Pro) | Pro engine: SQL built in C#, parallel materialization, change tracking, data migrations |
 | `redb.Postgres.Pro` | [![NuGet](https://img.shields.io/nuget/v/redb.Postgres.Pro?label=)](https://www.nuget.org/packages/redb.Postgres.Pro) | PostgreSQL Pro provider with optimized query generation |
 | `redb.MSSql.Pro` | [![NuGet](https://img.shields.io/nuget/v/redb.MSSql.Pro?label=)](https://www.nuget.org/packages/redb.MSSql.Pro) | MSSQL Pro provider with optimized query generation |
 | `redb.SQLite.Pro` | [![NuGet](https://img.shields.io/nuget/v/redb.SQLite.Pro?label=)](https://www.nuget.org/packages/redb.SQLite.Pro) | SQLite Pro provider — pure C# (no native extension): Blazor WebAssembly & mobile |
-| `redb.Export` | [![NuGet](https://img.shields.io/nuget/v/redb.Export?label=)](https://www.nuget.org/packages/redb.Export) | Database export/import: `.redb` files (JSONL/ZIP) for backup, migration between PostgreSQL ↔ MSSQL |
+| `redb.Export` | [![NuGet](https://img.shields.io/nuget/v/redb.Export?label=)](https://www.nuget.org/packages/redb.Export) | Database export/import: `.redb` files (JSONL/ZIP) for backup and moves between PostgreSQL, SQL Server and SQLite |
+| `redb.CLI` | [![NuGet](https://img.shields.io/nuget/v/redb.CLI?label=)](https://www.nuget.org/packages/redb.CLI) | `redb` command line tool: `init`, `schema`, `export`, `import`, `flat` |
+| `redb.Templates` | [![NuGet](https://img.shields.io/nuget/v/redb.Templates?label=)](https://www.nuget.org/packages/redb.Templates) | `dotnet new` project templates |
 
 ---
 
@@ -125,8 +135,11 @@ dotnet add package redb.Postgres
 # or MSSQL (Free)
 dotnet add package redb.MSSql
 
+# or SQLite (Free)
+dotnet add package redb.SQLite
+
 # Pro — includes redb.Core.Pro automatically
-dotnet add package redb.Postgres.Pro   # or redb.MSSql.Pro
+dotnet add package redb.Postgres.Pro   # or redb.MSSql.Pro, redb.SQLite.Pro
 ```
 
 Each provider package pulls in `redb.Core` (or `redb.Core.Pro`) as a transitive dependency.
@@ -135,19 +148,20 @@ Each provider package pulls in `redb.Core` (or `redb.Core.Pro`) as a transitive 
 
 ```csharp
 using redb.Core;
-using redb.Core.Extensions;
-using redb.Postgres.Pro.Extensions;  // or redb.MSSql.Pro.Extensions
+using redb.Core.Models.Configuration;
+using redb.Core.Pro.Extensions;      // AddRedbPro
+using redb.Postgres.Pro.Extensions;  // UsePostgres; or redb.MSSql.Pro.Extensions, redb.SQLite.Pro.Extensions
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Register REDB Pro
+// Register redb Pro
 builder.Services.AddRedbPro(options => options
     .UsePostgres("Host=localhost;Database=mydb;Username=postgres;Password=pass")
     // .UseMsSql("Server=localhost;Database=mydb;User Id=sa;Password=pass;TrustServerCertificate=true")
     .Configure(c =>
     {
-        c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;
-        c.EnableLazyReferences = false;   // V4: true makes `virtual` references stubs at any depth
+        c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking;   // Pro: writes only the changed values
+        c.EnableLazyReferences = false;   // true loads `virtual` references as stubs at any depth
         c.EnablePropsCache = true;
     }));
 
@@ -173,11 +187,11 @@ hit check and a run of lookups that find entries and serve none, which is a read
 the saved graph and never matches its hash. Raise the size to fit the working set, or leave the cache off for
 that database.
 
-**Free version** — same pattern, just `AddRedb` instead of `AddRedbPro`, no license:
+**Free version** — same pattern, just `AddRedb` instead of `AddRedbPro`:
 
 ```csharp
-using redb.Core.Extensions;
-using redb.Postgres.Extensions;  // or redb.MSSql.Extensions
+using redb.Core.Extensions;      // AddRedb
+using redb.Postgres.Extensions;  // UsePostgres; or redb.MSSql.Extensions, redb.SQLite.Extensions
 
 builder.Services.AddRedb(options => options
     .UsePostgres("Host=localhost;Database=mydb;Username=postgres;Password=pass"));
@@ -218,6 +232,50 @@ redb init --connection "Host=localhost;Database=mydb;..." --provider postgres
 
 # Export SQL to file
 redb schema --provider postgres --output redb_schema.sql
+```
+
+**Several nodes on one database.** The nodes of a cluster or the replicas of a service may start together against
+the same database, for example right after an upgrade. Start-up takes a schema lock for its schema work: creating the
+schema, deploying the SQL module, building the indexes of the streams form (Pro) and upgrading a SQLite file. Each step
+looks first without the lock; only a step that finds work takes it, looks again and does what is still missing. One
+node does the work; the others wait for the lock and find it done. A database already in step takes no lock at all.
+
+Scheme synchronization takes the same lock, at start-up and at run time alike (`SyncSchemeAsync`, modules loaded by
+several workers that share a Props class, a new field reaching every node at once). A sync first only reads: a scheme
+already in step, the usual case, takes no lock at all. A sync that has something to write takes the lock, looks again
+and writes what is still missing. A sync called inside a transaction of your own runs without the lock, since the lock
+would be released before your commit. The metadata cache of a scheme in step is not rebuilt at start-up; the service
+tables (`_schemes`, `_structures`, `_scheme_metadata_cache`) are not meant to be edited by hand.
+
+The lock is a session advisory lock on PostgreSQL and the write lock of the file on SQLite. On SQL Server it is an
+application lock (`sp_getapplock`) held in `master`; on Azure SQL Database it is held in the database itself. On a SQL
+Server of your own, schema work needs a login that can open `master` (every server login can, through its guest user).
+No other rights are needed. A waiting node logs the wait every thirty seconds and gives up after `SchemaLockTimeout`
+(15 minutes by default) with `RedbSchemaLockTimeoutException`:
+
+```csharp
+services.AddRedb(options => options
+    .UsePostgres(connectionString)
+    .Configure(c => c.SchemaLockTimeout = TimeSpan.FromMinutes(30))); // a very large _values builds longer
+```
+
+**Schema deployed by a DBA.** The application may connect with limited rights: a login without DDL rights, or on SQL
+Server a contained database user with no access to `master`. The DBA deploys the schema with `GetSchemaScript()`,
+upgrades the module with `GetUpgradeScript()` and syncs the schemes once with a privileged login. A start against such a
+database in step needs no schema work, takes no lock and goes through. If schema work is found (a module behind the
+package, a scheme changed in code), the start stops with an error saying to give the login access to `master` or to
+deploy with the DBA scripts.
+
+**Schema problems.** Some problems of the schema do not stop the service but need a person, for example a root field
+of a scheme written twice by nodes of an older version (see UPGRADING.md, "Duplicate root structures"). Each one is
+logged as an error at every start until it is resolved, and `IRedbService.SchemaProblems` lists them, so a health check
+can report the service as degraded:
+
+```csharp
+var problems = redb.SchemaProblems;            // as found by the last start or scheme sync; reads no database
+// or: await redb.CheckSchemaAsync(ct);        // looks again, read only
+if (problems.Count > 0)
+    return HealthCheckResult.Degraded(string.Join("; ", problems.Select(p => p.Message)));
 ```
 
 ### Client-side: Blazor WebAssembly & mobile
@@ -271,9 +329,11 @@ builder.Services.AddRedbPro(o => o
 |---------|-----|-------|
 | Save single object | `SaveAsync(obj)` | Create or update |
 | Load by ID | `LoadAsync<T>(id)` | Returns `RedbObject<T>` with Props |
-| Bulk insert | `AddNewObjectsAsync(objects)` | Single round-trip via COPY protocol, replaces thousands of INSERTs |
+| Bulk insert | `AddNewObjectsAsync(objects)` | New objects in bulk (COPY on PostgreSQL) instead of one INSERT each |
 | Batch save | `SaveAsync(IEnumerable<IRedbObject>)` | Save multiple objects at once |
-| Delete | `DeleteAsync(id)`, `DeleteWithPurgeAsync(ids)` | Single or batch delete with full purge |
+| Delete | `DeleteAsync(obj or id)`, `DeleteAsync(ids)` | Single or batch delete |
+| Delete in the background | `SoftDeleteAsync(...)`, `DeleteWithPurgeAsync(ids)` | Move to trash, purge in batches |
+| Unique keys | `ValueUnique`, `[RedbUnique]` | Enforced by the database, see [UNIQUE_KEYS.md](UNIQUE_KEYS.md) |
 | Load-modify-save | `LoadAsync` → modify → `SaveAsync` | Standard update pattern |
 
 ### Object Graph (RedbObject References in Props)
@@ -311,21 +371,21 @@ public class EmployeeProps
     public Dictionary<(int Year, string Quarter), string>? PerformanceReviews { get; set; }
 }
 
-// Save — entire graph persisted, ParentId set automatically
+// Save — entire graph persisted
 await redb.SaveAsync(employee);
 
 // Load — full graph reconstructed, all nested objects hydrated
-var loaded = await redb.LoadAsync<OrderProps>(id);
-// loaded.Props.Payment.Props          — ready
-// loaded.Props.RelatedMetrics[0].Props — ready
-// loaded.Props.Coupons["SUMMER"].Props — ready
+var loaded = await redb.LoadAsync<EmployeeProps>(employee.Id);
+// loaded.Props.CurrentProject.Props          — ready
+// loaded.Props.PastProjects[0].Props         — ready
+// loaded.Props.ProjectMetrics["Q1"].Props    — ready
 ```
 
 Nested objects are real `RedbObject` instances with their own `id`, `name`, `DateCreate`, `DateModify`, and `Props`. They can be queried independently, updated in place, and participate in tree structures.
 
 ### Rich Props Structure
 
-Props fields can be any combination of scalars, nested classes, collections, and dictionaries — arbitrarily deep. Everything is serialized, stored, and fully restored on load. No extra tables, no FKs, no mapping.
+Props fields can be any combination of scalars, nested classes, collections, and dictionaries — arbitrarily deep. Everything is stored and fully restored on load. No table per class, no mapping.
 
 ```csharp
 [RedbScheme("Analytics Record")]
@@ -459,16 +519,16 @@ providers, and the one trap worth knowing.
 |---------|---------|
 | ContainsKey | `.Where(e => e.PhoneDirectory!.ContainsKey("desk"))` |
 | Indexer filter | `.Where(e => e.BonusByYear![2023] > 6000)` |
-| Nested class in value | `.Where(e => e.Locations!["HQ"].City == "NY")` |
-| Tuple key | `.Where(e => e.Reviews![reviewKey] == "Excellent")` |
+| Nested class in value | `.Where(e => e.OfficeLocations!["HQ"].City == "NY")` |
+| Tuple key | `.Where(e => e.PerformanceReviews![reviewKey] == "Excellent")` |
 
 ### Projection & Pagination
 
 | Feature | API | Notes |
 |---------|-----|-------|
 | Select fields | `.Select(x => new { x.Props.FirstName, x.Props.Salary })` | Server-side projection, fetches only selected columns |
-| Distinct | `.Distinct()` | Dedup by Props hash |
-| DistinctBy | `.DistinctBy(x => x.Field)`, `.DistinctByRedb(x => x.Name)` | Distinct on specific field |
+| Distinct | `.Distinct()` | Pro: one object per Props hash |
+| DistinctBy | `.DistinctBy(x => x.Field)`, `.DistinctByRedb(x => x.Name)` | One object per key; in Pro with `OrderBy` (the key first), `Skip`/`Take`, and `CountAsync` counting the keys |
 | OrderBy | `.OrderBy(e => e.Salary)`, `.OrderByDescending(...)` | Ascending / descending |
 | ThenBy | `.ThenBy(...)`, `.ThenByDescending(...)` | Multi-field sorting |
 | Skip / Take | `.Skip(10).Take(10)` | Pagination |
@@ -526,15 +586,22 @@ providers, and the one trap worth knowing.
 | Custom frame | `.Frame(Frame.Rows(3))` | Sliding window: `ROWS BETWEEN N PRECEDING AND CURRENT ROW` |
 | Partition by base field | `.PartitionByRedb(x => x.SchemeId)` | Direct, no Props join |
 | Filter + window | `.Where(...).WithWindow(...)` | Pre-filter before windowing |
+| Page of a window | `.OrderBy(...).Skip(20).Take(10).WithWindow(...)` | Pro, flat and tree queries: the window over the whole filtered set, the page returned |
 | GroupBy + window | `.GroupBy(...).WithWindow(...).SelectAsync(...)` | Rank aggregated groups |
+
+With `Take`, Pro computes the window over the fields it needs (partition, ordering, arguments, filter) and reads the
+other selected fields only for the rows it returns.
 
 ### Tree Structures
 
-Built-in hierarchical data with closure-table storage and recursive CTEs.
+Built-in hierarchical data: each object points to its parent (`ParentId`), and subtrees are read by recursive queries.
+The tree services (`LoadTreeAsync`, `GetDescendantsAsync`, `GetPathToRootAsync`, `DeleteSubtreeAsync`, the cycle
+check of `MoveObjectAsync`) read the shape of a subtree or a chain of ancestors in one statement and the objects in one
+batch; a cycle in the parent links raises an error naming the object.
 
 | Feature | API | Notes |
 |---------|-----|-------|
-| Create child | `CreateChildAsync(child, parent)` | Single node creation |
+| Create child | `CreateChildAsync(child, parent)` | `child` is a `TreeRedbObject<T>` |
 | Bulk create | `AddNewObjectsAsync(treeObjects)` | Batch insert with pre-assigned IDs |
 | Load tree | `LoadTreeAsync<T>(root, maxDepth)` | Full hierarchy with depth limit |
 | Get children | `GetChildrenAsync<T>(parent)` | Direct children only |
@@ -545,15 +612,17 @@ Built-in hierarchical data with closure-table storage and recursive CTEs.
 | Filter roots | `.WhereRoots()` | Root nodes only |
 | Filter leaves | `.WhereLeaves()` | Leaf nodes only |
 | Filter by level | `.WhereLevel(2)` | Nodes at specific depth |
+| Children / descendants of a node | `.WhereChildrenOf(node)`, `.WhereDescendantsOf(node, maxDepth)` | Several tree filters in one query all apply |
 | Scoped subtree query | `TreeQuery<T>(rootId, maxDepth)` | Query within a subtree |
-| Multiple roots | `TreeQuery<T>(parents[], maxDepth)` | Query across subtrees |
+| Multiple roots | `TreeQuery<T>(rootIds, maxDepth)` | Query across subtrees |
 | Ancestor filter | `.WhereHasAncestor<T>(a => a.Budget > 500000)` | Filter by ancestor properties |
 | Descendant filter | `.WhereHasDescendant<T>(d => d.Budget > 100000)` | Filter by descendant properties |
-| Relationship check | `node.IsDescendantOfAsync(ancestor)` | Without loading tree |
+| Relationship check | `node.IsDescendantOfAsync<T>(ancestor, redb)` | Extension method, without loading the tree |
 | DFS / BFS traversal | `.DepthFirstTraversal()`, `.BreadthFirstTraversal()` | In-memory traversal |
 | Tree materialization | `.ToTreeListAsync()`, `.ToRootListAsync()`, `.ToFlatListAsync()` | Parent chains, recursive children, or flat |
 | Tree stats | `TreeCollection<T>.GetStats()` | Depth, leaf count, max width |
 | Aggregation on trees | `TreeQuery<T>().GroupBy(...)`, `.WithWindow(...)` | GroupBy and window functions in tree context |
+| Existence | `TreeQuery<T>(root).AnyAsync(...)` | Pro stops at the first matching node |
 
 ### Lists (Reference Dictionaries)
 
@@ -593,14 +662,14 @@ Built-in user management with password hashing, roles, and object-level permissi
 |---------|-----|-------|
 | Create user | `UserProvider.CreateUserAsync(request)` | Login, password, name, email, phone |
 | Authenticate | `UserProvider.ValidateUserAsync(login, password)` | Returns `IRedbUser?`, bcrypt by default (`IPasswordHasher`); legacy SHA256 + salt hashes keep verifying and rehash on the next password change |
-| Change password | `UserProvider.ChangePasswordAsync(userId, old, new)` | Verifies old password first |
-| Enable / disable | `UserProvider.EnableUserAsync(id)`, `DisableUserAsync(id)` | Soft disable |
+| Change password | `UserProvider.ChangePasswordAsync(user, current, new)` | Verifies the current password first |
+| Enable / disable | `UserProvider.EnableUserAsync(user)`, `DisableUserAsync(user)` | Soft disable |
 | Search users | `UserProvider.GetUsersAsync(criteria)` | Filter by login, email, role, date range |
 | Create role | `RoleProvider.CreateRoleAsync(request)` | Named role with optional description |
-| Assign role | `RoleProvider.AssignUserToRoleAsync(userId, roleId)` | Many-to-many |
-| Grant permission | `GrantPermissionAsync(request)` | Per-object or per-scheme, CRUD flags |
-| Check permission | `CanUserSelectObject(objectId)` | Select / Insert / Update / Delete |
-| Effective permissions | `GetEffectivePermissionsAsync(userId, objectId)` | Resolved from user + role inheritance |
+| Assign role | `RoleProvider.AssignUserToRoleAsync(user, role)` | Many-to-many |
+| Grant permission | `GrantPermissionAsync(user or role, obj, actions)`, `CreatePermissionAsync(request)` | Per-object or per-scheme, CRUD flags |
+| Check permission | `CanUserSelectObject(obj)` | Select / Insert / Update / Delete |
+| Effective permissions | `GetEffectivePermissionsAsync(user, obj)` | Resolved from user + role inheritance |
 | Security context | `SetCurrentUser(user)`, `CreateSystemContext()` | Ambient via `AsyncLocal`, disposable elevation |
 
 ```csharp
@@ -630,7 +699,7 @@ using (redb.CreateSystemContext())
 
 The registry is for code that cannot reach the container the redb service was built from, such as a module loaded into its own `AssemblyLoadContext`. `AddRedb` and `AddRedbPro` register it as a singleton with `TryAdd`, so a registry put into the container before them is kept and can be shared.
 
-- A subscription sees **every** save and delete of the process made through a redb service over that registry: scopes already open, other modules, and named instances (`RedbInstanceFactory`) built over the same registry.
+- A subscription sees **every** save and delete of the process made through a redb service over that registry: scopes already open, other modules, and other redb services built over the same registry.
 - An exception from its `SavingAsync` or `DeletingAsync` therefore cancels **any** save or delete of the process, not only the subscriber's own.
 - It takes effect from the next operation. An operation already running keeps the set of interceptors it started with, so its Saving and Saved always reach the same interceptors.
 - Disposing the handle removes the interceptor for every later operation, and the registry keeps no reference to it, so the load context can unload once the running operations end. Disposing twice, or from another thread, is safe.
@@ -655,11 +724,11 @@ graph TD
     A --> G["UserProvider / RoleProvider"]
     
     B --> H["ProSqlBuilder (Pro) / PVT SQL module (Free)"]
-    C --> I["CTE recursive queries"]
+    C --> I["Recursive tree queries"]
     D --> J["IRedbContext (SQL)"]
     E --> K["Auto-migration"]
     
-    H --> L["PostgreSQL / MSSQL"]
+    H --> L["PostgreSQL / SQL Server / SQLite"]
     I --> L
     J --> L
     K --> L
@@ -680,7 +749,8 @@ IRedbService          ← single entry point
 
 Storage is provider-based. Each `[RedbScheme]` class maps to an internal structure in the target database. Schema changes (new fields, removed fields, type changes) are handled automatically by `SyncSchemeAsync` — no migration files needed.
 
-**Supported backends:** PostgreSQL 14+, Microsoft SQL Server 2019+.
+**Supported backends:** PostgreSQL 14+, Microsoft SQL Server 2019+, SQLite (Free through a native loadable extension,
+Pro in pure C#).
 
 ### Schema lifecycle and multi-version deployments
 
@@ -700,6 +770,7 @@ removed as well:
   into `_values`), but the trigger `TR__structures__cascade_values`
   (`INSTEAD OF DELETE` on `_structures`) deletes the dependent `_values`
   rows first, producing the same runtime effect as PostgreSQL.
+- **SQLite** — the same FK is `ON DELETE CASCADE`; foreign keys are switched on for every connection.
 
 For rolling / blue-green deployments where old and new app versions may share
 the database, disable destructive sync:
@@ -714,10 +785,9 @@ When destructive sync is enabled and structures are actually removed, an
 `ILogger.LogWarning` is emitted listing the scheme name and the structure
 ids / names being deleted.
 
-The per-save value-set ownership contract (one object's `SaveAsync` rewrites
-its full value set) is still destructive in this release — old and new versions
-should not write to the same object during the multi-version window. An opt-in
-`PropsSaveMode.PreserveUnknownStructures` flag is planned; see ROADMAP.
+A save rewrites the full value set of the object, so the fields an older version
+does not know are lost when that version saves the object: old and new versions
+should not write to the same object during the multi-version window.
 
 ### Modules in a collectible AssemblyLoadContext
 
@@ -757,13 +827,25 @@ var order = await redb.LoadAsync<OrderProps>(orderId);
 | LINQ support | Partial | Full (Where, GroupBy, Window, Aggregation) |
 | Transactions | Limited | Full ACID |
 | Referential integrity | None | Built-in |
-| Vendor lock-in | Yes | No (PostgreSQL / MSSQL) |
+| Vendor lock-in | Yes | No (PostgreSQL / SQL Server / SQLite) |
 
 ---
 
 ## Pro
 
-REDB Pro unlocks compiled query execution, parallel materialization, deep nested property queries, arithmetic and math expressions in WHERE, `Sql.Function<T>()` for calling arbitrary SQL functions, change tracking, schema migrations, and advanced analytics (window functions over grouped data). If performance matters — use Pro.
+Free and Pro take the same LINQ API; they differ in the engine. Free runs queries through
+the SQL module installed in the database (PL/pgSQL, T-SQL, or a native loadable extension on SQLite). Pro builds the SQL
+in C#, materializes Props in parallel, and adds:
+
+- the query planner (`EnablePvtPrefilter`, on by default) with the streams form, which reads a page, a count or an
+  aggregate without pivoting every object of the scheme;
+- `PropsSaveStrategy.ChangeTracking`: a save writes only the values that changed;
+- data migrations of Props classes (`IRedbMigration<T>`, `MigrateAsync`);
+- SQLite in pure C# (`redb.SQLite.Pro`), for Blazor WebAssembly and mobile;
+- the 4.4 query work: windows with `Take` and over trees, `AnyAsync` over a tree that stops at the first node,
+  faster `DistinctBy` over trees.
+
+See [README-PRO.md](README-PRO.md).
 
 **Pro is free — no license key required.** Just add the `redb.*.Pro` packages and use them. Pro packages are proprietary (closed-source), but free of charge — starting from version 3.3.0 no license is needed. The whole 3.x and 4.x lines are covered, in production, with no request limits; licensing re-enables only at major 5.0, and versions you already run stay free forever.
 
@@ -780,14 +862,21 @@ REDB Pro unlocks compiled query execution, parallel materialization, deep nested
 | API Reference | [redbase-app.github.io/redb](https://redbase-app.github.io/redb/) |
 | Architecture | [redbase.app/architecture](https://redbase.app/architecture) |
 | Quick Start | [redbase.app/quickstart](https://redbase.app/quickstart) |
+| Examples | [redb.Examples](redb.Examples/README.md) |
+| Pro edition | [README-PRO.md](README-PRO.md) |
+| Upgrading | [UPGRADING.md](UPGRADING.md): what to check and change for a new version |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
+| Dates and times | [DATETIME.md](DATETIME.md) |
+| Case-insensitive search | [COLLATION.md](COLLATION.md) |
+| Unique keys | [UNIQUE_KEYS.md](UNIQUE_KEYS.md) |
+| Command line tool | [redb.CLI](redb.CLI/README.md) |
 | NuGet | [nuget.org/packages/redb.Core](https://www.nuget.org/packages/redb.Core) |
 
 ---
 
 ## License
 
-Core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.Export`,
+Core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`, `redb.Export`,
 `redb.CLI`, `redb.Templates`, `redb.PropsEditor`) are licensed under
 [Apache License 2.0](LICENSE) starting from version 2.0.0.
 Versions ≤ 1.3.0 published on nuget.org remain under MIT.

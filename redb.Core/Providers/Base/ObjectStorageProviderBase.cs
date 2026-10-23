@@ -1348,9 +1348,8 @@ namespace redb.Core.Providers.Base
             if (ids.Count == 0) return new List<TreeRedbObject<TProps>>();
 
             // 1. Get IDs of all objects and their ancestors via recursive CTE
-            var idsString = string.Join(",", ids);
-            var sql = _sql.Query_GetIdsWithAncestorsSql(idsString);
-            var allIds = await _context.QueryScalarListAsync<long>(sql, System.Array.Empty<object>(), cancellationToken);
+            var allIds = await _context.QueryScalarListAsync<long>(_sql.Tree_SelectIdsWithAncestors(),
+                new object[] { ids.ToArray(), TreeProviderBase.MaxAncestorDepth }, cancellationToken);
 
             // 2. Load all objects polymorphically (target + parents with real types)
             var loadedObjects = await LoadAsync(allIds, user, depth, cancellationToken);
@@ -1391,9 +1390,8 @@ namespace redb.Core.Providers.Base
             if (ids.Count == 0) return new List<ITreeRedbObject>();
 
             // 1. Get IDs of all objects and their ancestors
-            var idsString = string.Join(",", ids);
-            var sql = _sql.Query_GetIdsWithAncestorsSql(idsString);
-            var allIds = await _context.QueryScalarListAsync<long>(sql, System.Array.Empty<object>(), cancellationToken);
+            var allIds = await _context.QueryScalarListAsync<long>(_sql.Tree_SelectIdsWithAncestors(),
+                new object[] { ids.ToArray(), TreeProviderBase.MaxAncestorDepth }, cancellationToken);
 
             // 2. Load all objects
             var loadedObjects = await LoadAsync(allIds, user, depth, cancellationToken);
