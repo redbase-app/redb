@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- A document that does not match resources/order.xsd: handled here, the exchange ends, the
+       document goes to the rejected route with the reason in a header. -->
+  <onException exceptions="redb.Route.Validation.ValidationException" handled="true">
+    <setHeader name="rejectReason" expr="${exception.message}"/>
+    <to uri="direct://modulectx-rejected"/>
+  </onException>
+
+  <!-- Test documents every {{orders.period:3000}} ms; every fourth one has a line with qty 0,
+       which the schema refuses. In a real module this is file://, sftp://, an HTTP endpoint or a queue. -->
+  <route id="modulectx-orders" description="Checks an XML order against the XSD and turns it into an invoice">
+    <from uri="timer://modulectx-orders?period={{orders.period:3000}}"/>
+    <setHeader name="qty" expr="${header.CamelTimerCounter % 4 == 3 ? 0 : 2}"/>
+    <setBody expr='&lt;order id="order-${header.CamelTimerCounter}"&gt;&lt;customer&gt;ACME&lt;/customer&gt;&lt;line sku="A-1" qty="${header.qty}" price="9.50"/&gt;&lt;line sku="B-2" qty="1" price="20"/&gt;&lt;/order&gt;'/>
+    <!-- The schema and the stylesheet are files under resources/; the build checks they are there. -->
+    <validateXsd file="resources/order.xsd" throwOnFailure="true"/>
+    <xslt file="resources/order-to-invoice.xslt"/>
+    <log level="Information" showRouteId="true">
+      <message>invoice: ${body}</message>
+    </log>
+  </route>
+
+  <route id="modulectx-rejected" description="Logs the documents the schema refused">
+    <from uri="direct://modulectx-rejected"/>
+    <log level="Warning" showRouteId="true">
+      <message>order rejected: ${header.rejectReason}</message>
+    </log>
+  </route>
+
+</routes>

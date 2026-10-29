@@ -1,0 +1,41 @@
+# A local AMQP 1.0 broker for the module: Apache ActiveMQ Artemis, and the module on a Tsak worker. A test stand, not
+# a deployment.
+#
+# From the project folder (PowerShell or a POSIX shell alike):
+#   dotnet build -p:PackRouteOnBuild=true -p:Version=1.0.0        # -> pkg/routemodule-1.0.0.tpkg
+#   cp deploy/.env.example deploy/.env                              # then set AMQP_PASSWORD
+#   docker compose -f deploy/docker-compose.amqp.yml up -d
+#
+# Artemis creates the queues orders and orders.failed on first use. Its console: http://localhost:8161 (modulectx).
+name: modulectx-amqp
+
+services:
+  artemis:
+    image: apache/activemq-artemis:2.44.0
+    environment:
+      ARTEMIS_USER: modulectx
+      ARTEMIS_PASSWORD: ${AMQP_PASSWORD:?AMQP_PASSWORD required, see deploy/.env.example}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:8161:8161"
+    # Ready when the AMQP port answers; the module starts only then, so its consumers find the broker.
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/5672'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  module:
+    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.5.0-net10}
+    depends_on:
+      artemis:
+        condition: service_healthy
+    environment:
+      - Tsak__Modules__AssemblyPaths__0=/app/modules
+      - Tsak__Cluster__ApiEndpoint=http://module:9090
+      # The module's context: the Override layer, which wins over every other layer of its configuration.
+      - Tsak__Contexts__modulectx__Override__amqp.host=artemis
+      - Tsak__Contexts__modulectx__Override__amqp.user=modulectx
+      - Tsak__Contexts__modulectx__Override__amqp.password=${AMQP_PASSWORD:?AMQP_PASSWORD required, see deploy/.env.example}
+    volumes:
+      - ../pkg:/app/modules

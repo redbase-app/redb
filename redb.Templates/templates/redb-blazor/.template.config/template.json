@@ -4,6 +4,7 @@
   "classifications": [ "Web", "Blazor", "Database", "RedBase" ],
   "identity": "RedBase.Blazor.Template",
   "name": "RedBase Blazor Site",
+  "description": "A Blazor site (Interactive Server) on redb: a product list and form and a category tree; runs as is on SQLite with Pro.",
   "shortName": "redb-blazor",
   "tags": {
     "language": "C#",

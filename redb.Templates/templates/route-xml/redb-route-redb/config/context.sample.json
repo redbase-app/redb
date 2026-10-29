@@ -1,0 +1,54 @@
+{
+  "//": [
+    "Deployment sample: copy it as context.json next to the package on the host. Never put real secrets here.",
+    "The merged configuration, later layers win:",
+    "  1. host appsettings, Contexts default section",
+    "  2. host appsettings, this context's section",
+    "  3. this file: Contexts.default, then Contexts.modulectx",
+    "  4. in-package config/routemodule.config.json: ContextName and AutoStart only",
+    "  5. Override: environment variables (secrets live here)",
+    "Redb.local is the redb instance the routes use with storage=\"local\". RedbInstanceName names the one",
+    "instance whose EnsureCreated runs (it creates the redb tables in an empty database).",
+    "Another database: change Provider and ConnectionString, nothing else.",
+    "  sqlite    Data Source=modulectx-redb.db",
+    "  postgres  Host=localhost;Port=5432;Database=modulectx;Username=modulectx;Password=...",
+    "  mssql     Server=localhost,1433;Database=modulectx;User Id=modulectx;Password=...;TrustServerCertificate=true",
+    "UsePro with PropsSaveStrategy ChangeTracking: a save writes only the values that changed instead of",
+    "deleting and inserting the object's whole value set (DeleteInsert, the Free default). ChangeTracking needs Pro.",
+    "Caches: the props cache is off; to turn it on set EnablePropsCache true and size PropsCacheMaxSize to the",
+    "objects the module works with (a cache smaller than that evicts what it needs and gets slower than none).",
+    "The list cache is on. SkipHashValidationOnCacheCheck stays false on a cluster: a cache hit is checked",
+    "against the object's hash in the database, which catches changes made by other nodes."
+  ],
+  "Contexts": {
+    "default": {},
+    "modulectx": {
+      "orders.period": "3000",
+      "report.period": "15000",
+      "RedbInstanceName": "local",
+      "Redb": {
+        "local": {
+//#if (db == "sqlite")
+          "Provider": "sqlite",
+          "ConnectionString": "Data Source=modulectx-redb.db",
+//#elseif (db == "postgres")
+          "Provider": "postgres",
+          "ConnectionString": "Host=localhost;Port=5432;Database=modulectx;Username=modulectx;Password=change-me",
+//#else
+          "Provider": "mssql",
+          "ConnectionString": "Server=localhost,1433;Database=modulectx;User Id=modulectx;Password=change-me;TrustServerCertificate=true",
+//#endif
+          "UsePro": true,
+          "PropsSaveStrategy": "ChangeTracking",
+          "EnsureCreated": true,
+          "EnablePropsCache": false,
+          "PropsCacheMaxSize": 10000,
+          "PropsCacheTtlMinutes": 60,
+          "SkipHashValidationOnCacheCheck": false,
+          "EnableListCache": true,
+          "ListCacheTtlMinutes": 5
+        }
+      }
+    }
+  }
+}

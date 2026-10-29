@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Source: one order every {{orders.period:200}} ms, as headers orderId and amount. Every
+       seventh order has a negative amount, which the CHECK of the table refuses. In a real module
+       this is a queue, a file split into lines or an HTTP endpoint. -->
+  <route id="modulectx-orders-in" description="Generates single test orders">
+    <from uri="timer://modulectx-orders?period={{orders.period:200}}"/>
+    <setHeader name="orderId" expr="order-${header.CamelTimerCounter}"/>
+    <setHeader name="amount" expr="${header.CamelTimerCounter % 7 == 6 ? 0 - header.CamelTimerCounter : header.CamelTimerCounter}"/>
+    <setHeader name="batchKey" value="orders"/>
+    <to uri="seda://modulectx-orders"/>
+  </route>
+
+  <!-- Batcher: 20 orders, or what came within 3 seconds, become one exchange whose body is the
+       list of the order exchanges (groupedExchange); each item binds :#orderId and :#amount from
+       its own headers. The batch is one transaction. breakBatchOnError=false runs every row under
+       a savepoint: a row the database refuses is undone alone and listed in redbSql.batchErrors,
+       the other rows commit. -->
+  <route id="modulectx-orders-batch" description="Writes the orders in batches">
+    <from uri="seda://modulectx-orders"/>
+    <aggregate correlation="${header.batchKey}" strategy="groupedExchange" completionSize="20"
+               completionTimeout="00:00:03" forceCompletionOnStop="true">
+      <to uri="sql:INSERT INTO orders (order_id, amount) VALUES (:#orderId, :#amount)?dataSource=#main-db&amp;batchSize=100&amp;breakBatchOnError=false"/>
+      <log level="Information" showRouteId="true">
+        <message>batch written: ${header.redbSql.updateCount} row(s)</message>
+      </log>
+      <choice>
+        <when expr="header.redbSql.batchErrors != null">
+          <split expr="${header.redbSql.batchErrors}">
+            <log level="Warning" showRouteId="true">
+              <message>row ${body.Index} of the batch refused: ${body.Message}</message>
+            </log>
+          </split>
+        </when>
+      </choice>
+    </aggregate>
+  </route>
+
+</routes>

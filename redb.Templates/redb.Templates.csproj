@@ -4,12 +4,12 @@
     <PackageId>redb.Templates</PackageId>
     <!-- The pack version only. The redb.* packages the templates install stay on $(Version) from the root
          Directory.Build.props: bump this one when the templates themselves change. -->
-    <Version>4.4.2</Version>
+    <Version>4.5.0</Version>
     <Title>RedBase Project Templates</Title>
     <Authors>RedBase</Authors>
     <Company>RedBase</Company>
-    <Description>Project templates for RedBase (REDB), the entity database for .NET: a console app (dotnet new redb), a Razor Pages site (redb-razor), a Blazor site (redb-blazor), an integration worker (redb-worker), an LLM chat (redb-chat), a Blazor WebAssembly app with a redb.Route API (redb-app) and a Blazor BFF with redb.Route controllers (redb-bff). Each runs as is on SQLite with Pro; the route-based ones also deploy as Tsak modules.</Description>
-    <PackageTags>dotnet-new;templates;redbase;redb;database;entity;tree;linq;blazor;razor;worker;llm;bff;tsak</PackageTags>
+    <Description>Project templates for RedBase (REDB), the entity database for .NET: a console app (dotnet new redb), a Razor Pages site (redb-razor), a Blazor site (redb-blazor), an integration worker (redb-worker), an LLM chat (redb-chat), a Blazor WebAssembly app with a redb.Route API (redb-app), a Blazor BFF with redb.Route controllers (redb-bff), an application on redb.Identity (redb-identity-app: a module beside Identity with token introspection in process, and an OpenID Connect web server) and Tsak modules with routes in XML markup next to the same routes in C# (redb-route, and redb-route-rest, -rabbitmq, -kafka, -sql, -sql-batch, -eip, -scatter-gather, -validator-xslt, -beans, -redb, -ldap, -s3, -email, -file, -cron, -amqp, -mqtt, -as2, -as4 for one scenario each). The database ones run as is on SQLite with Pro; the route-based ones also deploy as Tsak modules.</Description>
+    <PackageTags>dotnet-new;templates;redbase;redb;database;entity;tree;linq;blazor;razor;worker;llm;bff;tsak;xml;routes;identity;oidc</PackageTags>
     <PackageProjectUrl>https://redbase.app</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>
@@ -24,8 +24,63 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="templates\**\*" Exclude="templates\**\bin\**;templates\**\obj\**" />
+    <Content Include="templates\**\*" Exclude="templates\**\bin\**;templates\**\obj\**;templates\route-xml\_shared\**;templates\route-xml\_agents\**" />
     <Compile Remove="**\*" />
     <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
+
+  <!-- The XML route module templates share their build files (Directory.Build.*, the tool manifest,
+       .gitignore): one copy in templates/route-xml/_shared goes into every template of that folder
+       at pack time, so the version pins and the packaging target exist once. -->
+  <ItemGroup>
+    <RouteXmlSharedFile Include="templates\route-xml\_shared\**\*" />
+    <RouteXmlTemplate Include="templates\route-xml\**\.template.config\template.json" />
+  </ItemGroup>
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);AddRouteXmlSharedFiles</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+  <Target Name="AddRouteXmlSharedFiles">
+    <ItemGroup>
+      <!-- RecursiveDir of a template.json is "<template>\.template.config\"; two levels up is the template folder. -->
+      <_RouteXmlTemplateDir Include="@(RouteXmlTemplate->'%(RecursiveDir)'->Replace('.template.config\', '')->Replace('.template.config/', ''))" />
+      <!-- One item per (shared file, template): batching over the template folder crosses the two lists. -->
+      <_RouteXmlSharedCopy Include="@(RouteXmlSharedFile)" TemplateDir="%(_RouteXmlTemplateDir.Identity)" />
+      <TfmSpecificPackageFile Include="@(_RouteXmlSharedCopy)"
+                              PackagePath="content\templates\route-xml\%(_RouteXmlSharedCopy.TemplateDir)%(_RouteXmlSharedCopy.RecursiveDir)%(_RouteXmlSharedCopy.Filename)%(_RouteXmlSharedCopy.Extension)" />
+    </ItemGroup>
+
+    <!-- AGENTS.md of every template: the common part of templates/route-xml/_agents, then the template's own
+         section from .template.config/agents-scenario.md (that folder never reaches the created project). -->
+    <ItemGroup>
+      <_RouteXmlAgents Include="@(_RouteXmlTemplateDir->'$(IntermediateOutputPath)route-xml\%(Identity)AGENTS.md')"
+                       TemplateDir="%(Identity)"
+                       Scenario="templates\route-xml\%(Identity).template.config\agents-scenario.md" />
+    </ItemGroup>
+    <ConcatenateTextFiles First="templates\route-xml\_agents\AGENTS.common.md" Second="%(_RouteXmlAgents.Scenario)"
+                          Output="%(_RouteXmlAgents.Identity)" />
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(_RouteXmlAgents)"
+                              PackagePath="content\templates\route-xml\%(_RouteXmlAgents.TemplateDir)AGENTS.md" />
+    </ItemGroup>
+  </Target>
+
+  <!-- File.ReadAllText and WriteAllText: ReadLinesFromFile drops the empty lines Markdown needs. A missing
+       second file leaves the first one alone. -->
+  <UsingTask TaskName="ConcatenateTextFiles" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <First ParameterType="System.String" Required="true" />
+      <Second ParameterType="System.String" Required="true" />
+      <Output ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var text = System.IO.File.ReadAllText(First);
+        if (System.IO.File.Exists(Second))
+            text = text.TrimEnd() + "\n\n" + System.IO.File.ReadAllText(Second).Trim() + "\n";
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Output));
+        System.IO.File.WriteAllText(Output, text.Replace("\r\n", "\n"));
+      ]]></Code>
+    </Task>
+  </UsingTask>
 </Project>

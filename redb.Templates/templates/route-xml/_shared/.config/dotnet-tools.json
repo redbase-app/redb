@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "redb.route.xml.codegen": {
+      "version": "4.5.0",
+      "commands": [
+        "redb-route-xml"
+      ],
+      "rollForward": false
+    }
+  }
+}

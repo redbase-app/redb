@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Every {{quotes.period:3000}} ms a price request goes to three suppliers at once. The answers
+       that arrive within one second are folded into the lowest price (strategy min:...); a supplier
+       that is slower is left out, the request does not wait for it. -->
+  <route id="modulectx-quote" description="Asks three suppliers for a price and keeps the best one">
+    <from uri="timer://modulectx-quote?period={{quotes.period:3000}}"/>
+    <setHeader name="item" expr="item-${header.CamelTimerCounter % 3}"/>
+    <setBody expr='{"item":"${header.item}","qty":10}'/>
+    <scatterGather parallel="true" timeout="00:00:01" strategy="min:${jpath('$.price')}">
+      <recipient uri="direct://modulectx-supplier-a"/>
+      <recipient uri="direct://modulectx-supplier-b"/>
+      <recipient uri="direct://modulectx-supplier-c"/>
+    </scatterGather>
+    <log level="Information" showRouteId="true">
+      <message>best price for ${header.item}: ${body}</message>
+    </log>
+  </route>
+
+  <!-- The suppliers. In a real module each is an HTTP call, a queue request-reply or a database
+       lookup; here they answer from the item name, and supplier C, the cheapest, is too slow. -->
+  <route id="modulectx-supplier-a" description="Supplier A: answers at once">
+    <from uri="direct://modulectx-supplier-a"/>
+    <setBody expr='{"supplier":"A","price":${100 + jpath("$.qty")}}'/>
+    <log level="Information" showRouteId="true">
+      <message>supplier A quotes ${body}</message>
+    </log>
+  </route>
+
+  <route id="modulectx-supplier-b" description="Supplier B: answers after 300 ms">
+    <from uri="direct://modulectx-supplier-b"/>
+    <delay duration="00:00:00.300"/>
+    <setBody expr='{"supplier":"B","price":${header.item == "item-1" ? 95 : 120}}'/>
+    <log level="Information" showRouteId="true">
+      <message>supplier B quotes ${body}</message>
+    </log>
+  </route>
+
+  <route id="modulectx-supplier-c" description="Supplier C: the cheapest, but answers after 2 seconds">
+    <from uri="direct://modulectx-supplier-c"/>
+    <log level="Information" showRouteId="true">
+      <message>supplier C got the request and needs 2 seconds; the request gives up after 1</message>
+    </log>
+    <delay duration="00:00:02"/>
+    <setBody value='{"supplier":"C","price":80}'/>
+  </route>
+
+</routes>

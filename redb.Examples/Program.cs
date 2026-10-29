@@ -337,11 +337,11 @@ class Program
         // Pro is free from 3.3.0 — no license key required for the entire 3.x line.
         // Empty string = no key; set a JWT here only against a 4.x+ build that re-enables licensing.
         var TestLicense=@"";
-        services.AddRedbPro(options => options
+        services.AddRedb(options => options
             .WithLicense(TestLicense)
             .Configure(c =>
             {
-                c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking; // FREE tier: DeleteInsert (ChangeTracking is a Pro feature). Flip to ChangeTracking for the Pro run.
+                c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert; // FREE tier: DeleteInsert (ChangeTracking is a Pro feature). Flip to ChangeTracking for the Pro run.
                 //c.SkipHashValidationOnCacheCheck = false;
                 c.EnablePropsCache = enablePropsCache;
                 c.PropsCacheMaxSize = 100000;

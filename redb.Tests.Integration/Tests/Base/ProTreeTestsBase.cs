@@ -219,6 +219,79 @@ public abstract class ProTreeTestsBase : TreeTestsBase
         (await Q().Where(n => n.Budget > 1000m).DistinctBy(n => n.Budget).CountAsync()).Should().Be(3);
     }
 
+    /// <summary>Children of a fresh root: (name, code, budget) per child, in this order.</summary>
+    private async Task<TreeRedbObject<TreeNodeProps>> SeedChildrenAsync(string tag, params (string Name, string Code, decimal Budget)[] children)
+    {
+        var root = TestDataFactory.CreateTreeNode($"droot-{tag}", $"DROOT-{tag}");
+        root.id = await Redb.SaveAsync(root);
+        foreach (var (name, code, budget) in children)
+            await Redb.CreateChildAsync(TestDataFactory.CreateTreeNode($"{name}-{tag}", $"{code}-{tag}", budget), root);
+        return root;
+    }
+
+    [Fact]
+    public async Task Distinct_OverATree_OnePerPropsHash_CountsOrdersAndPages()
+    {
+        // Three children with the same props, two with other same props: two nodes.
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var root = await SeedChildrenAsync(tag, ("same", "S", 1000m), ("same", "S", 1000m), ("same", "S", 1000m),
+            ("other", "O", 2000m), ("other", "O", 2000m));
+        IRedbQueryable<TreeNodeProps> Q() => Redb.TreeQuery<TreeNodeProps>(root.id);
+
+        (await Q().Distinct().ToListAsync()).Select(n => n.Props.Budget).Should().BeEquivalentTo(new[] { 1000m, 2000m });
+        (await Q().Distinct().CountAsync()).Should().Be(2);
+        (await Q().Distinct().OrderBy(n => n.Budget).Skip(1).ToListAsync()).Select(n => n.Props.Budget).Should().Equal(2000m);
+    }
+
+    [Fact]
+    public async Task DistinctRedb_OverATree_OnePerBaseFields_AndCounts()
+    {
+        // Children under two names (different budgets, so the props differ): two nodes.
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var root = await SeedChildrenAsync(tag, ("a", "A1", 1000m), ("a", "A2", 2000m), ("a", "A3", 3000m),
+            ("b", "B1", 4000m), ("b", "B2", 5000m));
+        IRedbQueryable<TreeNodeProps> Q() => Redb.TreeQuery<TreeNodeProps>(root.id);
+
+        (await Q().DistinctRedb().ToListAsync()).Select(n => n.name).Should().BeEquivalentTo(new[] { $"a-{tag}", $"b-{tag}" });
+        (await Q().DistinctRedb().CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task DistinctByRedb_And_DistinctBy_OverATree_WithAnOrderingAndAPage()
+    {
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var root = await SeedChildrenAsync(tag, ("a", "A1", 1000m), ("a", "A2", 1000m), ("b", "B1", 2000m),
+            ("b", "B2", 2000m), ("c", "C1", 3000m));
+        IRedbQueryable<TreeNodeProps> Q() => Redb.TreeQuery<TreeNodeProps>(root.id);
+
+        // One node per name, in the order of the key, then the page.
+        (await Q().OrderBy(n => n.Budget).DistinctByRedb(o => o.Name).Skip(1).Take(1).ToListAsync())
+            .Select(n => n.name).Should().Equal($"b-{tag}");
+        (await Q().DistinctByRedb(o => o.Name).CountAsync()).Should().Be(3);
+
+        // One node per budget, skipping the first.
+        (await Q().OrderBy(n => n.Budget).DistinctBy(n => n.Budget).Skip(1).ToListAsync())
+            .Select(n => n.Props.Budget).Should().Equal(2000m, 3000m);
+    }
+
+    [Fact]
+    public async Task DistinctBy_OverATree_ThenAnyAllWindowGroupBy_CurrentBehaviour()
+    {
+        // What these combinations do today over a tree; the intended meaning is not defined yet (see BUGS_FOUND).
+        // Budget 1000: the first child is "low", the second "high"; budget 2000: "high".
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var root = await SeedChildrenAsync(tag, ("low", "L", 1000m), ("high", "H1", 1000m), ("high", "H2", 2000m));
+        IRedbQueryable<TreeNodeProps> Q() => Redb.TreeQuery<TreeNodeProps>(root.id);
+
+        (await Q().DistinctBy(n => n.Budget).AnyAsync()).Should().BeTrue();
+        // Every key has a node named "high", though the kept node of budget 1000 is "low".
+        (await Q().DistinctBy(n => n.Budget).AllAsync(n => n.Name.StartsWith("high"))).Should().BeTrue();
+        (await Q().DistinctBy(n => n.Budget).WithWindow(w => w.OrderByDesc(x => x.Budget))
+            .SelectAsync(x => new { x.Id, R = Win.RowNumber() })).Should().HaveCount(3);
+        (await Q().DistinctBy(n => n.Budget).GroupBy(x => x.Budget)
+            .SelectAsync(g => new { g.Key, N = Agg.Count(g) })).Sum(g => g.N).Should().Be(3);
+    }
+
     [Fact]
     public async Task ParentChains_OfTreeListRootListAndLoadWithParents_ReachTheRoot_DeeperThan100Levels()
     {

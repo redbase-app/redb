@@ -1,4 +1,5 @@
 using redb.Core;
+using redb.Core.Query;
 using redb.Core.Models.Entities;
 using redb.Tests.Integration.Helpers;
 using redb.Tests.Integration.Models;
@@ -412,5 +413,34 @@ public abstract class TreeTestsBase
 
         results.Should().NotBeEmpty();
         results.Should().OnlyContain(r => r.name != null && r.name.Contains("Node_"));
+    }
+
+    [Fact]
+    public async Task Aggregates_And_GroupBy_OverATree_CountOnlyItsNodes()
+    {
+        // Two roots, each with children of its own; every aggregate over one subtree reads that subtree only.
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        async Task<TreeRedbObject<TreeNodeProps>> Root(string name, params decimal[] budgets)
+        {
+            var root = TestDataFactory.CreateTreeNode($"{name}-{tag}", $"{name}-{tag}", 1m);
+            root.id = await Redb.SaveAsync(root);
+            for (var i = 0; i < budgets.Length; i++)
+                await Redb.CreateChildAsync(TestDataFactory.CreateTreeNode($"{name}-{tag}-{i}", $"{name}{i}-{tag}", budgets[i]), root);
+            return root;
+        }
+        var a = await Root("aggA", 100m, 200m, 300m);
+        await Root("aggB", 5000m, 7000m);
+        IRedbQueryable<TreeNodeProps> A() => Redb.TreeQuery<TreeNodeProps>(a.id);
+
+        (await A().CountAsync()).Should().Be(3);
+        (await A().SumAsync(n => n.Budget)).Should().Be(600m);
+        (await A().AverageAsync(n => n.Budget)).Should().Be(200m);
+        (await A().MinAsync(n => n.Budget)).Should().Be(100m);
+        (await A().MaxAsync(n => n.Budget)).Should().Be(300m);
+        (await A().Where(n => n.Budget > 150m).SumAsync(n => n.Budget)).Should().Be(500m);
+        var groups = await A().GroupBy(n => n.IsActive)
+            .SelectAsync(g => new { g.Key, N = global::redb.Core.Query.Aggregation.Agg.Count(g), S = global::redb.Core.Query.Aggregation.Agg.Sum(g, n => n.Budget) });
+        groups.Should().ContainSingle().Which.S.Should().Be(600m);
+        groups.Single().N.Should().Be(3);
     }
 }

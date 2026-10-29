@@ -1,0 +1,68 @@
+@page "/notes"
+@attribute [Authorize]
+@inject ModuleClient Module
+
+<PageTitle>Notes</PageTitle>
+
+<h1>My notes</h1>
+
+<ModuleError Error="error" />
+
+<EditForm Model="draft" OnValidSubmit="AddAsync" FormName="note" class="form">
+    <DataAnnotationsValidator />
+    <label>Title <InputText @bind-Value="draft.Title" /></label>
+    <ValidationMessage For="() => draft.Title" />
+    <label>Text <InputTextArea @bind-Value="draft.Text" rows="3" /></label>
+    <div class="actions"><button type="submit">Add</button></div>
+</EditForm>
+
+<table>
+    <thead><tr><th>Title</th><th>Text</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var note in notes)
+    {
+        <tr>
+            <td>@note.Title</td>
+            <td>@note.Text</td>
+            <td>@note.CreatedAt.ToLocalTime().ToString("g")</td>
+            <td><button class="link" @onclick="() => DeleteAsync(note.Id)">Delete</button></td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+@code {
+    private List<NoteDto> notes = [];
+    private NoteDto draft = new();
+    private Exception? error;
+
+    protected override Task OnInitializedAsync() => RunAsync(LoadAsync);
+
+    private Task AddAsync() => RunAsync(async () =>
+    {
+        await Module.AddNoteAsync(draft);
+        draft = new();
+        await LoadAsync();
+    });
+
+    private Task DeleteAsync(long id) => RunAsync(async () =>
+    {
+        await Module.DeleteNoteAsync(id);
+        await LoadAsync();
+    });
+
+    private async Task LoadAsync() => notes = await Module.NotesAsync();
+
+    private async Task RunAsync(Func<Task> call)
+    {
+        error = null;
+        try
+        {
+            await call();
+        }
+        catch (Exception ex) when (ex is SessionEndedException or IdentityUnavailableException or ModuleException)
+        {
+            error = ex;
+        }
+    }
+}

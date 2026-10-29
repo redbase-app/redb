@@ -4,6 +4,7 @@
   "classifications": [ "Console", "AI", "Chat", "RedBase" ],
   "identity": "RedBase.Chat.Template",
   "name": "RedBase LLM Chat",
+  "description": "An LLM chat with its history in redb, in the console and over HTTP, with optional tools and audit; its own host or a Tsak module.",
   "shortName": "redb-chat",
   "tags": {
     "language": "C#",
@@ -16,6 +17,7 @@
       "type": "parameter",
       "datatype": "choice",
       "defaultValue": "none",
+      "displayName": "Tools",
       "description": "Tools the model can call",
       "choices": [
         { "choice": "none", "description": "A plain chat" },
@@ -27,6 +29,7 @@
       "type": "parameter",
       "datatype": "bool",
       "defaultValue": "false",
+      "displayName": "Audit",
       "description": "Stamp the user and audit tags on every stored message, and add an /audit console command"
     },
     "UseShell": {

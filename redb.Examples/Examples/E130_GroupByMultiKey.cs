@@ -11,7 +11,7 @@ namespace redb.Examples.Examples;
 /// Group by Department AND Position for detailed breakdown; one aggregate reads a field two nested
 /// classes deep (HomeAddress.Building.Floor).
 /// </summary>
-[ExampleMeta("E130", "GroupBy - Composite Key", "Analytics",
+[ExampleMeta("E130a", "GroupBy - Composite Key", "Analytics",
     ExampleTier.Free, 130, "GroupBy", "Composite", "MultiKey", "Analytics", RelatedApis = ["IRedbQueryable.GroupBy"])]
 public class E130_GroupByMultiKey : ExampleBase
 {
@@ -39,7 +39,7 @@ public class E130_GroupByMultiKey : ExampleBase
         sw.Stop();
 
         var first = byDeptPosition.FirstOrDefault();
-        return Ok("E130", "GroupBy - Composite Key", ExampleTier.Free, sw.ElapsedMilliseconds, byDeptPosition.Count,
+        return Ok("E130a", "GroupBy - Composite Key", ExampleTier.Free, sw.ElapsedMilliseconds, byDeptPosition.Count,
             [$"Groups: {byDeptPosition.Count}", $"First: {first?.Department ?? "N/A"}/{first?.Position ?? "N/A"}, Avg home floor: {first?.AvgFloor:F2}"]);
     }
 }

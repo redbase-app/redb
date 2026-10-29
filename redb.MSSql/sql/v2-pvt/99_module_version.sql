@@ -199,7 +199,11 @@ BEGIN
     -- 0.2.30 - block 0: value-leading indexes (_id_structure, <value>, _id_object) INCLUDE (_array_index) for every
     --          value column but the string replace the eleven object-leading *_not_null / *_filter ones (2026-10-16).
     --          Restore statements: 00_module_init.sql.
-    RETURN N'0.2.30';
+    -- 0.2.31 - DistinctBy/DistinctRedb in tree queries: the row source ranks by the query order and by every key
+    --          of @distinct_on, and the wrapper keeps _rn = 1 ordered by _ord. Until 0.2.30 the first key only was
+    --          partitioned, ranked by (SELECT 1), with the ordering applied outside, where a Props column does not
+    --          resolve: TreeQuery(...).DistinctBy(x => x.IsActive) failed with "Invalid column name 'IsActive'".
+    RETURN N'0.2.31';
 END;
 GO
 

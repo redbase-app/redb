@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The module sends, Holodeck receives (routes/send.route.xml). Holodeck verifies the module's signature with the
+     certificate under alias "module", decrypts with its own key and answers with a signed receipt in the HTTP
+     response. Party ids, agreement, service and action are the defaults of the module's configuration. -->
+<PMode xmlns="http://holodeck-b2b.org/schemas/2014/10/pmode">
+    <id>module-to-holodeck</id>
+    <mep>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/oneWay</mep>
+    <mepBinding>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/push</mepBinding>
+    <Initiator>
+        <PartyId>urn:redb:example:module</PartyId>
+        <Role>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/initiator</Role>
+        <SecurityConfiguration>
+            <Signing>
+                <KeystoreAlias>module</KeystoreAlias>
+            </Signing>
+        </SecurityConfiguration>
+    </Initiator>
+    <Responder>
+        <PartyId>urn:redb:example:holodeck</PartyId>
+        <Role>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/responder</Role>
+        <SecurityConfiguration>
+            <Signing>
+                <KeystoreAlias password="test-only-key">holodeck</KeystoreAlias>
+                <KeyReferenceMethod>BSTReference</KeyReferenceMethod>
+                <Algorithm>http://www.w3.org/2001/04/xmldsig-more#rsa-sha256</Algorithm>
+                <HashFunction>http://www.w3.org/2001/04/xmlenc#sha256</HashFunction>
+            </Signing>
+            <Encryption>
+                <KeystoreAlias password="test-only-key">holodeck</KeystoreAlias>
+            </Encryption>
+        </SecurityConfiguration>
+    </Responder>
+    <Agreement>
+        <name>urn:redb:example:agreement</name>
+    </Agreement>
+    <Leg>
+        <Receipt>
+            <ReplyPattern>RESPONSE</ReplyPattern>
+            <NotifyReceiptToBusinessApplication>false</NotifyReceiptToBusinessApplication>
+        </Receipt>
+        <DefaultDelivery>
+            <DeliveryMethod>org.holodeckb2b.backend.file.NotifyAndDeliverOperation</DeliveryMethod>
+            <Parameter>
+                <name>format</name>
+                <value>ebms</value>
+            </Parameter>
+            <Parameter>
+                <name>deliveryDirectory</name>
+                <value>data/msg_in</value>
+            </Parameter>
+        </DefaultDelivery>
+        <UserMessageFlow>
+            <BusinessInfo>
+                <Action>StoreMessage</Action>
+                <Service>
+                    <name>urn:redb:example:as4</name>
+                </Service>
+            </BusinessInfo>
+        </UserMessageFlow>
+    </Leg>
+</PMode>

@@ -1,0 +1,24 @@
+<Project>
+
+  <ItemGroup>
+    <None Include="routes/**/*.route.xml" />
+    <None Include="context.xml" />
+    <None Include="resources/**/*" />
+    <None Include="config/**/*.json" />
+  </ItemGroup>
+
+  <!-- Build the Tsak package: dotnet build -p:PackRouteOnBuild=true -p:Version=1.0.0
+       checks the markup, the endpoint options against the connectors in bin/, the bean
+       references and the required configuration keys, then writes pkg/<name>-<version>.tpkg.
+       A broken reference fails the build.
+       RoutePackageIncludeAssembly=true puts the module's own assembly into the package, for C# beans. -->
+  <Target Name="RoutePackage" AfterTargets="Build" Condition="'$(PackRouteOnBuild)' == 'true'">
+    <PropertyGroup>
+      <_RoutePackageEntry Condition="'$(RoutePackageIncludeAssembly)' == 'true'"> --entry &quot;$(TargetPath)&quot;</_RoutePackageEntry>
+    </PropertyGroup>
+    <Exec Command="dotnet tool restore" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="dotnet redb-route-xml pack &quot;$(MSBuildProjectDirectory)&quot; --version $(Version) --bin &quot;$(TargetDir).&quot;$(_RoutePackageEntry)"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+</Project>

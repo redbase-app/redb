@@ -12,7 +12,9 @@ namespace redb.Tests.Integration.Tests.SqlitePro;
 [Collection("SqlitePro")]
 public class SqliteProSaveInterceptorTests : SaveInterceptorTestsBase
 {
-    public SqliteProSaveInterceptorTests(SqliteProFixture _) { }
+    private readonly SqliteProFixture _fixture;
+
+    public SqliteProSaveInterceptorTests(SqliteProFixture fixture) => _fixture = fixture;
 
     protected override string ConnectionStringName => "Sqlite";
     protected override PropsSaveStrategy Strategy => PropsSaveStrategy.ChangeTracking;
@@ -20,7 +22,9 @@ public class SqliteProSaveInterceptorTests : SaveInterceptorTestsBase
         => services.AddRedbPro(configure);
     protected override void UseProvider(RedbOptionsBuilder options, string connectionString)
     {
+        // The database of the collection's fixture, which has the schema. The "Sqlite" connection string is the
+        // file of the Free collection: it had a schema only when that collection, or a previous run, made it.
         SqliteDataSource.NativeExtensionPath ??= SqliteTestSupport.ResolveNativeExtension();
-        options.UseSqlite(connectionString);
+        options.UseSqlite(_fixture.ConnectionString);
     }
 }

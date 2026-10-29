@@ -137,6 +137,12 @@ BEGIN
         ELSE N'_pvt_cte.'
     END;
     DECLARE @order_sql NVARCHAR(MAX) = dbo.pvt_build_order_conditions(@order, @fields, @base_prefix);
+    -- The ordering columns alone (no "ORDER BY"), for the ROW_NUMBER of the DistinctBy branches: they rank
+    -- inside the row source, where pivot columns are visible, and are kept even without paging.
+    DECLARE @order_cols NVARCHAR(MAX) = CASE
+        WHEN @order_sql = N'' THEN N''
+        ELSE SUBSTRING(@order_sql, 11, LEN(@order_sql)) + N', '   -- skip CHAR(10) + N'ORDER BY ' (10 chars)
+    END;
     -- T-SQL forbids ORDER BY inside subqueries unless paired with TOP/OFFSET-FETCH.
     -- The orchestrator output is always wrapped as a derived table by the C# layer,
     -- so drop ORDER BY when paging is absent and supply a stable default when
@@ -155,25 +161,30 @@ BEGIN
     -- the projected [_id] is orderable here; use it for deterministic paging.
     DECLARE @order_sql_dist NVARCHAR(MAX) = CASE WHEN @paging <> N'' THEN CHAR(10) + N'ORDER BY [_id]' ELSE N'' END;
 
-    -- DistinctBy emulation: T-SQL has no SELECT DISTINCT ON; use
-    -- ROW_NUMBER() OVER (PARTITION BY key ORDER BY (SELECT 1)) and
-    -- filter to rn=1 in an outer wrapper. Resolve the partition column.
-    -- Stored already alias-qualified per current shape:
+    -- DistinctBy emulation: T-SQL has no SELECT DISTINCT ON. The row source gets
+    --   _rn  = ROW_NUMBER() OVER (PARTITION BY <keys> ORDER BY <order>, <id>)  -- first row of a key by the query order
+    --   _ord = ROW_NUMBER() OVER (ORDER BY <order>, <id>)                      -- the query order itself
+    -- and the wrapper keeps _rn = 1 ordered by _ord. The ordering is evaluated inside the row source, where
+    -- pivot columns resolve (an outer ORDER BY on a Props field failed: "Invalid column name"), and it is kept
+    -- without paging (OFFSET 0 ROWS). Every key of @distinct_on is partitioned by (DistinctRedb sends the
+    -- object's columns); up to 0.2.30 the first key only, ranked by (SELECT 1), with the order applied outside.
+    -- Keys are stored alias-qualified per current shape:
     --   base col  -> @base_prefix + [DbCol]   (e.g. o.[_name] / _pvt_cte.[_name])
     --   props col -> _pvt_cte.[FieldName]     (pivot cols always live in _pvt_cte)
     DECLARE @rn_col NVARCHAR(MAX) = NULL;
     IF @distinct_on IS NOT NULL AND ISJSON(@distinct_on) = 1
     BEGIN
-        DECLARE @don_field NVARCHAR(400) = JSON_VALUE(@distinct_on, '$[0].field');
-        IF @don_field IS NOT NULL AND @don_field <> N''
-        BEGIN
-            DECLARE @don_meta NVARCHAR(MAX) = JSON_QUERY(@fields, N'$."' + STRING_ESCAPE(@don_field, 'json') + N'"');
-            IF @don_meta IS NOT NULL AND JSON_VALUE(@don_meta, '$.kind') = N'base'
-                SET @rn_col = @base_prefix + QUOTENAME(JSON_VALUE(@don_meta, '$.column'));
-            ELSE
-                SET @rn_col = N'_pvt_cte.' + QUOTENAME(@don_field);
-        END;
+        SELECT @rn_col = STRING_AGG(
+                   CASE WHEN JSON_VALUE(m.meta, '$.kind') = N'base'
+                        THEN @base_prefix + QUOTENAME(JSON_VALUE(m.meta, '$.column'))
+                        ELSE N'_pvt_cte.' + QUOTENAME(d.field) END,
+                   N', ') WITHIN GROUP (ORDER BY d.pos)
+          FROM (SELECT CAST([key] AS INT) AS pos, JSON_VALUE([value], '$.field') AS field
+                  FROM OPENJSON(@distinct_on)) d
+          CROSS APPLY (SELECT JSON_QUERY(@fields, N'$."' + STRING_ESCAPE(d.field, 'json') + N'"') AS meta) m
+         WHERE d.field IS NOT NULL AND d.field <> N'';
     END;
+    DECLARE @rn_paging NVARCHAR(MAX) = CASE WHEN @paging = N'' THEN CHAR(10) + N'OFFSET 0 ROWS' ELSE @paging END;
 
     -- ---------- Tree mode branch ----------
     -- Handles tree_roots, tree_leaves, tree_children, tree_descendants, tree_ancestors.
@@ -202,19 +213,14 @@ BEGIN
             END;
             DECLARE @rowSelT NVARCHAR(MAX) = CASE WHEN @narrow = 1 THEN N'o.[_id]' ELSE N'_pvt_cte.[_id]' END;
             IF @rn_col IS NOT NULL
-            BEGIN
-                -- Project the full row-source so the outer derived table can be
-                -- aliased with the same prefix `@order_sql` uses (`o.` or
-                -- `_pvt_cte.`). Otherwise base-field ORDER BY references can't
-                -- resolve in the outer scope (the ROW_NUMBER wrapper hides `o`).
-                DECLARE @rn_aliasT NVARCHAR(40) = CASE WHEN @narrow = 1 THEN N'o' ELSE N'_pvt_cte' END;
                 RETURN N'SELECT [_id] FROM (' + CHAR(10)
-                     + N'SELECT ' + @rn_aliasT + N'.*, ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY (SELECT 1)) AS [_rn]' + CHAR(10)
+                     + N'SELECT ' + @rowSelT + N' AS [_id], '
+                     + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + @rowSelT + N') AS [_rn], '
+                     + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + @rowSelT + N') AS [_ord]' + CHAR(10)
                      + N'FROM (' + CHAR(10) + @innerT + CHAR(10) + N') _pvt_cte' + @joinT + CHAR(10)
                      + N'WHERE ' + @whereTp + CHAR(10)
-                     + N') ' + @rn_aliasT + CHAR(10) + N'WHERE ' + @rn_aliasT + N'.[_rn] = 1'
-                     + @order_sql + @paging;
-            END;
+                     + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
+                     + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
             -- T-SQL forbids ORDER BY items not in SELECT when DISTINCT.
             -- Wrap so paging-ORDER applies outside the DISTINCT.
             IF @distinct = 1
@@ -292,10 +298,12 @@ BEGIN
         -- field (no props in the query) returned every node of the tree.
         IF @rn_col IS NOT NULL
             RETURN N'SELECT [_id] FROM (' + CHAR(10)
-                 + N'SELECT o.*, ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY (SELECT 1)) AS [_rn]' + CHAR(10)
+                 + N'SELECT o.[_id] AS [_id], '
+                 + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + N'o.[_id]) AS [_rn], '
+                 + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + N'o.[_id]) AS [_ord]' + CHAR(10)
                  + @baseFromT + CHAR(10)
-                 + N') o' + CHAR(10) + N'WHERE o.[_rn] = 1'
-                 + @order_sql + @paging;
+                 + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
+                 + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
         IF @distinct = 1
             RETURN N'SELECT [_id] FROM (' + CHAR(10)
                  + N'SELECT DISTINCT o.[_id] AS [_id] ' + @baseFromT + CHAR(10)
@@ -317,14 +325,13 @@ BEGIN
             + CHAR(10) + N'WHERE o.[_id_scheme] = ' + CAST(@scheme_id AS NVARCHAR(40))
             + CASE WHEN @whereA <> N'1=1' THEN N' AND ' + @whereA ELSE N'' END;
         IF @rn_col IS NOT NULL
-            -- Project o.* so the outer derived table aliased `o` exposes every
-            -- base column ORDER BY may reference (paging-only ORDER BY uses
-            -- `(SELECT 1)`, but a user ORDER BY can hit any base field).
             RETURN N'SELECT [_id] FROM (' + CHAR(10)
-                 + N'SELECT o.*, ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY (SELECT 1)) AS [_rn]' + CHAR(10)
+                 + N'SELECT o.[_id] AS [_id], '
+                 + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + N'o.[_id]) AS [_rn], '
+                 + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + N'o.[_id]) AS [_ord]' + CHAR(10)
                  + @baseFrom + CHAR(10)
-                 + N') o' + CHAR(10) + N'WHERE o.[_rn] = 1'
-                 + @order_sql + @paging;
+                 + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
+                 + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
         IF @distinct = 1
             RETURN N'SELECT [_id] FROM (' + CHAR(10)
                  + N'SELECT DISTINCT o.[_id] AS [_id] ' + @baseFrom + CHAR(10)
@@ -350,17 +357,14 @@ BEGIN
     END;
     DECLARE @rowSelC NVARCHAR(MAX) = CASE WHEN @narrow = 1 THEN N'o.[_id]' ELSE N'_pvt_cte.[_id]' END;
     IF @rn_col IS NOT NULL
-    BEGIN
-        -- Alias outer derived table with the same prefix `@order_sql` uses
-        -- (`o.` or `_pvt_cte.`) so base-field references in ORDER BY resolve.
-        DECLARE @rn_aliasC NVARCHAR(40) = CASE WHEN @narrow = 1 THEN N'o' ELSE N'_pvt_cte' END;
         RETURN N'SELECT [_id] FROM (' + CHAR(10)
-             + N'SELECT ' + @rn_aliasC + N'.*, ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY (SELECT 1)) AS [_rn]' + CHAR(10)
+             + N'SELECT ' + @rowSelC + N' AS [_id], '
+             + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + @rowSelC + N') AS [_rn], '
+             + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + @rowSelC + N') AS [_ord]' + CHAR(10)
              + N'FROM (' + CHAR(10) + @inner + CHAR(10) + N') _pvt_cte' + @joinC + CHAR(10)
              + N'WHERE ' + @whereC + CHAR(10)
-             + N') ' + @rn_aliasC + CHAR(10) + N'WHERE ' + @rn_aliasC + N'.[_rn] = 1'
-             + @order_sql + @paging;
-    END;
+             + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
+             + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
     IF @distinct = 1
         RETURN N'SELECT [_id] FROM (' + CHAR(10)
              + N'SELECT DISTINCT ' + @rowSelC + N' AS [_id] FROM ('

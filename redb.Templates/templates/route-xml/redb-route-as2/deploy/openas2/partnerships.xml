@@ -1,0 +1,36 @@
+<!-- The OpenAS2 side of the local exchange. The certs service of docker-compose.openas2.yml copies it into the
+     OpenAS2 configuration together with the image's own config template and the generated keystore.
+     x509_alias is the alias in as2_certs.p12: openas2 holds OpenAS2's key pair, module the module's certificate. -->
+<partnerships>
+    <partner name="openas2" as2_id="openas2" x509_alias="openas2" email="openas2@example.com"/>
+    <partner name="modulectx" as2_id="modulectx" x509_alias="module" email="modulectx@example.com"/>
+
+    <!-- The module sends to OpenAS2: signed SHA-256, encrypted AES-128, signed MDN. -->
+    <partnership name="modulectx-to-openas2">
+        <sender name="modulectx"/>
+        <receiver name="openas2"/>
+        <attribute name="protocol" value="as2"/>
+        <attribute name="content_transfer_encoding" value="binary"/>
+        <attribute name="encrypt" value="AES128"/>
+        <attribute name="sign" value="SHA-256"/>
+        <attribute name="as2_url" value="http://openas2:10080"/>
+        <attribute name="as2_mdn_options" value="signed-receipt-protocol=optional, pkcs7-signature; signed-receipt-micalg=optional, sha-256"/>
+        <attribute name="prevent_canonicalization_for_mic" value="false"/>
+    </partnership>
+
+    <!-- OpenAS2 sends to the module: a file dropped into data/outbox/modulectx is signed, encrypted and posted to
+         the module's receiver, which answers with a signed MDN. -->
+    <partnership name="openas2-to-modulectx">
+        <sender name="openas2"/>
+        <receiver name="modulectx"/>
+        <pollerConfig enabled="true"/>
+        <attribute name="subject" value="AS2 message from openas2"/>
+        <attribute name="protocol" value="as2"/>
+        <attribute name="content_transfer_encoding" value="binary"/>
+        <attribute name="encrypt" value="AES128"/>
+        <attribute name="sign" value="SHA-256"/>
+        <attribute name="as2_url" value="http://module:4080/as2/inbound"/>
+        <attribute name="as2_mdn_options" value="signed-receipt-protocol=optional, pkcs7-signature; signed-receipt-micalg=optional, sha-256"/>
+        <attribute name="prevent_canonicalization_for_mic" value="false"/>
+    </partnership>
+</partnerships>

@@ -1,0 +1,41 @@
+# A local S3-compatible store for the module: RustFS (MinIO-compatible, Apache 2.0), and the module on a Tsak worker.
+# A test stand, not a deployment.
+#
+# From the project folder (PowerShell or a POSIX shell alike):
+#   dotnet build -p:PackRouteOnBuild=true -p:Version=1.0.0        # -> pkg/routemodule-1.0.0.tpkg
+#   cp deploy/.env.example deploy/.env                              # then set S3_SECRET_KEY
+#   docker compose -f deploy/docker-compose.s3.yml up -d
+#
+# The store listens on http://localhost:9000 (S3 API) and http://localhost:9001 (web console); the access key is
+# modulectx, the secret key S3_SECRET_KEY. The module creates the buckets incoming and archive on first use.
+name: modulectx-s3
+
+services:
+  s3:
+    image: rustfs/rustfs:1.0.3
+    environment:
+      RUSTFS_ACCESS_KEY: modulectx
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY required, see deploy/.env.example}
+      RUSTFS_CONSOLE_ENABLE: "true"
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - s3-data:/data
+
+  module:
+    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.5.0-net10}
+    depends_on:
+      - s3
+    environment:
+      - Tsak__Modules__AssemblyPaths__0=/app/modules
+      - Tsak__Cluster__ApiEndpoint=http://module:9090
+      # The module's context: the Override layer, which wins over every other layer of its configuration.
+      - Tsak__Contexts__modulectx__Override__s3.serviceUrl=http://s3:9000
+      - Tsak__Contexts__modulectx__Override__s3.accessKey=modulectx
+      - Tsak__Contexts__modulectx__Override__s3.secretKey=${S3_SECRET_KEY:?S3_SECRET_KEY required, see deploy/.env.example}
+    volumes:
+      - ../pkg:/app/modules
+
+volumes:
+  s3-data:

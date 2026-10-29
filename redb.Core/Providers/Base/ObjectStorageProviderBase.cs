@@ -355,10 +355,9 @@ namespace redb.Core.Providers.Base
             {
                 Caching.CachePublication.AfterCommit(_context, () =>
                 {
-                    PropsCache.Set(loadedObj);
-                    // Recursively cache all nested objects (they are already in memory after deserialization!)
-                    if (loadedObj.GetPropsDirectly() is { } props)
-                        CacheNestedObjects(props);
+                    // One walk: the graph is marked shared and every nested RedbObject<T> is cached by its own id
+                    // (they are already in memory after deserialization).
+                    PropsCache.SetGraph(loadedObj);
                 });
             }
 
@@ -430,19 +429,103 @@ namespace redb.Core.Providers.Base
 
         /// <summary>
         /// Whether a cached object whose own hash matched its row may be served with the graph it holds. Its hash does
-        /// not move when an object it references changes or leaves for the trash, on this node or any other, so a
-        /// provider that caches whole graphs checks the loaded references against their rows. With <paramref name="sync"/>
-        /// every database call runs on the calling thread and the task is complete on return.
+        /// not move when an object it references changes or leaves for the trash, on this node or any other, so the
+        /// loaded references are checked against their rows: a missing row, a row of the trash scheme and a moved
+        /// hash all make the graph stale. With <paramref name="sync"/> every database call runs on the calling thread
+        /// and the task is complete on return.
         /// </summary>
         protected virtual Task<bool> IsCachedGraphCurrentAsync(IRedbObject cached, bool sync, CancellationToken cancellationToken)
-            => Task.FromResult(true);
+        {
+            // Only the references matter: the caller has already compared this object's own hash with its row.
+            var references = GetLoadedReferences(cached);
+            references.Remove(cached.Id);
+            if (references.Count == 0)
+                return Task.FromResult(true);
+
+            var ids = references.Keys.ToArray();
+            var sql = Sql.ObjectStorage_SelectObjectsByIds();
+            if (sync)
+                return Task.FromResult(IsGraphCurrent(references, _context.Query<RedbObjectRow>(sql, new object[] { ids })));
+
+            return IsGraphCurrentAsync(sql, ids, references, cancellationToken);
+        }
+
+        private async Task<bool> IsGraphCurrentAsync(string sql, long[] ids, Dictionary<long, Guid?> references, CancellationToken cancellationToken)
+        {
+            var rows = await _context.QueryAsync<RedbObjectRow>(sql, new object[] { ids }, cancellationToken);
+            return IsGraphCurrent(references, rows);
+        }
+
+        private static bool IsGraphCurrent(Dictionary<long, Guid?> references, List<RedbObjectRow> rows)
+        {
+            var byId = new Dictionary<long, RedbObjectRow>(rows.Count);
+            foreach (var row in rows)
+                byId[row.Id] = row;
+
+            return IsGraphCurrent(references, byId);
+        }
+
+        private static bool IsGraphCurrent(Dictionary<long, Guid?> references, Dictionary<long, RedbObjectRow> byId)
+        {
+            foreach (var (id, hash) in references)
+            {
+                if (!byId.TryGetValue(id, out var row))
+                    return false;                                   // the target is gone
+                if (row.IdScheme == RedbTypeIds.DeletedScheme)
+                    return false;                                   // the target left for the trash
+                if (row.Hash != hash)
+                    return false;                                   // the target changed
+            }
+
+            return true;
+        }
 
         /// <summary>
-        /// Recursively caches all nested RedbObject found in Props
+        /// The ids of the cached graphs that hold at least one stale reference. All graphs are checked in one query:
+        /// the bulk load hands over every object a cache hit returned, and one statement per object would be the
+        /// price of every list read under the props cache.
         /// </summary>
-        protected void CacheNestedObjects(object obj) => PropsCache.SetNested(obj);
+        private async Task<HashSet<long>> FindStaleCachedGraphsAsync(IEnumerable<IRedbObject> cachedObjects, CancellationToken cancellationToken)
+        {
+            var perRoot = new Dictionary<long, Dictionary<long, Guid?>>();
+            var all = new Dictionary<long, Guid?>();
 
+            foreach (var obj in cachedObjects)
+            {
+                var references = GetLoadedReferences(obj);
+                references.Remove(obj.Id);
+                if (references.Count == 0) continue;
 
+                perRoot[obj.Id] = references;
+                foreach (var (id, hash) in references)
+                    all[id] = hash;
+            }
+
+            var stale = new HashSet<long>();
+            if (all.Count == 0) return stale;
+
+            var ids = all.Keys.ToArray();
+            var rows = await _context.QueryAsync<RedbObjectRow>(
+                Sql.ObjectStorage_SelectObjectsByIds(), new object[] { ids }, cancellationToken);
+            var byId = new Dictionary<long, RedbObjectRow>(rows.Count);
+            foreach (var row in rows)
+                byId[row.Id] = row;
+
+            foreach (var (rootId, references) in perRoot)
+                if (!IsGraphCurrent(references, byId))
+                    stale.Add(rootId);
+
+            return stale;
+        }
+
+        /// <summary>
+        /// The loaded objects a cached graph vouches for beyond its root, by id with the hash each was loaded with.
+        /// The walk comes from <see cref="LoadedGraphInspector"/>: it visits the loaded part of Props, never a stub and
+        /// never a leaf getter (a list item's Object getter would load its target on read).
+        /// </summary>
+        private static Dictionary<long, Guid?> GetLoadedReferences(IRedbObject root)
+            => LoadedGraphInspector.CollectLoadedReferences(
+                root.GetType().GetMethod("GetPropsDirectly", Type.EmptyTypes)?.Invoke(root, null));
 
         /// <summary>
         /// Save single object via interface. Type determined internally.
@@ -1022,6 +1105,8 @@ namespace redb.Core.Providers.Base
                 foreach (var row in rows)
                     rowById[row.Id] = row;
 
+                var hits = new List<(long Id, IRedbObject Obj)>();
+
                 foreach (var id in ids)
                 {
                     IRedbObject? cachedObj = null;
@@ -1031,17 +1116,35 @@ namespace redb.Core.Providers.Base
                         var propsType = Cache.GetClrType(row.IdScheme);
                         if (propsType != null)
                         {
-                            // Dynamically call Get<TProps>(id, hash)
-                            var getMethod = typeof(GlobalPropsCache).GetMethod("Get")?.MakeGenericMethod(propsType);
-                            if (getMethod != null)
-                                cachedObj = getMethod.Invoke(PropsCache, new object[] { id, row.Hash.Value }) as IRedbObject;
+                            // Typed Get<TProps>(id, hash): the delegate is built once per props type.
+                            cachedObj = Caching.CacheDelegates.Get(PropsCache, propsType, id, row.Hash.Value);
                         }
                     }
 
                     if (cachedObj != null)
-                        result.Add(cachedObj);  // Cache HIT
+                        hits.Add((id, cachedObj));   // Cache HIT, checked for a stale graph below
                     else
-                        idsToLoad.Add(id);      // Cache MISS, or the object does not exist - the load reports that
+                        idsToLoad.Add(id);           // Cache MISS, or the object does not exist - the load reports that
+                }
+
+                // A cached graph keeps the references it was loaded with, and a target that changed or left for the
+                // trash moves neither this object's hash nor its cache entry. One query checks every reference of
+                // every hit; a stale graph is dropped and its object is read again.
+                if (hits.Count > 0)
+                {
+                    var stale = await FindStaleCachedGraphsAsync(hits.Select(h => h.Obj), cancellationToken);
+                    foreach (var (id, obj) in hits)
+                    {
+                        if (stale.Contains(id))
+                        {
+                            PropsCache.Remove(id);
+                            idsToLoad.Add(id);
+                        }
+                        else
+                        {
+                            result.Add(obj);
+                        }
+                    }
                 }
             }
             else
@@ -1238,19 +1341,8 @@ namespace redb.Core.Providers.Base
                     // Cache main + nested objects
                     if (_configuration.EnablePropsCache && PropsCache.Instance != null && redbObj.Hash.HasValue)
                     {
-                        var setMethod = typeof(GlobalPropsCache).GetMethod("Set")?.MakeGenericMethod(propsType);
-                        setMethod?.Invoke(PropsCache, new[] { redbObj });
-
-                        // Recursively cache nested objects
-                        var propsProperty = redbObj.GetType().GetProperty("Props");
-                        if (propsProperty != null)
-                        {
-                            var propsValue = propsProperty.GetValue(redbObj);
-                            if (propsValue != null)
-                            {
-                                CacheNestedObjects(propsValue);
-                            }
-                        }
+                        // The object and its nested objects in one walk.
+                        Caching.CacheDelegates.SetGraph(PropsCache, redbObj);
                     }
 
                     result.Add(redbObj);

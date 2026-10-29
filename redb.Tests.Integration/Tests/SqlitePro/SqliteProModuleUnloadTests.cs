@@ -28,9 +28,13 @@ public class SqliteProModuleUnloadTests
 {
     public SqliteProModuleUnloadTests(SqliteProFixture _) { }
 
+    // A database of its own, created by the test: the "Sqlite" connection string it used is the file of the Free
+    // collection, which had a schema only when that collection, or a previous run, made it.
+    private const string Cs = "Data Source=redb_tests_module_unload.db";
+
     private static ServiceProvider BuildHost()
     {
-        var cs = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build().GetConnectionString("Sqlite")!;
+        var cs = Cs;
         SqliteDataSource.NativeExtensionPath ??= SqliteTestSupport.ResolveNativeExtension();
         var services = new ServiceCollection();
         services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
@@ -105,9 +109,10 @@ public class SqliteProModuleUnloadTests
     [Fact]
     public async Task ModuleWithASchemeAndAnInterceptor_Unloads()
     {
+        SqliteTestSupport.DeleteDbFiles(Cs);
         await using var host = BuildHost();
         var redb = host.GetRequiredService<IRedbService>();
-        await redb.Context.ExecuteAsync("DELETE FROM _objects WHERE _name = 'module-unload-probe'");
+        await redb.InitializeAsync(ensureCreated: true);
 
         var (weak, saved, deleted) = await RunModuleAndUnload(host);
 

@@ -1,0 +1,107 @@
+# redb.Identity and the application module in one Tsak worker (the redb-identity-full image: worker,
+# Tsak dashboard, Identity's own sign-in and admin UI)
+#if (web)
+# and the application's web server.
+#endif
+#
+# From the project folder:
+#   cp deploy/.env.example deploy/.env          # then set the secrets
+#   pwsh deploy/pack-tpkg.ps1                   # -> deploy/output/RedbIdentityApp.tpkg
+#   docker compose -f deploy/docker-compose.yml up -d --build
+#
+#if (web)
+# Then open http://localhost:5085 (the application) and sign in as admin with IDENTITY_ADMIN_PASSWORD.
+#else
+# Then call the module's API on http://localhost:5094/api/me with an access token from Identity.
+#endif
+# Identity's own UI: http://localhost:8087; the Tsak dashboard: http://localhost:8085.
+#
+# Identity answers at https://localhost:5002 with the image's self-signed certificate: the browser warns
+#if (web)
+# once, the web server trusts it through its CA store (RedbIdentityApp.Web/Dockerfile). For a real
+#else
+# once. For a real
+#endif
+# deployment put a real certificate and the public https address on Identity (see README, "Deploy").
+
+services:
+  identity:
+    image: ghcr.io/redbase-app/redb-identity-full:${IDENTITY_VERSION:-4.5.0}
+    restart: unless-stopped
+    ports:
+      # Identity's issuer: the port is part of it, so it is the same inside and outside.
+      - "127.0.0.1:5002:5002"
+      - "127.0.0.1:8087:8087"   # Identity's sign-in and admin UI
+      - "127.0.0.1:8085:8085"   # Tsak dashboard
+      # The module's API, for a web server started on the host with dotnet run.
+      - "127.0.0.1:5094:5094"
+#if (web)
+      # The application's web server: it shares this container's network (network_mode below).
+      - "127.0.0.1:5085:5085"
+#endif
+    environment:
+      # The worker's management API has no API keys in this image: it listens on 127.0.0.1 only, where the
+      # Tsak dashboard of the same container reaches it, and its port is not published.
+      Tsak__Api__Host: 127.0.0.1
+      # The dashboard's sign-in (login admin).
+      Tsak__Web__AdminPassword: ${TSAK_WEB_ADMIN_PASSWORD:?TSAK_WEB_ADMIN_PASSWORD required}
+      # The application module: a second module folder of the worker.
+      Tsak__Modules__AssemblyPaths__1: /app/modules
+      # The module listens on all interfaces of the container, so the published port above reaches it.
+      Tsak__Contexts__redbidentityapp__Override__Api__Host: 0.0.0.0
+
+      # --- Identity ---
+      # The first administrator: replaces the default admin/admin while it is untouched.
+      Tsak__Contexts__identity.core__Override__Identity__SeedAdmin__Password: ${IDENTITY_ADMIN_PASSWORD:?IDENTITY_ADMIN_PASSWORD required}
+      # The service client the module and Identity's own UI use for the management API.
+      Tsak__Contexts__identity.core__Override__Identity__SeedBackchannelClient__ClientSecret: ${MANAGEMENT_CLIENT_SECRET:?MANAGEMENT_CLIENT_SECRET required}
+      Identity__BackchannelClient__ClientSecret: ${MANAGEMENT_CLIENT_SECRET:?MANAGEMENT_CLIENT_SECRET required}
+      # The application's administrative scope is issued only to users whose role carries it (the module
+      # attaches it to the admin role). scim is Identity's own default and stays.
+      Tsak__Contexts__identity.core__Override__Identity__AdminScopeEntitlement__GatedScopes__0: scim
+      Tsak__Contexts__identity.core__Override__Identity__AdminScopeEntitlement__GatedScopes__1: redbidentityapp.admin
+      # Identity reports revocations to the module, which then drops its cached token checks at once.
+      # Remove these three lines together with the module: Identity logs an error for every event it
+      # cannot deliver.
+      Tsak__Contexts__identity.core__Override__Identity__Audit__Targets__0__Name: redbidentityapp
+      Tsak__Contexts__identity.core__Override__Identity__Audit__Targets__0__Enabled: "true"
+      Tsak__Contexts__identity.core__Override__Identity__Audit__Targets__0__Uri: direct-vm://redbidentityapp-identity-events
+
+      # --- The module's secrets ---
+      Tsak__Contexts__redbidentityapp__Override__Identity__ResourceClientSecret: ${RESOURCE_CLIENT_SECRET:?RESOURCE_CLIENT_SECRET required}
+      Tsak__Contexts__redbidentityapp__Override__Identity__ManagementClientSecret: ${MANAGEMENT_CLIENT_SECRET:?MANAGEMENT_CLIENT_SECRET required}
+#if (web)
+      Tsak__Contexts__redbidentityapp__Override__Identity__WebClientSecret: ${WEB_CLIENT_SECRET:?WEB_CLIENT_SECRET required}
+#endif
+    volumes:
+      - identity_data:/app/data                       # SQLite: Identity's store and the worker's (the module's notes)
+      - identity_dp_keys:/root/.aspnet/DataProtection-Keys   # key rings of the Tsak worker and dashboard
+      - identity_web_keys:/app/web-keys               # Identity UI's key ring: its sign-ins survive a recreated container
+      - identity_web_logs:/app/web-logs
+      - ./output:/app/modules:ro                      # RedbIdentityApp.tpkg (pack-tpkg.ps1)
+#if (web)
+
+  web:
+    build:
+      context: ..
+      dockerfile: RedbIdentityApp.Web/Dockerfile
+    restart: unless-stopped
+    # One network namespace with Identity: https://localhost:5002 is Identity for the browser and for this
+    # server alike, and the module's API is 127.0.0.1:5094.
+    network_mode: "service:identity"
+    environment:
+      Identity__ClientSecret: ${WEB_CLIENT_SECRET:?WEB_CLIENT_SECRET required}
+    volumes:
+      - web_keys:/keys                                # this server's key ring: sessions survive a recreated container
+    depends_on:
+      - identity
+#endif
+
+volumes:
+  identity_data:
+  identity_dp_keys:
+  identity_web_keys:
+  identity_web_logs:
+#if (web)
+  web_keys:
+#endif

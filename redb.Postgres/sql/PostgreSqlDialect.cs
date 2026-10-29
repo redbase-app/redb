@@ -937,6 +937,9 @@ public class PostgreSqlDialect : ISqlDialect
     public string ObjectStorage_SelectExistingIds() =>
         "SELECT _id as Id FROM _objects WHERE _id = ANY($1)";
 
+    public string ObjectStorage_SelectExistingCreateDates() =>
+        "SELECT _id as Id, _date_create as DateCreate FROM _objects WHERE _id = ANY($1)";
+
     public string ObjectStorage_SelectIdHashPairs() =>
         "SELECT _id as Id, _hash as Hash FROM _objects WHERE _id = ANY($1)";
 
@@ -1383,7 +1386,7 @@ public class PostgreSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
     // Bump together with the literal in redb.Postgres/sql/v2-pvt/99_module_version.sql.
-    public string? Query_PvtRequiredVersion() => "0.7.16";
+    public string? Query_PvtRequiredVersion() => "0.7.17";
 
     // ============================================================
     // Native PVT projection orchestrator (pvt_build_projection_sql).

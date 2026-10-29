@@ -17,7 +17,12 @@ public abstract class GroupBySelectShapesTestsBase
 
     protected GroupBySelectShapesTestsBase(IRedbService redb) => Redb = redb;
 
-    private async Task SeedAsync() => await TestDataFactory.SeedEmployees(Redb, 20);
+    // Queries read only the objects their test seeded: other test classes share the database and may leave
+    // employees without salary or department behind.
+    private redb.Core.Query.IRedbQueryable<EmployeeProps> Seeded(List<long> ids)
+        => Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+
+    private Task<List<long>> SeedAsync() => TestDataFactory.SeedEmployees(Redb, 20);
 
     public class DeptRowDto
     {
@@ -30,9 +35,9 @@ public abstract class GroupBySelectShapesTestsBase
     public async Task SelectAsync_IntoDtoMemberInit_MaterializesEveryMember()
     {
         // G-1: MemberInit раньше не разбирался - каждая строка приходила как default!.
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var rows = await Redb.Query<EmployeeProps>()
+        var rows = await Seeded(ids)
             .GroupBy(e => e.Department)
             .SelectAsync(g => new DeptRowDto
             {
@@ -56,9 +61,9 @@ public abstract class GroupBySelectShapesTestsBase
     {
         // G-2: вычисление вокруг агрегата не заказывается у сервера - раньше член молча
         // оставался null/0. Контракт: громкий отказ с именем члена.
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var act = async () => await Redb.Query<EmployeeProps>()
+        var act = async () => await Seeded(ids)
             .GroupBy(e => e.Department)
             .SelectAsync(g => new { Doubled = Agg.Count(g) * 2 });
 
@@ -71,9 +76,9 @@ public abstract class GroupBySelectShapesTestsBase
     public async Task GroupBy_ComputedKey_IsLoud()
     {
         // G-3: вычисляемый ключ группировки раньше молча давал пустой GROUP BY.
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var act = async () => await Redb.Query<EmployeeProps>()
+        var act = async () => await Seeded(ids)
             .GroupBy(e => e.Age + 1)
             .SelectAsync(g => new { Cnt = Agg.Count(g) });
 
@@ -93,9 +98,9 @@ public abstract class GroupBySelectShapesTestsBase
     {
         // G-1 доехал до GroupByArray (решение владельца 2026-09-04): раньше здесь стоял
         // громкий отказ на DTO.
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var rows = await Redb.Query<EmployeeProps>()
+        var rows = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .SelectAsync(g => new ArrayGroupRowDto { Type = g.Key, Cnt = Agg.Count(g) });
 
@@ -112,10 +117,10 @@ public abstract class GroupBySelectShapesTestsBase
     {
         // Член, не ссылающийся на группу, - клиентская константа: вычисляется на клиенте,
         // а не молча null (раньше материализатор искал его в JSON и не находил).
-        await SeedAsync();
+        var ids = await SeedAsync();
         var tag = "fixed-tag";
 
-        var rows = await Redb.Query<EmployeeProps>()
+        var rows = await Seeded(ids)
             .GroupBy(e => e.Department)
             .SelectAsync(g => new { Dept = g.Key, Tag = tag, Cnt = Agg.Count(g) });
 

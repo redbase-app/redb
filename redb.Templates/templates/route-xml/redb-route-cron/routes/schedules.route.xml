@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- A job on a cron expression (Quartz syntax: seconds minutes hours day-of-month month day-of-week), here every
+       30 seconds; a real report would be "0 0 6 ? * MON-FRI", at six on working days. The schedule and the time zone
+       come from the configuration. stateful=true: a run that takes longer than the interval is not started a second
+       time beside itself. misfireInstruction=CronDoNothing: runs missed while the worker was down are skipped, the
+       next one comes on schedule. On a cluster with a shared Quartz store the job runs on one node. -->
+  <route id="modulectx-report" description="Runs the report job on a cron schedule">
+    <from uri="cron://modulectx-report?schedule={{report.schedule:0/30 * * * * ?}}&amp;timeZone={{report.timeZone:UTC}}&amp;stateful=true&amp;misfireInstruction=CronDoNothing"/>
+    <log level="Information" showRouteId="true">
+      <message>report job started</message>
+    </log>
+    <!-- The work of the job: a query, a file, a message to a queue. -->
+    <delay duration="00:00:01"/>
+    <log level="Information" showRouteId="true">
+      <message>report job finished</message>
+    </log>
+  </route>
+
+  <!-- An interval on the same scheduler: every {{heartbeat.period:60000}} ms. Unlike timer://, a qtimer job lives in
+       the Quartz store, so on a cluster it fires on one node, and a persistent store keeps it across restarts. -->
+  <route id="modulectx-heartbeat" description="A heartbeat on a Quartz interval">
+    <from uri="qtimer://modulectx-heartbeat?period={{heartbeat.period:60000}}&amp;stateful=true"/>
+    <log level="Information" showRouteId="true">
+      <message>heartbeat</message>
+    </log>
+  </route>
+
+</routes>

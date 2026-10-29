@@ -4,6 +4,7 @@
   "classifications": [ "Console", "Database", "RedBase" ],
   "identity": "RedBase.Console.Template",
   "name": "RedBase Console Application",
+  "description": "A console application on redb: objects with typed props created, queried, aggregated and arranged in a tree, in SQLite, PostgreSQL or SQL Server.",
   "shortName": "redb",
   "tags": {
     "language": "C#",
@@ -16,6 +17,7 @@
       "type": "parameter",
       "datatype": "choice",
       "defaultValue": "sqlite",
+      "displayName": "Database",
       "description": "Database provider to use",
       "choices": [
         { "choice": "postgres", "description": "PostgreSQL (via Npgsql)" },
@@ -27,6 +29,7 @@
       "type": "parameter",
       "datatype": "bool",
       "defaultValue": "true",
+      "displayName": "Pro features",
       "description": "Include Pro features (LINQ compilation, change tracking, analytics)"
     },
     "UsePostgres": {

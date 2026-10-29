@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its beans. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- The outgoing server. Security: None (plain, a local test server), StartTls (port 587) or Ssl (port 465). The
+       password has no default, so the module does not start until the deployment supplies it. -->
+  <bean name="smtp" type="redb.Route.Mail.MailConnectionFactory, redb.Route.Mail">
+    <property key="Host" value="{{mail.smtpHost:localhost}}"/>
+    <property key="Port" value="{{mail.smtpPort:587}}"/>
+    <property key="Security" value="{{mail.smtpSecurity:StartTls}}"/>
+    <property key="Username" value="{{mail.username}}"/>
+    <property key="Password" value="{{mail.password}}"/>
+  </bean>
+
+  <!-- The mailbox the module reads: IMAP, Ssl on port 993 for most providers. -->
+  <bean name="imap" type="redb.Route.Mail.MailConnectionFactory, redb.Route.Mail">
+    <property key="Host" value="{{mail.imapHost:localhost}}"/>
+    <property key="Port" value="{{mail.imapPort:993}}"/>
+    <property key="Security" value="{{mail.imapSecurity:Ssl}}"/>
+    <property key="Username" value="{{mail.username}}"/>
+    <property key="Password" value="{{mail.password}}"/>
+  </bean>
+
+  <!-- Routes written in C#: routes/HtmlReportRoute.cs sends an HTML report over the same smtp bean. -->
+  <routeBuilder type="RouteModule.Routes.HtmlReportRoute, RouteModule"/>
+
+</context>

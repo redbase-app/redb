@@ -19,6 +19,22 @@ public class QueryContext<TProps> where TProps : class, new()
 
     public FilterExpression? Filter { get; set; }
     public List<OrderingExpression> Orderings { get; set; } = new();
+
+    /// <summary>
+    /// DistinctBy / DistinctByRedb: the ordering by the key goes first, once, in the direction the query gave it
+    /// (ascending when it gave none). DISTINCT ON needs the key first, and the providers keep one row per key in that
+    /// order. The key used to be inserted ascending in front of the query's own ordering by it, so
+    /// OrderByDescending(key).DistinctBy(key) held both: the Free providers took the first and came back ascending.
+    /// </summary>
+    internal void PutDistinctKeyFirst(OrderingExpression key)
+    {
+        bool SameKey(OrderingExpression o) => !o.HasExpression
+            && o.Property.IsBaseField == key.Property.IsBaseField
+            && o.Property.Name == key.Property.Name;
+        var given = Orderings.LastOrDefault(SameKey);
+        Orderings.RemoveAll(SameKey);
+        Orderings.Insert(0, given ?? key);
+    }
     public int? Limit { get; set; }
     public int? Offset { get; set; }
     public bool IsDistinct { get; set; }

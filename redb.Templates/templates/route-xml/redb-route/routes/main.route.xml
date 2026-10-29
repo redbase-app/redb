@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- {{hello.period:5000}} reads the key hello.period from the context configuration
+       (config/context.sample.json shows where it goes); 5000 ms is used when it is not set. -->
+  <route id="modulectx-hello" description="Writes a line to the log on every tick">
+    <from uri="timer://modulectx-hello?period={{hello.period:5000}}"/>
+    <setBody value="hello from RouteModule"/>
+    <to uri="log://modulectx"/>
+  </route>
+
+</routes>

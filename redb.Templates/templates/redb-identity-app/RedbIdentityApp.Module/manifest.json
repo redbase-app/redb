@@ -1,0 +1,6 @@
+{
+  "Name": "RedbIdentityApp",
+  "Version": "1.0.0",
+  "EntryPoints": ["RedbIdentityApp.Module.dll"],
+  "Dependencies": ["redb.Identity.Core.Module"]
+}

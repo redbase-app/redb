@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Target framework, the RedBase version and the build-time packaging live in
+       Directory.Build.props and Directory.Build.targets next to this file. -->
+  <PropertyGroup>
+    <!-- The package name redb-route-xml pack uses: pkg/routemodule-<version>.tpkg,
+         with config/routemodule.config.json as the in-package identity. -->
+    <RoutePackageName>routemodule</RoutePackageName>
+    <!-- The C# routes of routes/CsvFilesRoute.cs live in this assembly: the package carries it. -->
+    <RoutePackageIncludeAssembly>true</RoutePackageIncludeAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="redb.Route.Xml" Version="$(RedbVersion)" />
+<!--#if (transport == "ftp") -->
+    <!-- The ftp:// connector and its FtpConnectionFactory. -->
+    <PackageReference Include="redb.Route.Ftp" Version="$(RedbVersion)" />
+<!--#elseif (transport == "sftp") -->
+    <!-- The sftp:// connector and its SftpConnectionFactory. -->
+    <PackageReference Include="redb.Route.Sftp" Version="$(RedbVersion)" />
+<!--#else -->
+    <!-- The file:// connector. -->
+    <PackageReference Include="redb.Route.File" Version="$(RedbVersion)" />
+<!--#endif -->
+  </ItemGroup>
+
+</Project>

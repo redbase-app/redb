@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- No signed receipt came back (the connection failed, the partner did not answer, the receipt did not verify):
+       the same message, with the same id and the same bytes, is sent again twice, half a minute apart, as AS4
+       reception awareness asks. When there is still no receipt, the failure is logged. -->
+  <onException exceptions="redb.Route.As4.As4ReceiptException,System.Net.Http.HttpRequestException" handled="true"
+               maximumRedeliveries="2" redeliveryDelay="00:00:30" retryAttemptedLogLevel="Warning">
+    <log level="Error" showRouteId="true">
+      <message>no receipt from the partner for ${header.redbAs4.messageId}: ${exception.message}</message>
+    </log>
+  </onException>
+
+  <!-- The partner answered with an ebMS error (it refused the message): that is its answer, sending the same
+       message again would get the same one. Logged, not redelivered. -->
+  <onException exceptions="redb.Route.As4.As4ErrorSignalException" handled="true">
+    <log level="Error" showRouteId="true">
+      <message>the partner refused ${header.redbAs4.messageId}: ${exception.message}</message>
+    </log>
+  </onException>
+
+  <!-- A test document every {{as4.sendPeriod:60000}} ms. Replace the timer and the body with the real source of
+       documents: the body is the payload, and the content type the source gives it (a file or HTTP consumer, a
+       marshal step) travels as the MimeType part property; a body set here has none and goes as
+       application/octet-stream. The message is signed, its payload compressed and encrypted for the partner; the
+       call returns when the partner's signed receipt has been verified. -->
+  <route id="modulectx-as4-send" description="Sends a test document to the AS4 partner">
+    <from uri="timer://modulectx-as4-send?period={{as4.sendPeriod:60000}}"/>
+    <setBody expr='&lt;invoice xmlns="urn:example:invoice"&gt;&lt;number&gt;${header.CamelTimerCounter}&lt;/number&gt;&lt;/invoice&gt;'/>
+    <to uri="as4:?connectionFactory=as4-node&amp;partner=partner"/>
+    <log level="Information" showRouteId="true">
+      <message>sent ${header.redbAs4.messageId}, receipt ${header.redbAs4.receiptMessageId}</message>
+    </log>
+  </route>
+
+</routes>

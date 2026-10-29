@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- A line the bean refuses (quantity 0 throws in Gross): logged, the exchange ends. -->
+  <onException exceptions="System.ArgumentOutOfRangeException" handled="true">
+    <log level="Warning" showRouteId="true">
+      <message>order ${header.orderId} refused: ${exception.message}</message>
+    </log>
+  </onException>
+
+  <!-- Every {{orders.period:3000}} ms an order line; every fifth one has quantity 0. -->
+  <route id="modulectx-orders" description="Prices an order line with the C# bean">
+    <from uri="timer://modulectx-orders?period={{orders.period:3000}}"/>
+    <setHeader name="orderId" expr="order-${header.CamelTimerCounter}"/>
+    <setHeader name="qty" expr="${header.CamelTimerCounter % 5 == 4 ? 0 : header.CamelTimerCounter % 3 + 1}"/>
+    <setHeader name="price" value="12.50"/>
+    <!-- A method with arguments: each one is an expression; the decimal it returns becomes the body. -->
+    <to uri="bean:#pricing?method=Gross(${header.qty}, ${header.price})"/>
+    <setHeader name="gross" expr="${body}"/>
+    <!-- A method that takes the exchange: it adds the headers currency and vat. -->
+    <to uri="bean:#pricing?method=Stamp"/>
+    <log level="Information" showRouteId="true">
+      <message>order ${header.orderId}: ${header.qty} x ${header.price} + VAT ${header.vat} = ${header.gross} ${header.currency}</message>
+    </log>
+  </route>
+
+</routes>

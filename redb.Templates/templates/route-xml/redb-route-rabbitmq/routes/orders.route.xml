@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- A failed message is tried again twice, one second apart. When it still fails, the original
+       message goes to the queue orders-failed and the delivery is acknowledged, so a bad message
+       never blocks the queue. -->
+  <onException exceptions="System.Exception" handled="true" useOriginalBody="true"
+               maximumRedeliveries="2" redeliveryDelay="00:00:01" retryAttemptedLogLevel="Warning">
+    <log level="Warning" showRouteId="true">
+      <message>moved to orders-failed: ${exception.message}</message>
+    </log>
+    <to uri="rabbitmq://orders-failed?connectionFactory=rabbit&amp;declare=true"/>
+  </onException>
+
+  <!-- Producer: an order every {{orders.period:5000}} ms; every fifth one has amount 0
+       and fails in the consumer, so the failure path is visible from the start. -->
+  <route id="modulectx-orders-out" description="Publishes a test order to the queue orders">
+    <from uri="timer://modulectx-orders?period={{orders.period:5000}}"/>
+    <choice>
+      <when expr="header.CamelTimerCounter % 5 == 0">
+        <setBody expr='{"id":"order-${header.CamelTimerCounter}","amount":0}'/>
+      </when>
+      <otherwise>
+        <setBody expr='{"id":"order-${header.CamelTimerCounter}","amount":${header.CamelTimerCounter}}'/>
+      </otherwise>
+    </choice>
+    <to uri="rabbitmq://orders?connectionFactory=rabbit&amp;declare=true"/>
+  </route>
+
+  <!-- Consumer: up to 10 unacknowledged messages at a time; a message is acknowledged after the
+       route finished with it. Replace the log with the real work. -->
+  <route id="modulectx-orders-in" description="Processes the orders from the queue orders">
+    <from uri="rabbitmq://orders?connectionFactory=rabbit&amp;declare=true&amp;prefetchCount=10"/>
+    <!-- A message arrives as bytes; the JSON checks and the log want the text. -->
+    <convertBody type="System.String"/>
+    <choice>
+      <when expr="jpath('$.amount') == 0">
+        <throwException type="System.InvalidOperationException" message="an order needs an amount"/>
+      </when>
+    </choice>
+    <log level="Information" showRouteId="true">
+      <message>order processed: ${body}</message>
+    </log>
+  </route>
+
+  <!-- The failed messages, for a person to look at. Nothing reads them in production but you. -->
+  <route id="modulectx-orders-failed" description="Logs the orders that failed after the retries">
+    <from uri="rabbitmq://orders-failed?connectionFactory=rabbit&amp;declare=true"/>
+    <convertBody type="System.String"/>
+    <log level="Warning" showRouteId="true">
+      <message>failed order: ${body}</message>
+    </log>
+  </route>
+
+</routes>

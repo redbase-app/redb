@@ -151,25 +151,42 @@ STABLE
 AS $BODY$
 DECLARE
     elem  jsonb;
+    oel   jsonb;
     dir   text;
     nulls text;
     parts text[] := ARRAY[]::text[];
     v_col text;
+    v_keys text[] := ARRAY[]::text[];
+    v_key_part text;
 BEGIN
     -- ---------- DISTINCT ON prefix --------------------------------
     -- PostgreSQL requires every DISTINCT ON expression to appear at
-    -- the head of ORDER BY (with matching direction). We always emit
-    -- them ASC -- callers needing the opposite must include the same
-    -- expression explicitly in p_order with their desired direction
-    -- before any other ordering keys, in which case PG will use that
-    -- direction and we MUST NOT double-add (deduplicate by textual
-    -- equality of the compiled fragment).
+    -- the head of ORDER BY. A key takes the direction of the p_order
+    -- entry for the same expression (OrderByDescending(k).DistinctBy(k)
+    -- comes back descending), ASC when p_order has none; that p_order
+    -- entry is then skipped below so the key is not ordered twice.
+    -- v0.7.17: the key used to be forced ASC.
     IF p_distinct_on IS NOT NULL
        AND jsonb_typeof(p_distinct_on) = 'array'
        AND jsonb_array_length(p_distinct_on) > 0 THEN
         FOR elem IN SELECT value FROM jsonb_array_elements(p_distinct_on) LOOP
             v_col := _pvt_compile_order_col(elem, p_fields, p_base_prefix);
-            parts := parts || (v_col || ' ASC');
+            v_key_part := v_col || ' ASC';
+            IF p_order IS NOT NULL AND jsonb_typeof(p_order) = 'array' THEN
+                FOR oel IN SELECT value FROM jsonb_array_elements(p_order) LOOP
+                    IF _pvt_compile_order_col(oel, p_fields, p_base_prefix) = v_col THEN
+                        dir   := lower(COALESCE(oel->>'dir', oel->>'direction', 'asc'));
+                        nulls := lower(COALESCE(oel->>'nulls', ''));
+                        v_key_part := v_col || ' ' || upper(dir)
+                            || CASE WHEN nulls = 'first' THEN ' NULLS FIRST'
+                                    WHEN nulls = 'last'  THEN ' NULLS LAST'
+                                    ELSE '' END;
+                        EXIT;
+                    END IF;
+                END LOOP;
+            END IF;
+            parts  := parts || v_key_part;
+            v_keys := v_keys || v_col;
         END LOOP;
     END IF;
 
@@ -190,6 +207,9 @@ BEGIN
         END IF;
 
         v_col := _pvt_compile_order_col(elem, p_fields, p_base_prefix);
+        IF v_col = ANY(v_keys) THEN
+            CONTINUE;   -- already at the head as a DISTINCT ON key
+        END IF;
 
         parts := parts || (
             v_col
@@ -207,4 +227,4 @@ END;
 $BODY$;
 
 COMMENT ON FUNCTION pvt_build_order_conditions(jsonb, jsonb, text, jsonb) IS
-    'Builds an ORDER BY clause for the outer SELECT. Accepts plain {"field"|"field_path","dir","nulls"} entries and Pro-parity {"$expr":<scalar-expr>,"dir","nulls"} entries; expressions are compiled via pvt_build_scalar_expr. Base fields use p_base_prefix (default '''', or ''o.'' for the narrow Pro-shape outer that JOINs _objects). When p_distinct_on is provided its expressions are auto-prepended ASC (PostgreSQL DISTINCT ON requirement). Returns empty string when both p_order and p_distinct_on are empty.';
+    'Builds an ORDER BY clause for the outer SELECT. Accepts plain {"field"|"field_path","dir","nulls"} entries and Pro-parity {"$expr":<scalar-expr>,"dir","nulls"} entries; expressions are compiled via pvt_build_scalar_expr. Base fields use p_base_prefix (default '''', or ''o.'' for the narrow Pro-shape outer that JOINs _objects). When p_distinct_on is provided its expressions are prepended (PostgreSQL DISTINCT ON requirement) with the direction of the matching p_order entry, ASC when there is none. Returns empty string when both p_order and p_distinct_on are empty.';

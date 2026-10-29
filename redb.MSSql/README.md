@@ -22,6 +22,10 @@ SQL Server provider for **RedBase (REDB)** — Entity Database for .NET.
   fail, at query time rather than at startup.
 - Azure SQL Database tracks the latest engine, so it satisfies both. It is not part of our test run.
 - Developed and tested against `mcr.microsoft.com/mssql/server:2025-latest`.
+- **Index usage counters need `VIEW SERVER STATE`** (`VIEW SERVER PERFORMANCE STATE` on 2022 and
+  newer). Without it, `Redb.Maintenance` still lists tables, indexes and their sizes, but
+  `IndexStatistics.Seeks`, `Scans`, `Updates`, `LastUsed` and `StatisticsWindow.CountersSince` are
+  null. Grant it to the application login with `GRANT VIEW SERVER STATE TO [login]`.
 
 ## Installation
 

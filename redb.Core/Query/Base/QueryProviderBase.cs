@@ -584,12 +584,20 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider
         return inner;
     }
 
+    /// <summary>Base fields of a DistinctRedb key, by the names the PVT module maps (01_pvt_field_path).</summary>
+    private static readonly string[] DistinctRedbFields =
+        ["Name", "ValueLong", "ValueString", "ValueGuid", "ValueBool", "ParentId", "SchemeId", "Note", "Key"];
+
     /// <summary>
     /// The <c>p_distinct_on</c> argument of <c>pvt_build_query_sql</c> for DistinctBy / DistinctByRedb, or null
     /// when the query has no distinct key. Shared by the flat query and the tree query of the Free providers.
     /// </summary>
     internal static string? BuildPvtDistinctOnJson<TProps>(QueryContext<TProps> context) where TProps : class, new()
     {
+        // DistinctRedb: one object per value of the object's own columns except the id, the columns the Pro providers
+        // partition by. The flag was set and never read here, so DistinctRedb() returned every object.
+        if (context.IsDistinctRedb && context.DistinctByField == null)
+            return "[" + string.Join(",", DistinctRedbFields.Select(f => "{\"field\":\"0$:" + f + "\"}")) + "]";
         if (context.DistinctByField == null)
             return null;
         var name = context.DistinctByField.Property.Name;

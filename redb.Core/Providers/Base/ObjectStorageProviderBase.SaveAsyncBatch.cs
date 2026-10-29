@@ -78,7 +78,42 @@ namespace redb.Core.Providers.Base
                 record.DateModify = dateModify == DateTimeOffset.MinValue ? DateTimeOffset.UtcNow : dateModify;
             }
 
+            // The saved object carries the dates its row gets. For an existing object DateCreate
+            // already holds the stored value (SelectExistingAndTakeCreateDatesAsync), which the
+            // update leaves untouched in the database.
+            obj.DateCreate = record.DateCreate;
+            obj.DateModify = record.DateModify;
+
             return record;
+        }
+
+        private sealed class IdDateCreateRow
+        {
+            public long Id { get; set; }
+            public DateTimeOffset DateCreate { get; set; }
+        }
+
+        /// <summary>
+        /// Ids of the objects that exist in the database. Each existing object takes its stored
+        /// creation date: an object built in memory (from JSON, say) and saved onto an existing row
+        /// had DateCreate 0001-01-01 after the save, while the row kept its own date.
+        /// </summary>
+        protected async Task<HashSet<long>> SelectExistingAndTakeCreateDatesAsync(
+            List<IRedbObject> objects, System.Threading.CancellationToken cancellationToken)
+        {
+            var ids = objects.Select(o => o.Id).ToArray();
+            if (ids.Length == 0)
+                return new HashSet<long>();
+
+            var rows = await _context.QueryAsync<IdDateCreateRow>(
+                Sql.ObjectStorage_SelectExistingCreateDates(), new object[] { ids }, cancellationToken);
+            var createdById = rows.ToDictionary(r => r.Id, r => r.DateCreate);
+            foreach (var obj in objects)
+            {
+                if (createdById.TryGetValue(obj.Id, out var dateCreate))
+                    obj.DateCreate = dateCreate;
+            }
+            return createdById.Keys.ToHashSet();
         }
 
         // ===== PUBLIC BATCH SAVE METHODS =====
@@ -514,11 +549,7 @@ namespace redb.Core.Providers.Base
                     Caching.CachePublication.AfterCommit(_context, () =>
                     {
                         foreach (var savedObj in toCache)
-                        {
-                            var propsType = Utils.RedbObjectTypes.GenericOf(savedObj.GetType())!.GetGenericArguments()[0];
-                            var setMethod = typeof(GlobalPropsCache).GetMethod("Set")?.MakeGenericMethod(propsType);
-                            setMethod?.Invoke(PropsCache, new[] { savedObj });
-                        }
+                            Caching.CacheDelegates.Set(PropsCache.Instance!, savedObj);
                     });
                 }
             }
@@ -638,11 +669,8 @@ namespace redb.Core.Providers.Base
             CancellationToken cancellationToken = default)
         {
             // Step 1: Determine which objects ACTUALLY exist in the DB
-            var allIds = allObjectsToSave.Select(o => o.Id).ToArray();
-            var existingIdsInDb = allIds.Any()
-                ? await _context.QueryScalarListAsync<long>(Sql.ObjectStorage_SelectExistingIds(), new object[] { allIds }, cancellationToken)
-                : [];
-            var existingIdsSet = existingIdsInDb.ToHashSet();
+            var existingIdsSet = await SelectExistingAndTakeCreateDatesAsync(allObjectsToSave, cancellationToken);
+            var existingIdsInDb = existingIdsSet.ToList();
 
             // Step 2: Delete all old values
             if (existingIdsInDb.Any())

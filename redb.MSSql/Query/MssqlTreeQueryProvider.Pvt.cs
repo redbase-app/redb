@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading;
@@ -237,6 +238,30 @@ public partial class MssqlTreeQueryProvider
     /// Builds the inner <c>SELECT _id ...</c> SQL via <c>dbo.pvt_build_query_sql</c>.
     /// The resulting SQL binds <c>@p0</c> = filter, and (when present) <c>@p1</c> = order.
     /// </summary>
+    /// <summary>
+    /// SQL preview of a tree query: the statement <c>dbo.pvt_build_query_sql</c> compiles for it, with the values it
+    /// binds listed above it. The base implementation asks the database for
+    /// <c>dbo.get_search_tree_sql_preview_base</c>, a procedure of the retired search module that this provider no
+    /// longer installs, so <c>ToSqlStringAsync</c> on a tree query failed with "Could not find stored procedure".
+    /// </summary>
+    public override async Task<string> GetSqlPreviewAsync<TProps>(
+        TreeQueryContext<TProps> context, CancellationToken cancellationToken = default)
+    {
+        if (!ShouldRoutePvtTree(context, out var route))
+            return await base.GetSqlPreviewAsync(context, cancellationToken);
+
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: false, cancellationToken);
+        var orderByJson = context.Orderings.Count > 0 ? _facetBuilder.BuildOrderBy(context.Orderings) : null;
+
+        var sb = new StringBuilder();
+        sb.Append("-- $1 (filter) = ")
+          .AppendLine(string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson);
+        if (!string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]")
+            sb.Append("-- $2 (order)  = ").AppendLine(orderByJson);
+        sb.Append(inner);
+        return sb.ToString();
+    }
+
     private async Task<string> BuildPvtTreeInnerSqlAsync<TProps>(
         TreeQueryContext<TProps> context,
         PvtTreeRoute route,

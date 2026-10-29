@@ -1437,8 +1437,8 @@ namespace redb.Core.Providers.Base
         /// <summary>
         /// Recursive cache update for all nested RedbObjects (saving instead of deleting)
         /// </summary>
-        // DELETED: UpdateCacheForNestedObjects - replaced by CacheNestedObjects from ObjectStorageProviderBase.cs
-        // Now a single method is used for caching nested objects in both LoadAsync and SaveAsync
+        // The load path writes nested entries in one walk (GlobalPropsCache.SetGraph); the save path keeps no
+        // separate nested walk here.
 
         #endregion
     }

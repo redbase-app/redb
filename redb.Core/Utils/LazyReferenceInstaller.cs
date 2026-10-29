@@ -109,10 +109,23 @@ public static class LazyReferenceInstaller
     public static void MarkShared(object? root)
     {
         if (root == null) return;
-        MarkSharedInto(root, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        MarkSharedInto(root, new HashSet<object>(ReferenceEqualityComparer.Instance), null);
     }
 
-    private static void MarkSharedInto(object? node, HashSet<object> visited)
+    /// <summary>
+    /// The same walk as <see cref="MarkShared"/>, and the loaded objects it passed are returned: one pass serves both
+    /// the shared mark and the cache entries of the graph, which used to be two walks of the same Props. A stub is
+    /// marked only; a list item is marked and its already loaded object is visited, never loaded by the walk.
+    /// </summary>
+    public static List<IRedbObject> MarkSharedAndCollect(object? root)
+    {
+        var collected = new List<IRedbObject>();
+        if (root == null) return collected;
+        MarkSharedInto(root, new HashSet<object>(ReferenceEqualityComparer.Instance), collected);
+        return collected;
+    }
+
+    private static void MarkSharedInto(object? node, HashSet<object> visited, List<IRedbObject>? collected)
     {
         if (node == null) return;
         var type = node.GetType();
@@ -122,7 +135,7 @@ public static class LazyReferenceInstaller
             item._isShared = true;
             item._origin = null;
             // The object the item already carries is shared with it.
-            MarkSharedInto(item.LoadedObject, visited);
+            MarkSharedInto(item.LoadedObject, visited, collected);
             return;
         }
         if (IsWalkLeaf(node)) return;
@@ -138,19 +151,23 @@ public static class LazyReferenceInstaller
                     field.SetValue(node, ambient.Shared);
                 return;
             }
-            MarkSharedInto(type.GetMethod("GetPropsDirectly")?.Invoke(node, null), visited);
+            // The nested entries SetNested used to write in a second walk: a loaded object with a hash
+            // of its own is served by id directly.
+            if (collected != null && obj is IRedbObject { Hash: not null } loaded)
+                collected.Add(loaded);
+            MarkSharedInto(type.GetMethod("GetPropsDirectly")?.Invoke(node, null), visited, collected);
             return;
         }
 
         if (node is IDictionary dict)
         {
-            foreach (DictionaryEntry e in dict) MarkSharedInto(e.Value, visited);
+            foreach (DictionaryEntry e in dict) MarkSharedInto(e.Value, visited, collected);
             return;
         }
 
         if (node is IEnumerable seq)
         {
-            foreach (var element in seq) MarkSharedInto(element, visited);
+            foreach (var element in seq) MarkSharedInto(element, visited, collected);
             return;
         }
 
@@ -158,7 +175,7 @@ public static class LazyReferenceInstaller
         foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!IsWalkedProperty(p)) continue;
-            MarkSharedInto(p.GetValue(node), visited);
+            MarkSharedInto(p.GetValue(node), visited, collected);
         }
     }
 

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Target framework, the RedBase version and the build-time packaging live in
+       Directory.Build.props and Directory.Build.targets next to this file. -->
+  <PropertyGroup>
+    <!-- The package name redb-route-xml pack uses: pkg/routemodule-<version>.tpkg,
+         with config/routemodule.config.json as the in-package identity. -->
+    <RoutePackageName>routemodule</RoutePackageName>
+    <!-- The C# API of routes/ApiRoute.cs lives in this assembly: the package carries it. -->
+    <RoutePackageIncludeAssembly>true</RoutePackageIncludeAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="redb.Route.Xml" Version="$(RedbVersion)" />
+    <!-- The <rest> element and the http:// connector. -->
+    <PackageReference Include="redb.Route.Http" Version="$(RedbVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The C# API checks orders against the same schema file as the XML one. -->
+    <EmbeddedResource Include="resources/order.schema.json" LogicalName="order.schema.json" />
+  </ItemGroup>
+
+</Project>

@@ -18,6 +18,7 @@ public class E139_DistinctRedb : ExampleBase
         var sw = Stopwatch.StartNew();
 
         var query = redb.Query<EmployeeProps>()
+            .OrderByRedb(o => o.Id)
             .DistinctRedb()
             .Take(100);
 

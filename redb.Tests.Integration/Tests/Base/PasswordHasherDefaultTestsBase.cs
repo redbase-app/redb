@@ -54,4 +54,25 @@ public abstract class PasswordHasherDefaultTestsBase
         var rejected = await Redb.UserProvider.ValidateUserAsync(login, "wrong-password");
         rejected.Should().BeNull("the legacy path must still reject a wrong password");
     }
+
+    [Fact]
+    public async Task SetPasswordHash_StoresAHashMadeElsewhere()
+    {
+        // An administrator password given in configuration as a hash (htpasswd -B writes $2y$):
+        // stored as is, and the default hasher accepts it at login.
+        var login = FreshLogin();
+        var user = await Redb.UserProvider.CreateUserAsync(
+            new CreateUserRequest { Login = login, Name = login, Password = "placeholder" });
+        var hash = BCrypt.Net.BCrypt.HashPassword("from-config", BCrypt.Net.BCrypt.GenerateSalt(4, 'y'));
+
+        (await Redb.UserProvider.SetPasswordHashAsync(user, hash)).Should().BeTrue();
+
+        (await Redb.Context.ExecuteScalarAsync<string>($"SELECT _password FROM _users WHERE _id = {user.Id}"))
+            .Should().Be(hash, "the hash is written as given, not hashed again");
+        (await Redb.UserProvider.ValidateUserAsync(login, "from-config")).Should().NotBeNull();
+        (await Redb.UserProvider.ValidateUserAsync(login, "placeholder")).Should().BeNull();
+
+        await FluentActions.Awaiting(() => Redb.UserProvider.SetPasswordHashAsync(user, " "))
+            .Should().ThrowAsync<ArgumentException>();
+    }
 }

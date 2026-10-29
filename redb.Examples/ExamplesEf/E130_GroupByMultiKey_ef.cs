@@ -8,7 +8,7 @@ namespace redb.Examples.ExamplesEf;
 
 /// <summary>EF Core twin of <see cref="E130_GroupByMultiKey"/>: grouped by department and position, with the average
 /// HomeAddress.Building.Floor per group; the nested floor costs EF two joins.</summary>
-[ExampleMeta("E130_ef", "EF: GroupBy - Composite Key", "Analytics", ExampleTier.Free, 1, "EF")]
+[ExampleMeta("E130a_ef", "EF: GroupBy - Composite Key", "Analytics", ExampleTier.Free, 1, "EF")]
 public class E130_GroupByMultiKey_ef : EfExampleBase
 {
     public override async Task<ExampleResult> RunEfAsync(IDbContextFactory<FlatContext> contexts)
@@ -38,7 +38,7 @@ public class E130_GroupByMultiKey_ef : EfExampleBase
         sw.Stop();
 
         var first = byDeptPosition.FirstOrDefault();
-        return Ok("E130_ef", "EF: GroupBy - Composite Key", ExampleTier.Free, sw.ElapsedMilliseconds, byDeptPosition.Count,
+        return Ok("E130a_ef", "EF: GroupBy - Composite Key", ExampleTier.Free, sw.ElapsedMilliseconds, byDeptPosition.Count,
             [$"Groups: {byDeptPosition.Count}", $"First: {first?.Department ?? "N/A"}/{first?.Position ?? "N/A"}, Avg home floor: {first?.AvgFloor:F2}"]);
     }
 }

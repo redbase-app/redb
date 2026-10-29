@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its beans. -->
+<context xmlns="urn:redb:route:1.0">
+<!--#if (transport == "ftp") -->
+
+  <!-- One FTP connection for every ftp:// endpoint of the module: the URIs say connectionFactory=remote and carry no
+       host or credentials. The password has no default, so the module does not start until the deployment supplies
+       it. FTPS: UseFtps on the endpoints. -->
+  <bean name="remote" type="redb.Route.Ftp.FtpConnectionFactory, redb.Route.Ftp">
+    <property key="Host" value="{{files.host:localhost}}"/>
+    <property key="Port" value="{{files.port:21}}"/>
+    <property key="Username" value="{{files.username}}"/>
+    <property key="Password" value="{{files.password}}"/>
+  </bean>
+<!--#elseif (transport == "sftp") -->
+
+  <!-- One SFTP connection for every sftp:// endpoint of the module: the URIs say connectionFactory=remote and carry no
+       host or credentials. The password has no default, so the module does not start until the deployment supplies
+       it. A key instead of a password: PrivateKeyPath and PrivateKeyPassphrase. In production pin the server with
+       ServerFingerprint or KnownHostsFile and StrictHostKeyChecking. -->
+  <bean name="remote" type="redb.Route.Sftp.SftpConnectionFactory, redb.Route.Sftp">
+    <property key="Host" value="{{files.host:localhost}}"/>
+    <property key="Port" value="{{files.port:22}}"/>
+    <property key="Username" value="{{files.username}}"/>
+    <property key="Password" value="{{files.password}}"/>
+  </bean>
+<!--#else -->
+
+  <!-- The folders are on the worker's file system: no connection bean. -->
+<!--#endif -->
+
+  <!-- Routes written in C#: routes/CsvFilesRoute.cs, CSV files through an inbox of its own. -->
+  <routeBuilder type="RouteModule.Routes.CsvFilesRoute, RouteModule"/>
+
+</context>

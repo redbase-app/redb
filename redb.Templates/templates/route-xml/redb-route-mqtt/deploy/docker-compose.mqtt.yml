@@ -1,0 +1,51 @@
+# A local MQTT broker for the module: Eclipse Mosquitto, and the module on a Tsak worker. A test stand, not a
+# deployment.
+#
+# From the project folder (PowerShell or a POSIX shell alike):
+#   dotnet build -p:PackRouteOnBuild=true -p:Version=1.0.0        # -> pkg/routemodule-1.0.0.tpkg
+#   cp deploy/.env.example deploy/.env                              # then set MQTT_PASSWORD
+#   docker compose -f deploy/docker-compose.mqtt.yml up -d
+#
+# The broker listens on localhost:1883 for the user modulectx; subscribe to alerts/# with any MQTT client to watch
+# the alerts.
+name: modulectx-mqtt
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.1.2-alpine
+    environment:
+      MQTT_PASSWORD: ${MQTT_PASSWORD:?MQTT_PASSWORD required, see deploy/.env.example}
+    # The password file is written at start from MQTT_PASSWORD, then the broker starts with mosquitto.conf.
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        cp /config-ro/mosquitto.conf /mosquitto/config/mosquitto.conf
+        mosquitto_passwd -c -b /mosquitto/config/passwd modulectx "$$MQTT_PASSWORD"
+        chown mosquitto:mosquitto /mosquitto/config/passwd
+        chmod 0700 /mosquitto/config/passwd
+        exec mosquitto -c /mosquitto/config/mosquitto.conf
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/config-ro/mosquitto.conf:ro
+    # Ready when the broker takes a login; the module starts only then, so its subscriptions find the broker.
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -u modulectx -P \"$$MQTT_PASSWORD\" -t '$$SYS/broker/version' -C 1 -W 3"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  module:
+    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.5.0-net10}
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment:
+      - Tsak__Modules__AssemblyPaths__0=/app/modules
+      - Tsak__Cluster__ApiEndpoint=http://module:9090
+      # The module's context: the Override layer, which wins over every other layer of its configuration.
+      - Tsak__Contexts__modulectx__Override__mqtt.host=mosquitto
+      - Tsak__Contexts__modulectx__Override__mqtt.username=modulectx
+      - Tsak__Contexts__modulectx__Override__mqtt.password=${MQTT_PASSWORD:?MQTT_PASSWORD required, see deploy/.env.example}
+    volumes:
+      - ../pkg:/app/modules

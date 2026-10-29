@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Holodeck's certificate manager for the local test exchange. The three keystores are written by the
+     certs service of deploy/docker-compose.holodeck.yml into deploy/holodeck/certs; their passwords are test values,
+     fixed here, in that service and in the P-Modes.
+     Direct trust: the module's certificate in the partner keystore is trusted as it is, no certification authority. -->
+<CertManagerConfiguration xmlns="http://holodeck-b2b.org/schemas/2019/09/config/certmanager"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://holodeck-b2b.org/schemas/2019/09/config/certmanager ../repository/xsd/hb2b-certmanager-cfg.xsd">
+    <DirectTrustPartnerCertificates>true</DirectTrustPartnerCertificates>
+    <Keystores>
+        <PrivateKeys>
+            <Path>repository/certs/privatekeys.jks</Path>
+            <Password>test-only-private</Password>
+        </PrivateKeys>
+        <TradingPartnerCertificates>
+            <Path>repository/certs/partnerkeys.jks</Path>
+            <Password>test-only-partners</Password>
+        </TradingPartnerCertificates>
+        <TrustedCertificates>
+            <Path>repository/certs/trustedcerts.jks</Path>
+            <Password>test-only-trusted</Password>
+        </TrustedCertificates>
+    </Keystores>
+</CertManagerConfiguration>

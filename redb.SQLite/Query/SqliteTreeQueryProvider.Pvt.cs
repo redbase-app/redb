@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading;
@@ -314,6 +315,31 @@ public partial class SqliteTreeQueryProvider
             throw new InvalidOperationException(
                 "pvt_build_query_sql returned an empty SQL string for tree query (scheme " + context.SchemeId + ").");
         return inner;
+    }
+
+    /// <summary>
+    /// SQL preview of a tree query: the statement <c>pvt_build_query_sql</c> compiles for it, with the
+    /// values it binds listed above it. The base implementation asks the database for
+    /// <c>get_search_tree_sql_preview_base</c>, a function of the retired search module that the native
+    /// SQLite extension does not host, so <c>ToSqlStringAsync</c> on a tree query failed with
+    /// "no such function: get_search_tree_sql_preview_base" (E204).
+    /// </summary>
+    public override async Task<string> GetSqlPreviewAsync<TProps>(
+        TreeQueryContext<TProps> context, CancellationToken cancellationToken = default)
+    {
+        if (!ShouldRoutePvtTree(context, out var route))
+            return await base.GetSqlPreviewAsync(context, cancellationToken);
+
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: false, cancellationToken);
+        var orderByJson = context.Orderings.Count > 0 ? _facetBuilder.BuildOrderBy(context.Orderings) : null;
+
+        var sb = new StringBuilder();
+        sb.Append("-- $1 (filter) = ")
+          .AppendLine(string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson);
+        if (!string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]")
+            sb.Append("-- $2 (order)  = ").AppendLine(orderByJson);
+        sb.Append(inner);
+        return sb.ToString();
     }
 
     /// <summary>

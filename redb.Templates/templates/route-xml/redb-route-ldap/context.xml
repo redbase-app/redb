@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its beans. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- One directory connection for every ldap: endpoint of the module: the URIs say connectionFactory=ldap and
+       carry no server or credentials of their own. The service account's password has no default, so the module
+       does not start until the deployment supplies it. For LDAPS set Ssl (port 636) or StartTls. -->
+  <bean name="ldap" type="redb.Route.Ldap.LdapConnectionFactory, redb.Route.Ldap">
+    <property key="Server" value="{{ldap.server:localhost}}"/>
+    <property key="Port" value="{{ldap.port:389}}"/>
+    <property key="BindDn" value="{{ldap.bindDn}}"/>
+    <property key="BindPassword" value="{{ldap.bindPassword}}"/>
+  </bean>
+
+  <!-- Routes written in C#: routes/DirectoryListRoute.cs lists the users over the same connection. -->
+  <routeBuilder type="RouteModule.Routes.DirectoryListRoute, RouteModule"/>
+
+</context>

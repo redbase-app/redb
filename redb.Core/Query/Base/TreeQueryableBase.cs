@@ -536,8 +536,8 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         newContext.DistinctByField = ordering;
         newContext.DistinctByIsBaseField = false;
 
-        // CRITICAL: PostgreSQL requires ORDER BY starting with DISTINCT ON fields
-        newContext.Orderings.Insert(0, ordering);
+        // The ordering by the key goes first, once, in the direction the query gave it.
+        newContext.PutDistinctKeyFirst(ordering);
 
         return CreateInstance(newContext);
     }
@@ -552,8 +552,8 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
         newContext.DistinctByField = ordering;
         newContext.DistinctByIsBaseField = true;
 
-        // CRITICAL: PostgreSQL requires ORDER BY starting with DISTINCT ON fields
-        newContext.Orderings.Insert(0, ordering);
+        // The ordering by the key goes first, once, in the direction the query gave it.
+        newContext.PutDistinctKeyFirst(ordering);
 
         return CreateInstance(newContext);
     }

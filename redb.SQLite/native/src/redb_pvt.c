@@ -38,9 +38,14 @@ SQLITE_EXTENSION_INIT3
  * 0.6.8 - the operand builder is total and fail-closed: a JSON string against a non-text column
  *         must be a plain numeric literal, and every other token type is either rendered as a
  *         quoted literal or refused through pvt_refuse(). No operand can reach the statement as raw
- *         JSON text any more (2026-10-04). */
+ *         JSON text any more (2026-10-04).
+ * 0.6.9 - OFFSET without LIMIT emitted "OFFSET n" alone, a syntax error in SQLite, so Skip without
+ *         Take died; DistinctBy and DistinctRedb partitioned by the first key entry only and never
+ *         parsed the "0$:" base prefix, so DistinctRedb ignored eight of its nine columns; _ranked
+ *         dropped the outer ORDER BY and returned rows in key order whatever the query asked for
+ *         (2026-10-26). */
 #ifndef PVT_MODULE_VERSION
-#define PVT_MODULE_VERSION "0.6.8"
+#define PVT_MODULE_VERSION "0.6.9"
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -1791,22 +1796,103 @@ int pvtHasPropFields(sqlite3 *db, const char *fields){
 ** <field> ORDER BY o._id) in a chained _ranked CTE, keeping rn=1 (mirrors redb.SQLite.Pro). Returns
 ** the PARTITION BY expression for the first distinct_on entry, or NULL. distinct_on is the C# shape
 ** [{"field":"Name"}] (prop) / [{"field":"0$:Name"}] (base); the field is collected into `fields`. */
-static char *pvtDistinctPartitionExpr(sqlite3 *db, const char *distinct_on, const char *fields){
+/* PARTITION BY / ORDER BY expression of p_distinct_on. Returns a sqlite3_malloc'd comma list,
+** or NULL when nothing resolves.
+**   pv_prefix  = "_pvt_cte." for Props columns, "" for a context that has the bare column names
+**   obj_prefix = "o."        for base columns (columns of _objects), "" likewise
+** DistinctRedb arrives as several entries ({"field":"0$:Name"},{"field":"0$:ValueLong"},...), so the
+** old "$[0].field" reader partitioned by the first column alone (six employees under two names came
+** back as two rows only by luck of _name being first). DistinctBy arrives as one entry, and its base
+** form carries the "0$:" prefix that pvtNormalizeBaseFieldName resolves and the old reader did not.
+*/
+static char *pvtDistinctExpr(sqlite3 *db, const char *distinct_on, const char *fields,
+                             const char *pv_prefix, const char *obj_prefix){
   if(!distinct_on || !*distinct_on || !strcmp(distinct_on, "null")) return 0;
-  char *fld = jsonGetText(db, distinct_on, "$[0].field");
-  if(!fld) return 0;
-  char *mp = sqlite3_mprintf("$.\"%w\"", fld);
-  char *meta = jsonGetText(db, fields, mp); sqlite3_free(mp);
-  char *expr = 0;
-  if(meta){
-    char *kind = jsonGetText(db, meta, "$.kind");
-    char *col  = jsonGetText(db, meta, "$.column");
-    if(kind && !strcmp(kind, "base")) expr = sqlite3_mprintf("o.%s", col ? col : "_id");
-    else                              expr = sqlite3_mprintf("_pvt_cte.\"%w\"", fld);
-    sqlite3_free(kind); sqlite3_free(col);
+  if(!pv_prefix) pv_prefix = "";
+  if(!obj_prefix) obj_prefix = "";
+
+  sqlite3_str *out = sqlite3_str_new(db);
+  int n = 0, err = 0;
+  sqlite3_stmt *it = 0;
+  if(sqlite3_prepare_v2(db, "SELECT value FROM json_each(?1)", -1, &it, 0) != SQLITE_OK){
+    sqlite3_free(sqlite3_str_finish(out));
+    return 0;
   }
-  sqlite3_free(meta); sqlite3_free(fld);
-  return expr;
+  sqlite3_bind_text(it, 1, distinct_on, -1, SQLITE_TRANSIENT);
+  while(!err && sqlite3_step(it) == SQLITE_ROW){
+    /* Each element is {"field":"<name>"}, not the name itself. */
+    char *v = jsonGetText(db, (const char*)sqlite3_column_text(it, 0), "$.field");
+    if(!v){ err = 1; break; }
+
+    char *expr = 0;
+    if(!strncmp(v, "0$:", 3)){
+      char *col = pvtNormalizeBaseFieldName(v);       /* honors the "0$:" prefix */
+      if(col){ expr = sqlite3_mprintf("%s%s", obj_prefix, col); sqlite3_free(col); }
+    } else {
+      char *mp = sqlite3_mprintf("$.\"%w\"", v);
+      char *meta = jsonGetText(db, fields, mp);
+      sqlite3_free(mp);
+      if(meta){
+        char *kind = jsonGetText(db, meta, "$.kind");
+        char *col  = jsonGetText(db, meta, "$.column");
+        if(kind && !strcmp(kind, "base"))
+          expr = sqlite3_mprintf("%s%s", obj_prefix, col ? col : "_id");
+        else
+          expr = sqlite3_mprintf("%s\"%w\"", pv_prefix, v);
+        sqlite3_free(kind); sqlite3_free(col); sqlite3_free(meta);
+      }
+    }
+    sqlite3_free(v);
+
+    if(!expr) err = 1;
+    else {
+      if(n) sqlite3_str_append(out, ", ", 2);
+      sqlite3_str_appendf(out, "%s", expr);
+      n++;
+      sqlite3_free(expr);
+    }
+  }
+  sqlite3_finalize(it);
+  if(err || n == 0){ sqlite3_free(sqlite3_str_finish(out)); return 0; }
+  return sqlite3_str_finish(out);
+}
+
+/* Direction of the ordering by the distinct key itself: "DESC" or "ASC".
+** DistinctBy sorts the kept rows by its key (Pro: the key rides in _ranked as _distinct_col and is
+** sorted in the direction of the last ordering by it). An ordering by another field does not apply,
+** which is what the shared test asserts: OrderBy(Salary).DistinctBy(Department) comes back by key.
+*/
+static const char *pvtDistinctDir(sqlite3 *db, const char *order, const char *first_field){
+  const char *res = "ASC";
+  if(!order || !first_field) return res;
+
+  char *key = sqlite3_mprintf("%s", first_field);
+  if(!strncmp(key, "0$:", 3)) memmove(key, key + 3, strlen(key + 3) + 1);
+
+  sqlite3_stmt *it = 0;
+  if(sqlite3_prepare_v2(db, "SELECT value FROM json_each(?1)", -1, &it, 0) != SQLITE_OK){
+    sqlite3_free(key);
+    return res;
+  }
+  sqlite3_bind_text(it, 1, order, -1, SQLITE_TRANSIENT);
+  while(sqlite3_step(it) == SQLITE_ROW){
+    const char *el = (const char*)sqlite3_column_text(it, 0);
+    if(!el) continue;
+    char *f = jsonGetText(db, el, "$.field");
+    if(!f) f = jsonGetText(db, el, "$.field_path");
+    if(f && !strcmp(f, key)){
+      char *d = jsonGetText(db, el, "$.dir");
+      if(!d) d = jsonGetText(db, el, "$.dir");
+      if(!d) d = jsonGetText(db, el, "$.direction");
+      if(d && (d[0] == 'd' || d[0] == 'D')) res = "DESC";
+      sqlite3_free(d); sqlite3_free(f);
+      break;
+    }
+    sqlite3_free(f);
+  }
+  sqlite3_finalize(it);
+  sqlite3_free(key);
+  return res;
 }
 
 static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *filter,
@@ -1835,7 +1921,20 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
   sqlite3_free(merged_order);
   if(!fields) return 0;
 
-  char *part_expr = have_dion ? pvtDistinctPartitionExpr(db, distinct_on, fields) : 0;
+  char *part_expr = have_dion ? pvtDistinctExpr(db, distinct_on, fields, "_pvt_cte.", "o.") : 0;
+  char *part_wide = have_dion ? pvtDistinctExpr(db, distinct_on, fields, "_pvt_cte.", "_pvt_cte.") : 0;
+  /* Bare column names: the outer SELECT of a distinct statement reads from _ranked, whose columns
+  ** come from _pvt_cte.* and o.*, so the key is addressed without a table prefix there. */
+  char *part_flat = have_dion ? pvtDistinctExpr(db, distinct_on, fields, "", "") : 0;
+  int  ndion = 0;
+  if(have_dion){
+    sqlite3_stmt *ls = 0;
+    if(sqlite3_prepare_v2(db, "SELECT json_array_length(?1)", -1, &ls, 0) == SQLITE_OK){
+      sqlite3_bind_text(ls, 1, distinct_on, -1, SQLITE_TRANSIENT);
+      if(sqlite3_step(ls) == SQLITE_ROW) ndion = sqlite3_column_int(ls, 0);
+      sqlite3_finalize(ls);
+    }
+  }
 
   char *push = 0, *resid = 0;
   pvtSplitFilter(db, filter, fields, &push, &resid);
@@ -1848,6 +1947,11 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
   {
     sqlite3_str *p = sqlite3_str_new(db);
     if(has_limit && limit >= 0) sqlite3_str_appendf(p, "\nLIMIT %d", limit);
+    /* SQLite has no bare OFFSET: "OFFSET n" alone is a syntax error (PostgreSQL and SQL Server take
+    ** it). A Skip without Take arrives here with no limit, and the statement died with
+    ** 'near "OFFSET": syntax error'. LIMIT -1 means unlimited, the same spelling SqliteDialect
+    ** .FormatPagination uses for the C# side. */
+    else if(offset > 0) sqlite3_str_appendf(p, "\nLIMIT %d", -1);
     if(offset > 0) sqlite3_str_appendf(p, "\nOFFSET %d", offset);
     paging = sqlite3_str_finish(p);
   }
@@ -1898,18 +2002,35 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
 
     char *order_sql = pvtBuildOrderConditions(db, order, fields, narrow ? "o." : "");
 
+    /* Order of the rows a distinct statement keeps. DistinctBy is one key and sorts by that key, in
+    ** the direction of the ordering by it (Pro: _distinct_col "sorted in the direction of the last
+    ** ordering by it"); an ordering by another field does not apply. DistinctRedb is a list of columns
+    ** and keeps the requested ordering, so it takes the full ORDER BY. */
+    char *d_order = 0;
+    if(narrow && part_expr && part_flat){
+      if(ndion == 1){
+        char *f0 = jsonGetText(db, distinct_on, "$[0].field");
+        d_order = sqlite3_mprintf("\nORDER BY %s %s", part_flat, pvtDistinctDir(db, order, f0));
+        sqlite3_free(f0);
+      } else {
+        d_order = pvtBuildOrderConditions(db, order, fields, "");
+      }
+    }
+
     if(narrow && part_expr){
-      /* DistinctBy: chain a _ranked CTE with ROW_NUMBER() and keep rn=1. The distinct_on field is
-      ** pivoted into _pvt_cte (prop) or read from o (base). Explicit ORDER BY is not applied on the
-      ** id-only outer projection here; the representative per group is the lowest o._id. */
+      /* DistinctBy / DistinctRedb: chain a _ranked CTE with ROW_NUMBER() and keep rn=1.
+      ** The CTE carries every column of both sides, so the outer ordering by a Props or base column
+      ** resolves against _ranked; the representative per group is the lowest o._id (Pro does the
+      ** same). The ordering used to be dropped here, and DistinctBy came back in key order ascending
+      ** whatever the query asked for. */
       result = sqlite3_mprintf(
-        "%s,\n_ranked AS (\n  SELECT o._id AS _id, ROW_NUMBER() OVER (PARTITION BY %s ORDER BY o._id) AS _rn"
+        "%s,\n_ranked AS (\n  SELECT _pvt_cte.*, o.*, ROW_NUMBER() OVER (PARTITION BY %s ORDER BY o._id) AS _rn"
         "\n  FROM _pvt_cte\n  JOIN _objects o ON o._id = _pvt_cte._id_object%s%s\n)"
-        "\nSELECT _id FROM _ranked WHERE _rn = 1%s",
+        "\nSELECT _id FROM _ranked WHERE _rn = 1%s%s",
         cte, part_expr,
         strcmp(where_sql,"TRUE")==0 ? "" : "\n  WHERE ",
         strcmp(where_sql,"TRUE")==0 ? "" : where_sql,
-        paging);
+        d_order ? d_order : "", paging);
     }else if(narrow){
       result = sqlite3_mprintf(
         "%s\nSELECT %so._id FROM _pvt_cte\nJOIN _objects o ON o._id = _pvt_cte._id_object%s%s%s",
@@ -1918,23 +2039,18 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
         strcmp(where_sql,"TRUE")==0 ? "" : where_sql,
         order_sql);
       char *r2 = sqlite3_mprintf("%s%s", result, paging); sqlite3_free(result); result = r2;
-    }else if(part_expr){
-      /* DistinctBy in the wide shape (a tree query without props, or an absence check). This branch
-      ** used to drop the distinct key and return every row. The wide _pvt_cte carries the base
-      ** columns itself, so a base key "o.<col>" is read as "_pvt_cte.<col>"; representative per
-      ** group is the lowest _id, as in the narrow branch. */
-      char *wide_part = !strncmp(part_expr, "o.", 2)
-        ? sqlite3_mprintf("_pvt_cte.%s", part_expr + 2)
-        : sqlite3_mprintf("%s", part_expr);
+    }else if(part_wide){
+      /* The same in the wide shape (a tree query without props, or an absence check). The wide
+      ** _pvt_cte carries the base columns itself, so the key is read from it directly; _ranked still
+      ** carries every column and the outer ordering is applied to it. */
       result = sqlite3_mprintf(
-        "%s,\n_ranked AS (\n  SELECT _pvt_cte._id AS _id, ROW_NUMBER() OVER (PARTITION BY %s ORDER BY _pvt_cte._id) AS _rn"
+        "%s,\n_ranked AS (\n  SELECT _pvt_cte.*, ROW_NUMBER() OVER (PARTITION BY %s ORDER BY _pvt_cte._id) AS _rn"
         "\n  FROM _pvt_cte%s%s\n)"
-        "\nSELECT _id FROM _ranked WHERE _rn = 1%s",
-        cte, wide_part,
+        "\nSELECT _id FROM _ranked WHERE _rn = 1%s%s",
+        cte, part_wide,
         strcmp(where_sql,"TRUE")==0 ? "" : "\n  WHERE ",
         strcmp(where_sql,"TRUE")==0 ? "" : where_sql,
-        paging);
-      sqlite3_free(wide_part);
+        d_order ? d_order : "", paging);
     }else{
       result = sqlite3_mprintf(
         "%s\nSELECT %s_id FROM _pvt_cte%s%s%s%s",
@@ -1943,12 +2059,12 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
         strcmp(where_sql,"TRUE")==0 ? "" : where_sql,
         order_sql, paging);
     }
-    sqlite3_free(cte); sqlite3_free(where_sql); sqlite3_free(order_sql);
+    sqlite3_free(cte); sqlite3_free(where_sql); sqlite3_free(order_sql); sqlite3_free(d_order);
   }
 
 done:
   sqlite3_free(fields); sqlite3_free(push); sqlite3_free(resid); sqlite3_free(paging);
-  sqlite3_free(part_expr);
+  sqlite3_free(part_expr); sqlite3_free(part_wide); sqlite3_free(part_flat);
   return result;
 }
 

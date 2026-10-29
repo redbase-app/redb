@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Order",
+  "type": "object",
+  "required": [ "id", "amount" ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "amount": { "type": "number", "exclusiveMinimum": 0 },
+    "comment": { "type": "string" }
+  },
+  "additionalProperties": false
+}

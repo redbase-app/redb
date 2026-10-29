@@ -548,6 +548,26 @@ public abstract class UserProviderBase : IUserProvider
         return result > 0;
     }
 
+    /// <inheritdoc />
+    public virtual async Task<bool> SetPasswordHashAsync(IRedbUser user, string passwordHash, IRedbUser? currentUser = null, CancellationToken cancellationToken = default)
+    {
+        if (user.Id == 0)
+            throw new InvalidOperationException("System user password (ID 0) cannot be changed");
+
+        if (currentUser != null && currentUser.Id != 1 && currentUser.Id != user.Id)
+            throw new UnauthorizedAccessException("Only admin can set passwords for other users");
+
+        if (string.IsNullOrWhiteSpace(passwordHash))
+            throw new ArgumentException("Password hash cannot be empty", nameof(passwordHash));
+
+        var exists = await Context.ExecuteScalarAsync<long?>(Sql.Users_ExistsById(), new object[] { user.Id }, cancellationToken);
+        if (!exists.HasValue)
+            throw new ArgumentException($"User with ID {user.Id} not found");
+
+        var result = await Context.ExecuteAsync(Sql.Users_UpdatePassword(), new object[] { passwordHash, user.Id }, cancellationToken);
+        return result > 0;
+    }
+
     // ============================================================
     // === STATUS MANAGEMENT ===
     // ============================================================

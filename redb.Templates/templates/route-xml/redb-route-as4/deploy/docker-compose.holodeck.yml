@@ -1,0 +1,75 @@
+# A local AS4 exchange: the module on a Tsak worker, Holodeck B2B as its trading partner. A test stand with test
+# keys made on the spot, not a deployment.
+#
+# From the project folder (PowerShell or a POSIX shell alike):
+#   dotnet build -p:PackRouteOnBuild=true -p:Version=1.0.0        # -> pkg/routemodule-1.0.0.tpkg
+#   cp deploy/.env.example deploy/.env                              # then set AS4_KEY_PASSWORD
+#   docker compose -f deploy/docker-compose.holodeck.yml up -d --build
+#
+# certs runs first and once: keytool writes the module's key pair to deploy/keys and Holodeck's keystores to
+# deploy/holodeck/certs, and leaves them alone when they are there. The module sends to http://holodeck:8080, Holodeck
+# sends to http://module:4090/as4/in; both stay inside the compose network.
+name: modulectx-as4
+
+services:
+  certs:
+    image: eclipse-temurin:17-jre
+    environment:
+      - AS4_KEY_PASSWORD=${AS4_KEY_PASSWORD:?AS4_KEY_PASSWORD required, see deploy/.env.example}
+    volumes:
+      - ./keys:/keys
+      - ./holodeck/certs:/holodeck-certs
+    # Test key pairs, RSA 2048, two years. The module: PKCS#12 with AS4_KEY_PASSWORD. Holodeck: the three JKS stores
+    # of its certificate manager, passwords as in holodeck/conf/certmanager_config.xml and the P-Modes.
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        if [ -f /keys/module.p12 ] && [ -f /holodeck-certs/privatekeys.jks ]; then echo "keys present"; exit 0; fi
+        rm -f /keys/module.p12 /keys/module.crt /keys/holodeck.crt /holodeck-certs/*.jks
+        keytool -genkeypair -alias module -keyalg RSA -keysize 2048 -sigalg SHA256withRSA -validity 730 \
+          -dname "CN=module.example, O=Test only" \
+          -keystore /keys/module.p12 -storetype PKCS12 -storepass "$$AS4_KEY_PASSWORD"
+        keytool -exportcert -rfc -alias module -keystore /keys/module.p12 -storetype PKCS12 \
+          -storepass "$$AS4_KEY_PASSWORD" -file /keys/module.crt
+        keytool -genkeypair -alias holodeck -keyalg RSA -keysize 2048 -sigalg SHA256withRSA -validity 730 \
+          -dname "CN=holodeck.example, O=Test only" \
+          -keystore /holodeck-certs/privatekeys.jks -storetype JKS -storepass test-only-private -keypass test-only-key
+        keytool -exportcert -rfc -alias holodeck -keystore /holodeck-certs/privatekeys.jks -storetype JKS \
+          -storepass test-only-private -file /keys/holodeck.crt
+        keytool -importcert -noprompt -alias module -file /keys/module.crt \
+          -keystore /holodeck-certs/partnerkeys.jks -storetype JKS -storepass test-only-partners
+        keytool -importcert -noprompt -alias module -file /keys/module.crt \
+          -keystore /holodeck-certs/trustedcerts.jks -storetype JKS -storepass test-only-trusted
+        chmod 644 /keys/* /holodeck-certs/*
+        echo "keys written"
+
+  holodeck:
+    build: ./holodeck
+    image: modulectx-holodeck:8.1.1
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+    volumes:
+      - ./holodeck/conf/certmanager_config.xml:/opt/holodeckb2b/conf/certmanager_config.xml:ro
+      - ./holodeck/pmodes:/opt/holodeckb2b/repository/pmodes:ro
+      - ./holodeck/certs:/opt/holodeckb2b/repository/certs:ro
+      - ./holodeck/samples:/opt/holodeckb2b/samples:ro
+
+  module:
+    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.5.0-net10}
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:4090:4090"   # the AS4 receiver, for a partner on this machine
+    environment:
+      - Tsak__Modules__AssemblyPaths__0=/app/modules
+      - Tsak__Cluster__ApiEndpoint=http://module:9090
+      # The module's context: the Override layer, which wins over every other layer of its configuration.
+      - Tsak__Contexts__modulectx__Override__as4.keyFile=/app/keys/module.p12
+      - Tsak__Contexts__modulectx__Override__as4.keyPassword=${AS4_KEY_PASSWORD:?AS4_KEY_PASSWORD required, see deploy/.env.example}
+      - Tsak__Contexts__modulectx__Override__as4.partnerCertificateFile=/app/keys/holodeck.crt
+      - Tsak__Contexts__modulectx__Override__as4.partnerAddress=http://holodeck:8080/holodeckb2b/as4
+    volumes:
+      - ../pkg:/app/modules
+      - ./keys:/app/keys:ro

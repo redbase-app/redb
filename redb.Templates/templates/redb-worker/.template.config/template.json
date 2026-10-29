@@ -4,6 +4,7 @@
   "classifications": [ "Worker", "Integration", "Database", "RedBase" ],
   "identity": "RedBase.Worker.Template",
   "name": "RedBase Integration Worker",
+  "description": "An integration worker on redb.Route and redb: a folder inbox, an XSD check, one transaction and a receipt; its own host or a Tsak module.",
   "shortName": "redb-worker",
   "tags": {
     "language": "C#",

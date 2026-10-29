@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- The partner did not answer, or its MDN did not confirm the transfer (RequireValidMdn on the agreement): the
+       document is sent again twice, half a minute apart, then the failure is logged. -->
+  <onException exceptions="System.Exception" handled="true"
+               maximumRedeliveries="2" redeliveryDelay="00:00:30" retryAttemptedLogLevel="Warning">
+    <log level="Error" showRouteId="true">
+      <message>the partner did not confirm the document: ${exception.message}</message>
+    </log>
+  </onException>
+
+  <!-- A test document every {{as2.sendPeriod:60000}} ms. Replace the timer and the body with the real source (a
+       file:// or sftp:// consumer, an HTTP endpoint, a queue). The document is signed and encrypted for the partner
+       and POSTed to the agreement's PartnerUrl; the call returns when the partner's signed MDN has been verified and
+       its MIC matched. -->
+  <route id="modulectx-as2-send" description="Sends a test document to the AS2 partner">
+    <from uri="timer://modulectx-as2-send?period={{as2.sendPeriod:60000}}"/>
+    <setHeader name="Subject" expr="test document ${header.CamelTimerCounter}"/>
+    <setBody value="ISA*00*          *00*          *ZZ*MODULE         *ZZ*PARTNER        *261025*1200*U*00401*000000001*0*T*>~"/>
+    <to uri="as2:/send?connectionFactory=partner"/>
+    <log level="Information" showRouteId="true">
+      <message>sent ${header.Message-ID}: ${header.redbAs2.mdnDisposition}, MIC ${header.redbAs2.mdnMicStatus}</message>
+    </log>
+  </route>
+
+</routes>

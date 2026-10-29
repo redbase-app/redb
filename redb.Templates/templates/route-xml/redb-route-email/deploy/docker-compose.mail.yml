@@ -1,0 +1,46 @@
+# A local mail server for the module: GreenMail (SMTP and IMAP for tests, one mailbox), and the module on a Tsak
+# worker. A test stand, not a deployment: GreenMail keeps the mail in memory and speaks no TLS on these ports.
+#
+# From the project folder (PowerShell or a POSIX shell alike):
+#   dotnet build -p:PackRouteOnBuild=true -p:Version=1.0.0        # -> pkg/routemodule-1.0.0.tpkg
+#   cp deploy/.env.example deploy/.env                              # then set MAIL_PASSWORD
+#   docker compose -f deploy/docker-compose.mail.yml up -d
+#
+# The mailbox modulectx@example.org (password MAIL_PASSWORD) receives what the module sends and is what the module
+# reads, so one module shows both directions. A mail client can use it too: SMTP localhost:3025, IMAP localhost:3143.
+name: modulectx-mail
+
+services:
+  mail:
+    image: greenmail/standalone:2.1.14
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users=modulectx:${MAIL_PASSWORD:?MAIL_PASSWORD required, see deploy/.env.example}@example.org
+        -Dgreenmail.users.login=email
+    ports:
+      - "127.0.0.1:3025:3025"
+      - "127.0.0.1:3143:3143"
+
+  module:
+    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.5.0-net10}
+    depends_on:
+      - mail
+    environment:
+      - Tsak__Modules__AssemblyPaths__0=/app/modules
+      - Tsak__Cluster__ApiEndpoint=http://module:9090
+      # The module's context: the Override layer, which wins over every other layer of its configuration.
+      - Tsak__Contexts__modulectx__Override__mail.smtpHost=mail
+      - Tsak__Contexts__modulectx__Override__mail.smtpPort=3025
+      - Tsak__Contexts__modulectx__Override__mail.smtpSecurity=None
+      - Tsak__Contexts__modulectx__Override__mail.imapHost=mail
+      - Tsak__Contexts__modulectx__Override__mail.imapPort=3143
+      - Tsak__Contexts__modulectx__Override__mail.imapSecurity=None
+      - Tsak__Contexts__modulectx__Override__mail.username=modulectx@example.org
+      - Tsak__Contexts__modulectx__Override__mail.password=${MAIL_PASSWORD:?MAIL_PASSWORD required, see deploy/.env.example}
+      - Tsak__Contexts__modulectx__Override__mail.from=modulectx@example.org
+      - Tsak__Contexts__modulectx__Override__mail.to=modulectx@example.org
+      - Tsak__Contexts__modulectx__Override__mail.sendPeriod=30000
+      - Tsak__Contexts__modulectx__Override__mail.pollPeriod=10000
+    volumes:
+      - ../pkg:/app/modules

@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "RedBase",
+  "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
+  "identity": "RedBase.Route.Xml.File",
+  "name": "redb.Route XML module: files",
+  "description": "Files in XML markup: an inbox folder polled for new files, done and error folders, a receipt per file; on a local disk, FTP or SFTP.",
+  "shortName": "redb-route-file",
+  "tags": {
+    "type": "project",
+    "redbSmoke": "pack"
+  },
+  "sourceName": "RouteModule",
+  "preferNameDirectory": true,
+  "symbols": {
+    "context": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "",
+      "displayName": "Context name",
+      "description": "The route context the module runs in. Empty: the module name in lower case."
+    },
+    "nameLower": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": { "source": "name", "toLower": true },
+      "fileRename": "routemodule"
+    },
+    "contextName": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": { "sourceVariableName": "context", "fallbackVariableName": "nameLower" },
+      "replaces": "modulectx"
+    },
+    "framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "net10.0", "description": ".NET 10" },
+        { "choice": "net9.0", "description": ".NET 9" },
+        { "choice": "net8.0", "description": ".NET 8" }
+      ],
+      "defaultValue": "net10.0",
+      "replaces": "net10.0",
+      "displayName": "Target framework",
+      "description": "The target framework of the module project."
+    },
+    "transport": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "file", "description": "A folder of the worker's file system (a local disk or a mounted share)" },
+        { "choice": "ftp", "description": "An FTP server (FTPS with UseFtps)" },
+        { "choice": "sftp", "description": "An SFTP server (SSH)" }
+      ],
+      "defaultValue": "file",
+      "displayName": "Transport",
+      "description": "Where the inbox and outbox folders are: the connector, its URI scheme and, for FTP and SFTP, the connection bean."
+    },
+    "scheme": {
+      "type": "generated",
+      "generator": "switch",
+      "replaces": "file://",
+      "parameters": {
+        "evaluator": "C++",
+        "datatype": "string",
+        "cases": [
+          { "condition": "(transport == \"ftp\")", "value": "ftp://" },
+          { "condition": "(transport == \"sftp\")", "value": "sftp://" },
+          { "condition": "(true)", "value": "file://" }
+        ]
+      }
+    },
+    "headerPrefix": {
+      "type": "generated",
+      "generator": "switch",
+      "replaces": "redbFile.",
+      "parameters": {
+        "evaluator": "C++",
+        "datatype": "string",
+        "cases": [
+          { "condition": "(transport == \"ftp\")", "value": "redbFtp." },
+          { "condition": "(transport == \"sftp\")", "value": "redbSftp." },
+          { "condition": "(true)", "value": "redbFile." }
+        ]
+      }
+    },
+    "connection": {
+      "type": "generated",
+      "generator": "switch",
+      "replaces": "?connectionFactory=remote&amp;",
+      "parameters": {
+        "evaluator": "C++",
+        "datatype": "string",
+        "cases": [
+          { "condition": "(transport == \"file\")", "value": "?" },
+          { "condition": "(true)", "value": "?connectionFactory=remote&amp;" }
+        ]
+      }
+    }
+  },
+  "sources": [
+    {
+      "exclude": [
+        "**/[Bb]in/**", "**/[Oo]bj/**", ".template.config/**/*", "**/*.filelist", "**/*.user", "**/*.lock.json",
+        "pkg/**", "schema/**", "deploy/.env", "deploy/data/**"
+      ]
+    }
+  ]
+}

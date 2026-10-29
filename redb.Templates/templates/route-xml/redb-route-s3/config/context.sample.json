@@ -1,0 +1,28 @@
+{
+  "//": [
+    "Deployment sample: copy it as context.json next to the package on the host. Never put real secrets here.",
+    "The merged configuration, later layers win:",
+    "  1. host appsettings, Contexts default section",
+    "  2. host appsettings, this context's section",
+    "  3. this file: Contexts.default, then Contexts.modulectx",
+    "  4. in-package config/routemodule.config.json: ContextName and AutoStart only",
+    "  5. Override: environment variables (secrets live here)",
+    "Every {{key}} without a {{key:default}} in the XML must get a value from one of these layers:",
+    "the built package lists them in manifest.json under RequiredConfigKeys, and the module stops at init when one is missing.",
+    "s3.accessKey and s3.secretKey are such keys; the secret key goes through the environment.",
+    "AWS S3: s3.serviceUrl empty, s3.region your region, s3.forcePathStyle false."
+  ],
+  "Contexts": {
+    "default": {},
+    "modulectx": {
+      "s3.serviceUrl": "http://localhost:9000",
+      "s3.region": "us-east-1",
+      "s3.forcePathStyle": "true",
+      "s3.accessKey": "modulectx",
+      "s3.inbox": "incoming",
+      "s3.archive": "archive",
+      "orders.period": "20000",
+      "prices.period": "30000"
+    }
+  }
+}

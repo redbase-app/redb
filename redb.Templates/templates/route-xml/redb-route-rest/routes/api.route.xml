@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- A body that does not match the schema: answer 400 with a JSON error instead of 500.
+       handled="true" ends the exchange here, the caller gets this body. -->
+  <onException exceptions="redb.Route.Validation.ValidationException" handled="true">
+    <log level="Warning" showRouteId="true">
+      <message>request rejected: ${exception.message}</message>
+    </log>
+    <setHeader name="redbHttp.ResponseCode" value="400"/>
+    <setBody value='{"error":"the body does not match resources/order.schema.json"}'/>
+  </onException>
+
+  <!-- The API listens on port 5180 (port takes a number, not a configuration key); the OpenAPI document is served at /api/openapi.json.
+       Path parameters arrive as header.<name>, query parameters as header.query.<name>. -->
+  <rest path="/api" port="5180" produces="application/json"
+        title="RouteModule API" version="1.0.0">
+
+    <get path="/hello/{name}">
+      <param name="name" type="path" required="true" dataType="string" description="Who to greet"/>
+      <setBody expr='{"greeting":"Hello, ${header.name}"}'/>
+    </get>
+
+    <post path="/orders" consumes="application/json" to="direct://modulectx-order-in"/>
+
+  </rest>
+
+  <!-- The POST handler: check the body, then answer 202. Put the real work (a queue, a database)
+       between the check and the answer. -->
+  <route id="modulectx-order-in" description="Accepts an order checked against the JSON schema">
+    <from uri="direct://modulectx-order-in"/>
+    <!-- The HTTP body arrives as bytes; the schema check and the log want the text. -->
+    <convertBody type="System.String"/>
+    <validateJsonSchema file="resources/order.schema.json" throwOnFailure="true"/>
+    <log level="Information" showRouteId="true">
+      <message>order accepted: ${body}</message>
+    </log>
+    <setHeader name="redbHttp.ResponseCode" value="202"/>
+    <setBody value='{"accepted":true}'/>
+  </route>
+
+</routes>

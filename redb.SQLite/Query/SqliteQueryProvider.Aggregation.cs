@@ -167,7 +167,7 @@ public partial class SqliteQueryProvider
             {
                 entry[opKey] = new Dictionary<string, object>
                 {
-                    ["$field"] = r.FieldPath ?? string.Empty
+                    ["$field"] = NormalizePvtFieldName(r.FieldPath, r.IsBaseField)
                 };
             }
             entries.Add(entry);

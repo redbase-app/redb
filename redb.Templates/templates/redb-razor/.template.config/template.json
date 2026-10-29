@@ -4,6 +4,7 @@
   "classifications": [ "Web", "Razor Pages", "Database", "RedBase" ],
   "identity": "RedBase.Razor.Template",
   "name": "RedBase Razor Pages Site",
+  "description": "A Razor Pages site on redb: a product list with search, sorting and paging, and a create and edit form; runs as is on SQLite with Pro.",
   "shortName": "redb-razor",
   "tags": {
     "language": "C#",

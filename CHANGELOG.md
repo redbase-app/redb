@@ -25,170 +25,123 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Pending changes live in `changelog/unreleased/` until the release; `pwsh scripts/changelog.ps1 -Preview` shows them.
 
-## [4.4.2] — 2026-10-23
-
-### Changed
-
-- **`AnyAsync` over a tree stops at the first node.** `TreeQuery(...).AnyAsync()` used to count the whole subtree; Pro
-  now asks for one node. On PostgreSQL and SQLite a large subtree with matching nodes answers many times faster. Packages: `redb.Core`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **Tree services read a subtree in one query.** `LoadTreeAsync`, `GetDescendantsAsync`, `GetPathToRootAsync`, their
-  polymorphic forms, `DeleteSubtreeAsync` and the cycle check of `MoveObjectAsync` no longer query once per node: the
-  shape comes in one statement and the objects in one batch (11 thousand descendants: tens of seconds before). A cycle in
-  the parent links now raises an error naming the object instead of being walked to the depth limit. Packages: `redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`.
-- **`DistinctBy` over a tree is faster on SQL Server and SQLite.** On a subtree of 100 thousand nodes it takes about
-  2 s instead of 5 to 17 s on SQL Server and 1.6 s instead of 2.7 to 3.4 s on SQLite; on smaller subtrees SQLite answers
-  in a tenth of the time it took before. Packages: `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **A window over a large tree is several times faster on SQL Server.** The result is no longer built as one value on
-  the server before it is sent: a window over 100 thousand nodes takes about 5 s instead of 25 to 40 s. Packages: `redb.MSSql.Pro`.
-- **Window queries with `Take` are faster.** The window is computed over the fields it needs (partition, ordering,
-  function arguments, filter), and the other selected fields are read only for the rows returned: on 100 thousand objects
-  a ranked page of 50 takes about 210 ms instead of up to 1 s on SQL Server, and about half the time on PostgreSQL. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **A window over a tree honours `Take`, `Skip` and `OrderBy`.** `TreeQuery(...).OrderBy(...).Skip(...).Take(...).WithWindow(...)`
-  returned every node of the subtree; it now returns the requested page, in the requested order, with the window computed
-  over the whole filtered subtree. With `Take`, the selected fields the window does not need are read for the returned rows only. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-
-### Fixed
-
-- **PostgreSQL and SQLite keep one root field name per scheme.** A new unique index stops a root field being written
-  twice; existing databases get it at the next module upgrade (PostgreSQL) or start (SQLite), after empty duplicates are
-  removed. Duplicates holding values are logged as errors at every start and listed by `IRedbService.SchemaProblems`;
-  `IRedbService.CheckSchemaAsync()` looks again without a restart. Packages: `redb.Core`, `redb.Postgres`, `redb.Postgres.Pro`, `redb.SQLite`, `redb.SQLite.Pro`. Upgrade: [UPGRADING.md](UPGRADING.md#duplicate-root-structures).
-- **Nodes sharing one database no longer fail on each other's schema work.** Creating the schema, deploying the SQL
-  module, building the Pro indexes, upgrading a SQLite file and every scheme sync that has something to write (at start-up
-  or at run time) now run under a schema lock: one node writes, the others wait (`SchemaLockTimeout`, 15 minutes by
-  default) and find it done. A database already in step takes no lock, so limited logins keep starting as before. Packages: `redb.Core`, `redb.Postgres`, `redb.Postgres.Pro`, `redb.MSSql`, `redb.MSSql.Pro`, `redb.SQLite`, `redb.SQLite.Pro`.
-- **The SQL preview of a window query shows its filter.** `ToSqlStringAsync` of `WithWindow(...)` after `Where(...)`
-  returned the SQL without the filter; it now returns the statement `SelectAsync` runs. Packages: `redb.Core`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **`ToTreeListAsync`, `ToRootListAsync` and `LoadWithParentsAsync` work on SQL Server trees deeper than 100 levels.**
-  Reading the ancestors stopped there with a recursion limit error; the object ids now also go to the server as a
-  parameter instead of being written into the statement. Packages: `redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`.
-- **`LoadWithParentsAsync` works for an object that has a parent.** It failed with "An item with the same key has already
-  been added" whenever an ancestor was loaded along with the object. Packages: `redb.Core`.
-- **A scheme keeps its CLR type after a module that carried the same types unloads.** When a collectible
-  `AssemblyLoadContext` loaded a copy of an assembly the host also uses and was then unloaded, the host's schemes of that
-  assembly could no longer be matched to their types by name: polymorphic loads read such objects without their Props type. Packages: `redb.Core`.
-- **`DistinctBy` keeps the ordering of the query on SQL Server and SQLite.** `OrderByDescending(x => x.Key).DistinctBy(x => x.Key)`
-  came back ascending on SQLite and in no order on SQL Server, and an ordering by another field, as in
-  `OrderBy(x => x.Salary).DistinctBy(x => x.Department)`, failed with "pvt_cte" in the error. Packages: `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **`CountAsync` after `DistinctBy` counts the distinct keys.** `Query<T>().DistinctBy(x => x.Key).CountAsync()` counted
-  every object, not one per key. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **Several tree filters in one query all apply.** Only the first of `WhereChildrenOf`, `WhereRoots`, `WhereLeaves` and
-  `WhereDescendantsOf` was used and the others were silently dropped: `WhereChildrenOf(a).WhereLeaves()` returned every
-  child of `a`. Each filter now narrows the result, in any order. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **`Win.Ntile(n)` over a tree uses `n`.** A window over a tree always split the rows into 4 buckets, whatever was asked. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **`DistinctBy` over a tree keeps the direction of the ordering by its key on SQLite.**
-  `OrderByDescending(x => x.Key).DistinctBy(x => x.Key)` returned the rows in ascending order. Packages: `redb.SQLite.Pro`.
-
-## [4.4.1] — 2026-10-21
-
-### Changed
-
-- **No changes of its own.** Released as 4.4.1 together with redb.Route 4.4.1, which fixes `seda:` after a context restart. 4.4.0 was withdrawn on the day of release; 4.4.1 carries the same code of this module.
-
-## [4.4.0] — 2026-10-21
-
-> **Withdrawn on the day of release because of the seda restart bug in redb.Route; use 4.4.1.**
-
-### Breaking
-
-- **Custom storage providers: the interceptor parameter of the provider constructors and of
-  `CreateObjectStorageProvider` is a `RedbSaveInterceptorPipeline`.** Only code that builds a storage provider itself
-  is affected. Packages: `redb.Core`. Upgrade: [UPGRADING.md](UPGRADING.md#custom-storage-providers).
-- **`redb.Postgres` brings Npgsql 10, and three of its changes reach code that uses Npgsql directly.** A failed
-  batch command no longer carries its SQL into the exception, `Root Certificate` no longer falls back to the system
-  store, and an untyped read of `date` or `time` returns `DateOnly` / `TimeOnly`. The redb API itself is unaffected. Packages: `redb.Postgres`, `redb.Postgres.Pro`. Upgrade: [UPGRADING.md](UPGRADING.md#npgsql-10).
-- **PostgreSQL Pro: empty values sort where LINQ, SQL Server and SQLite put them**: first under `OrderBy`, last under
-  `OrderByDescending`. PostgreSQL did the opposite. Packages: `redb.Postgres.Pro`. Upgrade: [UPGRADING.md](UPGRADING.md#empty-values-in-sorting).
+## [4.5.0] — 2026-10-29
 
 ### Added
 
-- **`IRedbObjectCache.RemoveObjectsOfTypes(Func<Type, bool>)`.** redb calls it when a collectible load context unloads;
-  a custom cache that does not override it is cleared whole, so it keeps compiling and stays correct. Packages: `redb.Core`.
-- **`IRedbSaveInterceptorRegistry`: save interceptors can subscribe at run time.** Code that cannot reach the DI
-  container of the redb service, such as a module in its own load context, calls `Add(interceptor)` and disposes the
-  returned handle when it stops. `AddRedb` and `AddRedbPro` register the registry. Packages: `redb.Core`, `redb.Core.Pro`.
+- **`IUserProvider.SetPasswordHashAsync(user, passwordHash)` stores a ready password hash.** Use it for an administrator
+  password given in configuration as a BCrypt hash; the default hasher accepts it at login. Custom `IUserProvider`
+  implementations keep compiling: the default member throws `NotSupportedException`. Packages: `redb.Core`.
+- **`dotnet new redb-identity-app`: an application on redb.Identity.** A Tsak module in the same worker as
+  Identity, whose API checks bearer tokens by introspection over direct-vm (cached, 401/403/503 as RFC 6750
+  says), and a Blazor web server that signs users in with OpenID Connect. Options: `--web`, `--framework`. Packages: `redb.Templates`.
+- **`dotnet new redb-route-eip` creates a Tsak module with the common integration patterns in XML markup.** A seda
+  queue, an idempotent consumer, a throttle, a wire tap into an aggregator, a content-based router, a splitter and the
+  context's dead letter channel, driven by a timer: it runs without a broker or a database. Packages: `redb.Templates`.
+- **`dotnet new redb-route-kafka` creates a Tsak module for Kafka in XML markup.** One connection bean for all
+  endpoints, a producer keyed by the order id, a consumer group that retries a failed record twice and then moves
+  it to a topic of failed records, and a compose file for a local single-node Kafka. The brokers are a required key. Packages: `redb.Templates`.
+- **`dotnet new redb-route-rabbitmq` creates a Tsak module for RabbitMQ in XML markup.** One connection bean for all
+  endpoints, a producer, a consumer that retries a failed message twice and then moves it to a queue of failed
+  messages, and a compose file for a local broker. The password is a required configuration key. Packages: `redb.Templates`.
+- **`dotnet new redb-route-rest` creates a Tsak module with an HTTP JSON API in XML markup.** A `<rest>` block with
+  a GET and a POST, the POST body checked against a JSON schema from `resources/`, a 400 answer on a bad body and
+  the OpenAPI document at `/api/openapi.json`. Packages: `redb.Templates`.
+- **`dotnet new redb-route-sql-batch` creates a Tsak module that writes to SQL in batches in XML markup.** Single
+  messages are aggregated into batches of 20 and written in one transaction; a row the database refuses is undone
+  under its savepoint and reported, the others commit. `--db sqlite` (the default), `postgres` or `mssql`. Packages: `redb.Templates`.
+- **`dotnet new redb-route-sql` creates a Tsak module with the SQL outbox pattern in XML markup.** A route writes
+  rows, a poll consumer reads the new ones and marks each done, or failed with the reason. `--db sqlite` (the default,
+  no server needed), `postgres` or `mssql` picks the driver, the connection string and the table definition. Packages: `redb.Templates`.
+- **`dotnet new redb-route` creates a Tsak module with routes in XML markup.** A timer route, `context.xml`, the
+  context configuration sample and the `redb-route-xml` tool as a local tool; `dotnet build -p:PackRouteOnBuild=true`
+  checks the markup and writes the `.tpkg`. Options: `--context`, `--framework`. Packages: `redb.Templates`.
+- **Every `redb-route-*` template puts an `AGENTS.md` into the project.** It tells an AI coding agent what the
+  project is, where the schema and the connector options come from, how keys, secrets and beans are written, how to
+  check a change and how the module is deployed, plus a section on the routes of that template. Packages: `redb.Templates`.
+- **`dotnet new redb-route-as2` creates a Tsak module for AS2 in XML markup.** It sends a signed and encrypted
+  document and verifies the partner's signed MDN, and receives with duplicate detection. A compose file makes test keys
+  and runs a local exchange with OpenAS2 in both directions. Packages: `redb.Templates`.
+- **`dotnet new redb-route-as4` creates a Tsak module for AS4 (eDelivery) in XML markup.** A route that sends a
+  signed and encrypted message and waits for the partner's signed receipt, a receiving route with duplicate detection,
+  and a compose file for a local exchange with Holodeck B2B. The key file, its password and the partner's
+  certificate are required configuration keys. Packages: `redb.Templates`.
+- **`dotnet new redb-route-beans` creates a Tsak module whose XML routes call a C# class of the project.** The bean is
+  built in `context.xml` from configuration (constructor argument and property), the routes call a method with
+  expression arguments and one that takes the exchange; the project's assembly travels in the package. Packages: `redb.Templates`.
+- **`dotnet new redb-route-cron` creates a Tsak module with scheduled jobs in XML markup.** A job on a Quartz cron
+  expression in a configured time zone, never started beside a run still going and skipping runs missed while the
+  worker was down, and an interval on the same scheduler. Packages: `redb.Templates`.
+- **`dotnet new redb-route-email` creates a Tsak module that sends and reads e-mail in XML markup.** A sender over SMTP
+  with retries and a reader of the unseen messages of an IMAP inbox that marks each read once processed, with one
+  connection bean per server. A compose file runs GreenMail and the module on a worker. Packages: `redb.Templates`.
+- **`dotnet new redb-route-file` creates a Tsak module that processes files in XML markup.** An inbox polled for new
+  files, each checked against a schema, moved to a done or an error folder, with a receipt written to an outbox.
+  `--transport file` (the default), `ftp` or `sftp` picks the connector; a compose file runs a local FTP or SFTP server. Packages: `redb.Templates`.
+- **`dotnet new redb-route-ldap` creates a Tsak module for LDAP in XML markup.** A watch that loads the user entries
+  once and then follows their changes, a search on a timer and a password check by bind, all through one connection
+  bean. A compose file starts OpenLDAP with test entries and the module on a worker. Packages: `redb.Templates`.
+- **`dotnet new redb-route-redb` creates a Tsak module that stores redb objects from XML routes.** A props class of
+  the project is the scheme, synced at context start; the routes save objects by a unique key and query them through
+  a named redb instance of the context on Pro with ChangeTracking. `--db sqlite` (the default), `postgres` or `mssql`. Packages: `redb.Templates`.
+- **`dotnet new redb-route-s3` creates a Tsak module for S3 in XML markup.** A route writes objects into a bucket, a
+  poll consumer reads the new ones and moves each to an archive bucket once it is processed. One connection bean serves
+  AWS S3 and S3-compatible stores; a compose file runs a local store and the module on a worker. Packages: `redb.Templates`.
+- **`dotnet new redb-route-scatter-gather` creates a Tsak module with scatter-gather in XML markup.** One request
+  goes to three recipients in parallel, the answers that arrive within the timeout are folded into the best price,
+  a recipient that is too slow is left out. It runs without a broker. Packages: `redb.Templates`.
+- **`dotnet new redb-route-validator-xslt` creates a Tsak module that checks XML against an XSD and transforms it
+  with XSLT, in XML markup.** The schema and the stylesheet live in `resources/` and travel in the package; a document
+  the schema refuses goes to its own route with the reason. It runs without a broker. Packages: `redb.Templates`.
+- **`dotnet new redb-route-amqp` creates a Tsak module for AMQP 1.0 in XML markup.** One connection bean for all
+  endpoints, a producer, a consumer that retries a failed message twice and then moves it to a queue of failed
+  messages, and a compose file that runs ActiveMQ Artemis and the module on a worker. Packages: `redb.Templates`.
+- **`dotnet new redb-route-mqtt` creates a Tsak module for MQTT in XML markup.** One connection bean, test sensors
+  that publish with QoS 1, a retained status topic, a subscriber with topic wildcards that forwards readings over a
+  limit, and a compose file that runs Mosquitto and the module on a worker. Packages: `redb.Templates`.
+- **Every `redb-route-*` template shows its scenario in XML markup and in C#.** Next to the XML route files each
+  module has a `RouteBuilder` in `routes/*.cs`, added to the same context by `<routeBuilder type="...">` in
+  `context.xml`, with the same beans and configuration keys; the package carries the module's DLL. The README of each
+  template names the one difference to notice between the two forms. Packages: `redb.Templates`.
 
 ### Changed
 
-- **`redb` CLI exits with code 1 when `export`, `import`, `init` or `flat` fails.** They printed the error and exited
-  with 0, so a calling script could not see the failure. Packages: `redb.CLI`.
-- **`redb` CLI on System.CommandLine 2.0.13.** Commands, options, aliases and defaults are unchanged; help and parse
-  errors are in English whatever the language of the operating system. Packages: `redb.CLI`.
-- **When a collectible load context unloads, redb clears the caches of the .NET libraries**, as `dotnet watch` does,
-  so System.Text.Json and the others let the context go. The first serialization after an unload runs cold; a failing
-  handler is logged as a warning. Packages: `redb.Core`.
-- **PostgreSQL Pro: `AllAsync` looks for one counterexample instead of counting twice.** One statement that stops at the
-  first object for which the predicate is not TRUE replaces two counts (100 000 employees: 190-240 ms instead of
-  290-420). A predicate over the object's own fields or a computed value, and the other providers, keep the two counts. Packages: `redb.Core`, `redb.Core.Pro`, `redb.Postgres.Pro`.
-- **Polymorphic deserialization resolves a scheme id in the redb service current for the calling flow**, not in the
-  one initialized last. A resolver set with `SystemTextJsonRedbSerializer.SetTypeResolver` still takes precedence. Packages: `redb.Core`.
-- **A scheme read on its first query is logged at Debug, not Warning.** A scheme the database does not hold still
-  fails the query. Packages: `redb.Core`.
-- **Pro: an ordering written after `Select` sorts in the database, and a projection gets `ThenBy`.** `Select(...).OrderBy(...).Take(10)`
-  now runs as `OrderBy(...).Take(10).Select(...)` when the key is a projected Props member or a field of the object; a computed
-  key and the Free providers still sort in memory. `ThenBy` and `ThenByDescending` are new on a projection and need an `OrderBy` before them. Packages: `redb.Core`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **Pro: a filter on a dictionary entry by its key reads one row per object.** `Where(x => x.Dict.ContainsKey("k"))` and
-  `Where(x => x.Dict["k"] == value)` no longer group every row of the dictionary in the scheme; a page of 100 over
-  100 000 employees takes 90-100 ms instead of 270-300 on PostgreSQL and SQLite. Packages: `redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **`redb flat` hands out keys and deletes in cascade, as redb does.** Keys default to one shared sequence, `flat_identity`,
-  started above every copied key, and deleting a header row removes its Props, nested and collection rows. A database
-  exported earlier keeps its old schema: export it again, and let new rows take their keys from the sequence. Packages: `redb.Export`, `redb.CLI`.
-- **`redb flat` indexes every foreign key that no key or unique constraint already covers.** The indexes are
-  created after the data is copied and are part of the `--ddl-only` script, whose closing line now counts them. Packages: `redb.Export`, `redb.CLI`.
-- **SQL Server Pro: a filter with `Field == null` no longer checks every object of the scheme.** The objects without a value
-  are found by one anti join over the index of the field, which stops when the page is full (a page of
-  `Where(x => x.Field == null).Take(5)` over 100 000 employees with no such object: 300 ms -> 60 ms). Packages: `redb.MSSql.Pro`.
-- **Database drivers: Npgsql 10.0.3, Microsoft.Data.SqlClient 7.1.1, Microsoft.Data.Sqlite 10.0.13, native SQLite
-  3.53.3.** The security baseline pins MailKit and MimeKit 4.18.1, MessagePack 3.1.12 and
-  System.Security.Cryptography.Xml / .Pkcs 10.0.13. A project that pins Microsoft.Data.SqlClient below 7.0.3 has to raise it. Packages: `redb.Postgres`, `redb.MSSql`, `redb.SQLite`. Upgrade: [UPGRADING.md](UPGRADING.md#npgsql-10).
-- **PostgreSQL: JIT is off for redb connections.** The provider adds `-c jit=off` to the connection string Options
-  unless they name `jit`: a page that takes 2.5 ms took 82 ms with JIT. Packages: `redb.Postgres`.
-- **Value-leading indexes on PostgreSQL (PVT module 0.7.16), SQL Server (0.2.30) and SQLite (schema step 11)**: a
-  filter on a field reads one range of its index. An existing database builds them on the first start with this
-  version, and writes to `_values` wait meanwhile. Packages: `redb.Postgres`, `redb.MSSql`, `redb.SQLite`. Upgrade: [UPGRADING.md](UPGRADING.md#value-leading-indexes).
-- **PostgreSQL Pro and SQLite Pro: an open range that is narrow by the data starts the streams** (`Weight > 7500` over
-  689 thousand points: 0.8-1.2 s to 12-35 ms), aggregates, groupings and windows over it included. Packages: `redb.Postgres.Pro`, `redb.SQLite.Pro`.
-- **PostgreSQL Pro: the streams form finds a narrow filter through the index of values**: one order number among
-  689 thousand points, 2.4 s to 31 ms. A list without `Take` takes the streams form too. Packages: `redb.Postgres.Pro`.
-- **PostgreSQL Pro and SQLite Pro: a page sorted by one Props field walks that field's index** (with `Take`, a number
-  or a date as the key, no narrow condition): pages over 689 thousand points, seconds to 10-40 ms. Not under `WhereRedb`. Packages: `redb.Postgres.Pro`, `redb.SQLite.Pro`.
-- **PostgreSQL Pro: queries narrowed by a Props value read the index of values.** Counts, existence checks, null checks,
-  aggregates, groupings, windows and pages with `Take` take their objects from the index of the narrow condition instead
-  of every object of the scheme, and an equality or `In` on a string field reads its index (100 000 employees: two to
-  five times faster). A filter on the object's own fields (`WhereRedb`, `OrderByRedb`) keeps its form. Packages: `redb.Postgres.Pro`.
-- **PostgreSQL Pro: a text field under `WhereRedb` is read for the objects of the window only.** A grouping, a null check
-  or a substring search by a text field on objects narrowed by their own columns (a date window, a parent) no longer reads
-  every value of the field in the scheme, so its time follows the window rather than the archive. Packages: `redb.Postgres.Pro`.
-- **Pro: a page sorted by a Props field with `ThenBy` reads only the run of equal first keys it needs**, from the index
-  of values, instead of the whole scheme when the first key repeats: `OrderByDescending(x => x.Salary).ThenBy(x => x.LastName).Take(100)`
-  over 100 000 employees, about 290 ms to 60 ms on PostgreSQL, SQL Server and SQLite. The answer does not change. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **SQLite: a new index `IX__values__structure_object_string` (schema version 12), and SQLite Pro answers `Field == null`
-  over a text field from it** (850 ms to 70 ms over 100 000 objects). An existing file builds the index on its first
-  start with this version, which takes a while on a large file. Packages: `redb.SQLite`, `redb.SQLite.Pro`. Upgrade: [UPGRADING.md](UPGRADING.md#sqlite-index-on-text-values).
-- **SQLite Pro and SQL Server Pro: an OR of narrow branches stays on the aggregate form with the row prefilter**, as
-  on PostgreSQL: three branches, 1.3-1.7 s to 27-95 ms. Packages: `redb.SQLite.Pro`, `redb.MSSql.Pro`.
-- **SQLite Pro: counting by a null check reads the index of values.** `Count(x => x.Field == null)` and
-  `Count(x => x.Field != null)` on their own no longer read the value of every object from the table
-  (100 000 employees, a text field: 0.9-1 s -> 35-50 ms). Packages: `redb.SQLite.Pro`.
+- **The props cache fills a loaded graph in one pass.** Loading an object with nested references no longer walks its Props twice, so the load path is faster; cache contents, hash checks and invalidation stay the same. Packages: `redb.Core`.
 
 ### Fixed
 
-- **A module in a collectible `AssemblyLoadContext` unloads after it used redb.** Process-wide caches held the
-  module's Props types for the life of the process; they hold them weakly now and drop the module's objects on unload.
-  Nothing is needed from the host beyond `Unload()`. Packages: `redb.Core`, `redb.Core.Pro`.
-- **Pro: the props cache no longer serves a referenced object that changed or went to the trash.** Before serving a cached
-  object, the objects it references are checked against the database, so changes from another cluster node are seen too.
-  A query caches referenced objects by their own ids; a graph saved with an id-only reference is not cached until loaded. Packages: `redb.Core`, `redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
-- **Pro: the PVT prefilter covers an OR of three or more conditions**, as it covered two: an order number searched in
-  three fields over a month, 1.9 s to 0.1 s on PostgreSQL. Packages: `redb.Core.Pro`.
-- **Pro: `!x.Dict.ContainsKey("k")` counts the objects that have no dictionary at all.** With the PVT prefilter off, or on a
-  query that keeps the aggregate form, such objects were left out, so the same filter gave different sets depending on the form. Packages: `redb.Core.Pro`.
-- **SQLite Pro: a filter on a field of a class inside a dictionary no longer scans the scheme for every match**
-  (61 s to 0.1 s on the examples). Packages: `redb.SQLite.Pro`.
-- **The module templates scale on Tsak.** `deploy/docker-compose.tsak.yml` of `redb-app`, `redb-bff`, `redb-chat` and
-  `redb-worker` no longer sets `Tsak__Cluster__NodeId`, so each replica of `docker compose up --scale` names itself after
-  its host; a fixed id had the second replica refused. Packages: `redb.Templates`.
+- **`DistinctRedb()` is applied by the free providers.** It returned every object; it now keeps one object per value of
+  the object's own fields, as the Pro providers do. Packages: `redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`.
+- **A cached object is no longer served with a reference that has changed or left for the trash.** The free providers
+  returned the graph they had cached, so an object loaded before a soft-delete kept showing the trashed target as live. Packages: `redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`.
+- **After `SaveAsync` and `SaveByUniqueAsync` the object carries the dates its row holds.** An object without dates
+  (deserialized from JSON, say) saved onto an existing row came back with `DateCreate` and `DateModify` equal to
+  0001-01-01; now it has the stored creation date and the new modification date, as a reload shows. Packages: `redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **`Redb.Maintenance` works on SQL Server for a login without `VIEW SERVER STATE`.** `GetStatisticsWindowAsync` and
+  `GetIndexStatsAsync` failed with a permission error; now the usage counters and their start time come back null, and
+  tables, indexes and sizes are read as before. Packages: `redb.MSSql`.
+- **`AggregateAsync` with a field of the object next to Props fields works on the free SQL Server and SQLite
+  providers.** `x => new { SumId = Agg.Sum(x.Id), Total = Agg.Sum(x.Props.Salary) }` failed: SQL Server with a
+  conversion error, SQLite with `pvt_build_aggregate_sql: unsupported`. Packages: `redb.MSSql`, `redb.SQLite`.
+- **`DistinctBy` and `DistinctRedb` work over trees on SQL Server.** A tree query with either failed with
+  "Invalid column name" for the field it ordered or ranked by, and `DistinctRedb()` partitioned by the first of its
+  columns only. The ordering and every key are now evaluated where the pivot columns resolve. Packages: `redb.MSSql`.
+- **The SQL preview of a tree query works on SQL Server.** `ToSqlStringAsync()` failed with
+  "Could not find stored procedure 'dbo.get_search_tree_sql_preview_base'"; it now returns the statement
+  `dbo.pvt_build_query_sql` compiles for the query. Packages: `redb.MSSql`.
+- **`DistinctRedb()` works again on SQL Server.** Since 4.4.2 `Query<T>().DistinctRedb()` failed with "The column '_name'
+  was specified multiple times for '_ranked'". Packages: `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **`Distinct()` and `DistinctRedb()` work over trees and keep the ordering of the query.** Over a tree, SQL Server returned
+  every node and its `CountAsync` failed, and `DistinctRedb()` failed on PostgreSQL and SQLite ("_id_parent is ambiguous");
+  on PostgreSQL the rows came back in the order of the distinct key, so `OrderBy` and `Skip`/`Take` cut the wrong page. Packages: `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`.
+- **`DistinctBy` and `DistinctRedb` keep the page the query asks for.** The rows came back in ascending key order
+  whatever the `OrderBy` said, so `Skip` and `Take` cut the wrong page, and `DistinctRedb()` deduplicated by the
+  first of its fields only. Both now follow the query, as the Pro provider does. Packages: `redb.SQLite`.
+- **`Skip` without `Take`, and the SQL preview of a tree query, work on SQLite.** A query with `Skip` alone failed with
+  `near "OFFSET": syntax error`, and `ToSqlStringAsync()` of a `TreeQuery` failed with
+  `no such function: get_search_tree_sql_preview_base`. Packages: `redb.SQLite`.
+- **`Skip` without `Take` works over a tree on SQLite.** `TreeQuery(...).Skip(n)` failed with `near "OFFSET": syntax error`. Packages: `redb.SQLite.Pro`.
 
 ## Earlier versions
 
-Earlier releases are archived by line in [changelog/](changelog/): [4.3.x](changelog/CHANGELOG-4.3.x.md), [4.2.x](changelog/CHANGELOG-4.2.x.md), [4.1.x](changelog/CHANGELOG-4.1.x.md), [4.0.x](changelog/CHANGELOG-4.0.x.md), [3.x](changelog/CHANGELOG-3.x.md), [2.x](changelog/CHANGELOG-2.x.md), [1.x](changelog/CHANGELOG-1.x.md).
+Earlier releases are archived by line in [changelog/](changelog/): [4.4.x](changelog/CHANGELOG-4.4.x.md), [4.3.x](changelog/CHANGELOG-4.3.x.md), [4.2.x](changelog/CHANGELOG-4.2.x.md), [4.1.x](changelog/CHANGELOG-4.1.x.md), [4.0.x](changelog/CHANGELOG-4.0.x.md), [3.x](changelog/CHANGELOG-3.x.md), [2.x](changelog/CHANGELOG-2.x.md), [1.x](changelog/CHANGELOG-1.x.md).

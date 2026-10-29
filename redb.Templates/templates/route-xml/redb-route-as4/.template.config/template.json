@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "RedBase",
+  "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
+  "identity": "RedBase.Route.Xml.As4",
+  "name": "redb.Route XML module: AS4",
+  "description": "AS4 (eDelivery) in XML markup: sends a signed and encrypted user message to a partner and receives one with its receipt; a Holodeck B2B partner for a local exchange.",
+  "shortName": "redb-route-as4",
+  "tags": {
+    "type": "project",
+    "redbSmoke": "pack"
+  },
+  "sourceName": "RouteModule",
+  "preferNameDirectory": true,
+  "symbols": {
+    "context": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "",
+      "displayName": "Context name",
+      "description": "The route context the module runs in. Empty: the module name in lower case."
+    },
+    "nameLower": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": { "source": "name", "toLower": true },
+      "fileRename": "routemodule"
+    },
+    "contextName": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": { "sourceVariableName": "context", "fallbackVariableName": "nameLower" },
+      "replaces": "modulectx"
+    },
+    "framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "net10.0", "description": ".NET 10" },
+        { "choice": "net9.0", "description": ".NET 9" },
+        { "choice": "net8.0", "description": ".NET 8" }
+      ],
+      "defaultValue": "net10.0",
+      "replaces": "net10.0",
+      "displayName": "Target framework",
+      "description": "The target framework of the module project."
+    }
+  },
+  "sources": [
+    {
+      "exclude": [
+        "**/[Bb]in/**", "**/[Oo]bj/**", ".template.config/**/*", "**/*.filelist", "**/*.user", "**/*.lock.json",
+        "pkg/**", "schema/**", "deploy/.env", "deploy/keys/**", "deploy/holodeck/certs/**"
+      ]
+    }
+  ]
+}

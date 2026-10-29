@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- The access point's address for partners: POST http(s)://<host>:{{as4.port:4090}}/as4/in. The receiver
+       decrypts and verifies the message against the agreement, refuses with an ebMS error what does not hold, and
+       answers a message it took with a signed non-repudiation receipt in the same HTTP response. The receipt goes
+       when the route has finished: a failure in the route answers the partner with an error instead, and the
+       partner sends the message again. A message received before gets its receipt again and does not reach the
+       route twice (idempotentRepository=as4-received). -->
+  <route id="modulectx-as4-receive" description="Receives AS4 user messages from the partner">
+    <from uri="as4:/as4/in?port={{as4.port:4090}}&amp;connectionFactory=as4-node&amp;idempotentRepository=as4-received"/>
+    <!-- One payload arrives as the body (bytes); the part properties and the message properties are headers. -->
+    <convertBody type="System.String"/>
+    <log level="Information" showRouteId="true">
+      <message>received ${header.redbAs4.messageId} from ${header.redbAs4.partner} (${header.redbAs4.service} / ${header.redbAs4.action}): ${body}</message>
+    </log>
+    <!-- Replace the log with the real work: store the document, hand it to a queue, call a service. -->
+  </route>
+
+</routes>

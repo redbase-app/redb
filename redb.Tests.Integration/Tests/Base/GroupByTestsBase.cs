@@ -12,6 +12,11 @@ public abstract class GroupByTestsBase
 
     protected GroupByTestsBase(IRedbService redb) => Redb = redb;
 
+    // Queries read only the objects their test seeded: other test classes share the database and may leave
+    // employees without salary or department behind.
+    private redb.Core.Query.IRedbQueryable<EmployeeProps> Seeded(List<long> ids)
+        => Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+
     private async Task<List<long>> SeedAsync()
     {
         return await TestDataFactory.SeedEmployees(Redb, 20);
@@ -22,7 +27,7 @@ public abstract class GroupByTestsBase
     {
         var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.Department)
             .SelectAsync(g => new
             {
@@ -48,7 +53,7 @@ public abstract class GroupByTestsBase
     {
         var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .Where(e => e.IsRemote)
             .GroupBy(e => e.Department)
             .SelectAsync(g => new
@@ -71,7 +76,7 @@ public abstract class GroupByTestsBase
     {
         var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.Department)
             .SelectAsync(g => new
             {
@@ -96,7 +101,7 @@ public abstract class GroupByTestsBase
     {
         var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.IsRemote)
             .SelectAsync(g => new
             {
@@ -116,7 +121,7 @@ public abstract class GroupByTestsBase
         var ids = await SeedAsync();
 
         // Key: anonymous property name "Dept" differs from field name "Department"
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.Department)
             .SelectAsync(g => new
             {
@@ -140,7 +145,7 @@ public abstract class GroupByTestsBase
         var ids = await SeedAsync();
 
         // Key: "Remote" differs from field "IsRemote"
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.IsRemote)
             .SelectAsync(g => new
             {

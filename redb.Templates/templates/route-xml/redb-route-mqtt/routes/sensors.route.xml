@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Test sensors: every {{sensors.period:5000}} ms a temperature reading of room-1 and room-2 on
+       sensors/<room>/temperature, QoS 1 (delivered at least once). In a real module the devices publish. -->
+  <route id="modulectx-sensors-out" description="Publishes test temperature readings">
+    <from uri="timer://modulectx-sensors?period={{sensors.period:5000}}"/>
+    <setBody expr='{"room":"room-1","celsius":${header.CamelTimerCounter % 15 + 20}}'/>
+    <to uri="mqtt://sensors/room-1/temperature?connectionFactory=mqtt&amp;mode=Publish&amp;qos=1&amp;contentType=application/json"/>
+    <setBody expr='{"room":"room-2","celsius":${header.CamelTimerCounter % 7 + 18}}'/>
+    <to uri="mqtt://sensors/room-2/temperature?connectionFactory=mqtt&amp;mode=Publish&amp;qos=1&amp;contentType=application/json"/>
+  </route>
+
+  <!-- The module's status, retained: the broker keeps the last one and hands it to every new subscriber at once. -->
+  <route id="modulectx-status" description="Publishes the module status as a retained message">
+    <from uri="timer://modulectx-status?period=60000"/>
+    <setBody value='{"module":"modulectx","state":"running"}'/>
+    <to uri="mqtt://modules/modulectx/status?connectionFactory=mqtt&amp;mode=Publish&amp;qos=1&amp;retain=true"/>
+  </route>
+
+  <!-- Every room's temperature (+ matches one topic level). A reading over 30 degrees goes on to alerts/temperature. -->
+  <route id="modulectx-sensors-in" description="Reads the temperatures and raises alerts">
+    <from uri="mqtt://sensors/+/temperature?connectionFactory=mqtt&amp;qos=1"/>
+    <!-- A message arrives as bytes; the JSON expressions want the text. -->
+    <convertBody type="System.String"/>
+    <log level="Information" showRouteId="true">
+      <message>${header.redbMqtt.topic}: ${jpath('$.celsius')} C</message>
+    </log>
+    <filter expr="jpath('$.celsius') &gt; 30">
+      <to uri="mqtt://alerts/temperature?connectionFactory=mqtt&amp;mode=Publish&amp;qos=1"/>
+    </filter>
+  </route>
+
+  <route id="modulectx-alerts" description="Logs the temperature alerts">
+    <from uri="mqtt://alerts/temperature?connectionFactory=mqtt&amp;qos=1"/>
+    <convertBody type="System.String"/>
+    <log level="Warning" showRouteId="true">
+      <message>alert: ${body}</message>
+    </log>
+  </route>
+
+</routes>

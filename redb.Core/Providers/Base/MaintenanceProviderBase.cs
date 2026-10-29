@@ -69,8 +69,8 @@ public abstract class MaintenanceProviderBase : IMaintenanceProvider
     public virtual async Task<IReadOnlyList<IndexStatistics>> GetIndexStatsAsync(CancellationToken cancellationToken = default)
     {
         // The dialect SQL normalizes each engine's catalogs to one alias contract, so this is
-        // the only mapping in existence. The single allowed branch: SQLite without the dbstat
-        // virtual table compiled in cannot report sizes - fall back to the size-less form.
+        // the only mapping in existence. The single allowed branch: the dialect's fallback form,
+        // for SQLite without dbstat (no sizes) and SQL Server without VIEW SERVER STATE (no counters).
         List<IndexStatsRow> rows;
         try
         {
@@ -81,8 +81,8 @@ public abstract class MaintenanceProviderBase : IMaintenanceProvider
                                           && fallback != Sql.Maintenance_SelectIndexStats())
         {
             Logger?.LogDebug(ex,
-                "REDB maintenance: sized index-stats query failed (dbstat not compiled in?); " +
-                "falling back to the size-less form.");
+                "REDB maintenance: index-stats query failed (dbstat not compiled in, or no " +
+                "VIEW SERVER STATE right); falling back to the dialect's reduced form.");
             rows = await Context.QueryAsync<IndexStatsRow>(
                 fallback, System.Array.Empty<object>(), cancellationToken);
         }

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Holodeck sends, the module receives (routes/receive.route.xml): a message submitted through data/msg_out
+     (deploy/holodeck/samples) goes to the module's receiver, signed with Holodeck's key, the payload compressed and
+     encrypted for the module with the eDelivery AS4 algorithms. Holodeck expects the module's signed receipt in the
+     HTTP response and writes it to data/msg_in once it has verified it. -->
+<PMode xmlns="http://holodeck-b2b.org/schemas/2014/10/pmode">
+    <id>holodeck-to-module</id>
+    <mep>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/oneWay</mep>
+    <mepBinding>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/push</mepBinding>
+    <Initiator>
+        <PartyId>urn:redb:example:holodeck</PartyId>
+        <Role>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/initiator</Role>
+        <SecurityConfiguration>
+            <Signing>
+                <KeystoreAlias password="test-only-key">holodeck</KeystoreAlias>
+                <KeyReferenceMethod>BSTReference</KeyReferenceMethod>
+                <Algorithm>http://www.w3.org/2001/04/xmldsig-more#rsa-sha256</Algorithm>
+                <HashFunction>http://www.w3.org/2001/04/xmlenc#sha256</HashFunction>
+            </Signing>
+        </SecurityConfiguration>
+    </Initiator>
+    <Responder>
+        <PartyId>urn:redb:example:module</PartyId>
+        <Role>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/responder</Role>
+        <SecurityConfiguration>
+            <Signing>
+                <KeystoreAlias>module</KeystoreAlias>
+            </Signing>
+            <Encryption>
+                <KeystoreAlias>module</KeystoreAlias>
+                <Algorithm>http://www.w3.org/2009/xmlenc11#aes128-gcm</Algorithm>
+                <KeyTransport>
+                    <Algorithm>http://www.w3.org/2009/xmlenc11#rsa-oaep</Algorithm>
+                    <MGFAlgorithm>http://www.w3.org/2009/xmlenc11#mgf1sha256</MGFAlgorithm>
+                    <DigestAlgorithm>http://www.w3.org/2001/04/xmlenc#sha256</DigestAlgorithm>
+                    <KeyReferenceMethod>BSTReference</KeyReferenceMethod>
+                </KeyTransport>
+            </Encryption>
+        </SecurityConfiguration>
+    </Responder>
+    <Agreement>
+        <name>urn:redb:example:agreement</name>
+    </Agreement>
+    <Leg>
+        <Protocol>
+            <Address>http://module:4090/as4/in</Address>
+        </Protocol>
+        <Receipt>
+            <ReplyPattern>RESPONSE</ReplyPattern>
+            <NotifyReceiptToBusinessApplication>true</NotifyReceiptToBusinessApplication>
+        </Receipt>
+        <ReceptionAwareness>
+            <MaxRetries>2</MaxRetries>
+            <RetryInterval>30</RetryInterval>
+        </ReceptionAwareness>
+        <DefaultDelivery>
+            <DeliveryMethod>org.holodeckb2b.backend.file.NotifyAndDeliverOperation</DeliveryMethod>
+            <Parameter>
+                <name>format</name>
+                <value>ebms</value>
+            </Parameter>
+            <Parameter>
+                <name>deliveryDirectory</name>
+                <value>data/msg_in</value>
+            </Parameter>
+        </DefaultDelivery>
+        <UserMessageFlow>
+            <BusinessInfo>
+                <Action>StoreMessage</Action>
+                <Service>
+                    <name>urn:redb:example:as4</name>
+                </Service>
+            </BusinessInfo>
+            <PayloadProfile>
+                <UseAS4Compression>true</UseAS4Compression>
+            </PayloadProfile>
+        </UserMessageFlow>
+    </Leg>
+</PMode>

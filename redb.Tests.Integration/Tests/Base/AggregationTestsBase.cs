@@ -18,6 +18,10 @@ public abstract class AggregationTestsBase
         IsPro = isPro;
     }
 
+    // Every query reads only the objects its test seeded: other test classes share the database and may leave
+    // employees without salary or department behind.
+    private IRedbQueryable<EmployeeProps> Seeded(List<long> ids) => Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+
     private async Task<List<long>> SeedAsync()
     {
         return await TestDataFactory.SeedEmployees(Redb, 15);
@@ -28,9 +32,9 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var count = await Redb.Query<EmployeeProps>().CountAsync();
+        var count = await Seeded(ids).CountAsync();
 
-        count.Should().BeGreaterThanOrEqualTo(15);
+        count.Should().Be(15);
     }
 
     [Fact]
@@ -38,7 +42,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var count = await Redb.Query<EmployeeProps>()
+        var count = await Seeded(ids)
             .Where(e => e.IsRemote)
             .CountAsync();
 
@@ -50,7 +54,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var any = await Redb.Query<EmployeeProps>().AnyAsync();
+        var any = await Seeded(ids).AnyAsync();
 
         any.Should().BeTrue();
     }
@@ -70,7 +74,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var sum = await Redb.Query<EmployeeProps>()
+        var sum = await Seeded(ids)
             .SumAsync(e => e.Salary);
 
         sum.Should().BeGreaterThan(0m);
@@ -81,7 +85,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var avg = await Redb.Query<EmployeeProps>()
+        var avg = await Seeded(ids)
             .AverageAsync(e => e.Age);
 
         avg.Should().BeGreaterThan(0m);
@@ -92,7 +96,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var min = await Redb.Query<EmployeeProps>()
+        var min = await Seeded(ids)
             .MinAsync(e => e.Salary);
 
         min.Should().NotBeNull();
@@ -104,7 +108,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var max = await Redb.Query<EmployeeProps>()
+        var max = await Seeded(ids)
             .MaxAsync(e => e.Salary);
 
         max.Should().NotBeNull();
@@ -116,7 +120,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var result = await Redb.Query<EmployeeProps>()
+        var result = await Seeded(ids)
             .AggregateAsync(e => new
             {
                 TotalSalary = Agg.Sum(e.Props.Salary),
@@ -128,7 +132,7 @@ public abstract class AggregationTestsBase
 
         result.Should().NotBeNull();
         result!.TotalSalary.Should().BeGreaterThan(0m);
-        result.Count.Should().BeGreaterThanOrEqualTo(15);
+        result.Count.Should().Be(15);
         result.MinSalary.Should().BeLessThanOrEqualTo(result.MaxSalary);
     }
 
@@ -136,18 +140,17 @@ public abstract class AggregationTestsBase
     /// A base field in a batch next to Props fields is a property of the object, not of a value row.
     /// The batch statement ranged over the rows of _values, so an object came once per aggregated
     /// structure and SUM(Id) came out doubled with two Props fields. Checked against the loaded objects,
-    /// with and without a Props filter. Pro only: the Free SQL Server module and the SQLite extension
-    /// refuse a base field in a batch.
+    /// with and without a Props filter. On every provider: the free SQL Server and SQLite providers
+    /// sent the base field without its "0$:" mark, and their modules refused it as a Props path.
     /// </summary>
     [Fact]
     public async Task AggregateAsync_BaseFieldNextToPropsFields_CountsEachObjectOnce()
     {
-        if (!IsPro) return;
         var ids = await SeedAsync();
 
         foreach (var withPropsFilter in new[] { false, true })
         {
-            var query = Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+            var query = Seeded(ids);
             if (withPropsFilter)
                 query = query.Where(e => e.Age >= 30);
 
@@ -175,7 +178,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .OrderBy(e => e.Age)
             .Take(5)
             .Select(e => new { e.Props.FirstName, e.Props.Salary })
@@ -194,7 +197,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var departments = await Redb.Query<EmployeeProps>()
+        var departments = await Seeded(ids)
             .Select(e => e.Props.Department)
             .Distinct()
             .ToListAsync();
@@ -207,7 +210,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .DistinctBy(e => e.Department)
             .ToListAsync();
 
@@ -221,7 +224,7 @@ public abstract class AggregationTestsBase
         var ids = await SeedAsync();
 
         var targets = new[] { "Engineering", "Marketing" };
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .WhereIn(e => e.Department, targets)
             .ToListAsync();
 
@@ -235,14 +238,14 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var totalSum = await Redb.Query<EmployeeProps>()
+        var totalSum = await Seeded(ids)
             .SumAsync(e => e.Salary);
 
-        var remoteSum = await Redb.Query<EmployeeProps>()
+        var remoteSum = await Seeded(ids)
             .Where(e => e.IsRemote)
             .SumAsync(e => e.Salary);
 
-        var officeSum = await Redb.Query<EmployeeProps>()
+        var officeSum = await Seeded(ids)
             .Where(e => !e.IsRemote)
             .SumAsync(e => e.Salary);
 
@@ -254,7 +257,7 @@ public abstract class AggregationTestsBase
     {
         var ids = await SeedAsync();
 
-        var all = await Redb.Query<EmployeeProps>()
+        var all = await Seeded(ids)
             .AllAsync(e => e.Salary > 0);
 
         all.Should().BeTrue();
@@ -271,8 +274,8 @@ public abstract class AggregationTestsBase
         var ids = await SeedAsync();
         var oneId = ids[0];
 
-        var allSum = await Redb.Query<EmployeeProps>().SumRedbAsync(o => o.Id);
-        var filteredSum = await Redb.Query<EmployeeProps>()
+        var allSum = await Seeded(ids).SumRedbAsync(o => o.Id);
+        var filteredSum = await Seeded(ids)
             .WhereRedb(o => o.Id == oneId)
             .SumRedbAsync(o => o.Id);
 
@@ -286,7 +289,7 @@ public abstract class AggregationTestsBase
         var ids = await SeedAsync();
         var oneId = ids[0];
 
-        var stats = await Redb.Query<EmployeeProps>()
+        var stats = await Seeded(ids)
             .WhereRedb(o => o.Id == oneId)
             .AggregateRedbAsync(o => new { Count = Agg.Count(), SumId = Agg.Sum(o.Id) });
 
@@ -301,9 +304,9 @@ public abstract class AggregationTestsBase
         // nothing yields an EMPTY selection → SUM is NULL in SQL → reading it as a number threw
         // InvalidOperationException. Before the filter fix the selection was never empty (filter was
         // dropped), so this path was unreachable. "A ledger with no movements" must sum to 0, not throw.
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var sum = await Redb.Query<EmployeeProps>()
+        var sum = await Seeded(ids)
             .WhereRedb(o => o.Id == -1)   // no object has id -1 → empty selection
             .SumRedbAsync(o => o.Id);
 
@@ -313,9 +316,9 @@ public abstract class AggregationTestsBase
     [Fact]
     public async Task AverageRedbAsync_EmptySelection_ReturnsZero_DoesNotThrow()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var avg = await Redb.Query<EmployeeProps>()
+        var avg = await Seeded(ids)
             .WhereRedb(o => o.Id == -1)
             .AverageRedbAsync(o => o.Id);
 
@@ -328,8 +331,8 @@ public abstract class AggregationTestsBase
         // GetStatisticsAsync is the Props path, but shares the same filterJson-drop defect on Pro.
         var ids = await SeedAsync();
 
-        var allStats = await Redb.Query<EmployeeProps>().GetStatisticsAsync(e => e.Salary);
-        var remoteStats = await Redb.Query<EmployeeProps>()
+        var allStats = await Seeded(ids).GetStatisticsAsync(e => e.Salary);
+        var remoteStats = await Seeded(ids)
             .Where(e => e.IsRemote)
             .GetStatisticsAsync(e => e.Salary);
 

@@ -4,6 +4,7 @@
   "classifications": [ "Web", "Blazor", "WebAssembly", "API", "Database", "RedBase" ],
   "identity": "RedBase.App.Template",
   "name": "RedBase Blazor WebAssembly App with a redb.Route API",
+  "description": "A Blazor WebAssembly client and a redb.Route REST API with JWT sign-in on redb; the API runs in its own host or as a Tsak module.",
   "shortName": "redb-app",
   "tags": {
     "language": "C#",

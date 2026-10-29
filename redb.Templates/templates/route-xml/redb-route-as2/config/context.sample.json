@@ -1,0 +1,27 @@
+{
+  "//": [
+    "Deployment sample: copy it as context.json next to the package on the host. Never put real secrets here.",
+    "The merged configuration, later layers win:",
+    "  1. host appsettings, Contexts default section",
+    "  2. host appsettings, this context's section",
+    "  3. this file: Contexts.default, then Contexts.modulectx",
+    "  4. in-package config/routemodule.config.json: ContextName and AutoStart only",
+    "  5. Override: environment variables (secrets live here)",
+    "Every {{key}} without a {{key:default}} in the XML must get a value from one of these layers:",
+    "the built package lists them in manifest.json under RequiredConfigKeys, and the module stops at init when one is missing.",
+    "as2.keyFile, as2.keyPassword and as2.partnerCertificateFile are such keys; the password goes through the environment."
+  ],
+  "Contexts": {
+    "default": {},
+    "modulectx": {
+      "as2.keyFile": "/app/keys/module.p12",
+      "as2.partnerCertificateFile": "/app/keys/openas2.crt",
+      "as2.ourId": "modulectx",
+      "as2.partnerId": "openas2",
+      "as2.partnerUrl": "http://openas2:10080",
+      "as2.port": "4080",
+      "as2.sendPeriod": "60000",
+      "as2.invoicePeriod": "90000"
+    }
+  }
+}

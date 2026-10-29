@@ -998,6 +998,13 @@ public interface ISqlDialect
     string ObjectStorage_SelectExistingIds();
 
     /// <summary>
+    /// SELECT id + stored creation date of existing objects. Params: $1=objectIds (array).
+    /// Returns: Id, DateCreate. The save strategies take the existing ids from it and hand the
+    /// stored creation date back to the saved object: an update never rewrites _date_create.
+    /// </summary>
+    string ObjectStorage_SelectExistingCreateDates();
+
+    /// <summary>
     /// SELECT id + persisted content hash of existing objects. Params: $1=objectIds (array).
     /// Returns: Id, Hash. F1 (CT hash shortcut): an existing object whose recomputed hash
     /// equals the persisted one skips the value pipeline under ChangeTracking.
@@ -1159,9 +1166,10 @@ public interface ISqlDialect
     string Maintenance_SelectStatisticsWindow();
 
     /// <summary>
-    /// Size-less fallback for engines where the sized form may be unavailable (SQLite without
-    /// the dbstat virtual table). Engines with no such failure mode return the same text as
-    /// <see cref="Maintenance_SelectIndexStats"/> - the base provider then never falls back.
+    /// Fallback form for engines where the full form may be unavailable: SQLite without the dbstat
+    /// virtual table (no sizes), SQL Server without VIEW SERVER STATE (no usage counters). Engines
+    /// with no such failure mode return the same text as <see cref="Maintenance_SelectIndexStats"/>,
+    /// and the base provider then never falls back.
     /// </summary>
     string Maintenance_SelectIndexStatsNoSize();
 

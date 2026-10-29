@@ -4,6 +4,7 @@
   "classifications": [ "Web", "Blazor", "BFF", "API", "Database", "RedBase" ],
   "identity": "RedBase.Bff.Template",
   "name": "RedBase Blazor BFF with redb.Route controllers",
+  "description": "A Blazor backend-for-frontend with a cookie session and a backend of redb.Route controllers on redb; the backend runs in its own host or as a Tsak module.",
   "shortName": "redb-bff",
   "tags": {
     "language": "C#",

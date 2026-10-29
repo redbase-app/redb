@@ -92,6 +92,22 @@ namespace redb.Core.Caching
         }
 
         /// <summary>
+        /// Save WHOLE RedbObject and every loaded object under it. One walk marks the graph shared and collects the
+        /// nested entries, where a Set followed by <see cref="SetNested"/> walked the same Props twice.
+        /// </summary>
+        public void SetGraph<TProps>(RedbObject<TProps> obj) where TProps : class, new()
+        {
+            var cache = Instance;
+            if (cache == null || !obj.hash.HasValue) return;
+            cache.Set(obj);
+            foreach (var nested in Utils.LazyReferenceInstaller.MarkSharedAndCollect(obj))
+            {
+                if (ReferenceEquals(nested, obj)) continue;
+                CacheDelegates.Set(cache, nested);
+            }
+        }
+
+        /// <summary>
         /// Caches every loaded RedbObject found under <paramref name="props"/> by its own id, so a nested object is
         /// served directly by id as well; the entries only (the Set of the root marked the graph shared already).
         /// Stubs are neither cached nor walked.

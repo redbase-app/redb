@@ -349,6 +349,35 @@ public abstract class ValueUniqueTestsBase : IAsyncLifetime
             .Should().Be(1);
     }
 
+    /// <summary>
+    /// An object built in memory (as from JSON: no dates) and saved onto an existing row came back
+    /// with DateCreate and DateModify 0001-01-01, while a reload showed the stored dates. After a
+    /// save the object carries what its row holds: on insert both dates, on update the stored
+    /// creation date and the new modification date.
+    /// </summary>
+    [Fact]
+    public async Task SaveByUnique_TheSavedObjectCarriesTheStoredDates_OnInsertAndUpdate()
+    {
+        await SyncAsync();
+        var key = $"UP-DATES-{Guid.NewGuid():N}";
+
+        var first = Order(key, "v1");
+        var id = await Redb.SaveByUniqueAsync(first);
+        var stored = (await Redb.LoadAsync<UniqueOrderProps>(id, depth: 1))!;
+        first.DateCreate.Should().BeCloseTo(stored.DateCreate, TimeSpan.FromMilliseconds(1));
+        first.DateModify.Should().BeCloseTo(stored.DateModify, TimeSpan.FromMilliseconds(1));
+
+        var second = Order(key, "v2");
+        second.DateCreate.Should().Be(default, "the case is an object without dates, as deserialized from JSON");
+        (await Redb.SaveByUniqueAsync(second)).Should().Be(id);
+        var reloaded = (await Redb.LoadAsync<UniqueOrderProps>(id, depth: 1))!;
+
+        reloaded.DateCreate.Should().Be(stored.DateCreate, "an update keeps the creation date of the row");
+        second.DateCreate.Should().Be(reloaded.DateCreate);
+        second.DateModify.Should().BeCloseTo(reloaded.DateModify, TimeSpan.FromMilliseconds(1));
+        second.DateModify.Should().BeOnOrAfter(stored.DateModify);
+    }
+
     [Fact]
     public async Task SaveByUnique_WithoutKey_IsRefused()
     {

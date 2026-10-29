@@ -942,6 +942,9 @@ public class MsSqlDialect : ISqlDialect
     public string ObjectStorage_SelectExistingIds() =>
         "SELECT _id as Id FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
 
+    public string ObjectStorage_SelectExistingCreateDates() =>
+        "SELECT _id as Id, _date_create as DateCreate FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
+
     public string ObjectStorage_SelectIdHashPairs() =>
         "SELECT _id as Id, _hash as Hash FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
     
@@ -1020,8 +1023,35 @@ public class MsSqlDialect : ISqlDialect
     // sys.dm_db_index_usage_stats resets on server restart and holds rows only for indexes
     // touched since - hence the LEFT JOIN and nullable counters. Heap rows (index_id 0) are
     // not indexes and are excluded.
-    public string Maintenance_SelectIndexStats() =>
-        """
+    public string Maintenance_SelectIndexStats() => IndexStatsSql(withUsage: true);
+
+    // The DMV needs VIEW SERVER STATE (VIEW SERVER PERFORMANCE STATE on SQL Server 2022); a
+    // database owner without it gets this form: the same indexes and sizes, usage counters null.
+    public string Maintenance_SelectIndexStatsNoSize() => IndexStatsSql(withUsage: false);
+
+    private static string IndexStatsSql(bool withUsage)
+    {
+        var usage = withUsage
+            ? """
+              CAST(MAX(u.user_seeks) AS bigint)          AS [Seeks],
+                     CAST(MAX(u.user_scans) + MAX(u.user_lookups) AS bigint) AS [Scans],
+                     CAST(MAX(u.user_updates) AS bigint)        AS [Updates],
+                     CASE WHEN MAX(u.last_user_seek) >= ISNULL(MAX(u.last_user_scan), '19000101')
+                          THEN MAX(u.last_user_seek) ELSE MAX(u.last_user_scan) END AS [LastUsed]
+              """
+            : """
+              CAST(NULL AS bigint)                       AS [Seeks],
+                     CAST(NULL AS bigint)                       AS [Scans],
+                     CAST(NULL AS bigint)                       AS [Updates],
+                     CAST(NULL AS datetime)                     AS [LastUsed]
+              """;
+        var usageJoin = withUsage
+            ? """
+              LEFT JOIN sys.dm_db_index_usage_stats u
+                         ON u.object_id = i.object_id AND u.index_id = i.index_id AND u.database_id = DB_ID()
+              """
+            : "";
+        return $$"""
         SELECT SCHEMA_NAME(t.schema_id)                   AS [Schema],
                t.name                                     AS [Table],
                i.name                                     AS [Name],
@@ -1052,22 +1082,18 @@ public class MsSqlDialect : ISqlDialect
                    ) THEN 1 ELSE 0 END AS bit)            AS [BacksForeignKey],
                CAST(SUM(a.used_pages) * 8 * 1024 AS bigint) AS [SizeBytes],
                CAST(MAX(p.rows) AS bigint)                AS [EstimatedRows],
-               CAST(MAX(u.user_seeks) AS bigint)          AS [Seeks],
-               CAST(MAX(u.user_scans) + MAX(u.user_lookups) AS bigint) AS [Scans],
-               CAST(MAX(u.user_updates) AS bigint)        AS [Updates],
-               CASE WHEN MAX(u.last_user_seek) >= ISNULL(MAX(u.last_user_scan), '19000101')
-                    THEN MAX(u.last_user_seek) ELSE MAX(u.last_user_scan) END AS [LastUsed]
+               {{usage}}
         FROM sys.indexes i
         JOIN sys.tables t     ON t.object_id = i.object_id
         JOIN sys.partitions p ON p.object_id = i.object_id AND p.index_id = i.index_id
         JOIN sys.allocation_units a ON a.container_id = p.partition_id
-        LEFT JOIN sys.dm_db_index_usage_stats u
-               ON u.object_id = i.object_id AND u.index_id = i.index_id AND u.database_id = DB_ID()
+        {{usageJoin}}
         WHERE i.index_id > 0 AND t.is_ms_shipped = 0
         GROUP BY t.schema_id, t.name, i.name, i.is_unique, i.is_primary_key, i.is_unique_constraint,
                  i.type, i.object_id, i.index_id
         ORDER BY t.name, i.name
         """;
+    }
 
     public string Maintenance_AnalyzeTable(string? schema, string table, int analysisLimit)
         => $"UPDATE STATISTICS {QuoteIdentifier(schema ?? "dbo")}.{QuoteIdentifier(table)}";
@@ -1110,7 +1136,6 @@ public class MsSqlDialect : ISqlDialect
         FROM sys.dm_os_sys_info
         """;
 
-    public string Maintenance_SelectIndexStatsNoSize() => Maintenance_SelectIndexStats();
 
     // ============================================================
     // === VALIDATION SQL ===
@@ -1415,7 +1440,7 @@ public class MsSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
 
     // Bump together with the literal RETURNed by dbo.pvt_module_version() in redb.MSSql/sql/v2-pvt/99_module_version.sql.
-    public string? Query_PvtRequiredVersion() => "0.2.30";
+    public string? Query_PvtRequiredVersion() => "0.2.31";
 
     // Native PVT projection orchestrator — not supported on MSSql (yet).
     // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these

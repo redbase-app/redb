@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "RedBase",
+  "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
+  "identity": "RedBase.Route.Xml.SqlBatch",
+  "name": "redb.Route XML module: SQL batch insert",
+  "description": "SQL batches in XML markup: single messages collected into batches of 20 and written in one transaction; a bad row is skipped and reported.",
+  "shortName": "redb-route-sql-batch",
+  "tags": {
+    "type": "project",
+    "redbSmoke": "pack"
+  },
+  "sourceName": "RouteModule",
+  "preferNameDirectory": true,
+  "symbols": {
+    "context": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "",
+      "displayName": "Context name",
+      "description": "The route context the module runs in. Empty: the module name in lower case."
+    },
+    "nameLower": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": { "source": "name", "toLower": true },
+      "fileRename": "routemodule"
+    },
+    "contextName": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": { "sourceVariableName": "context", "fallbackVariableName": "nameLower" },
+      "replaces": "modulectx"
+    },
+    "framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "net10.0", "description": ".NET 10" },
+        { "choice": "net9.0", "description": ".NET 9" },
+        { "choice": "net8.0", "description": ".NET 8" }
+      ],
+      "defaultValue": "net10.0",
+      "replaces": "net10.0",
+      "displayName": "Target framework",
+      "description": "The target framework of the module project."
+    },
+    "db": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "sqlite", "description": "SQLite: a file next to the worker, no server needed" },
+        { "choice": "postgres", "description": "PostgreSQL" },
+        { "choice": "mssql", "description": "SQL Server" }
+      ],
+      "defaultValue": "sqlite",
+      "displayName": "Database",
+      "description": "The database the routes work with: the provider, the connection string and the SQL dialect of the table."
+    }
+  },
+  "sources": [
+    {
+      "exclude": [
+        "**/[Bb]in/**", "**/[Oo]bj/**", ".template.config/**/*", "**/*.filelist", "**/*.user", "**/*.lock.json",
+        "pkg/**", "schema/**"
+      ]
+    }
+  ]
+}

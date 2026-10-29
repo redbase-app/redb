@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The application module: InitRoute.main, the controllers, the redb Props classes. It runs in the
+       same Tsak worker as redb.Identity (the redb-identity-full image, deploy/docker-compose.yml) and
+       calls Identity in process over direct-vm: token introspection, the management API, the setup of
+       its clients and scopes. deploy/pack-tpkg.ps1 packs it into RedbIdentityApp.tpkg.
+
+       Every redb.* assembly comes from the worker and from the Identity modules at run time
+       (redb.Identity.Contracts from the identity.contracts carrier): the package must not carry a
+       second copy, so pack-tpkg.ps1 leaves them out. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\RedbIdentityApp.Contracts\RedbIdentityApp.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="redb.Core" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route.Core" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route.Http" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Route.Controllers" Version="$(RedbVersion)" />
+    <PackageReference Include="redb.Identity.Contracts" Version="$(RedbVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The module's configuration, packed into the .tpkg next to the module DLL. -->
+    <None Update="RedbIdentityApp.Module.config.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

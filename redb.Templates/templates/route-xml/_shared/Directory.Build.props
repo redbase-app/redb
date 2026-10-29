@@ -1,0 +1,19 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- One place for the RedBase version. The redb-route-xml tool in .config/dotnet-tools.json
+         must carry the same version: it refuses a build output of another redb.Route.Xml. -->
+    <RedbVersion>4.5.0</RedbVersion>
+    <!-- Versions live in these files: the project is created where no central Directory.Packages.props applies. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+
+    <!-- A route module is a library: NuGet assemblies reach bin/ only when asked, and the
+         build-time pack check reads the connectors and markup contributions from there. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+</Project>

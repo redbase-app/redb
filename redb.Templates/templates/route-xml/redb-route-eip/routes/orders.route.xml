@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Test traffic: an order every {{orders.period:2000}} ms. Every fourth tick repeats the
+       previous order id (the idempotent consumer drops it), every seventh order has a type no
+       branch handles (it ends in the dead letter channel). -->
+  <route id="modulectx-source" description="Generates test orders">
+    <from uri="timer://modulectx-source?period={{orders.period:2000}}"/>
+    <setHeader name="orderId" expr="${header.CamelTimerCounter % 4 == 3 ? header.CamelTimerCounter - 1 : header.CamelTimerCounter}"/>
+    <setHeader name="orderType" expr="${header.CamelTimerCounter % 7 == 6 ? 'toy' : (header.CamelTimerCounter % 2 == 0 ? 'book' : 'music')}"/>
+    <setBody expr='{"id":"order-${header.orderId}","type":"${header.orderType}","lines":[{"sku":"A-1","qty":1},{"sku":"B-2","qty":2}]}'/>
+    <!-- seda: an in-memory queue; the caller goes on at once, the intake reads at its own pace. -->
+    <to uri="seda://modulectx-orders"/>
+  </route>
+
+  <!-- Intake: drop repeated order ids, at most 5 orders a second, a copy to the audit,
+       then a branch by order type. -->
+  <route id="modulectx-intake" description="Deduplicates, throttles, audits and routes the orders">
+    <from uri="seda://modulectx-orders?concurrentConsumers=2"/>
+    <idempotentConsumer key="${header.orderId}" repository="#seen-orders" skipDuplicate="true">
+      <throttle maxPerPeriod="5" period="00:00:01">
+        <wireTap uri="direct://modulectx-audit"/>
+        <choice>
+          <when expr="header.orderType == 'book'">
+            <to uri="direct://modulectx-books"/>
+          </when>
+          <when expr="header.orderType == 'music'">
+            <to uri="direct://modulectx-music"/>
+          </when>
+          <otherwise>
+            <throwException type="System.InvalidOperationException" message="no route for this order type"/>
+          </otherwise>
+        </choice>
+      </throttle>
+    </idempotentConsumer>
+  </route>
+
+  <!-- Splitter: one exchange per order line. -->
+  <route id="modulectx-books" description="Handles a book order line by line">
+    <from uri="direct://modulectx-books"/>
+    <!-- The expression yields the lines array; every element becomes the body of its own exchange. -->
+    <split expr="${jpath('$.lines')}">
+      <log level="Information" showRouteId="true">
+        <message>book order ${header.orderId}: ${jpath('$.qty')} x ${jpath('$.sku')}</message>
+      </log>
+    </split>
+  </route>
+
+  <route id="modulectx-music" description="Handles a music order">
+    <from uri="direct://modulectx-music"/>
+    <log level="Information" showRouteId="true">
+      <message>music order ${header.orderId}: ${body}</message>
+    </log>
+  </route>
+
+  <!-- Aggregator: the audit copies are collected per order type, three at a time
+       (or whatever arrived within 10 seconds) into one line. -->
+  <route id="modulectx-audit" description="Collects the audit copies per order type">
+    <from uri="direct://modulectx-audit"/>
+    <setBody expr="${header.orderId}"/>
+    <aggregate correlation="${header.orderType}" strategy="concat:, " completionSize="3"
+               completionTimeout="00:00:10" forceCompletionOnStop="true">
+      <log level="Information" showRouteId="true">
+        <message>audit ${header.orderType}: orders ${body}</message>
+      </log>
+    </aggregate>
+  </route>
+
+  <!-- Dead letter channel of the context (context.xml): what failed and why. -->
+  <route id="modulectx-dead" description="Logs the exchanges that failed">
+    <from uri="direct://modulectx-dead"/>
+    <log level="Error" showRouteId="true">
+      <message>dead letter: ${exception.message}, body ${body}</message>
+    </log>
+  </route>
+
+</routes>

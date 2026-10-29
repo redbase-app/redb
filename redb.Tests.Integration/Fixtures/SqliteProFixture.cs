@@ -20,6 +20,9 @@ public sealed class SqliteProFixture : IAsyncLifetime
     public IRedbService Redb { get; private set; } = null!;
     public ServiceProvider ServiceProvider { get; private set; } = null!;
 
+    /// <summary>The fixture's own database file: a test of the collection that builds a host of its own uses this one.</summary>
+    public string ConnectionString { get; private set; } = null!;
+
     public async Task InitializeAsync()
     {
         var config = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build();
@@ -42,6 +45,7 @@ public sealed class SqliteProFixture : IAsyncLifetime
         // for Pro, which does not call it - and the order of the tests no longer matters.
         redb.SQLite.Data.SqliteDataSource.NativeExtensionPath ??= SqliteTestSupport.ResolveNativeExtension();
         SqliteTestSupport.DeleteDbFiles(cs);
+        ConnectionString = cs;
 
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Warning));

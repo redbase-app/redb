@@ -1,0 +1,64 @@
+#if (transport == "file")
+# The module on a Tsak worker with the folders on a volume: deploy/data/inbox, done, error and deploy/data/outbox.
+# A test stand, not a deployment.
+#else
+# A local file server for the module and the module on a Tsak worker. A test stand, not a deployment.
+#endif
+#
+# From the project folder (PowerShell or a POSIX shell alike):
+#   dotnet build -p:PackRouteOnBuild=true -p:Version=1.0.0        # -> pkg/routemodule-1.0.0.tpkg
+#if (transport != "file")
+#   cp deploy/.env.example deploy/.env                              # then set FILES_PASSWORD
+#endif
+#   docker compose -f deploy/docker-compose.files.yml up -d
+name: modulectx-files
+
+services:
+#if (transport == "ftp")
+  files:
+    image: stilliard/pure-ftpd:bookworm-1.0.50
+    environment:
+      PUBLICHOST: files
+      FTP_USER_NAME: modulectx
+      FTP_USER_PASS: ${FILES_PASSWORD:?FILES_PASSWORD required, see deploy/.env.example}
+      FTP_USER_HOME: /home/ftpusers/modulectx
+#endif
+#if (transport == "sftp")
+  files:
+    # The image has no version tags; the digest pins it. The user is chrooted to /home/modulectx and may write only
+    # below files/, where the module's folders are.
+    image: atmoz/sftp@sha256:43dd1c023cf1bae487127d4b54660b0aee6e94c188a6599be36fb89ba115f961
+    command: "modulectx:${FILES_PASSWORD:?FILES_PASSWORD required, see deploy/.env.example}:1001::files"
+#endif
+
+  module:
+    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.5.0-net10}
+#if (transport != "file")
+    depends_on:
+      - files
+#endif
+    environment:
+      - Tsak__Modules__AssemblyPaths__0=/app/modules
+      - Tsak__Cluster__ApiEndpoint=http://module:9090
+      # The module's context: the Override layer, which wins over every other layer of its configuration.
+#if (transport == "file")
+      - Tsak__Contexts__modulectx__Override__files.inbox=/data/inbox
+      - Tsak__Contexts__modulectx__Override__files.outbox=/data/outbox
+      - Tsak__Contexts__modulectx__Override__files.csInbox=/data/inbox-cs
+#elseif (transport == "ftp")
+      - Tsak__Contexts__modulectx__Override__files.host=files
+      - Tsak__Contexts__modulectx__Override__files.username=modulectx
+      - Tsak__Contexts__modulectx__Override__files.password=${FILES_PASSWORD:?FILES_PASSWORD required, see deploy/.env.example}
+#else
+      - Tsak__Contexts__modulectx__Override__files.host=files
+      - Tsak__Contexts__modulectx__Override__files.username=modulectx
+      - Tsak__Contexts__modulectx__Override__files.password=${FILES_PASSWORD:?FILES_PASSWORD required, see deploy/.env.example}
+      - Tsak__Contexts__modulectx__Override__files.inbox=files/inbox
+      - Tsak__Contexts__modulectx__Override__files.outbox=files/outbox
+      - Tsak__Contexts__modulectx__Override__files.csInbox=files/inbox-cs
+#endif
+    volumes:
+      - ../pkg:/app/modules
+#if (transport == "file")
+      - ./data:/data
+#endif

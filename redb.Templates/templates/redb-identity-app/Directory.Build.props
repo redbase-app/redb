@@ -1,0 +1,23 @@
+<Project>
+
+  <!-- Shared settings of every project. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- One place for the RedBase version. The module runs in the redb-identity-full image of the same
+         release (deploy/docker-compose.yml): keep the two in step. -->
+    <RedbVersion>4.5.0</RedbVersion>
+    <!-- Versions live in these files: the project is created where no central Directory.Packages.props applies. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <!-- ASP.NET Core packages follow the target framework: each line is the latest patch of its major. -->
+  <PropertyGroup>
+    <AspNetCoreVersion Condition="'$(TargetFramework)' == 'net8.0'">8.0.32</AspNetCoreVersion>
+    <AspNetCoreVersion Condition="'$(TargetFramework)' == 'net9.0'">9.0.21</AspNetCoreVersion>
+    <AspNetCoreVersion Condition="'$(AspNetCoreVersion)' == ''">10.0.13</AspNetCoreVersion>
+  </PropertyGroup>
+
+</Project>

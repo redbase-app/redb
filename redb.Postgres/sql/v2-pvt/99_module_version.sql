@@ -209,7 +209,9 @@ BEGIN
     --          replace the object-leading IX__values__{String,Long,DateTimeOffset,Numeric}_not_null and
     --          ix__values__array_null_structure (2026-10-16), with _array_index in INCLUDE. Restore statements:
     --          00_module_init.sql. (0.7.15 was a development build of the same, without the INCLUDE.)
-    RETURN '0.7.16';
+    -- 0.7.17 - pvt_build_order_conditions: a DISTINCT ON key takes the direction of its p_order entry instead of
+    --          ASC (OrderByDescending(k).DistinctBy(k) came back ascending), and that entry is not repeated.
+    RETURN '0.7.17';
 END;
 $BODY$;
 

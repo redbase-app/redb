@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Directory sync: every entry under {{ldap.usersDn}} once at start (initialLoad), then every entry whose
+       modifyTimestamp changed, polled every 10 seconds. One exchange per entry; the body is the entry (Dn, Attributes,
+       ChangeType). Replace the log with the real work: update a user table, a redb object, another system. -->
+  <route id="modulectx-ldap-watch" description="Follows the changes of the user entries">
+    <from uri="ldap:WATCH:{{ldap.usersDn}}?connectionFactory=ldap&amp;filter=(objectClass=inetOrgPerson)&amp;changeTrackingMode=modifyTimestamp&amp;pollInterval=10000&amp;initialLoad=true"/>
+    <log level="Information" showRouteId="true">
+      <message>directory entry ${body.ChangeType}: ${body.Dn}</message>
+    </log>
+  </route>
+
+  <!-- A search on a timer: how many users there are. The body is the list of entries, the count is a header. -->
+  <route id="modulectx-ldap-count" description="Counts the user entries every minute">
+    <from uri="timer://modulectx-ldap-count?period={{ldap.countPeriod:60000}}"/>
+    <to uri="ldap:SEARCH:{{ldap.usersDn}}?connectionFactory=ldap&amp;filter=(objectClass=inetOrgPerson)&amp;attributes=uid,mail"/>
+    <log level="Information" showRouteId="true">
+      <message>users in the directory: ${header.redbLdap.ResultCount}</message>
+    </log>
+  </route>
+
+  <!-- A password check: call it with the headers redbLdap.AuthDn and redbLdap.AuthPassword, for example from an HTTP
+       route of redb.Route.Http. BIND with those credentials; redbLdap.BindResult is 0 when they are right, the LDAP
+       result code otherwise (49: invalid credentials). A wrong password is an answer, not a failure. -->
+  <route id="modulectx-ldap-check-password" description="Checks a user's password with a bind">
+    <from uri="direct://modulectx-check-password"/>
+    <to uri="ldap:BIND:{{ldap.baseDn}}?connectionFactory=ldap"/>
+    <choice>
+      <when expr="header.redbLdap.BindResult == 0">
+        <log level="Information" showRouteId="true">
+          <message>password accepted for ${header.redbLdap.AuthDn}</message>
+        </log>
+      </when>
+      <otherwise>
+        <log level="Warning" showRouteId="true">
+          <message>password refused for ${header.redbLdap.AuthDn}: result ${header.redbLdap.BindResult}</message>
+        </log>
+      </otherwise>
+    </choice>
+  </route>
+
+</routes>

@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "RedBase",
+  "classifications": [ "Web", "Blazor", "BFF", "API", "Identity", "RedBase" ],
+  "identity": "RedBase.IdentityApp.Template",
+  "name": "RedBase application on redb.Identity",
+  "description": "A Tsak module next to redb.Identity in one worker (bearer tokens checked by introspection over direct-vm, the management API in process) and a Blazor web server that signs users in with OpenID Connect.",
+  "shortName": "redb-identity-app",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "sourceName": "RedbIdentityApp",
+  "preferNameDirectory": true,
+  "symbols": {
+    "framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "net10.0", "description": ".NET 10" },
+        { "choice": "net9.0", "description": ".NET 9" },
+        { "choice": "net8.0", "description": ".NET 8" }
+      ],
+      "defaultValue": "net10.0",
+      "replaces": "net10.0",
+      "displayName": "Target framework",
+      "description": "The target framework of every project."
+    },
+    "dotnetImage": {
+      "type": "generated",
+      "generator": "regex",
+      "parameters": {
+        "source": "framework",
+        "steps": [ { "regex": "^net(.*)$", "replacement": "DOTNET_VERSION=$1" } ]
+      },
+      "replaces": "DOTNET_VERSION=10.0"
+    },
+    "web": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "true",
+      "displayName": "Web server",
+      "description": "Add the Blazor web server that signs users in with OpenID Connect. Without it, only the module and its API."
+    }
+  },
+  "SpecialCustomOperations": {
+    "**/*.slnx": {
+      "operations": [
+        {
+          "type": "conditional",
+          "configuration": {
+            "actionableIf": [ "<!--#if" ],
+            "actionableElse": [ "#else", "<!--#else" ],
+            "actionableElseif": [ "#elseif", "<!--#elseif" ],
+            "endif": [ "#endif", "<!--#endif" ],
+            "trim": "true",
+            "wholeLine": "true"
+          }
+        }
+      ]
+    },
+    "**/.env.example": {
+      "operations": [
+        {
+          "type": "conditional",
+          "configuration": {
+            "if": [ "#if" ],
+            "else": [ "#else" ],
+            "elseif": [ "#elseif" ],
+            "endif": [ "#endif" ],
+            "trim": "true",
+            "wholeLine": "true"
+          }
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "exclude": [
+        "**/[Bb]in/**", "**/[Oo]bj/**", ".template.config/**/*", "**/*.filelist", "**/*.user", "**/*.lock.json",
+        "**/*.db", "**/*.db-shm", "**/*.db-wal", "data/**", "runtime/**", "deploy/output/**", "deploy/.env"
+      ],
+      "modifiers": [
+        {
+          "condition": "(!web)",
+          "exclude": [ "RedbIdentityApp.Web/**" ]
+        }
+      ]
+    }
+  ]
+}

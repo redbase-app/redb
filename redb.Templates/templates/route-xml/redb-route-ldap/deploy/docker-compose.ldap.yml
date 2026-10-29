@@ -1,0 +1,41 @@
+# A local directory for the module: OpenLDAP with the test entries of ldap/users.ldif, and the module on a Tsak
+# worker. A test stand, not a deployment.
+#
+# From the project folder (PowerShell or a POSIX shell alike):
+#   dotnet build -p:PackRouteOnBuild=true -p:Version=1.0.0        # -> pkg/routemodule-1.0.0.tpkg
+#   cp deploy/.env.example deploy/.env                              # then set LDAP_ADMIN_PASSWORD
+#   docker compose -f deploy/docker-compose.ldap.yml up -d
+#
+# The module reads the directory as cn=admin,dc=example,dc=org.
+# Add a user with ldapadd in the openldap container and the watch route logs it within 10 seconds.
+name: modulectx-ldap
+
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    # --copy-service: the bootstrap LDIF is copied, the mounted file stays read-only.
+    command: ["--copy-service"]
+    environment:
+      LDAP_ORGANISATION: "Example"
+      LDAP_DOMAIN: "example.org"
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:?LDAP_ADMIN_PASSWORD required, see deploy/.env.example}
+    ports:
+      - "127.0.0.1:389:389"
+    volumes:
+      - ./ldap/users.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-users.ldif:ro
+
+  module:
+    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.5.0-net10}
+    depends_on:
+      - openldap
+    environment:
+      - Tsak__Modules__AssemblyPaths__0=/app/modules
+      - Tsak__Cluster__ApiEndpoint=http://module:9090
+      # The module's context: the Override layer, which wins over every other layer of its configuration.
+      - Tsak__Contexts__modulectx__Override__ldap.server=openldap
+      - Tsak__Contexts__modulectx__Override__ldap.bindDn=cn=admin,dc=example,dc=org
+      - Tsak__Contexts__modulectx__Override__ldap.bindPassword=${LDAP_ADMIN_PASSWORD:?LDAP_ADMIN_PASSWORD required, see deploy/.env.example}
+      - Tsak__Contexts__modulectx__Override__ldap.baseDn=dc=example,dc=org
+      - Tsak__Contexts__modulectx__Override__ldap.usersDn=ou=users,dc=example,dc=org
+    volumes:
+      - ../pkg:/app/modules

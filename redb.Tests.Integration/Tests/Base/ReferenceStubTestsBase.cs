@@ -22,11 +22,32 @@ namespace redb.Tests.Integration.Tests.Base;
 /// test — it pins the shape every later piece relies on.
 /// </para>
 /// </summary>
-public abstract class ReferenceStubTestsBase
+public abstract class ReferenceStubTestsBase : IAsyncLifetime
 {
     protected readonly IRedbService Redb;
 
+    // The database is shared with whole-scheme tests: every object a test saves is deleted after it,
+    // the employees first, then the projects they reference.
+    private readonly List<long> _employees = new();
+    private readonly List<long> _projects = new();
+
     protected ReferenceStubTestsBase(IRedbService redb) => Redb = redb;
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        if (_employees.Count > 0) await Redb.DeleteAsync(_employees);
+        if (_projects.Count > 0) await Redb.DeleteAsync(_projects);
+    }
+
+    // A complete employee, so that a whole-scheme aggregate never meets a zero salary or an empty department.
+    private static EmployeeProps StubEmployee(string firstName, string lastName, long projectId) => new()
+    {
+        FirstName = firstName, LastName = lastName, Age = 30, Position = "dev",
+        Salary = 1000m, Department = "Stub", HireDate = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        CurrentProject = new RedbObject<ProjectMetricsProps> { id = projectId }
+    };
 
     private async Task<(long employeeId, long projectId)> SaveEmployeeWithProjectAsync(string tag)
     {
@@ -36,17 +57,15 @@ public abstract class ReferenceStubTestsBase
             Props = new ProjectMetricsProps { ProjectId = 7, TasksTotal = 10, TasksCompleted = 3 }
         };
         var projectId = await Redb.SaveAsync(project);
+        _projects.Add(projectId);
 
         var employee = new RedbObject<EmployeeProps>
         {
             name = $"stub-employee-{tag}",
-            Props = new EmployeeProps
-            {
-                FirstName = "Stub", LastName = tag, Age = 30, Position = "dev",
-                CurrentProject = new RedbObject<ProjectMetricsProps> { id = projectId }
-            }
+            Props = StubEmployee("Stub", tag, projectId)
         };
         var employeeId = await Redb.SaveAsync(employee);
+        _employees.Add(employeeId);
         return (employeeId, projectId);
     }
 
@@ -133,17 +152,15 @@ public abstract class ReferenceStubTestsBase
             Props = new ProjectMetricsProps { ProjectId = 8, TasksTotal = 20, TasksCompleted = 5 }
         };
         var projectId = await Redb.SaveAsync(project);
+        _projects.Add(projectId);
 
         var employees = Enumerable.Range(0, 2).Select(i => new RedbObject<EmployeeProps>
         {
             name = $"stub-employee-batch-{i}",
-            Props = new EmployeeProps
-            {
-                FirstName = "Batch", LastName = i.ToString(), Age = 30, Position = "dev",
-                CurrentProject = new RedbObject<ProjectMetricsProps> { id = projectId }
-            }
+            Props = StubEmployee("Batch", i.ToString(), projectId)
         }).Cast<IRedbObject>().ToList();
         var ids = await Redb.SaveAsync(employees);
+        _employees.AddRange(ids);
         ids.Should().HaveCount(2);
 
         var loaded = await Redb.LoadAsync<ProjectMetricsProps>(projectId, depth: 1);

@@ -158,6 +158,22 @@ namespace redb.Core.Providers
         /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
         Task<bool> SetPasswordAsync(IRedbUser user, string newPassword, IRedbUser? currentUser = null,
         CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Store a password hash computed elsewhere, for example an administrator password given in
+        /// configuration as a hash rather than in plain text. The hash is written as is, so it must be
+        /// one the configured <see cref="redb.Core.Security.IPasswordHasher"/> verifies: with the
+        /// default hasher, a BCrypt hash (<c>$2a$</c>, <c>$2b$</c> or <c>$2y$</c>).
+        /// Same access rules as <see cref="SetPasswordAsync"/>.
+        /// </summary>
+        /// <param name="user">User</param>
+        /// <param name="passwordHash">Password hash</param>
+        /// <param name="currentUser">Current user (for audit)</param>
+        /// <returns>true if the hash was stored</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> SetPasswordHashAsync(IRedbUser user, string passwordHash, IRedbUser? currentUser = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException($"{GetType().Name} does not support setting a password hash.");
         
         // === STATUS MANAGEMENT ===
         

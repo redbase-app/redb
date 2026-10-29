@@ -969,6 +969,9 @@ public class SqliteDialect : ISqlDialect
     public string ObjectStorage_SelectExistingIds() =>
         "SELECT _id as Id FROM _objects WHERE _id IN (SELECT value FROM json_each($1))";
 
+    public string ObjectStorage_SelectExistingCreateDates() =>
+        "SELECT _id as Id, _date_create as DateCreate FROM _objects WHERE _id IN (SELECT value FROM json_each($1))";
+
     public string ObjectStorage_SelectIdHashPairs() =>
         "SELECT _id as Id, _hash as Hash FROM _objects WHERE _id IN (SELECT value FROM json_each($1))";
 
@@ -1478,7 +1481,7 @@ public class SqliteDialect : ISqlDialect
     // gate would try to apply a SQL bundle, and there is none. Bump both on every change of the C code.
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
-    public string? Query_PvtRequiredVersion() => "0.6.8";
+    public string? Query_PvtRequiredVersion() => "0.6.9";
 
     public string? Query_BuildPvtProjectionSqlFunction() => null;
 

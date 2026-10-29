@@ -22,7 +22,12 @@ public abstract class GroupByHavingTestsBase
 
     protected GroupByHavingTestsBase(IRedbService redb) => Redb = redb;
 
-    private async Task SeedAsync() => await TestDataFactory.SeedEmployees(Redb, 20);
+    // Queries read only the objects their test seeded: other test classes share the database and may leave
+    // employees without salary or department behind.
+    private redb.Core.Query.IRedbQueryable<EmployeeProps> Seeded(List<long> ids)
+        => Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+
+    private Task<List<long>> SeedAsync() => TestDataFactory.SeedEmployees(Redb, 20);
 
     // ──────────────────────────────────────────────────────────────────
     //  Regular GroupBy + HAVING
@@ -31,9 +36,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupBy_Having_CountGt_PassThrough()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.Department)
             .Having(g => Agg.Count(g) > 0)
             .SelectAsync(g => new
@@ -56,8 +61,8 @@ public abstract class GroupByHavingTestsBase
     {
         // G-4 (ревью 2026-09-03): Having мутировал this - ветвление заражало сестринскую
         // ветку обоими предикатами.
-        await SeedAsync();
-        var grouped = Redb.Query<EmployeeProps>().GroupBy(e => e.Department);
+        var ids = await SeedAsync();
+        var grouped = Seeded(ids).GroupBy(e => e.Department);
         var strict = grouped.Having(g => Agg.Count(g) > 1_000_000);
         var loose = grouped.Having(g => Agg.Count(g) > 0);
 
@@ -72,9 +77,9 @@ public abstract class GroupByHavingTestsBase
     public async Task Having_NullConstant_IsLoud()
     {
         // G-5 (ревью 2026-09-03): null-константа превращалась в СТРОКУ "null".
-        await SeedAsync();
+        var ids = await SeedAsync();
         long? nothing = null;
-        var act = async () => await Redb.Query<EmployeeProps>()
+        var act = async () => await Seeded(ids)
             .GroupBy(e => e.Department)
             .Having(g => Agg.Count(g) == nothing)
             .SelectAsync(g => new { g.Key });
@@ -86,9 +91,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupBy_Having_CountGt_FiltersAll()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.Department)
             .Having(g => Agg.Count(g) > 1_000_000)
             .SelectAsync(g => new
@@ -103,9 +108,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupBy_Having_SumSalary_Threshold()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.Department)
             .Having(g => Agg.Sum(g, e => e.Salary) > 0m)
             .SelectAsync(g => new
@@ -121,9 +126,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupBy_Having_AndCombinator()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.Department)
             .Having(g => Agg.Count(g) > 0 && Agg.Average(g, e => e.Age) > 0.0)
             .SelectAsync(g => new
@@ -138,9 +143,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupBy_Having_OrCombinator()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.Department)
             .Having(g => Agg.Count(g) > 1_000_000 || Agg.Count(g) > 0)
             .SelectAsync(g => new
@@ -155,9 +160,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupBy_Having_NotCombinator()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupBy(e => e.Department)
             .Having(g => !(Agg.Count(g) > 1_000_000))
             .SelectAsync(g => new
@@ -176,9 +181,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupByArray_Having_CountGt_PassThrough()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .Having(g => Agg.Count(g) > 0)
             .SelectAsync(g => new
@@ -202,9 +207,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupByArray_Having_CountGt_FiltersAll()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .Having(g => Agg.Count(g) > 1_000_000)
             .SelectAsync(g => new
@@ -221,9 +226,9 @@ public abstract class GroupByHavingTestsBase
     {
         // The HAVING aggregates an item field the select does not read. SQL Server Free wrote it as
         // MAX([Value]) - a column the query does not have - and failed.
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .Having(g => Agg.Max(g, c => c.Value) == "no-such-contact-value")
             .SelectAsync(g => new { Type = g.Key, Count = Agg.Count(g) });
@@ -235,9 +240,9 @@ public abstract class GroupByHavingTestsBase
     public async Task GroupByArray_Having_OnAnItemField_KeepsTheMatchingGroups()
     {
         // The same field in the select and in the HAVING: both read one joined column.
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .Having(g => Agg.Max(g, c => c.Value) != "no-such-contact-value")
             .SelectAsync(g => new { Type = g.Key, MaxValue = Agg.Max(g, c => c.Value) });
@@ -249,9 +254,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupByArray_Having_AndCombinator()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .Having(g => Agg.Count(g) > 0 && Agg.Count(g) < 1_000_000)
             .SelectAsync(g => new
@@ -266,9 +271,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupByArray_Having_OrCombinator()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .Having(g => Agg.Count(g) > 1_000_000 || Agg.Count(g) > 0)
             .SelectAsync(g => new
@@ -283,9 +288,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupByArray_Having_NotCombinator()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .Having(g => !(Agg.Count(g) > 1_000_000))
             .SelectAsync(g => new
@@ -310,9 +315,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupByArray_NoHaving_CountOnly()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .SelectAsync(g => new
             {
@@ -335,9 +340,9 @@ public abstract class GroupByHavingTestsBase
     [Fact]
     public async Task GroupByArray_NoHaving_MultipleAggregates()
     {
-        await SeedAsync();
+        var ids = await SeedAsync();
 
-        var results = await Redb.Query<EmployeeProps>()
+        var results = await Seeded(ids)
             .GroupByArray(e => e.Contacts!, c => c.Type)
             .SelectAsync(g => new
             {

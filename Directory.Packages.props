@@ -21,9 +21,10 @@
     <_RedbCentralRoot>$([MSBuild]::EnsureTrailingSlash('$(MSBuildThisFileDirectory)'))</_RedbCentralRoot>
     <_RedbProjectRel>$([MSBuild]::MakeRelative('$(_RedbCentralRoot)', '$(MSBuildProjectDirectory)').Replace('/', '\'))</_RedbProjectRel>
     <_RedbProjectTop>$(_RedbProjectRel.Split('\')[0])</_RedbProjectTop>
-    <!-- Version of the redb packages for the projects that take them from NuGet (the UI projects); captured here,
-         before a project can set a Version of its own. -->
-    <RedbPackageVersion>$(Version)</RedbPackageVersion>
+    <!-- Version of the redb packages for the projects that take them from NuGet (the UI projects): the last version
+         published on nuget.org, not $(Version), so these projects restore while develop carries an unpublished
+         version. The release agent raises it right after the packages of a release are published. -->
+    <RedbPackageVersion>4.4.2</RedbPackageVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(ManagePackageVersionsCentrally)' == ''
@@ -58,6 +59,8 @@
     <PackageVersion Include="redb.Postgres.Pro" Version="$(RedbPackageVersion)" />
     <PackageVersion Include="redb.MSSql" Version="$(RedbPackageVersion)" />
     <PackageVersion Include="redb.MSSql.Pro" Version="$(RedbPackageVersion)" />
+    <PackageVersion Include="redb.SQLite" Version="$(RedbPackageVersion)" />
+    <PackageVersion Include="redb.SQLite.Pro" Version="$(RedbPackageVersion)" />
     <PackageVersion Include="redb.Export" Version="$(RedbPackageVersion)" />
   </ItemGroup>
 
@@ -120,10 +123,4 @@
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
   </ItemGroup>
-
-  <!-- redb packages: the monorepo ProjectReferences, rewritten for the public repository. -->
-  <ItemGroup>
-    <PackageVersion Include="redb.SQLite.Pro" Version="4.4.2" />
-  </ItemGroup>
 </Project>
-

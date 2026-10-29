@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its beans. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- The order ids seen so far, for <idempotentConsumer>. This one lives in the memory of one
+       worker and is empty after a restart; on a cluster use a shared repository
+       (redb.Route.Sql SqlIdempotentRepository, or the redb-backed one of redb.Route.Core). -->
+  <bean name="seen-orders" type="redb.Route.Processors.InMemoryIdempotentRepository, redb.Route"/>
+
+  <!-- The context's dead letter channel: an exchange that fails in any route and that no
+       onException of that route took ends here, with the exception attached. -->
+  <deadLetterChannel uri="direct://modulectx-dead"/>
+
+  <!-- Routes written in C#: routes/OrdersRoute.cs runs the same patterns on names of its own. -->
+  <routeBuilder type="RouteModule.Routes.OrdersRoute, RouteModule"/>
+
+</context>

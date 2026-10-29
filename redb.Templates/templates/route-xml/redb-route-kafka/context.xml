@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its beans. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- One cluster connection for every kafka:// endpoint of the module: the URIs say
+       connectionFactory=kafka and carry no brokers of their own. The values come from the
+       context configuration. For SASL or TLS set SecurityProtocol, SaslMechanism, SaslUsername,
+       SaslPassword or the Ssl* properties here. -->
+  <bean name="kafka" type="redb.Route.Kafka.KafkaConnectionFactory, redb.Route.Kafka">
+    <property key="Brokers" value="{{kafka.brokers}}"/>
+    <property key="GroupId" value="{{kafka.group:modulectx}}"/>
+    <property key="AutoOffsetReset" value="Earliest"/>
+  </bean>
+
+  <!-- Routes written in C#: routes/PaymentsRoute.cs, payments on the topic cs-payments over the same connection. -->
+  <routeBuilder type="RouteModule.Routes.PaymentsRoute, RouteModule"/>
+
+</context>
