@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Redb",
   "name": "redb.Route XML module: redb objects",
-  "description": "redb objects in XML markup: a props class of the project, saved by a unique key and queried, on Pro with ChangeTracking and switchable caches.",
+  "description": "redb objects from XML routes: a props class saved by a unique key and queried, on Pro; a typed LINQ report in C#.",
   "shortName": "redb-route-redb",
   "tags": {
     "type": "project",

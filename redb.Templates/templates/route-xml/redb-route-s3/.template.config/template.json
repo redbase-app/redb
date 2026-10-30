@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.S3",
   "name": "redb.Route XML module: S3",
-  "description": "S3 in XML markup: objects written to a bucket, a poll consumer that reads the new ones and moves them to an archive bucket; a compose file with MinIO.",
+  "description": "S3 in XML markup: objects written to a bucket, new ones read and moved to an archive; CSV price lists in C#.",
   "shortName": "redb-route-s3",
   "tags": {
     "type": "project",

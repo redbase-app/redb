@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>RedbApp</RootNamespace>
     <!-- One place for the RedBase version. -->
-    <RedbVersion>4.5.0</RedbVersion>
+    <RedbVersion>4.5.1</RedbVersion>
     <!-- Versions live in this file: the project is created where no central Directory.Packages.props applies. -->
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>

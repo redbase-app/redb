@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.ScatterGather",
   "name": "redb.Route XML module: scatter-gather",
-  "description": "Scatter-gather in XML markup: one request to three suppliers in parallel, the answers that came within the timeout collected and the best price picked.",
+  "description": "Scatter-gather in XML markup: one request to three suppliers in parallel, the best price in time; a second in C#.",
   "shortName": "redb-route-scatter-gather",
   "tags": {
     "type": "project",

@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.File",
   "name": "redb.Route XML module: files",
-  "description": "Files in XML markup: an inbox folder polled for new files, done and error folders, a receipt per file; on a local disk, FTP or SFTP.",
+  "description": "Files in XML markup: an inbox, done and error folders, a receipt per file; CSV files in C#; local disk, FTP or SFTP.",
   "shortName": "redb-route-file",
   "tags": {
     "type": "project",

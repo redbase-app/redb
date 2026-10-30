@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Cron",
   "name": "redb.Route XML module: schedules",
-  "description": "Schedules in XML markup: a job on a cron expression with a time zone and a misfire rule, a Quartz interval timer, no overlapping runs.",
+  "description": "Schedules in XML markup: a cron job with a time zone and a misfire rule, a Quartz interval; a cleanup job in C#.",
   "shortName": "redb-route-cron",
   "tags": {
     "type": "project",

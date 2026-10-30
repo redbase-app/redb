@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.ValidatorXslt",
   "name": "redb.Route XML module: XSD check and XSLT",
-  "description": "XML documents in XML markup: checked against an XSD, transformed with XSLT, a document that does not match goes to its own route.",
+  "description": "XML documents in XML markup: an XSD check, an XSLT transformation, a rejected document routed; the same in C#.",
   "shortName": "redb-route-validator-xslt",
   "tags": {
     "type": "project",

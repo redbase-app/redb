@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Pending changes live in `changelog/unreleased/` until the release; `pwsh scripts/changelog.ps1 -Preview` shows them.
 
+## [4.5.1] — 2026-10-30
+
+### Changed
+
+- **The `redb-route-*` template descriptions (`dotnet new <name> -h`) name the C# routes too.** Each one says what the template's
+  `RouteBuilder` in `routes/*.cs` does next to the XML routes, as the table in the package README does. Packages: `redb.Templates`.
+
 ## [4.5.0] — 2026-10-29
 
 ### Added

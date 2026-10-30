@@ -24,7 +24,7 @@
     <!-- Version of the redb packages for the projects that take them from NuGet (the UI projects): the last version
          published on nuget.org, not $(Version), so these projects restore while develop carries an unpublished
          version. The release agent raises it right after the packages of a release are published. -->
-    <RedbPackageVersion>4.4.2</RedbPackageVersion>
+    <RedbPackageVersion>4.5.1</RedbPackageVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(ManagePackageVersionsCentrally)' == ''

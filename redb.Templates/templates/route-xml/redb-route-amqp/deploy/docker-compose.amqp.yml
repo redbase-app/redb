@@ -26,7 +26,7 @@ services:
       retries: 30
 
   module:
-    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.5.0-net10}
+    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.5.1-net10}
     depends_on:
       artemis:
         condition: service_healthy

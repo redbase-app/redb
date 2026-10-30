@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Basic",
   "name": "redb.Route XML module",
-  "description": "An empty Tsak module with routes in XML markup: a timer that writes to the log.",
+  "description": "A Tsak module with routes in XML markup: a timer that writes to the log, and the same route in C#.",
   "shortName": "redb-route",
   "tags": {
     "type": "project",

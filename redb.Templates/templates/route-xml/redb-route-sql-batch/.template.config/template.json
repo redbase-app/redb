@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.SqlBatch",
   "name": "redb.Route XML module: SQL batch insert",
-  "description": "SQL batches in XML markup: single messages collected into batches of 20 and written in one transaction; a bad row is skipped and reported.",
+  "description": "SQL batches in XML markup: batches of 20 in one transaction each, a bad row skipped and reported; records from C#.",
   "shortName": "redb-route-sql-batch",
   "tags": {
     "type": "project",

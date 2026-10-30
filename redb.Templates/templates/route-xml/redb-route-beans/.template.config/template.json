@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Beans",
   "name": "redb.Route XML module: C# beans",
-  "description": "XML routes that call a C# class of the project: a bean built from configuration, a method with arguments, a method that takes the exchange.",
+  "description": "XML routes that call a C# class of the project: a bean from configuration, method calls; a second route in C#.",
   "shortName": "redb-route-beans",
   "tags": {
     "type": "project",

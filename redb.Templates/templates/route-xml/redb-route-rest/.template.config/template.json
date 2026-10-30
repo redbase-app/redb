@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Rest",
   "name": "redb.Route XML module: REST API",
-  "description": "An HTTP JSON API in XML markup: a GET with a path parameter, a POST checked by a JSON schema, 400 on a bad body.",
+  "description": "An HTTP JSON API in XML markup: a GET with a path parameter, a POST checked by a JSON schema; the same API in C#.",
   "shortName": "redb-route-rest",
   "tags": {
     "type": "project",

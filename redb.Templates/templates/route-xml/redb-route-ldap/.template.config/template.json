@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Ldap",
   "name": "redb.Route XML module: LDAP",
-  "description": "LDAP in XML markup: a directory watch with an initial load, a search on a timer and a password check by bind; a compose file with a seeded OpenLDAP.",
+  "description": "LDAP in XML markup: a directory watch, a search on a timer, a password check by bind; a user list in C#.",
   "shortName": "redb-route-ldap",
   "tags": {
     "type": "project",

@@ -2,7 +2,7 @@
 #   docker build -f RedbIdentityApp.Web/Dockerfile -t redbidentityapp-web .
 ARG DOTNET_VERSION=10.0
 # The Identity image of the same release: the web server trusts its development certificate.
-ARG IDENTITY_IMAGE=ghcr.io/redbase-app/redb-identity-full:4.5.0
+ARG IDENTITY_IMAGE=ghcr.io/redbase-app/redb-identity-full:4.5.1
 
 FROM ${IDENTITY_IMAGE} AS identity
 

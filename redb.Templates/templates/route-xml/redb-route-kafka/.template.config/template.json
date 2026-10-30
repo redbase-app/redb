@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Kafka",
   "name": "redb.Route XML module: Kafka",
-  "description": "Kafka in XML markup: a keyed producer, a consumer group with retries, and a topic for the records that still fail.",
+  "description": "Kafka in XML markup: a keyed producer, a consumer group with retries, a topic for failed records; payments in C#.",
   "shortName": "redb-route-kafka",
   "tags": {
     "type": "project",

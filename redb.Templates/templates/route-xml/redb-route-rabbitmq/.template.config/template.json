@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.RabbitMQ",
   "name": "redb.Route XML module: RabbitMQ",
-  "description": "RabbitMQ in XML markup: a producer, a consumer with retries, and a queue for the messages that still fail.",
+  "description": "RabbitMQ in XML markup: a producer, a consumer with retries, a queue for failed messages; request-reply in C#.",
   "shortName": "redb-route-rabbitmq",
   "tags": {
     "type": "project",

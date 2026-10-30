@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Amqp",
   "name": "redb.Route XML module: AMQP 1.0",
-  "description": "AMQP 1.0 in XML markup (ActiveMQ Artemis, Qpid, Azure Service Bus and others): a producer, a consumer with retries and a queue for the messages that still fail.",
+  "description": "AMQP 1.0 in XML markup: a producer, a consumer with retries, a queue for failed messages; request-reply in C#.",
   "shortName": "redb-route-amqp",
   "tags": {
     "type": "project",

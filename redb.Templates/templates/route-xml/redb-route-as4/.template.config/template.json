@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.As4",
   "name": "redb.Route XML module: AS4",
-  "description": "AS4 (eDelivery) in XML markup: sends a signed and encrypted user message to a partner and receives one with its receipt; a Holodeck B2B partner for a local exchange.",
+  "description": "AS4 (eDelivery) in XML markup: a signed, encrypted send with its receipt, a receiver; credit notes sent from C#.",
   "shortName": "redb-route-as4",
   "tags": {
     "type": "project",

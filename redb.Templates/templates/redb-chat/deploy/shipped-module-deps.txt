@@ -1,5 +1,5 @@
 # Assemblies the redb.Tsak worker already provides: /app/*.dll and /app/Libs/shared/*.dll of
-# redb-tsak-worker:4.4.2. A module dependency present here is NOT packed into the .tpkg; every other
+# redb-tsak-worker:4.5.0. A module dependency present here is NOT packed into the .tpkg; every other
 # dependency travels inside the package.
 #
 # The worker resolves these from its own folder and from Libs/shared next to the application
@@ -183,6 +183,7 @@ redb.Route.Controllers.dll
 redb.Route.Core.dll
 redb.Route.DataFormats.Avro.dll
 redb.Route.DataFormats.Csv.dll
+redb.Route.DataFormats.Mime.dll
 redb.Route.DataFormats.Protobuf.dll
 redb.Route.DataFormats.Yaml.dll
 redb.Route.Elasticsearch.dll

@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Email",
   "name": "redb.Route XML module: e-mail",
-  "description": "E-mail in XML markup: messages sent over SMTP and an IMAP inbox read, unseen messages marked read; a compose file with GreenMail.",
+  "description": "E-mail in XML markup: SMTP sending with retries, an IMAP inbox read and marked; an HTML report sent from C#.",
   "shortName": "redb-route-email",
   "tags": {
     "type": "project",

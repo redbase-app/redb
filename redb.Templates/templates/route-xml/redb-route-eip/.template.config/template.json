@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Eip",
   "name": "redb.Route XML module: integration patterns",
-  "description": "Integration patterns in XML markup without a broker: seda, idempotent consumer, throttle, wire tap, aggregate, choice, split, dead letter channel.",
+  "description": "Integration patterns in XML markup, no broker: seda, idempotent consumer, aggregate, split; the same chain in C#.",
   "shortName": "redb-route-eip",
   "tags": {
     "type": "project",

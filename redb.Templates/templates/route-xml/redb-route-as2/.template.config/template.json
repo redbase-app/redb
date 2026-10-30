@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.As2",
   "name": "redb.Route XML module: AS2",
-  "description": "AS2 in XML markup: sends a signed and encrypted document and verifies the signed MDN, receives with duplicate detection; a compose file for a local exchange with OpenAS2.",
+  "description": "AS2 in XML markup: a signed, encrypted send with a verified MDN, a receiver with duplicate detection; invoices in C#.",
   "shortName": "redb-route-as2",
   "tags": {
     "type": "project",

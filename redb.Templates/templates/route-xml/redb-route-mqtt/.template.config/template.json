@@ -4,7 +4,7 @@
   "classifications": [ "Integration", "XML", "Tsak", "RedBase", "RouteXml" ],
   "identity": "RedBase.Route.Xml.Mqtt",
   "name": "redb.Route XML module: MQTT",
-  "description": "MQTT in XML markup: sensor readings published with QoS 1, a wildcard subscription, an alert topic and a retained status; a compose file with Mosquitto.",
+  "description": "MQTT in XML markup: sensors publishing with QoS 1, a wildcard subscriber, a retained status; humidity in C#.",
   "shortName": "redb-route-mqtt",
   "tags": {
     "type": "project",
