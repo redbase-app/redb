@@ -167,6 +167,9 @@ public partial class PostgresQueryProvider
                     ["$field"] = NormalizePvtFieldName(r.FieldPath, r.IsBaseField)
                 };
             }
+            // Agg.Count(g, x => condition): the module compiles it as a per-aggregate filter.
+            if (r.ConditionJson != null)
+                entry["filter"] = JsonDocument.Parse(r.ConditionJson).RootElement.Clone();
             entries.Add(entry);
         }
         return JsonSerializer.Serialize(entries);

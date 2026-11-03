@@ -95,6 +95,7 @@ DECLARE
     v_inline_cols   text := '';
     v_inline_sids   text := '';
     v_inline_li_join boolean := false;
+    v_inline_aliases text := '';
     v_inline_first  boolean := true;
     v_fname         text;
     v_fmeta         jsonb;
@@ -200,23 +201,31 @@ BEGIN
                     v_inline_sids := v_inline_sids || ', ';
                 END IF;
                 v_inline_sids := v_inline_sids || (v_fmeta->>'sid');
+                v_inline_aliases := v_inline_aliases || ', p.' || quote_ident(v_fname);
                 IF (v_fmeta->>'list_item_prop') IN ('Value', 'Alias') THEN
                     v_inline_li_join := true;
                 END IF;
             END LOOP;
+            -- The pivot of the value rows (p), and every object of the scheme joined to it: an object with no row for
+            -- the grouped fields (a null key has no row) is grouped under NULL. An inner join here dropped it, and with
+            -- it the NULL group. Same form as the narrow CTE of pvt_build_cte_sql.
             v_inline_sql :=
-                E'SELECT\n        o._id' || v_inline_cols ||
+                E'SELECT\n        o._id' || v_inline_aliases ||
                 E'\n    FROM _objects o' ||
-                E'\n    INNER JOIN _values v ON v._id_object = o._id' ||
+                E'\n    LEFT JOIN (SELECT v._id_object' || v_inline_cols ||
+                E'\n    FROM _values v' ||
                 CASE WHEN v_inline_li_join
                      THEN E'\n    LEFT JOIN _list_items li ON li._id = v._ListItem'
                      ELSE '' END ||
+                E'\n    WHERE v._id_structure = ANY(ARRAY[' || v_inline_sids || ']::bigint[])' ||
+                E'\n      AND v._array_index IS NULL' ||
+                E'\n      AND v._id_object IN (SELECT o._id FROM _objects o WHERE o._id_scheme = ' || p_scheme_id::text ||
+                CASE WHEN v_push_sql IS NOT NULL AND v_push_sql <> ''
+                     THEN ' AND ' || v_push_sql ELSE '' END || ')' ||
+                E'\n    GROUP BY v._id_object) p ON p._id_object = o._id' ||
                 E'\n    WHERE o._id_scheme = ' || p_scheme_id::text ||
                 CASE WHEN v_push_sql IS NOT NULL AND v_push_sql <> ''
-                     THEN ' AND ' || v_push_sql ELSE '' END ||
-                E'\n      AND v._id_structure = ANY(ARRAY[' || v_inline_sids || ']::bigint[])' ||
-                E'\n      AND v._array_index IS NULL' ||
-                E'\n    GROUP BY o._id';
+                     THEN ' AND ' || v_push_sql ELSE '' END;
             v_prefix := 'pvt.';
         ELSE
             -- 6. Build CTE (legacy path: mixed types / tree / base refs).

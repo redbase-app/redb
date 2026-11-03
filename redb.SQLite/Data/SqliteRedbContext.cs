@@ -28,6 +28,9 @@ namespace redb.SQLite.Data
         /// Bulk operations (COPY protocol).
         /// </summary>
         protected override IBulkOperations BulkOperations => _bulkOperations;
+        /// <inheritdoc />
+        protected override Task<string> QueryRowsAsJsonCoreAsync(string sql, object[] parameters, System.Threading.CancellationToken cancellationToken)
+            => _connection.QueryRowsAsJsonAsync(sql, parameters, cancellationToken);
         
         /// <summary>
         /// Sqlite data source (for direct access if needed).

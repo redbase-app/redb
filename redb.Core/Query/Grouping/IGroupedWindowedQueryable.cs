@@ -14,7 +14,6 @@ namespace redb.Core.Query.Grouping;
 /// <typeparam name="TKey">Group key type</typeparam>
 /// <typeparam name="TProps">Object properties type</typeparam>
 public interface IGroupedWindowedQueryable<TKey, TProps>
-    where TProps : class, new()
 {
     /// <summary>
     /// Execute query and materialize results with window functions applied to groups.
@@ -41,7 +40,6 @@ public interface IGroupedWindowedQueryable<TKey, TProps>
 /// <typeparam name="TKey">Group key type</typeparam>
 /// <typeparam name="TProps">Object properties type</typeparam>
 public interface IGroupedWindowSpec<TKey, TProps>
-    where TProps : class, new()
 {
     /// <summary>
     /// Partition window by group key field (for ranking within partitions).

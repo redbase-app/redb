@@ -144,6 +144,24 @@ public interface ITreeQueryProvider : IRedbQueryProvider
         string? havingJson = null,
         CancellationToken cancellationToken = default) where TProps : class, new();
     
+    /// <summary>
+    /// Runs a grouping over the elements of an array for the objects of a subtree: the objects the tree context
+    /// selects (its roots, depth and Where) take part, no others. <see cref="Grouping.ArrayGroupQuery.Filter"/> and
+    /// <see cref="Grouping.ArrayGroupQuery.FilterJson"/> must be null: the context carries the condition.
+    /// </summary>
+    Task<System.Text.Json.JsonDocument> ExecuteTreeArrayGroupQueryAsync<TProps>(
+        Base.TreeQueryContext<TProps> context,
+        Grouping.ArrayGroupQuery query,
+        CancellationToken cancellationToken = default) where TProps : class, new();
+
+    /// <summary>
+    /// The SQL <see cref="ExecuteTreeArrayGroupQueryAsync"/> runs for the same request.
+    /// </summary>
+    Task<string> GetTreeArrayGroupQuerySqlAsync<TProps>(
+        Base.TreeQueryContext<TProps> context,
+        Grouping.ArrayGroupQuery query,
+        CancellationToken cancellationToken = default) where TProps : class, new();
+
     // ===== TREE GROUPED WINDOW (GroupBy + Window for Trees) =====
     
     /// <summary>
@@ -157,6 +175,7 @@ public interface ITreeQueryProvider : IRedbQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
+        string? havingJson = null,
         CancellationToken cancellationToken = default) where TProps : class, new();
     
     /// <summary>
@@ -169,5 +188,6 @@ public interface ITreeQueryProvider : IRedbQueryProvider
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
+        string? havingJson = null,
         CancellationToken cancellationToken = default) where TProps : class, new();
 }

@@ -126,6 +126,10 @@ BEGIN
             SET @tree_filter =
                 N'o.[_id] IN (SELECT _id FROM dbo.pvt_tree_leaves('
                 + @scheme_arg + N', ' + @seed_arg + N'))';
+            -- Down to a depth: the leaves of the whole tree that lie within it; pvt_tree_leaves walks without one.
+            IF @tree_ids IS NOT NULL AND @max_depth IS NOT NULL
+                SET @tree_filter += N' AND o.[_id] IN (SELECT _id FROM dbo.pvt_tree_descendants('
+                    + @scheme_arg + N', ' + @seed_arg + N', ' + @depth_arg + N', ' + @poly_arg + N', 0))';
         END
         ELSE IF @source_mode = N'tree_ancestors'
         BEGIN
@@ -262,8 +266,9 @@ BEGIN
         CLOSE c; DEALLOCATE c;
     END;
 
-    DECLARE @join_kind NVARCHAR(20) =
-        CASE WHEN @force_outer = 1 THEN N'LEFT JOIN' ELSE N'INNER JOIN' END;
+    -- Always LEFT: an object that stores no value (a null field has no row) is still an object of the source, and
+    -- counts, groups (under NULL) and lists like any other.
+    DECLARE @join_kind NVARCHAR(20) = N'LEFT JOIN';
     DECLARE @li_join   NVARCHAR(MAX) =
         CASE WHEN @has_listitem = 1
              THEN CHAR(13) + CHAR(10) + N'        LEFT JOIN dbo._list_items li ON li.[_id] = v.[_ListItem]'
@@ -367,24 +372,43 @@ BEGIN
     DECLARE @body NVARCHAR(MAX);
 
     -- ------ Narrow Pro-shape -----------------------------------------
-    -- Eligible when: narrow flag set, no forced outer (LEFT JOIN would
-    -- drop objects without any _values rows), no nested-dict groups,
-    -- and at least one pivot sid was collected. Base pushdown folds
-    -- into the IN-subquery so the planner can prune via system-column
-    -- indexes BEFORE the _values scan.
+    -- Eligible when: narrow flag set, no forced outer, no nested-dict groups, and at least one pivot sid was
+    -- collected. The pivot of the value rows (p), and every object of the source (scheme, base pushdown, tree
+    -- restriction) joined to it: an object with no row for any requested structure (every field null) keeps its
+    -- pivot row with NULL columns. Without the outer join it was lost, and with it a group, a count, a list row.
+    -- Pivoting first and joining after keeps the pivot as fast as it was (see the PG module).
     IF @narrow = 1 AND @force_outer = 0 AND @has_nested = 0 AND @sids <> N''
     BEGIN
-        DECLARE @obj_subq NVARCHAR(MAX) =
-            N'(SELECT o.[_id] FROM dbo._objects o WHERE o.[_id_scheme] = '
-            + CAST(@scheme_id AS NVARCHAR(40)) + @extra_pred + @tree_pred + N')';
+        DECLARE @obj_where NVARCHAR(MAX) =
+            N'o.[_id_scheme] = ' + CAST(@scheme_id AS NVARCHAR(40)) + @extra_pred + @tree_pred;
 
+        -- A tree source: the walk (a multi-statement function) is called once, in the WHERE of the objects, and each
+        -- object reads its values through OUTER APPLY. With the pivot joined to the objects the walk ran twice, once
+        -- per side, and a filter over a 100 thousand node subtree took 3.3 s instead of 1.8 s.
+        IF @tree_filter <> N''
+            SET @body =
+                N'SELECT o.[_id] AS [_id_object], p.' + REPLACE(@pivot_aliases, N', ', N', p.')
+              + CHAR(13) + CHAR(10) + N'        FROM dbo._objects o'
+              + CHAR(13) + CHAR(10) + N'        OUTER APPLY ('
+              -- Array columns are subqueries on the row's object: here that is the outer object, not v.
+              + CHAR(13) + CHAR(10) + N'        SELECT' + STUFF(REPLACE(@pivot_cols, N'v.[_id_object]', N'o.[_id]'), 1, 1, N'')
+              + CHAR(13) + CHAR(10) + N'        FROM dbo._values v' + @li_join
+              + CHAR(13) + CHAR(10) + N'        WHERE v.[_id_object] = o.[_id] AND v.[_id_structure] IN (' + @sids + N')'
+              + CHAR(13) + CHAR(10) + N'        ) p'
+              + CHAR(13) + CHAR(10) + N'        WHERE ' + @obj_where;
+        ELSE
         SET @body =
-            N'SELECT' + CHAR(13) + CHAR(10)
+            N'SELECT o.[_id] AS [_id_object], p.' + REPLACE(@pivot_aliases, N', ', N', p.')
+          + CHAR(13) + CHAR(10) + N'        FROM dbo._objects o'
+          + CHAR(13) + CHAR(10) + N'        LEFT JOIN ('
+          + CHAR(13) + CHAR(10) + N'        SELECT' + CHAR(13) + CHAR(10)
           + N'            v.[_id_object]' + @pivot_cols
           + CHAR(13) + CHAR(10) + N'        FROM dbo._values v' + @li_join
           + CHAR(13) + CHAR(10) + N'        WHERE v.[_id_structure] IN (' + @sids + N')'
-          + CHAR(13) + CHAR(10) + N'          AND v.[_id_object] IN ' + @obj_subq
-          + CHAR(13) + CHAR(10) + N'        GROUP BY v.[_id_object]';
+          + CHAR(13) + CHAR(10) + N'          AND v.[_id_object] IN (SELECT o.[_id] FROM dbo._objects o WHERE ' + @obj_where + N')'
+          + CHAR(13) + CHAR(10) + N'        GROUP BY v.[_id_object]'
+          + CHAR(13) + CHAR(10) + N'        ) p ON p.[_id_object] = o.[_id]'
+          + CHAR(13) + CHAR(10) + N'        WHERE ' + @obj_where;
     END
     ELSE IF @narrow_nest = 1 AND @force_outer = 0
     BEGIN

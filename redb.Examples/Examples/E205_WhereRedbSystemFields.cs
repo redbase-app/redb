@@ -22,7 +22,6 @@ public class E205_WhereRedbSystemFields : ExampleBase
     public override async Task<ExampleResult> RunAsync(IRedbService redb)
     {
         var sw = Stopwatch.StartNew();
-        await redb.SyncSchemeAsync<EmployeeProps>();
 
         // Seed: three employees carrying SYSTEM fields alongside Props. The service fields
         // (key, value_string, value_long...) live on the _objects row itself - no scheme

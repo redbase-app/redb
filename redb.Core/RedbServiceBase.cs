@@ -35,6 +35,20 @@ public abstract class RedbServiceBase : IRedbService
     protected ITreeProvider _treeProvider;
     private readonly IPermissionProvider _permissionProvider;
     protected IQueryableProvider _queryProvider;
+
+    // The query provider every query goes through. The groupings of its queries read their list item keys through
+    // the list provider (Query.Grouping.ListItemGroupKeys): it is handed over here, on use, because a Pro service
+    // replaces _queryProvider after this constructor. An implementation not derived from QueryableProviderBase has
+    // none, and such a grouping refuses with the reason.
+    private IQueryableProvider Queries
+    {
+        get
+        {
+            if (_queryProvider is Providers.Base.QueryableProviderBase queryables && queryables.ListItems == null)
+                queryables.ListItems = _listProvider;
+            return _queryProvider;
+        }
+    }
     private readonly IValidationProvider _validationProvider;
     private readonly IRedbSecurityContext _securityContext;
     private readonly IUserProvider _userProvider;
@@ -966,40 +980,40 @@ public abstract class RedbServiceBase : IRedbService
     // === IQueryableProvider DELEGATION ===
 
     public IRedbQueryable<TProps> Query<TProps>() where TProps : class, new()
-        => _queryProvider.Query<TProps>();
+        => Queries.Query<TProps>();
     
     public IRedbQueryable<TProps> Query<TProps>(IRedbUser user) where TProps : class, new()
-        => _queryProvider.Query<TProps>(user);
+        => Queries.Query<TProps>(user);
 
     public IRedbQueryable<TProps> TreeQuery<TProps>() where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>();
+        => Queries.TreeQuery<TProps>();
     
     public IRedbQueryable<TProps> TreeQuery<TProps>(IRedbUser user) where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>(user);
+        => Queries.TreeQuery<TProps>(user);
 
     public IRedbQueryable<TProps> TreeQuery<TProps>(long rootObjectId, int? maxDepth = null) where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>(rootObjectId, maxDepth);
+        => Queries.TreeQuery<TProps>(rootObjectId, maxDepth);
 
     public IRedbQueryable<TProps> TreeQuery<TProps>(IRedbObject? rootObject, int? maxDepth = null) where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>(rootObject, maxDepth);
+        => Queries.TreeQuery<TProps>(rootObject, maxDepth);
 
     public IRedbQueryable<TProps> TreeQuery<TProps>(IEnumerable<IRedbObject> rootObjects, int? maxDepth = null) where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>(rootObjects, maxDepth);
+        => Queries.TreeQuery<TProps>(rootObjects, maxDepth);
 
     public IRedbQueryable<TProps> TreeQuery<TProps>(IEnumerable<long> rootObjectIds, int? maxDepth = null) where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>(rootObjectIds, maxDepth);
+        => Queries.TreeQuery<TProps>(rootObjectIds, maxDepth);
 
     public IRedbQueryable<TProps> TreeQuery<TProps>(long rootObjectId, IRedbUser user, int? maxDepth = null) where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>(rootObjectId, user, maxDepth);
+        => Queries.TreeQuery<TProps>(rootObjectId, user, maxDepth);
 
     public IRedbQueryable<TProps> TreeQuery<TProps>(IRedbObject? rootObject, IRedbUser user, int? maxDepth = null) where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>(rootObject, user, maxDepth);
+        => Queries.TreeQuery<TProps>(rootObject, user, maxDepth);
 
     public IRedbQueryable<TProps> TreeQuery<TProps>(IEnumerable<IRedbObject> rootObjects, IRedbUser user, int? maxDepth = null) where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>(rootObjects, user, maxDepth);
+        => Queries.TreeQuery<TProps>(rootObjects, user, maxDepth);
 
     public IRedbQueryable<TProps> TreeQuery<TProps>(IEnumerable<long> rootObjectIds, IRedbUser user, int? maxDepth = null) where TProps : class, new()
-        => _queryProvider.TreeQuery<TProps>(rootObjectIds, user, maxDepth);
+        => Queries.TreeQuery<TProps>(rootObjectIds, user, maxDepth);
 
     // === IValidationProvider DELEGATION ===
 

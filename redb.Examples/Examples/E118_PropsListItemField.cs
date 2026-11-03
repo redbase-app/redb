@@ -39,9 +39,6 @@ public class E118_PropsListItemField : ExampleBase
                 "Item 'Active' not found. Run E115 first.");
         }
 
-        // Sync Person scheme
-        await redb.SyncSchemeAsync<PersonProps>();
-
         // Create person with Status field (ListItem)
         var person = new RedbObject<PersonProps>
         {

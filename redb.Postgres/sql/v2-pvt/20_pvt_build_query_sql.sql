@@ -59,6 +59,39 @@ DROP FUNCTION IF EXISTS pvt_build_query_sql(bigint, jsonb, integer, integer, jso
 DROP FUNCTION IF EXISTS pvt_build_query_sql(bigint, jsonb, integer, integer, jsonb, integer, boolean, text, bigint[]);
 DROP FUNCTION IF EXISTS pvt_build_query_sql(bigint, jsonb, integer, integer, jsonb, integer, boolean, text, bigint[], boolean, boolean);
 
+-- WhereLevel of a tree query that starts from nodes: the level counts from them (the start is 0, its children 1),
+-- as the maxDepth of the same query and Pro count it. The walk CTE _pvt_tree carries that depth; a node reached from
+-- two starts keeps the first depth. Returns the HAVING condition on min(depth) for a $level value (a number or an
+-- operator object such as {"$gte": 2}).
+CREATE OR REPLACE FUNCTION pvt_seed_level_having(p_level jsonb)
+RETURNS text
+LANGUAGE plpgsql
+IMMUTABLE
+AS $BODY$
+DECLARE
+    v_parts text := '';
+    v_op    text;
+    v_key   text;
+    v_val   text;
+BEGIN
+    IF jsonb_typeof(p_level) = 'number' THEN
+        RETURN 'min(depth) = ' || (p_level #>> '{}')::integer::text;
+    END IF;
+    IF jsonb_typeof(p_level) <> 'object' THEN
+        RAISE EXCEPTION 'pvt_seed_level_having: $level expects a number or an operator object, got %', p_level;
+    END IF;
+    FOR v_key, v_val IN SELECT key, value FROM jsonb_each_text(p_level) LOOP
+        v_op := CASE v_key WHEN '$gt' THEN '>' WHEN '$gte' THEN '>=' WHEN '$lt' THEN '<'
+                           WHEN '$lte' THEN '<=' WHEN '$eq' THEN '=' WHEN '$ne' THEN '<>' END;
+        IF v_op IS NULL THEN
+            RAISE EXCEPTION 'pvt_seed_level_having: unsupported $level operator %', v_key;
+        END IF;
+        v_parts := v_parts || CASE WHEN v_parts = '' THEN '' ELSE ' AND ' END
+                   || 'min(depth) ' || v_op || ' ' || v_val::integer::text;
+    END LOOP;
+    RETURN CASE WHEN v_parts = '' THEN 'TRUE' ELSE v_parts END;
+END;
+$BODY$;
 CREATE OR REPLACE FUNCTION pvt_build_query_sql(
     p_scheme_id    bigint,
     p_filter       jsonb    DEFAULT NULL,
@@ -90,6 +123,8 @@ DECLARE
     v_outer_filter  jsonb;
     v_residual_sql  text;
     v_can_push      boolean;
+    v_seed_level    jsonb;
+    v_level_sql     text;
 BEGIN
     IF p_scheme_id IS NULL THEN
         RAISE EXCEPTION 'pvt_build_query_sql: p_scheme_id is required';
@@ -101,6 +136,15 @@ BEGIN
        AND jsonb_typeof(p_distinct_on) = 'array'
        AND jsonb_array_length(p_distinct_on) > 0 THEN
         RAISE EXCEPTION 'pvt_build_query_sql: p_distinct and p_distinct_on are mutually exclusive';
+    END IF;
+
+    -- 0. WhereLevel below start nodes counts from them: it leaves the filter and becomes a condition on the walk
+    --    depth (step 6). Without start nodes (the whole scheme) the level stays absolute, counted from the root.
+    IF p_source_mode IN ('tree', 'tree_descendants', 'tree_children', 'tree_roots', 'tree_leaves')
+       AND p_tree_ids IS NOT NULL AND array_length(p_tree_ids, 1) IS NOT NULL
+       AND jsonb_typeof(p_filter) = 'object' AND p_filter ? '$level' THEN
+        v_seed_level := p_filter -> '$level';
+        p_filter := p_filter - '$level';
     END IF;
 
     -- 1. Resolve metadata for every referenced field. DISTINCT ON
@@ -255,6 +299,13 @@ BEGIN
         v_where_sql := pvt_build_where_from_json(
             v_outer_filter, v_fields,
             CASE WHEN v_narrow THEN 'o.' ELSE '' END);
+    END IF;
+    IF v_seed_level IS NOT NULL THEN
+        -- The node id stays outside the subquery, so it binds to the outer row in the wide shape too.
+        v_level_sql := CASE WHEN v_narrow THEN 'o.' ELSE '' END
+            || '_id = ANY(ARRAY(SELECT _id FROM _pvt_tree GROUP BY _id HAVING ' || pvt_seed_level_having(v_seed_level) || '))';
+        v_where_sql := CASE WHEN v_where_sql = 'TRUE' THEN v_level_sql
+                            ELSE '(' || v_where_sql || ') AND ' || v_level_sql END;
     END IF;
     v_order_sql := pvt_build_order_conditions(
         p_order, v_fields,

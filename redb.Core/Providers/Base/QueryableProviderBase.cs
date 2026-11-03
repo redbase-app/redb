@@ -30,6 +30,20 @@ namespace redb.Core.Providers.Base
         protected readonly ILazyPropsLoader? LazyPropsLoader;
         protected readonly string CacheDomain;
 
+        /// <summary>The list provider of the service, set by RedbServiceBase: see WithListItems.</summary>
+        internal IListProvider? ListItems { get; set; }
+
+        // Hands the list provider to the query providers of a new query, for the groupings it may run: the key of a
+        // grouping by a list item is read through it (Query.Grouping.ListItemGroupKeys).
+        private IRedbQueryable<TProps> WithListItems<TProps>(IRedbQueryable<TProps> query) where TProps : class, new()
+        {
+            if (query is redb.Core.Query.RedbQueryable<TProps> flat && flat.QueryProvider is redb.Core.Query.Grouping.IListItemKeySource flatKeys)
+                flatKeys.ListItems = ListItems;
+            if (query is redb.Core.Query.Base.TreeQueryableBase<TProps> tree && tree.TreeProvider is redb.Core.Query.Grouping.IListItemKeySource treeKeys)
+                treeKeys.ListItems = ListItems;
+            return query;
+        }
+
         protected QueryableProviderBase(
             IRedbContext context,
             IRedbObjectSerializer serializer,
@@ -91,13 +105,13 @@ namespace redb.Core.Providers.Base
         {
             var scheme = GetSchemeSync<TProps>();
             var effectiveUser = SecurityContext.GetEffectiveUser();
-            return CreateQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery);
+            return WithListItems(CreateQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery));
         }
 
         public IRedbQueryable<TProps> Query<TProps>(IRedbUser user) where TProps : class, new()
         {
             var scheme = GetSchemeSync<TProps>();
-            return CreateQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery);
+            return WithListItems(CreateQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery));
         }
         
         /// <summary>
@@ -134,14 +148,14 @@ namespace redb.Core.Providers.Base
             var scheme = GetSchemeSync<TProps>();
 
             var effectiveUser = SecurityContext.GetEffectiveUser();
-            return CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, null, null);
+            return WithListItems(CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, null, null));
         }
 
         public IRedbQueryable<TProps> TreeQuery<TProps>(IRedbUser user) where TProps : class, new()
         {
             var scheme = GetSchemeSync<TProps>();
 
-            return CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, null, null);
+            return WithListItems(CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, null, null));
         }
 
         // ===== SYNC TREE QUERIES WITH ROOT OBJECT =====
@@ -151,7 +165,7 @@ namespace redb.Core.Providers.Base
             var scheme = GetSchemeSync<TProps>();
 
             var effectiveUser = SecurityContext.GetEffectiveUser();
-            return CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, rootObjectId, maxDepth);
+            return WithListItems(CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, rootObjectId, maxDepth));
         }
 
         public IRedbQueryable<TProps> TreeQuery<TProps>(IRedbObject? rootObject, int? maxDepth = null) where TProps : class, new()
@@ -161,9 +175,9 @@ namespace redb.Core.Providers.Base
             var effectiveUser = SecurityContext.GetEffectiveUser();
             
             if (rootObject == null)
-                return CreateEmptyTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery);
+                return WithListItems(CreateEmptyTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery));
 
-            return CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, rootObject.Id, maxDepth);
+            return WithListItems(CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, rootObject.Id, maxDepth));
         }
 
         public IRedbQueryable<TProps> TreeQuery<TProps>(IEnumerable<IRedbObject> rootObjects, int? maxDepth = null) where TProps : class, new()
@@ -175,12 +189,12 @@ namespace redb.Core.Providers.Base
             var effectiveUser = SecurityContext.GetEffectiveUser();
             
             if (!rootList.Any())
-                return CreateEmptyTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery);
+                return WithListItems(CreateEmptyTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery));
 
             if (rootList.Count == 1)
-                return CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, rootList[0].Id, maxDepth);
+                return WithListItems(CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, rootList[0].Id, maxDepth));
 
-            return CreateMultiRootTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, rootList, maxDepth);
+            return WithListItems(CreateMultiRootTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, rootList, maxDepth));
         }
 
         public IRedbQueryable<TProps> TreeQuery<TProps>(IEnumerable<long> rootObjectIds, int? maxDepth = null) where TProps : class, new()
@@ -192,19 +206,19 @@ namespace redb.Core.Providers.Base
             var effectiveUser = SecurityContext.GetEffectiveUser();
             
             if (!idsList.Any())
-                return CreateEmptyTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery);
+                return WithListItems(CreateEmptyTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery));
 
             if (idsList.Count == 1)
-                return CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, idsList[0], maxDepth);
+                return WithListItems(CreateTreeQuery<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, idsList[0], maxDepth));
 
-            return CreateMultiRootTreeQueryByIds<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, idsList, maxDepth);
+            return WithListItems(CreateMultiRootTreeQueryByIds<TProps>(scheme.Id, effectiveUser.Id, Configuration.DefaultCheckPermissionsOnQuery, idsList, maxDepth));
         }
 
         public IRedbQueryable<TProps> TreeQuery<TProps>(long rootObjectId, IRedbUser user, int? maxDepth = null) where TProps : class, new()
         {
             var scheme = GetSchemeSync<TProps>();
 
-            return CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, rootObjectId, maxDepth);
+            return WithListItems(CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, rootObjectId, maxDepth));
         }
 
         public IRedbQueryable<TProps> TreeQuery<TProps>(IRedbObject? rootObject, IRedbUser user, int? maxDepth = null) where TProps : class, new()
@@ -212,9 +226,9 @@ namespace redb.Core.Providers.Base
             var scheme = GetSchemeSync<TProps>();
 
             if (rootObject == null)
-                return CreateEmptyTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery);
+                return WithListItems(CreateEmptyTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery));
 
-            return CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, rootObject.Id, maxDepth);
+            return WithListItems(CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, rootObject.Id, maxDepth));
         }
 
         public IRedbQueryable<TProps> TreeQuery<TProps>(IEnumerable<IRedbObject> rootObjects, IRedbUser user, int? maxDepth = null) where TProps : class, new()
@@ -224,12 +238,12 @@ namespace redb.Core.Providers.Base
             var scheme = GetSchemeSync<TProps>();
 
             if (!rootList.Any())
-                return CreateEmptyTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery);
+                return WithListItems(CreateEmptyTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery));
 
             if (rootList.Count == 1)
-                return CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, rootList[0].Id, maxDepth);
+                return WithListItems(CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, rootList[0].Id, maxDepth));
 
-            return CreateMultiRootTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, rootList, maxDepth);
+            return WithListItems(CreateMultiRootTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, rootList, maxDepth));
         }
 
         public IRedbQueryable<TProps> TreeQuery<TProps>(IEnumerable<long> rootObjectIds, IRedbUser user, int? maxDepth = null) where TProps : class, new()
@@ -239,12 +253,12 @@ namespace redb.Core.Providers.Base
             var scheme = GetSchemeSync<TProps>();
 
             if (!idsList.Any())
-                return CreateEmptyTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery);
+                return WithListItems(CreateEmptyTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery));
 
             if (idsList.Count == 1)
-                return CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, idsList[0], maxDepth);
+                return WithListItems(CreateTreeQuery<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, idsList[0], maxDepth));
 
-            return CreateMultiRootTreeQueryByIds<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, idsList, maxDepth);
+            return WithListItems(CreateMultiRootTreeQueryByIds<TProps>(scheme.Id, user.Id, Configuration.DefaultCheckPermissionsOnQuery, idsList, maxDepth));
         }
     }
 }

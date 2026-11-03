@@ -992,6 +992,9 @@ public class MsSqlDialect : ISqlDialect
     
     public string ListItems_SelectById() =>
         "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id = @p0";
+
+    public string ListItems_SelectByIds() =>
+        "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
     
     public string ListItems_SelectByListId() =>
         "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id_list = @p0 ORDER BY _value";
@@ -1284,9 +1287,6 @@ public class MsSqlDialect : ISqlDialect
     public string Query_AggregateGroupedSql() =>
         throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (aggregate_grouped)");
 
-    public string Query_AggregateArrayGroupedSql() =>
-        throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (aggregate_array_grouped)");
-
     public string Query_WindowSql() =>
         throw new NotSupportedException(LegacyMsSqlRemovedMsg + " (query_with_window)");
     
@@ -1440,7 +1440,7 @@ public class MsSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
 
     // Bump together with the literal RETURNed by dbo.pvt_module_version() in redb.MSSql/sql/v2-pvt/99_module_version.sql.
-    public string? Query_PvtRequiredVersion() => "0.2.31";
+    public string? Query_PvtRequiredVersion() => "0.2.39";
 
     // Native PVT projection orchestrator — not supported on MSSql (yet).
     // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these

@@ -18,13 +18,16 @@ namespace redb.SQLite.Query;
 public partial class SqliteQueryProvider : QueryProviderBase
 {
     /// <summary>
-    /// Underlying SQLite connection, used by the analytics partials to package
-    /// dynamic-shaped result rows to JSON in C#. SQLite has no row_to_json /
-    /// json_agg, so the PVT-compiled inner SQL is executed here and its rows are
-    /// serialized via the reader (column names from the reader) — the SQLite analog
-    /// of "SELECT json_agg(row_to_json(t)) FROM (sql) t".
+    /// The first row of <paramref name="sql"/> as a JSON object, or null when there is none. SQLite has no
+    /// row_to_json, so the analytics read their rows through IRedbContext.QueryRowsAsJsonAsync (one command and one
+    /// telemetry span, as on the other providers); they used to read on the raw connection, which opened no span.
     /// </summary>
-    private SqliteRedbConnection SqliteConn => (SqliteRedbConnection)_context.Db;
+    private async Task<string?> FirstRowAsJsonAsync(string sql)
+    {
+        var json = await _context.QueryRowsAsJsonAsync(sql, System.Array.Empty<object>());
+        using var rows = System.Text.Json.JsonDocument.Parse(json);
+        return rows.RootElement.GetArrayLength() == 0 ? null : rows.RootElement[0].GetRawText();
+    }
     public SqliteQueryProvider(
         IRedbContext context,
         IRedbObjectSerializer serializer,

@@ -20,18 +20,18 @@
 --
 -- Output shape (NARROW Pro-parity, used for flat + non-null queries):
 --   WITH _pvt_cte AS (
---       SELECT
---           v._id_object,
---           <one column per field via pvt_build_column_expr>
---       FROM _values v
---       WHERE v._id_structure = ANY(ARRAY[<sid1>, <sid2>, ...]::bigint[])
---         AND v._id_object IN (
---             SELECT _id FROM _objects
---              WHERE _id_scheme = <scheme_id>
---                [AND <pushed base predicate>]
---                [AND o._id IN (SELECT _id FROM _pvt_tree)]
---         )
---       GROUP BY v._id_object
+--       SELECT o._id AS _id_object, p.<field>, ...
+--       FROM _objects o
+--       LEFT JOIN (
+--           SELECT v._id_object,
+--                  <one column per field via pvt_build_column_expr>
+--           FROM _values v
+--           WHERE v._id_structure = ANY(ARRAY[<sid1>, <sid2>, ...]::bigint[])
+--             AND v._id_object IN (SELECT o._id FROM _objects o WHERE <object set>)
+--           GROUP BY v._id_object
+--       ) p ON p._id_object = o._id
+--       WHERE <object set>   -- o._id_scheme = <scheme_id> [AND <pushed base predicate>]
+--                            -- [AND o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree))]
 --   )
 -- The narrow shape skips the wide GROUP BY (21 cols -> 1 col),
 -- narrows the _values scan via the `_id_structure = ANY` index hint,
@@ -108,7 +108,7 @@ DECLARE
     v_pvt_body        text;
     v_sids            bigint[] := ARRAY[]::bigint[];
     v_sid_text        text;
-    v_objects_subq    text;
+    v_objects_where    text;
     v_tree_filter     text := '';
     -- Nested-only optimization (Pro-parity, see E062 in CHANGELOG):
     -- when v_pivot_cols is empty AND there's exactly one nested-dict
@@ -210,7 +210,9 @@ BEGIN
     END IF;
 
     -- ------- JOIN kind: LEFT keeps objects with no _values rows -------
-    v_join_kind := CASE WHEN p_force_outer THEN 'LEFT JOIN' ELSE 'INNER JOIN' END;
+    -- Always LEFT: an object that stores no value (a null field has no row) is still an object of the source, and
+    -- counts, groups (under NULL) and lists like any other.
+    v_join_kind := 'LEFT JOIN';
 
     -- ------- Tree-mode object-set restriction -------------------------
     -- Emit the `_pvt_tree(_id, depth)` CTE matching the requested
@@ -276,8 +278,8 @@ BEGIN
                 || E'\n)');
             v_has_recursive := true;
             v_tree_filter := CASE WHEN p_include_seed
-                                  THEN 'o._id IN (SELECT _id FROM _pvt_tree)'
-                                  ELSE 'o._id IN (SELECT _id FROM _pvt_tree WHERE depth > 0)' END;
+                                  THEN 'o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree))'
+                                  ELSE 'o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree WHERE depth > 0))' END;
 
         ELSIF p_source_mode = 'tree_children' THEN
             IF v_seed_arr IS NULL THEN
@@ -289,7 +291,7 @@ BEGIN
                 || 'WHERE o._id_parent = ANY(' || v_seed_arr || ')'
                 || CASE WHEN NOT p_polymorphic THEN v_scheme_pred ELSE '' END
                 || E'\n)');
-            v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree)';
+            v_tree_filter := 'o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree))';
 
         ELSIF p_source_mode = 'tree_roots' THEN
             IF v_seed_arr IS NOT NULL THEN
@@ -306,7 +308,7 @@ BEGIN
                     || 'WHERE o._id_parent IS NULL AND o._id_scheme = ' || p_scheme_id::text
                     || E'\n)');
             END IF;
-            v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree)';
+            v_tree_filter := 'o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree))';
 
         ELSIF p_source_mode = 'tree_leaves' THEN
             IF v_seed_arr IS NOT NULL THEN
@@ -328,7 +330,7 @@ BEGIN
                             ELSE '' END
                     || E'\n)');
                 v_has_recursive := true;
-                v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree WHERE depth > 0)'
+                v_tree_filter := 'o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree WHERE depth > 0))'
                               || ' AND NOT EXISTS (SELECT 1 FROM _objects c WHERE c._id_parent = o._id)';
             ELSE
                 v_cte_parts := v_cte_parts || (
@@ -337,7 +339,7 @@ BEGIN
                     || 'WHERE o._id_scheme = ' || p_scheme_id::text
                     || ' AND NOT EXISTS (SELECT 1 FROM _objects c WHERE c._id_parent = o._id)'
                     || E'\n)');
-                v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree)';
+                v_tree_filter := 'o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree))';
             END IF;
 
         ELSIF p_source_mode = 'tree_ancestors' THEN
@@ -361,7 +363,7 @@ BEGIN
                 || CASE WHEN NOT p_polymorphic THEN v_scheme_pred ELSE '' END
                 || E'\n)');
             v_has_recursive := true;
-            v_tree_filter := 'o._id IN (SELECT _id FROM _pvt_tree)';
+            v_tree_filter := 'o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree))';
         END IF;
 
         IF v_tree_filter <> '' THEN
@@ -493,13 +495,12 @@ BEGIN
     END LOOP;
 
     -- ------- Inner pivot SELECT ---------------------------------------
-    -- Narrow Pro-shape: scan _values directly, restrict by
-    -- _id_structure ANY(<requested sids>), restrict object set via an
-    -- IN-subquery over _objects (carrying scheme + base pushdown +
-    -- tree restriction), and group by a single column (_id_object).
+    -- Narrow Pro-shape: the objects of the source (scheme + base pushdown +
+    -- tree restriction) LEFT JOIN their _values rows of the requested
+    -- structures, grouped by a single column (_id_object). An object with
+    -- no such row keeps its row with NULL columns.
     -- The outer SELECT must JOIN _objects to expose base columns.
-    -- Eligible iff: narrow flag set, no LEFT JOIN required (would
-    -- lose missing _values rows), no nested-dict groups (they require
+    -- Eligible iff: narrow flag set, no force_outer, no nested-dict groups (they require
     -- pi.* projection over the wide source), and at least one pivot
     -- sid was collected. Tree mode IS supported: v_tree_filter is
     -- folded into the IN-subquery so the recursive `_pvt_tree` walk
@@ -513,8 +514,8 @@ BEGIN
           INTO v_sid_text
           FROM unnest(v_sids) AS s;
 
-        v_objects_subq := format(
-            '(SELECT o._id FROM _objects o WHERE o._id_scheme = %s%s%s)',
+        v_objects_where := format(
+            'o._id_scheme = %s%s%s',
             p_scheme_id::text,
             CASE WHEN p_extra_where IS NOT NULL AND p_extra_where <> ''
                  THEN ' AND ' || p_extra_where
@@ -523,15 +524,27 @@ BEGIN
                  THEN ' AND ' || v_tree_filter
                  ELSE '' END);
 
+        -- The pivot of the value rows (p), and every object of the source joined to it: an object with no row for any
+        -- requested structure (every field null) keeps its pivot row with NULL columns. Without the outer join it was
+        -- lost, and with it a group, a count, a list row. Pivoting first and joining after is the faster form: the
+        -- pivot grouped straight from _objects LEFT JOIN _values took 975 ms against 810-900 on 100 000 objects.
         v_inner_pivot :=
-            E'SELECT\n            v._id_object' || v_pivot_cols ||
+            E'SELECT\n            o._id AS _id_object' ||
+            CASE WHEN array_length(v_pivot_aliases, 1) IS NOT NULL
+                 THEN ', p.' || array_to_string(v_pivot_aliases, ', p.')
+                 ELSE '' END ||
+            E'\n        FROM _objects o' ||
+            E'\n        LEFT JOIN (' ||
+            E'\n        SELECT\n            v._id_object' || v_pivot_cols ||
             E'\n        FROM _values v' ||
             CASE WHEN v_has_listitem_join
                  THEN E'\n        LEFT JOIN _list_items li ON li._id = v._ListItem'
                  ELSE '' END ||
             E'\n        WHERE v._id_structure = ANY(ARRAY[' || v_sid_text || ']::bigint[])' ||
-            E'\n          AND v._id_object IN ' || v_objects_subq ||
-            E'\n        GROUP BY v._id_object';
+            E'\n          AND v._id_object IN (SELECT o._id FROM _objects o WHERE ' || v_objects_where || ')' ||
+            E'\n        GROUP BY v._id_object' ||
+            E'\n        ) p ON p._id_object = o._id' ||
+            E'\n        WHERE ' || v_objects_where;
     ELSE
         v_inner_pivot :=
             E'SELECT\n            ' || v_base_cols || v_pivot_cols ||
@@ -613,4 +626,4 @@ END;
 $BODY$;
 
 COMMENT ON FUNCTION pvt_build_cte_sql(bigint, jsonb, text, bigint[], integer, boolean, text, boolean, boolean, boolean, text) IS
-    'Builds the WITH _pvt_cte AS (...) clause. Two pivot shapes: wide legacy (`FROM _objects o JOIN _values v` GROUP BY 21 base cols) used for null-checks, tree mode, and nested-dict groups; narrow Pro-shape (`FROM _values v WHERE _id_structure=ANY(...) AND _id_object IN (SELECT _id FROM _objects WHERE ...)` GROUP BY 1) selected via p_narrow=true. In narrow mode the outer SELECT must JOIN _objects to expose base columns. Source modes: flat | tree (alias for tree_descendants) | tree_descendants | tree_children (single level, non-recursive) | tree_roots (`_id_parent IS NULL`) | tree_leaves (no children, non-recursive) | tree_ancestors (recursive walk UP via _id_parent). p_include_seed=false strips the seed from tree_descendants results; p_polymorphic=false ANDs scheme_id into recursive walk.';
+    'Builds the WITH _pvt_cte AS (...) clause. Two pivot shapes: wide legacy (`FROM _objects o LEFT JOIN _values v` GROUP BY 21 base cols) used for null-checks, tree mode, and nested-dict groups; narrow Pro-shape (`FROM _objects o LEFT JOIN _values v ON ... AND _id_structure=ANY(...) WHERE <object set>` GROUP BY 1) selected via p_narrow=true. In narrow mode the outer SELECT must JOIN _objects to expose base columns. Source modes: flat | tree (alias for tree_descendants) | tree_descendants | tree_children (single level, non-recursive) | tree_roots (`_id_parent IS NULL`) | tree_leaves (no children, non-recursive) | tree_ancestors (recursive walk UP via _id_parent). p_include_seed=false strips the seed from tree_descendants results; p_polymorphic=false ANDs scheme_id into recursive walk.';

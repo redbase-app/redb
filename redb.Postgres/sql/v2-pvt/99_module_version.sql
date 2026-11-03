@@ -211,7 +211,22 @@ BEGIN
     --          00_module_init.sql. (0.7.15 was a development build of the same, without the INCLUDE.)
     -- 0.7.17 - pvt_build_order_conditions: a DISTINCT ON key takes the direction of its p_order entry instead of
     --          ASC (OrderByDescending(k).DistinctBy(k) came back ascending), and that entry is not repeated.
-    RETURN '0.7.17';
+    -- 0.7.23 - tree sources: the walk restricts the objects as o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree ...)) instead of
+    --          an IN subquery. Since the pivot starts from the objects the walk is read twice, and the recursive CTE,
+    --          estimated at a few hundred rows, became the inner side of nested loops: a Props filter over a
+    --          100 thousand node subtree ran for minutes; now 0.75 s (2026-11-02).
+    -- 0.7.22 - pvt_build_query_sql: WhereLevel of a tree query that starts from nodes counts from them (pvt_seed_level_having
+    --          over the walk depth), as maxDepth and Pro do; it counted from the root of the whole tree (2026-11-02).
+    -- 0.7.21 - the pivot starts from the objects in every shape (LEFT JOIN _values): an object that stores no value
+    --          for the fields a statement reads (a null field has no row) kept no pivot row, and lists, counts,
+    --          groups (the NULL group) and windows lost it; the inline pivot of pvt_build_groupby_sql
+    --          likewise (2026-11-02).
+    -- 0.7.18 - pvt_build_array_groupby_sql (GroupByArray): array paths through classes and arrays (an inner array
+    --          of an element), '$element' of an array of simple values, fields of classes inside the element,
+    --          COUNT(*) with a filter, elements reached from the ids of the filtered objects, element fields joined
+    --          by _array_parent_id alone with _array_parent_id IS NOT NULL; every form it cannot answer raises
+    --          instead of joining a field to the wrong row (2026-11-02).
+    RETURN '0.7.23';
 END;
 $BODY$;
 

@@ -482,20 +482,24 @@ CREATE INDEX [IX__objects__parent_scheme_id] ON [dbo].[_objects]([_id_parent], [
 CREATE INDEX [IX__objects__scheme_date_create] ON [dbo].[_objects]([_id_scheme], [_date_create] DESC, [_id])
 CREATE INDEX [IX__objects__scheme_date_modify] ON [dbo].[_objects]([_id_scheme], [_date_modify] DESC, [_id])
 CREATE INDEX [IX__objects__scheme_name] ON [dbo].[_objects]([_id_scheme], [_name], [_id])
+-- _date_modify is deliberately NOT in INCLUDE of the three covering _objects indexes below (as in PostgreSQL,
+-- 2026-10-12). It changes on every save, so an index that carries it is rewritten for every saved object and
+-- grows on a database with frequent saves. Queries that go through them read the object row anyway. An existing
+-- database keeps the old definitions: sql/maintenance/rebuild_objects_indexes_without_date_modify.sql.
 -- Covering index for descendant lookup (WhereHasAncestor optimization)
 CREATE INDEX [IX__objects__parent_id_descendant_lookup] ON [dbo].[_objects](
     [_id_parent], [_id_scheme]
-) INCLUDE ([_id], [_id_owner], [_date_create], [_date_modify]) WHERE [_id_parent] IS NOT NULL
+) INCLUDE ([_id], [_id_owner], [_date_create]) WHERE [_id_parent] IS NOT NULL
 -- Covering index for tree queries with date sorting
 CREATE INDEX [IX__objects__scheme_parent_date_create] ON [dbo].[_objects](
     [_id_scheme], [_id_parent], [_date_create] DESC
-) INCLUDE ([_id], [_id_owner], [_date_modify])
+) INCLUDE ([_id], [_id_owner])
 -- Composite index for reverse ancestor lookup (child -> parent)
 CREATE INDEX [IX__objects__id_parent_scheme] ON [dbo].[_objects]([_id], [_id_parent], [_id_scheme]) WHERE [_id_parent] IS NOT NULL
 -- Covering index for tree queries with filtering
 CREATE INDEX [IX__objects__scheme_parent_owner] ON [dbo].[_objects](
     [_id_scheme], [_id_parent]
-) INCLUDE ([_id], [_id_owner], [_date_create], [_date_modify], [_name]) WHERE [_id_parent] IS NOT NULL
+) INCLUDE ([_id], [_id_owner], [_date_create], [_name]) WHERE [_id_parent] IS NOT NULL
 GO
 
 -- List items indexes

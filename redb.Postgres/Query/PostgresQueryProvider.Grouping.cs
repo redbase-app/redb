@@ -88,7 +88,7 @@ public partial class PostgresQueryProvider
     /// <c>json_agg(row_to_json(t))</c>; exposed so <c>ToSqlStringAsync</c> and
     /// other diagnostics surfaces can see the actual SQL.
     /// </summary>
-    public async Task<string> GetGroupBySqlPreviewAsync(
+    public override async Task<string> GetGroupBySqlPreviewAsync(
         long schemeId,
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
@@ -98,14 +98,14 @@ public partial class PostgresQueryProvider
         var groupList = groupFields?.ToList() ?? new List<GroupFieldRequest>();
         var aggList = aggregations?.ToList() ?? new List<AggregateRequest>();
         if (groupList.Count == 0)
-            return "-- No GROUP BY keys; would degenerate into a flat aggregate batch.";
+            throw new ArgumentException("A GroupBy SQL preview needs at least one key.", nameof(groupFields));
         return await BuildGroupByInnerSqlAsync(schemeId, groupList, aggList, filterJson, havingJson);
     }
 
     /// <summary>
     /// FilterExpression overload of <see cref="GetGroupBySqlPreviewAsync(long, IEnumerable&lt;GroupFieldRequest&gt;, IEnumerable&lt;AggregateRequest&gt;, string, string)"/>.
     /// </summary>
-    public Task<string> GetGroupBySqlPreviewAsync(
+    public override Task<string> GetGroupBySqlPreviewAsync(
         long schemeId,
         IEnumerable<GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
@@ -188,78 +188,50 @@ public partial class PostgresQueryProvider
     }
 
     /// <summary>
-    /// Array-element GroupBy override that always routes through the PVT-compiled
-    /// <c>pvt_build_array_groupby_sql</c>. The PVT function accepts a NULL/empty
-    /// HAVING predicate and simply omits the HAVING clause, so both no-HAVING
-    /// and HAVING call sites use the same single SQL path. Legacy
-    /// <c>aggregate_array_grouped</c> is no longer invoked from this provider.
+    /// GroupByArray on the free PostgreSQL provider: <c>pvt_build_array_groupby_sql</c> of the module builds the
+    /// grouping (and its HAVING); a window over the groups is written around it by <see cref="GroupedWindowSelect"/>.
     /// </summary>
-    public override async Task<JsonDocument?> ExecuteArrayGroupedAggregateAsync(
-        long schemeId,
-        string arrayPath,
-        IEnumerable<GroupFieldRequest> groupFields,
-        IEnumerable<AggregateRequest> aggregations,
-        string? filterJson = null,
-        string? havingJson = null, CancellationToken cancellationToken = default)
+    public override async Task<JsonDocument> ExecuteArrayGroupQueryAsync(ArrayGroupQuery query, CancellationToken cancellationToken = default)
     {
-        var groupList = groupFields?.ToList() ?? new List<GroupFieldRequest>();
-        if (groupList.Count == 0 && !string.IsNullOrEmpty(havingJson))
-            throw new NotSupportedException(
-                "HAVING requires GROUP BY keys; cannot be combined with a flat array aggregate.");
-        if (groupList.Count == 0)
-        {
-            // No group keys, no HAVING -> nothing meaningful to compile; preserve legacy
-            // null-result contract for empty inputs.
-            return null;
-        }
-        var aggList = aggregations?.ToList() ?? new List<AggregateRequest>();
+        var sql = await BuildArrayGroupSqlAsync(query, cancellationToken);
+        var wrapped = "SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json)::text AS \"Value\" FROM (" + sql + ") t";
+        var json = await _context.ExecuteScalarAsync<string>(wrapped, System.Array.Empty<object>(), cancellationToken);
+        if (string.IsNullOrEmpty(json))
+            throw new InvalidOperationException("GroupByArray: the grouping returned no JSON array for scheme " + query.SchemeId + ".");
+        return JsonDocument.Parse(json);
+    }
 
-        var groupByJson = JsonSerializer.Serialize(
-            groupList.Select(g => new Dictionary<string, object?>
-            {
-                ["field"] = g.FieldPath,
-                ["alias"] = string.IsNullOrEmpty(g.Alias) ? g.FieldPath : g.Alias
-            }));
+    /// <inheritdoc />
+    public override Task<string> GetArrayGroupQuerySqlAsync(ArrayGroupQuery query, CancellationToken cancellationToken = default)
+        => BuildArrayGroupSqlAsync(query, cancellationToken);
 
-        var aggregationsJson = aggList.Count == 0
-            ? null
-            : JsonSerializer.Serialize(
-                aggList.Select(a => new Dictionary<string, object?>
-                {
-                    ["field"] = a.FieldPath,
-                    ["func"] = a.Function switch
-                    {
-                        AggregateFunction.Average => "AVG",
-                        _ => a.Function.ToString().ToUpperInvariant()
-                    },
-                    ["alias"] = string.IsNullOrEmpty(a.Alias) ? a.Function.ToString() : a.Alias
-                }));
-
-        object filterParam = string.IsNullOrEmpty(filterJson) || filterJson == "{}" || filterJson == "null"
-            ? DBNull.Value
-            : (object)filterJson!;
-        object aggParam = aggregationsJson is null ? DBNull.Value : (object)aggregationsJson;
-        object havingParam = string.IsNullOrEmpty(havingJson) || havingJson == "{}" || havingJson == "null"
-            ? DBNull.Value
-            : (object)havingJson!;
+    private async Task<string> BuildArrayGroupSqlAsync(ArrayGroupQuery query, CancellationToken cancellationToken)
+    {
+        query.EnsureValid();
+        var filterJson = query.Filter != null ? _facetBuilder.BuildFacetFilters(query.Filter) : query.FilterJson;
+        var shown = query.Aggregations.ToList();
+        var aggregations = query.Window == null
+            ? shown
+            : GroupedWindowSelect.WithHiddenAggregates(shown, query.Window.Functions, query.Window.PartitionBy, query.Window.OrderBy);
 
         var invocation = "SELECT pvt_build_array_groupby_sql("
-            + schemeId.ToString(CultureInfo.InvariantCulture)
+            + query.SchemeId.ToString(CultureInfo.InvariantCulture)
             + ", $1::text, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, NULL::jsonb, NULL::integer, 0) AS \"Value\"";
-
-        _logger?.LogDebug("PVT ArrayGroupBy Build: SchemeId={SchemeId}, Array={Array}, GroupBy={GroupBy}, Aggs={Aggs}, Filter={Filter}, Having={Having}",
-            schemeId, arrayPath, groupByJson, aggregationsJson ?? "null", filterJson ?? "null", havingJson);
-
-        var innerSql = await _context.ExecuteScalarAsync<string>(
-            invocation, new object[] { arrayPath, filterParam, groupByJson, aggParam, havingParam }, cancellationToken);
+        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[]
+        {
+            query.ArrayPath,
+            ArrayGroupModuleJson.Param(filterJson),
+            ArrayGroupModuleJson.GroupBy(query.GroupFields),
+            ArrayGroupModuleJson.Param(ArrayGroupModuleJson.Aggregations(aggregations)),
+            ArrayGroupModuleJson.Param(query.HavingJson)
+        }, cancellationToken);
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
-                "pvt_build_array_groupby_sql returned an empty SQL string for scheme " + schemeId + ".");
+                "pvt_build_array_groupby_sql returned an empty SQL string for scheme " + query.SchemeId + ".");
 
-        var wrapped = "SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json)::text AS \"Value\" FROM (" + innerSql + ") t";
-        var jsonArray = await _context.ExecuteScalarAsync<string>(wrapped, System.Array.Empty<object>(), cancellationToken);
-        if (string.IsNullOrEmpty(jsonArray))
-            return null;
-        return JsonDocument.Parse(jsonArray);
+        return query.Window == null
+            ? innerSql
+            : GroupedWindowSelect.Build(innerSql, query.GroupFields, aggregations, shown,
+                query.Window.Functions, query.Window.PartitionBy, query.Window.OrderBy, QuoteIdent, rankingNeedsOrder: false);
     }
 }

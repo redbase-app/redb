@@ -1022,6 +1022,9 @@ public class SqliteDialect : ISqlDialect
     public string ListItems_SelectById() =>
         "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id = $1";
 
+    public string ListItems_SelectByIds() =>
+        "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id IN (SELECT value FROM json_each($1))";
+
     public string ListItems_SelectByListId() =>
         "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id_list = $1 ORDER BY _value";
 
@@ -1347,9 +1350,6 @@ public class SqliteDialect : ISqlDialect
     public string Query_AggregateGroupedSql() =>
         throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_grouped)");
 
-    public string Query_AggregateArrayGroupedSql() =>
-        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_array_grouped)");
-
     public string Query_WindowSql() =>
         throw new NotSupportedException(LegacyPgRemovedMsg + " (query_with_window)");
 
@@ -1481,7 +1481,7 @@ public class SqliteDialect : ISqlDialect
     // gate would try to apply a SQL bundle, and there is none. Bump both on every change of the C code.
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
-    public string? Query_PvtRequiredVersion() => "0.6.9";
+    public string? Query_PvtRequiredVersion() => "0.6.13";
 
     public string? Query_BuildPvtProjectionSqlFunction() => null;
 

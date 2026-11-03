@@ -48,6 +48,12 @@ namespace redb.Core.Providers
         
         Task<RedbListItem?> GetListItemAsync(long itemId,
         CancellationToken cancellationToken = default);
+        /// <summary>
+        /// The list items of the given ids, in one query for those the cache does not hold. An id that names no item is
+        /// absent from the result; the order of the result is not that of the ids.
+        /// </summary>
+        Task<List<RedbListItem>> GetListItemsByIdsAsync(IEnumerable<long> itemIds,
+        CancellationToken cancellationToken = default);
         Task<List<RedbListItem>> GetListItemsAsync(long listId,
         CancellationToken cancellationToken = default);
         Task<RedbListItem?> GetListItemByValueAsync(long listId, string value,

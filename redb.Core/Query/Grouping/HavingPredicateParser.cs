@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Text.Json;
 using redb.Core.Query.Aggregation;
 
@@ -17,6 +16,7 @@ namespace redb.Core.Query.Grouping;
 ///
 /// Supported predicates:
 ///   Agg.Count(g)                                — <c>{"$count":"*"}</c>
+///   Agg.Count(g, x =&gt; condition)                — <c>{"$count":"*","filter":&lt;condition&gt;}</c>
 ///   Agg.Sum/Average/Min/Max(g, x =&gt; x.Field)   — <c>{"$sum":{"$field":"Field"}}</c>
 ///   binary comparisons (>, &lt;, &gt;=, &lt;=, ==, !=) and &amp;&amp; / ||
 ///
@@ -26,19 +26,28 @@ namespace redb.Core.Query.Grouping;
 /// </summary>
 internal static class HavingPredicateParser
 {
+    private const string OwnerApi = "Having";
+
     /// <summary>
     /// Compile predicate body to PVT JSON string.
     /// Returns null when predicate is null.
     /// </summary>
     public static string? ToJson<TKey, TProps>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, bool>>? predicate) where TProps : class, new()
+        Expression<Func<IRedbGrouping<TKey, TProps>, bool>>? predicate)
+        => ToJson(predicate, GroupItemKind.Props);
+
+    /// <summary>
+    /// Compile predicate body to PVT JSON string; <paramref name="kind"/> says what the lambdas inside Agg.* read.
+    /// </summary>
+    public static string? ToJson<TKey, TProps>(
+        Expression<Func<IRedbGrouping<TKey, TProps>, bool>>? predicate, GroupItemKind kind)
     {
         if (predicate is null) return null;
-        var node = TranslateBoolean(predicate.Body, predicate.Parameters[0]);
+        var node = TranslateBoolean(predicate.Body, predicate.Parameters[0], kind);
         return JsonSerializer.Serialize(node);
     }
 
-    private static object TranslateBoolean(Expression expr, ParameterExpression groupParam)
+    private static object TranslateBoolean(Expression expr, ParameterExpression groupParam, GroupItemKind kind)
     {
         // Unwrap Convert(... , bool)
         while (expr is UnaryExpression u && (u.NodeType == ExpressionType.Convert || u.NodeType == ExpressionType.ConvertChecked))
@@ -52,7 +61,7 @@ internal static class HavingPredicateParser
                 var be = (BinaryExpression)expr;
                 return new Dictionary<string, object>
                 {
-                    ["$and"] = new[] { TranslateBoolean(be.Left, groupParam), TranslateBoolean(be.Right, groupParam) }
+                    ["$and"] = new[] { TranslateBoolean(be.Left, groupParam, kind), TranslateBoolean(be.Right, groupParam, kind) }
                 };
             }
             case ExpressionType.OrElse:
@@ -61,13 +70,13 @@ internal static class HavingPredicateParser
                 var be = (BinaryExpression)expr;
                 return new Dictionary<string, object>
                 {
-                    ["$or"] = new[] { TranslateBoolean(be.Left, groupParam), TranslateBoolean(be.Right, groupParam) }
+                    ["$or"] = new[] { TranslateBoolean(be.Left, groupParam, kind), TranslateBoolean(be.Right, groupParam, kind) }
                 };
             }
             case ExpressionType.Not:
             {
                 var ue = (UnaryExpression)expr;
-                return new Dictionary<string, object> { ["$not"] = TranslateBoolean(ue.Operand, groupParam) };
+                return new Dictionary<string, object> { ["$not"] = TranslateBoolean(ue.Operand, groupParam, kind) };
             }
             case ExpressionType.GreaterThan:
             case ExpressionType.GreaterThanOrEqual:
@@ -75,14 +84,14 @@ internal static class HavingPredicateParser
             case ExpressionType.LessThanOrEqual:
             case ExpressionType.Equal:
             case ExpressionType.NotEqual:
-                return TranslateComparison((BinaryExpression)expr, groupParam);
+                return TranslateComparison((BinaryExpression)expr, groupParam, kind);
         }
 
         throw new NotSupportedException(
             "Unsupported HAVING expression node: " + expr.NodeType + " (" + expr + ")");
     }
 
-    private static Dictionary<string, object> TranslateComparison(BinaryExpression be, ParameterExpression groupParam)
+    private static Dictionary<string, object> TranslateComparison(BinaryExpression be, ParameterExpression groupParam, GroupItemKind kind)
     {
         var opKey = be.NodeType switch
         {
@@ -95,25 +104,22 @@ internal static class HavingPredicateParser
             _ => throw new NotSupportedException("Comparison " + be.NodeType + " is not supported in HAVING.")
         };
 
-        var left = TranslateOperand(be.Left, groupParam);
-        var right = TranslateOperand(be.Right, groupParam);
+        var left = TranslateOperand(be.Left, groupParam, kind);
+        var right = TranslateOperand(be.Right, groupParam, kind);
         return new Dictionary<string, object> { [opKey] = new[] { left, right } };
     }
 
-    private static object TranslateOperand(Expression expr, ParameterExpression groupParam)
+    private static object TranslateOperand(Expression expr, ParameterExpression groupParam, GroupItemKind kind)
     {
         // Unwrap Convert (boxing for value types: e.g. (decimal)Agg.Sum(...))
         while (expr is UnaryExpression u && (u.NodeType == ExpressionType.Convert || u.NodeType == ExpressionType.ConvertChecked))
             expr = u.Operand;
 
-        if (expr is MethodCallExpression mc)
-        {
-            var agg = TryTranslateAggregate(mc, groupParam);
-            if (agg != null) return agg;
-        }
+        if (expr is MethodCallExpression mc && mc.Method.DeclaringType == typeof(Agg))
+            return TranslateAggregate(mc, groupParam, kind);
 
         // Treat anything not referencing the group parameter as a captured constant.
-        if (!ReferencesParameter(expr, groupParam))
+        if (!GroupSelectorMembers.ReferencesParameter(expr, groupParam))
         {
             var value = EvaluateConstant(expr);
             if (value is null)
@@ -122,110 +128,36 @@ internal static class HavingPredicateParser
                 throw new NotSupportedException(
                     "HAVING: сравнение с null-константой не поддерживается - сравните с Count или не-null значением.");
             return new Dictionary<string, object> { ["$const"] = value };
-
         }
 
         throw new NotSupportedException(
             "Unsupported HAVING operand: " + expr + ". Only Agg.* aggregates and captured constants are allowed.");
     }
 
-    private static object? TryTranslateAggregate(MethodCallExpression mc, ParameterExpression groupParam)
+    private static object TranslateAggregate(MethodCallExpression mc, ParameterExpression groupParam, GroupItemKind kind)
     {
-        // Agg.* static calls
-        if (mc.Method.DeclaringType == typeof(Agg) || (mc.Method.DeclaringType?.FullName == "redb.Core.Query.Aggregation.Agg"))
+        // One strict reading for SelectAsync and HAVING: the same call means the same SQL in both.
+        var request = GroupAggregateParser.Parse(mc, groupParam, alias: mc.Method.Name, kind, OwnerApi);
+
+        if (request.Function == AggregateFunction.Count)
         {
-            var funcName = mc.Method.Name;
-            var opKey = funcName switch
-            {
-                "Sum" => "$sum",
-                "Average" => "$avg",
-                "Min" => "$min",
-                "Max" => "$max",
-                "Count" => "$count",
-                _ => null
-            };
-            if (opKey is null) return null;
-
-            // Group-overload form: Agg.<Func>(g, x => x.Field) or Agg.Count(g)
-            // Standalone form (Agg.Sum(value)) is rejected — must be applied to a group.
-            if (mc.Arguments.Count >= 1 && IsGroupReference(mc.Arguments[0], groupParam))
-            {
-                if (funcName == "Count")
-                {
-                    // Always COUNT(*) for groups
-                    return new Dictionary<string, object> { [opKey] = "*" };
-                }
-
-                if (mc.Arguments.Count < 2)
-                    throw new NotSupportedException("Agg." + funcName + " requires a selector lambda over the group.");
-
-                var field = ExtractFieldPathFromLambda(mc.Arguments[1]);
-                if (string.IsNullOrEmpty(field))
-                    throw new NotSupportedException("Agg." + funcName + " selector must reference a single Props field.");
-
-                return new Dictionary<string, object>
-                {
-                    [opKey] = new Dictionary<string, object> { ["$field"] = field! }
-                };
-            }
+            var node = new Dictionary<string, object> { ["$count"] = "*" };
+            if (request.ConditionJson != null)
+                node["filter"] = JsonDocument.Parse(request.ConditionJson).RootElement.Clone();
+            return node;
         }
-        return null;
-    }
 
-    private static bool IsGroupReference(Expression expr, ParameterExpression groupParam)
-    {
-        while (expr is UnaryExpression u && (u.NodeType == ExpressionType.Convert || u.NodeType == ExpressionType.ConvertChecked))
-            expr = u.Operand;
-        return expr == groupParam;
-    }
-
-    private static string? ExtractFieldPathFromLambda(Expression expr)
-    {
-        if (expr is UnaryExpression q && q.NodeType == ExpressionType.Quote)
-            expr = q.Operand;
-
-        if (expr is LambdaExpression lambda)
+        var opKey = request.Function switch
         {
-            var body = lambda.Body;
-            while (body is UnaryExpression conv &&
-                   (conv.NodeType == ExpressionType.Convert || conv.NodeType == ExpressionType.ConvertChecked))
-                body = conv.Operand;
-            return ExtractMemberPath(body as MemberExpression);
-        }
-        return null;
-    }
-
-    private static string? ExtractMemberPath(MemberExpression? member)
-    {
-        if (member is null) return null;
-        var parts = new List<string>();
-        Expression? cur = member;
-        while (cur is MemberExpression m)
+            AggregateFunction.Sum => "$sum",
+            AggregateFunction.Average => "$avg",
+            AggregateFunction.Min => "$min",
+            _ => "$max"
+        };
+        return new Dictionary<string, object>
         {
-            if (m.Member.Name != "Props")
-                parts.Insert(0, m.Member.Name);
-            cur = m.Expression;
-        }
-        return parts.Count == 0 ? null : string.Join(".", parts);
-    }
-
-    private static bool ReferencesParameter(Expression expr, ParameterExpression p)
-    {
-        var v = new ParamRefVisitor(p);
-        v.Visit(expr);
-        return v.Found;
-    }
-
-    private sealed class ParamRefVisitor : ExpressionVisitor
-    {
-        private readonly ParameterExpression _p;
-        public bool Found;
-        public ParamRefVisitor(ParameterExpression p) { _p = p; }
-        protected override Expression VisitParameter(ParameterExpression node)
-        {
-            if (node == _p) Found = true;
-            return base.VisitParameter(node);
-        }
+            [opKey] = new Dictionary<string, object> { ["$field"] = request.FieldPath }
+        };
     }
 
     private static object? EvaluateConstant(Expression expr)

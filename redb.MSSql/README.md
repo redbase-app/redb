@@ -43,6 +43,14 @@ builder.Services.AddRedb(options => options
     .UseMsSql("Server=localhost;Database=mydb;User Id=sa;Password=pass;TrustServerCertificate=true"));
 ```
 
+## Server settings
+
+With the SQL Server defaults (`max degree of parallelism` 0, `cost threshold for parallelism` 5) the free
+provider's window, GroupBy and aggregate queries go parallel on every core and run 2 to 6 times slower: on
+100 000 employees an `NTILE` window took 11.5 s instead of 1.8 s. We test with `cost threshold for parallelism`
+50 and `max degree of parallelism` 4, set with `sp_configure` followed by `RECONFIGURE`. Simple filters and the
+Pro provider are not affected.
+
 ## Links
 
 - Documentation (EN): [redbase.app](https://redbase.app)

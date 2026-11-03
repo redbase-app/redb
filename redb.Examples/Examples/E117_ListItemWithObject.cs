@@ -29,8 +29,7 @@ public class E117_ListItemWithObject : ExampleBase
                 "List 'ExampleStatuses' not found. Run E114 first.");
         }
 
-        // Sync City scheme and create a city object
-        await redb.SyncSchemeAsync<CityProps>();
+        // Create a city object
         var cityObj = new RedbObject<CityProps>
         {
             name = "Moscow",

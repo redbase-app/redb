@@ -6,7 +6,7 @@ namespace redb.Core.Query.Grouping;
 /// Interface for grouped REDB queries.
 /// Allows executing aggregations per group via SelectAsync.
 /// </summary>
-public interface IRedbGroupedQueryable<TKey, TProps> where TProps : class, new()
+public interface IRedbGroupedQueryable<TKey, TProps>
 {
     /// <summary>
     /// Executes projection with aggregations for each group.

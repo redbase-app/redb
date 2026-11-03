@@ -218,6 +218,23 @@ namespace redb.Core.Providers.Base
             return item;
         }
 
+        public async Task<List<RedbListItem>> GetListItemsByIdsAsync(IEnumerable<long> itemIds, CancellationToken cancellationToken = default)
+        {
+            var items = new List<RedbListItem>();
+            var missing = new List<long>();
+            foreach (var id in itemIds.Distinct())
+            {
+                var cached = ListCache.GetListItem(id);
+                if (cached != null) items.Add(cached);
+                else missing.Add(id);
+            }
+            if (missing.Count > 0)
+                items.AddRange(await Context.QueryAsync<RedbListItem>(Sql.ListItems_SelectByIds(), new object[] { missing.ToArray() }, cancellationToken));
+            Attach(items);
+            await PreloadLinkedObjectsAsync(items, cancellationToken);
+            return items;
+        }
+
         public async Task<List<RedbListItem>> GetListItemsAsync(long listId, CancellationToken cancellationToken = default)
         {
             var items = ListCache.GetListItems(listId);

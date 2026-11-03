@@ -75,6 +75,26 @@ namespace redb.Core.Models.Entities
         internal IRedbObject? LoadedObject => _objectLoaded ? _object : null;
 
         /// <summary>
+        /// Makes this item, a key of a grouping that carried only the id, the item <paramref name="source"/> is: its
+        /// fields, the database it came from and its linked object when loaded. See ListItemGroupKeys.
+        /// </summary>
+        internal void TakeFrom(RedbListItem source)
+        {
+            Id = source.Id;
+            IdList = source.IdList;
+            Value = source.Value;
+            IdObject = source.IdObject;
+            Alias = source.Alias;
+            _cacheDomain = source._cacheDomain;
+            _origin = source._origin;
+            if (source._objectLoaded)
+            {
+                _object = source._object;
+                _objectLoaded = true;
+            }
+        }
+
+        /// <summary>
         /// Asynchronous form of <see cref="Object"/>: resolves the linked object on the reader's scope without blocking a
         /// thread. Prefer this - or <c>redb.LoadLinkedObjectsAsync(items)</c> for many items, one query - on hot paths.
         /// </summary>

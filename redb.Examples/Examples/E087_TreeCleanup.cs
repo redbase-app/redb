@@ -21,8 +21,6 @@ public class E087_TreeCleanup : ExampleBase
 {
     public override async Task<ExampleResult> RunAsync(IRedbService redb)
     {
-        await redb.SyncSchemeAsync<DepartmentProps>();
-
         var sw = Stopwatch.StartNew();
 
         var existing = await redb.TreeQuery<DepartmentProps>().ToListAsync();

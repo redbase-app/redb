@@ -12,7 +12,7 @@
 -- Where <func> is one of: count / sum / avg / min / max.
 --
 -- NOT in this slice (matches MSSql free deliberate cuts):
---   * per-aggregate `distinct` / `filter`
+--   * per-aggregate `distinct` (a `filter` is supported on $count of "*": the conditional count)
 --   * $string_agg / $bool_and / $bool_or
 --   * arithmetic / function operands ($add/$mul/$upper/...)
 --   * narrow shape (always Shape A or Shape C wide)
@@ -30,6 +30,40 @@
 
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
+GO
+
+-- ---------- pvt_json_field_refs --------------------------------------
+-- Every {"$field": "<name>"} inside a JSON expression (a filter of a conditional count, a HAVING).
+CREATE OR ALTER FUNCTION dbo.pvt_json_field_refs(@node NVARCHAR(MAX))
+RETURNS TABLE
+AS
+RETURN
+(
+    WITH n AS (
+        SELECT [key], [value], [type] FROM OPENJSON(@node)
+        UNION ALL
+        SELECT j.[key], j.[value], j.[type]
+        FROM n CROSS APPLY OPENJSON(n.[value]) j
+        WHERE n.[type] IN (4, 5)
+    )
+    SELECT DISTINCT CAST([value] AS NVARCHAR(400)) AS name FROM n WHERE [key] = N'$field' AND [type] = 1
+);
+GO
+
+-- ---------- pvt_build_groupby_having_expr (declaration) --------------
+-- The boolean translator of 22_pvt_groupby.sql, declared here so the filter of a conditional count in
+-- pvt_build_agg_expr can call it: a function must exist before a function that calls it is created.
+-- 22_pvt_groupby.sql replaces this body.
+CREATE OR ALTER FUNCTION dbo.pvt_build_groupby_having_expr(
+    @node        NVARCHAR(MAX),
+    @fields      NVARCHAR(MAX),
+    @base_prefix NVARCHAR(20)
+)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    RETURN NULL;
+END;
 GO
 
 -- ---------- pvt_extend_fields_with_aggs ------------------------------
@@ -86,6 +120,25 @@ BEGIN
                 FETCH NEXT FROM props INTO @k, @v, @t;
             END;
             CLOSE props; DEALLOCATE props;
+            -- Fields of the condition of a conditional count ({"$count":"*","filter":{...}}).
+            DECLARE refs CURSOR LOCAL FAST_FORWARD FOR
+                SELECT name FROM dbo.pvt_json_field_refs(JSON_QUERY(@entry, N'$.filter'));
+            DECLARE @ref NVARCHAR(400);
+            OPEN refs;
+            FETCH NEXT FROM refs INTO @ref;
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                IF JSON_QUERY(@out, N'$."' + STRING_ESCAPE(@ref, 'json') + N'"') IS NULL
+                BEGIN
+                    DECLARE @ref_meta NVARCHAR(MAX) = dbo.pvt_resolve_field_path(@scheme_id, @ref);
+                    IF @ref_meta IS NOT NULL
+                        SET @out = CASE WHEN @out = N'{}'
+                            THEN N'{"' + STRING_ESCAPE(@ref, 'json') + N'":' + @ref_meta + N'}'
+                            ELSE LEFT(@out, LEN(@out) - 1) + N',"' + STRING_ESCAPE(@ref, 'json') + N'":' + @ref_meta + N'}' END;
+                END;
+                FETCH NEXT FROM refs INTO @ref;
+            END;
+            CLOSE refs; DEALLOCATE refs;
         END;
         FETCH NEXT FROM entries INTO @entry;
     END;
@@ -176,6 +229,18 @@ BEGIN
     END;
     IF @func IS NULL
         RETURN dbo.pvt_fail(N'unsupported aggregate ' + @op);
+
+    -- Conditional count {"$count":"*","filter":<expression>} -> COUNT(CASE WHEN <expression> THEN 1 END).
+    DECLARE @filter NVARCHAR(MAX) = JSON_QUERY(@entry, N'$.filter');
+    IF @filter IS NOT NULL
+    BEGIN
+        IF @lo <> N'$count' OR @arg_t <> 1 OR @arg <> N'*'
+            RETURN dbo.pvt_fail(N'only $count of "*" takes a filter');
+        DECLARE @cond NVARCHAR(MAX) = dbo.pvt_build_groupby_having_expr(@filter, @fields, @base_prefix);
+        IF @cond IS NULL
+            RETURN dbo.pvt_fail(N'the filter of a count does not translate');
+        RETURN N'COUNT(CASE WHEN ' + @cond + N' THEN 1 END)';
+    END;
 
     -- $count "*" → COUNT(*)
     IF @lo = N'$count' AND @arg_t = 1 AND @arg = N'*'

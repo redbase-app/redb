@@ -19,7 +19,7 @@ public class E187_UpdateExisting : ExampleBase
         var sw = Stopwatch.StartNew();
 
         // Create an object to update
-        var scheme = await redb.EnsureSchemeFromTypeAsync<EmployeeProps>();
+        var scheme = (await redb.GetSchemeByTypeAsync<EmployeeProps>())!;
         var original = new RedbObject<EmployeeProps>
         {
             name = $"ToUpdate_{DateTime.UtcNow.Ticks}",

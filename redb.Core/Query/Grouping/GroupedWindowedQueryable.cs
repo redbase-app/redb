@@ -5,7 +5,6 @@ using System.Linq.Expressions;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using redb.Core.Models.Contracts;
 using redb.Core.Query.Aggregation;
 using redb.Core.Query.QueryExpressions;
 using redb.Core.Query.Window;
@@ -13,21 +12,40 @@ using redb.Core.Query.Window;
 namespace redb.Core.Query.Grouping;
 
 /// <summary>
+/// Where the groups of a grouped window come from: a GroupBy over objects or a GroupByArray over elements.
+/// </summary>
+internal interface IGroupedWindowSource
+{
+    /// <summary>Name of the provider for messages.</summary>
+    string ProviderName { get; }
+
+    /// <summary>What the lambdas inside Agg.* read.</summary>
+    GroupItemKind Kind { get; }
+
+    /// <summary>Keys of the grouping, aliased as the selector names g.Key.</summary>
+    List<GroupFieldRequest> GroupFields(LambdaExpression selector);
+
+    Task<JsonDocument> ExecuteAsync(LambdaExpression selector, List<AggregateRequest> aggregations, ArrayGroupWindow window, CancellationToken cancellationToken);
+
+    Task<string> GetSqlAsync(LambdaExpression selector, List<AggregateRequest> aggregations, ArrayGroupWindow window, CancellationToken cancellationToken);
+
+    /// <summary>The list provider the list item keys are read through (ListItemGroupKeys).</summary>
+    redb.Core.Providers.IListProvider? ListItems { get; }
+}
+
+/// <summary>
 /// Queryable for applying window functions to grouped data.
 /// Wraps grouped query and adds window function support.
 /// </summary>
 public class GroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQueryable<TKey, TProps>
-    where TProps : class, new()
 {
-    private readonly IRedbQueryProvider _provider;
-    private readonly long _schemeId;
-    private readonly Expression _keySelector;
+    private const string OwnerApi = "WithWindow.SelectAsync";
+
+    private readonly IGroupedWindowSource _source;
     private readonly GroupedWindowSpec<TKey, TProps> _windowSpec;
 
     /// <summary>True when the key comes from GroupByRedb: its members are fields of the object, not of Props.</summary>
     public bool IsBaseFieldGrouping { get; init; }
-    private readonly string? _filterJson;
-    private readonly FilterExpression? _filter;
 
     /// <summary>
     /// Constructor with filterJson (legacy compatibility).
@@ -38,15 +56,10 @@ public class GroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQueryable<
         Expression keySelector,
         GroupedWindowSpec<TKey, TProps> windowSpec,
         string? filterJson = null)
+        : this(provider, schemeId, keySelector, windowSpec, filterJson, null, null)
     {
-        _provider = provider;
-        _schemeId = schemeId;
-        _keySelector = keySelector;
-        _windowSpec = windowSpec;
-        _filterJson = filterJson;
-        _filter = null;
     }
-    
+
     /// <summary>
     /// Constructor with FilterExpression (Pro version).
     /// </summary>
@@ -56,364 +69,219 @@ public class GroupedWindowedQueryable<TKey, TProps> : IGroupedWindowedQueryable<
         Expression keySelector,
         GroupedWindowSpec<TKey, TProps> windowSpec,
         FilterExpression? filter)
+        : this(provider, schemeId, keySelector, windowSpec, null, filter, null)
     {
-        _provider = provider;
-        _schemeId = schemeId;
-        _keySelector = keySelector;
+    }
+
+    /// <summary>
+    /// Constructor for a GroupBy with HAVING: the window runs over the groups that pass it.
+    /// </summary>
+    public GroupedWindowedQueryable(
+        IRedbQueryProvider provider,
+        long schemeId,
+        Expression keySelector,
+        GroupedWindowSpec<TKey, TProps> windowSpec,
+        string? filterJson,
+        FilterExpression? filter,
+        string? havingJson)
+    {
         _windowSpec = windowSpec;
-        _filter = filter;
-        _filterJson = null;
+        _source = new FlatGroupWindowSource(this, provider, schemeId, keySelector, filterJson, filter, havingJson);
+    }
+
+    internal GroupedWindowedQueryable(IGroupedWindowSource source, GroupedWindowSpec<TKey, TProps> windowSpec)
+    {
+        _source = source;
+        _windowSpec = windowSpec;
     }
 
     public async Task<List<TResult>> SelectAsync<TResult>(
         Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
-        var groupFields = ParseGroupFields();
-        var aggregations = ParseAggregations(selector);
-        var windowFuncs = ParseWindowFunctions(selector);
-        var partitionBy = ParsePartitionBy();
-        var orderBy = ParseOrderBy();
-
-        // Use FilterExpression if available, otherwise filterJson
-        var jsonResult = _filter != null
-            ? await _provider.ExecuteGroupedWindowQueryAsync(_schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, _filter, cancellationToken: cancellationToken)
-            : await _provider.ExecuteGroupedWindowQueryAsync(_schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, _filterJson, cancellationToken: cancellationToken);
-
-        return MaterializeResults<TResult>(jsonResult, selector, groupFields);
+        var (aggregations, window) = Parse(selector);
+        var json = await _source.ExecuteAsync(selector, aggregations, window, cancellationToken);
+        var rows = ArrayGroupMaterializer.Materialize<TResult>(json, selector, _source.GroupFields(selector), _source.ProviderName, OwnerApi);
+        await ListItemGroupKeys.FillAsync(rows, _source.ListItems, OwnerApi, cancellationToken);
+        return rows;
     }
 
-    public async Task<string> ToSqlStringAsync<TResult>(
+    public Task<string> ToSqlStringAsync<TResult>(
         Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
-        var groupFields = ParseGroupFields();
-        var aggregations = ParseAggregations(selector);
-        var windowFuncs = ParseWindowFunctions(selector);
-        var partitionBy = ParsePartitionBy();
-        var orderBy = ParseOrderBy();
-
-        // Use FilterExpression if available, otherwise filterJson
-        return _filter != null
-            ? await _provider.GetGroupedWindowSqlPreviewAsync(
-                _schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, _filter, cancellationToken: cancellationToken)
-            : await _provider.GetGroupedWindowSqlPreviewAsync(
-                _schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, _filterJson, cancellationToken: cancellationToken);
+        var (aggregations, window) = Parse(selector);
+        return _source.GetSqlAsync(selector, aggregations, window, cancellationToken);
     }
 
-    private List<GroupFieldRequest> ParseGroupFields()
+    private (List<AggregateRequest> Aggregations, ArrayGroupWindow Window) Parse(LambdaExpression selector)
     {
-        var result = new List<GroupFieldRequest>();
-        
-        var body = _keySelector is LambdaExpression lambda ? lambda.Body : _keySelector;
-        
-        if (body is NewExpression newExpr && newExpr.Members != null)
-        {
-            for (int i = 0; i < newExpr.Members.Count; i++)
-            {
-                var member = newExpr.Members[i];
-                var arg = newExpr.Arguments[i];
-                var fieldPath = ExtractFieldPath(arg);
-                result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = member.Name, IsBaseField = IsBaseFieldGrouping });
-            }
-        }
-        else if (body is MemberExpression memberExpr)
-        {
-            var fieldPath = ExtractFieldPath(memberExpr);
-            result.Add(new GroupFieldRequest { FieldPath = fieldPath, Alias = memberExpr.Member.Name, IsBaseField = IsBaseFieldGrouping });
-        }
-        
-        return result;
-    }
-
-    private List<AggregateRequest> ParseAggregations(LambdaExpression selector)
-    {
-        var result = new List<AggregateRequest>();
+        var aggregations = new List<AggregateRequest>();
+        var functions = new List<WindowFuncRequest>();
         var param = selector.Parameters[0];
 
-        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, "Оконный SelectAsync"))
+        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, OwnerApi))
         {
             var expr = GroupSelectorMembers.StripConvert(rawExpr);
 
             if (GroupSelectorMembers.IsKeyAccess(expr, param))
                 continue;
 
-            if (expr is MethodCallExpression methodCall)
+            if (expr is MethodCallExpression win && win.Method.DeclaringType == typeof(Win))
             {
-                var funcName = methodCall.Method.Name;
-                var declaringType = methodCall.Method.DeclaringType;
-
-                if (declaringType == typeof(Win))
-                    continue; // оконная функция - её разбирает ParseWindowFunctions
-
-                if (declaringType?.Name == "Agg" &&
-                    funcName is "Sum" or "Average" or "Min" or "Max" or "Count")
-                {
-                    var fieldPath = methodCall.Arguments.Count > 1
-                        ? ExtractFieldPathFromLambda(methodCall.Arguments[1])
-                        : null;
-                    result.Add(new AggregateRequest
-                    {
-                        Function = Enum.Parse<AggregateFunction>(funcName),
-                        FieldPath = fieldPath ?? "",
-                        Alias = name
-                    });
-                    continue;
-                }
-
-                if (declaringType == typeof(IRedbGrouping<TKey, TProps>) &&
-                    funcName is "Sum" or "Avg" or "Min" or "Max" or "Count")
-                {
-                    var fieldPath = methodCall.Arguments.Count > 0
-                        ? ExtractFieldPathFromLambda(methodCall.Arguments[0])
-                        : null;
-                    result.Add(new AggregateRequest
-                    {
-                        Function = Enum.Parse<AggregateFunction>(funcName),
-                        FieldPath = fieldPath ?? "",
-                        Alias = name
-                    });
-                    continue;
-                }
+                functions.Add(WindowFunction(win, param, name));
+                continue;
             }
 
-            if (expr is MemberExpression && GroupSelectorMembers.ReferencesParameter(expr, param))
-                continue; // путь поля (e.Props.X) - материализуется по имени/алиасу
+            if (GroupAggregateParser.IsAggCall(expr))
+            {
+                aggregations.Add(GroupAggregateParser.Parse((MethodCallExpression)expr, param, name, _source.Kind, OwnerApi));
+                continue;
+            }
 
             if (!GroupSelectorMembers.ReferencesParameter(expr, param))
-                continue; // клиентское значение - вычислится при материализации
+                continue; // a client value, computed once at materialization
 
             throw new NotSupportedException(
-                $"Оконный SelectAsync: член '{name}' использует строку/группу, но не является полем, " +
-                $"g.Key, Agg.*, методом группы или Win.* ('{expr}').");
+                $"{OwnerApi}: member '{name}' uses the group but is neither g.Key, nor Agg.*, nor Win.* ('{rawExpr}').");
         }
 
-        return result;
-    }
+        if (functions.Count == 0)
+            throw new NotSupportedException($"{OwnerApi}: the selector of a window over groups needs at least one Win.* function.");
 
-
-    private List<WindowFuncRequest> ParseWindowFunctions(LambdaExpression selector)
-    {
-        var result = new List<WindowFuncRequest>();
-
-        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, "Оконный SelectAsync"))
+        return (aggregations, new ArrayGroupWindow
         {
-            if (GroupSelectorMembers.StripConvert(rawExpr) is MethodCallExpression methodCall &&
-                methodCall.Method.DeclaringType == typeof(Win))
-            {
-                string? fieldPath = null;
-                if (methodCall.Arguments.Count > 0)
-                    fieldPath = ExtractFieldPathFromLambda(methodCall.Arguments[0]);
-
-                result.Add(new WindowFuncRequest
-                {
-                    Func = methodCall.Method.Name,
-                    FieldPath = fieldPath ?? "",
-                    Alias = name
-                });
-            }
-        }
-
-        return result;
+            Functions = functions,
+            PartitionBy = ParsePartitionBy(),
+            OrderBy = ParseOrderBy()
+        });
     }
 
+    /// <summary>
+    /// A Win.* call of the selector. Ntile takes its bucket count; Sum, Avg, Min, Max, Count, Lag, Lead,
+    /// FirstValue and LastValue take a key or an Agg.* over the group; the ranking functions take nothing.
+    /// </summary>
+    private WindowFuncRequest WindowFunction(MethodCallExpression win, ParameterExpression groupParam, string alias)
+    {
+        var request = new WindowFuncRequest { Func = win.Method.Name, Alias = alias };
+        if (win.Arguments.Count == 0)
+            return request;
+
+        if (win.Method.Name == "Ntile")
+        {
+            if (GroupSelectorMembers.ReferencesParameter(win.Arguments[0], groupParam))
+                throw new NotSupportedException($"{OwnerApi}: Win.Ntile takes a constant number of buckets; got '{win.Arguments[0]}'.");
+            request.Buckets = Expression.Lambda<Func<int>>(win.Arguments[0]).Compile()();
+            return request;
+        }
+
+        request.FieldPath = OverReference(win.Arguments[0], groupParam, $"the argument of Win.{win.Method.Name}");
+        return request;
+    }
 
     private List<WindowFieldRequest> ParsePartitionBy()
     {
         var result = new List<WindowFieldRequest>();
-        
         foreach (var expr in _windowSpec.PartitionByExpressions)
         {
-            if (expr.Body is MemberExpression memberExpr)
+            var body = GroupSelectorMembers.StripConvert(expr.Body);
+            // PartitionBy(k => k.Department): a member of a composite key, by its name.
+            if (body is MemberExpression memberExpr && memberExpr.Expression == expr.Parameters[0])
             {
                 result.Add(new WindowFieldRequest { FieldPath = memberExpr.Member.Name, Alias = memberExpr.Member.Name });
+                continue;
             }
+            // PartitionBy(k => k): the single key.
+            if (body == expr.Parameters[0])
+            {
+                result.Add(new WindowFieldRequest { FieldPath = "Key", Alias = "Key" });
+                continue;
+            }
+            throw new NotSupportedException($"WithWindow: PartitionBy takes the key or a member of it (k => k.Field); got '{expr}'.");
         }
-        
         return result;
     }
 
     private List<WindowOrderRequest> ParseOrderBy()
     {
         var result = new List<WindowOrderRequest>();
-        
         foreach (var (expr, desc) in _windowSpec.OrderByExpressions)
-        {
-            // OrderBy can reference aggregations like Agg.Sum(g, x => x.Supply) or g.Sum(x => x.Supply)
-            if (expr.Body is MethodCallExpression methodCall)
+            result.Add(new WindowOrderRequest
             {
-                var funcName = methodCall.Method.Name;
-                var declaringType = methodCall.Method.DeclaringType;
-                string? fieldPath = null;
-                
-                // Agg.Sum(g, x => x.Field) - field is in Arguments[1]
-                if (declaringType?.Name == "Agg" && methodCall.Arguments.Count > 1)
-                {
-                    fieldPath = ExtractFieldPathFromLambda(methodCall.Arguments[1]);
-                }
-                // g.Sum(x => x.Field) - field is in Arguments[0]  
-                else if (methodCall.Arguments.Count > 0)
-                {
-                    fieldPath = ExtractFieldPathFromLambda(methodCall.Arguments[0]);
-                }
-                // Use aggregation alias pattern
-                result.Add(new WindowOrderRequest { FieldPath = $"Agg_{funcName}_{fieldPath ?? "Count"}", Descending = desc });
-            }
-            else if (expr.Body is MemberExpression memberExpr)
-            {
-                result.Add(new WindowOrderRequest { FieldPath = memberExpr.Member.Name, Descending = desc });
-            }
-        }
-        
+                FieldPath = OverReference(expr.Body, expr.Parameters[0], "OrderBy of the window"),
+                Descending = desc
+            });
         return result;
     }
 
-    private string ExtractFieldPath(Expression expr)
+    /// <summary>
+    /// A reference inside OVER or a window function: g.Key (single key), g.Key.Member (composite key) or
+    /// Agg.*(g, ...) in the "Agg_Func_Field" form providers resolve with <see cref="GroupedWindowNames"/>.
+    /// </summary>
+    private string OverReference(Expression body, ParameterExpression groupParam, string what)
     {
-        if (expr is MemberExpression memberExpr)
+        var expr = GroupSelectorMembers.StripConvert(body);
+        if (GroupAggregateParser.IsAggCall(expr))
         {
-            var path = new List<string>();
-            var current = memberExpr;
-            
-            while (current != null)
-            {
-                if (current.Member.Name != "Props")
-                    path.Insert(0, current.Member.Name);
-                current = current.Expression as MemberExpression;
-            }
-            
-            return string.Join(".", path);
+            var request = GroupAggregateParser.Parse((MethodCallExpression)expr, groupParam, "over", _source.Kind, OwnerApi);
+            if (request.ConditionJson != null)
+                throw new NotSupportedException(
+                    $"WithWindow: {what} refers to a conditional count; select it in SelectAsync and sort the result instead.");
+            return request.Function == AggregateFunction.Count
+                ? "Agg_Count_Count"
+                : $"Agg_{request.Function}_{request.FieldPath}";
         }
-        
-        return expr.ToString();
+        if (expr is MemberExpression m && GroupSelectorMembers.IsKeyAccess(m, groupParam))
+            return m.Member.Name == "Key" ? "Key" : m.Member.Name;
+        throw new NotSupportedException($"WithWindow: {what} must be g.Key, a member of g.Key or an Agg.* call; got '{body}'.");
     }
-
-    private string? ExtractFieldPathFromLambda(Expression expr)
-    {
-        if (expr is UnaryExpression unary)
-            expr = unary.Operand;
-            
-        if (expr is LambdaExpression lambda)
-            return ExtractFieldPath(lambda.Body);
-            
-        return ExtractFieldPath(expr);
-    }
-
-    private List<TResult> MaterializeResults<TResult>(JsonDocument? jsonDoc, LambdaExpression selector, List<GroupFieldRequest> groupFields)
-    {
-        var results = new List<TResult>();
-        if (jsonDoc == null) return results;
-
-        var members = GroupSelectorMembers.Extract(selector, "Оконный SelectAsync");
-        var param = selector.Parameters[0];
-
-        // Клиентские значения - раз на запрос. Win/Agg-вызовы клиентскими не считаются, даже
-        // когда не ссылаются на параметр (Win.RowNumber()): их значение приходит из JSON.
-        var clientValues = new object?[members.Count];
-        var isClient = new bool[members.Count];
-        for (int i = 0; i < members.Count; i++)
-        {
-            var e = GroupSelectorMembers.StripConvert(members[i].Expr);
-            var serverCall = e is MethodCallExpression mcx &&
-                (mcx.Method.DeclaringType == typeof(Win) || mcx.Method.DeclaringType?.Name == "Agg");
-            if (!serverCall && !GroupSelectorMembers.ReferencesParameter(e, param))
-            {
-                isClient[i] = true;
-                clientValues[i] = Expression.Lambda(members[i].Expr).Compile().DynamicInvoke();
-            }
-        }
-
-        foreach (var element in jsonDoc.RootElement.EnumerateArray())
-        {
-            var values = new object?[members.Count];
-            for (int i = 0; i < members.Count; i++)
-            {
-                if (isClient[i]) { values[i] = clientValues[i]; continue; }
-
-                var (name, type, rawExpr) = members[i];
-                if (element.TryGetProperty(name, out var prop))
-                    values[i] = ConvertJsonValue(prop, type);
-                else
-                {
-                    var jsonAlias = ExtractJsonAliasFromArgument(GroupSelectorMembers.StripConvert(rawExpr), groupFields);
-                    if (!string.IsNullOrEmpty(jsonAlias) && element.TryGetProperty(jsonAlias, out prop))
-                        values[i] = ConvertJsonValue(prop, type);
-                    else
-                        values[i] = GetDefaultValue(type);
-                }
-            }
-            results.Add(GroupSelectorMembers.Construct<TResult>(selector, values));
-        }
-
-        return results;
-    }
-
 
     /// <summary>
-    /// Extracts JSON field alias from selector argument.
-    /// Handles patterns:
-    ///   g.Key (single key) → returns the single GroupBy alias
-    ///   g.Key.Department (composite key) → returns alias for "Department"
-    ///   g.Key.SomeField.Id → returns "SomeField" (parent of .Id)
-    ///   g.Key.Id (single ListItem key) → returns the single GroupBy alias
+    /// A GroupBy over objects as the source of the window.
     /// </summary>
-    private string? ExtractJsonAliasFromArgument(Expression arg, List<GroupFieldRequest> groupFields)
+    private sealed class FlatGroupWindowSource : IGroupedWindowSource
     {
-        if (arg is MemberExpression member)
+        private readonly GroupedWindowedQueryable<TKey, TProps> _owner;
+        private readonly IRedbQueryProvider _provider;
+        private readonly long _schemeId;
+        private readonly Expression _keySelector;
+        private readonly string? _filterJson;
+        private readonly FilterExpression? _filter;
+        private readonly string? _havingJson;
+
+        public FlatGroupWindowSource(GroupedWindowedQueryable<TKey, TProps> owner, IRedbQueryProvider provider, long schemeId,
+            Expression keySelector, string? filterJson, FilterExpression? filter, string? havingJson)
         {
-            // g.Key → single key → return the only GroupBy alias
-            if (member.Member.Name == "Key" && groupFields.Count == 1)
-            {
-                return groupFields[0].Alias;
-            }
-
-            // g.Key.SomeField.Id → return parent field name "SomeField"
-            // g.Key.Id (single key) → return the only GroupBy alias
-            if (member.Member.Name == "Id" && member.Expression is MemberExpression idParent)
-            {
-                if (idParent.Member.Name == "Key" && groupFields.Count == 1)
-                    return groupFields[0].Alias;
-                return idParent.Member.Name;
-            }
-
-            // g.Key.Department (composite key) → find matching GroupBy alias
-            if (member.Expression is MemberExpression keyAccess && keyAccess.Member.Name == "Key")
-            {
-                var fieldName = member.Member.Name;
-                var matchingGroup = groupFields.FirstOrDefault(g =>
-                    g.Alias == fieldName || g.FieldPath == fieldName);
-                return matchingGroup?.Alias ?? fieldName;
-            }
+            _owner = owner;
+            _provider = provider;
+            _schemeId = schemeId;
+            _keySelector = keySelector;
+            _filterJson = filterJson;
+            _filter = filter;
+            _havingJson = havingJson;
         }
-        return null;
-    }
 
-    private object? ConvertJsonValue(JsonElement element, Type targetType)
-    {
-        // Unwrap Nullable<T> so projection members like bool?/long? resolve to their core type.
-        var t = Nullable.GetUnderlyingType(targetType) ?? targetType;
-        return element.ValueKind switch
+        public string ProviderName => _provider.GetType().Name;
+        public redb.Core.Providers.IListProvider? ListItems => (_provider as IListItemKeySource)?.ListItems;
+
+        public GroupItemKind Kind => GroupItemKind.Props;
+
+        public List<GroupFieldRequest> GroupFields(LambdaExpression selector)
+            => GroupKeyFields.Parse(_keySelector, _owner.IsBaseFieldGrouping, "WithWindow");
+
+        public async Task<JsonDocument> ExecuteAsync(LambdaExpression selector, List<AggregateRequest> aggregations, ArrayGroupWindow window, CancellationToken cancellationToken)
         {
-            JsonValueKind.Null => null,
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            // SQLite stores bool as INTEGER 0/1 → JSON Number (PG returns true/false handled above).
-            JsonValueKind.Number when t == typeof(bool) => element.GetInt32() != 0,
-            JsonValueKind.Number when t == typeof(long) => element.GetInt64(),
-            JsonValueKind.Number when t == typeof(int) => element.GetInt32(),
-            JsonValueKind.Number when t == typeof(decimal) => element.GetDecimal(),
-            JsonValueKind.Number when t == typeof(double) => element.GetDouble(),
-            JsonValueKind.Number when t == typeof(float) => (float)element.GetDouble(),
-            // SQLite returns bool/Guid/DateTimeOffset as TEXT for some expressions.
-            JsonValueKind.String when t == typeof(bool) =>
-                element.GetString() is var s && (s == "1" || string.Equals(s, "true", StringComparison.OrdinalIgnoreCase)),
-            JsonValueKind.String when t == typeof(Guid) =>
-                element.TryGetGuid(out var g) ? g : (object?)element.GetString(),
-            JsonValueKind.String when t == typeof(DateTimeOffset) =>
-                element.TryGetDateTimeOffset(out var d) ? d : (object?)element.GetString(),
-            JsonValueKind.String => element.GetString(),
-            _ => element.ToString()
-        };
-    }
+            var groupFields = GroupFields(selector);
+            var json = _filter != null
+                ? await _provider.ExecuteGroupedWindowQueryAsync(_schemeId, groupFields, aggregations, window.Functions, window.PartitionBy, window.OrderBy, _filter, _havingJson, cancellationToken)
+                : await _provider.ExecuteGroupedWindowQueryAsync(_schemeId, groupFields, aggregations, window.Functions, window.PartitionBy, window.OrderBy, _filterJson, _havingJson, cancellationToken);
+            return json ?? throw new InvalidOperationException($"{OwnerApi}: {ProviderName} returned no answer for the grouped window.");
+        }
 
-    private object? GetDefaultValue(Type type) =>
-        type.IsValueType ? Activator.CreateInstance(type) : null;
+        public Task<string> GetSqlAsync(LambdaExpression selector, List<AggregateRequest> aggregations, ArrayGroupWindow window, CancellationToken cancellationToken)
+        {
+            var groupFields = GroupFields(selector);
+            return _filter != null
+                ? _provider.GetGroupedWindowSqlPreviewAsync(_schemeId, groupFields, aggregations, window.Functions, window.PartitionBy, window.OrderBy, _filter, _havingJson, cancellationToken)
+                : _provider.GetGroupedWindowSqlPreviewAsync(_schemeId, groupFields, aggregations, window.Functions, window.PartitionBy, window.OrderBy, _filterJson, _havingJson, cancellationToken);
+        }
+    }
 }

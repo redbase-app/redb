@@ -19,6 +19,7 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
     where TProps : class, new()
 {
     protected readonly IRedbQueryProvider _provider;
+    internal IRedbQueryProvider QueryProvider => _provider;
     protected readonly QueryContext<TProps> _context;
     protected readonly IFilterExpressionParser _filterParser;
     protected readonly IOrderingExpressionParser _orderingParser;
@@ -1464,11 +1465,10 @@ where TField : struct
     /// </summary>
     public virtual Grouping.IRedbGroupedQueryable<TKey, TItem> GroupByArray<TItem, TKey>(
         Expression<Func<TProps, IEnumerable<TItem>>> arraySelector,
-        Expression<Func<TItem, TKey>> keySelector) where TItem : class, new()
+        Expression<Func<TItem, TKey>> keySelector)
     {
-        var filterJson = BuildFilterJson();
         return new Grouping.RedbArrayGroupedQueryable<TKey, TItem, TProps>(
-            _provider, _context.SchemeId, filterJson, _context.Filter, arraySelector, keySelector);
+            _provider, _context.SchemeId, null, _context.Filter, arraySelector, keySelector);
     }
 
     // ===== WINDOW FUNCTIONS =====

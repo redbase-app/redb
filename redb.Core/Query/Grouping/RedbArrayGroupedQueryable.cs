@@ -1,37 +1,82 @@
 using System.Linq.Expressions;
 using System.Text.Json;
+using redb.Core.Models.Contracts;
+using redb.Core.Models.Entities;
 using redb.Core.Query.Aggregation;
+using redb.Core.Query.Base;
 using redb.Core.Query.QueryExpressions;
 using redb.Core.Query.Utils;
+using redb.Core.Query.Window;
 
 namespace redb.Core.Query.Grouping;
 
 /// <summary>
-/// Grouping by array elements (Items[].Property)
+/// Runs an <see cref="ArrayGroupQuery"/> on a provider: the flat one, or the tree one with its subtree.
 /// </summary>
-public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQueryable<TKey, TItem>
-    where TItem : class, new()
-    where TProps : class, new()
+internal interface IArrayGroupRunner
+{
+    /// <summary>Name of the provider for messages.</summary>
+    string ProviderName { get; }
+
+    Task<JsonDocument> ExecuteAsync(ArrayGroupQuery query, CancellationToken cancellationToken);
+
+    Task<string> GetSqlAsync(ArrayGroupQuery query, CancellationToken cancellationToken);
+
+    /// <summary>The list provider the list item keys are read through (ListItemGroupKeys).</summary>
+    redb.Core.Providers.IListProvider? ListItems { get; }
+}
+
+internal sealed class FlatArrayGroupRunner : IArrayGroupRunner
 {
     private readonly IRedbQueryProvider _provider;
-    private readonly long _schemeId;
-    private readonly string? _filterJson;
-    private readonly FilterExpression? _filter;
-    private readonly Expression _arraySelector;
-    private readonly Expression _keySelector;
-    private string? _havingJson;
-    private readonly List<LambdaExpression> _havingPredicates = new();
-    
-    public RedbArrayGroupedQueryable(
-        IRedbQueryProvider provider,
-        long schemeId,
-        string? filterJson,
-        Expression<Func<TProps, IEnumerable<TItem>>> arraySelector,
-        Expression<Func<TItem, TKey>> keySelector)
-        : this(provider, schemeId, filterJson, null, arraySelector, keySelector)
-    {
-    }
+    public FlatArrayGroupRunner(IRedbQueryProvider provider) => _provider = provider;
+    public string ProviderName => _provider.GetType().Name;
+    public redb.Core.Providers.IListProvider? ListItems => (_provider as IListItemKeySource)?.ListItems;
+    public Task<JsonDocument> ExecuteAsync(ArrayGroupQuery query, CancellationToken cancellationToken)
+        => _provider.ExecuteArrayGroupQueryAsync(query, cancellationToken);
+    public Task<string> GetSqlAsync(ArrayGroupQuery query, CancellationToken cancellationToken)
+        => _provider.GetArrayGroupQuerySqlAsync(query, cancellationToken);
+}
 
+internal sealed class TreeArrayGroupRunner<TProps> : IArrayGroupRunner where TProps : class, new()
+{
+    private readonly ITreeQueryProvider _provider;
+    private readonly TreeQueryContext<TProps> _context;
+    public TreeArrayGroupRunner(ITreeQueryProvider provider, TreeQueryContext<TProps> context)
+    {
+        _provider = provider;
+        _context = context;
+    }
+    public string ProviderName => _provider.GetType().Name;
+    public redb.Core.Providers.IListProvider? ListItems => (_provider as IListItemKeySource)?.ListItems;
+    public Task<JsonDocument> ExecuteAsync(ArrayGroupQuery query, CancellationToken cancellationToken)
+        => _provider.ExecuteTreeArrayGroupQueryAsync(_context, query, cancellationToken);
+    public Task<string> GetSqlAsync(ArrayGroupQuery query, CancellationToken cancellationToken)
+        => _provider.GetTreeArrayGroupQuerySqlAsync(_context, query, cancellationToken);
+}
+
+/// <summary>
+/// Grouping by the elements of an array: <c>GroupByArray(e =&gt; e.Contacts, c =&gt; c.Type)</c>, an inner array
+/// (<c>e =&gt; e.Contacts.SelectMany(c =&gt; c.Metadata)</c>), an array of simple values (<c>e =&gt; e.Skills, s =&gt; s</c>).
+/// Every form it cannot translate is refused with <see cref="NotSupportedException"/>.
+/// </summary>
+public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQueryable<TKey, TItem>
+    where TProps : class, new()
+{
+    private const string OwnerApi = "GroupByArray";
+
+    private readonly IArrayGroupRunner _runner;
+    private readonly long _schemeId;
+    private readonly FilterExpression? _filter;
+    private readonly LambdaExpression _arraySelector;
+    private readonly LambdaExpression _keySelector;
+    private readonly List<LambdaExpression> _havingPredicates = new();
+
+    private readonly GroupItemKind _kind;
+
+    /// <summary>
+    /// Flat grouping; <paramref name="filterJson"/> is not used, the condition comes from <paramref name="filter"/>.
+    /// </summary>
     public RedbArrayGroupedQueryable(
         IRedbQueryProvider provider,
         long schemeId,
@@ -39,159 +84,101 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         FilterExpression? filter,
         Expression<Func<TProps, IEnumerable<TItem>>> arraySelector,
         Expression<Func<TItem, TKey>> keySelector)
+        : this(new FlatArrayGroupRunner(provider), schemeId, filter, arraySelector, keySelector)
     {
-        _provider = provider;
+    }
+
+    internal RedbArrayGroupedQueryable(
+        IArrayGroupRunner runner,
+        long schemeId,
+        FilterExpression? filter,
+        LambdaExpression arraySelector,
+        LambdaExpression keySelector)
+    {
+        _runner = runner;
         _schemeId = schemeId;
-        _filterJson = filterJson;
         _filter = filter;
         _arraySelector = arraySelector;
         _keySelector = keySelector;
+        _kind = ResolveItemKind();
+        // Parse now: a form that cannot be translated is refused where it is written, not at execution.
+        _ = ParseArrayPath(_arraySelector);
+        _ = ParseGroupFields(alias: null);
     }
-    
+
     public async Task<List<TResult>> SelectAsync<TResult>(
         Expression<Func<IRedbGrouping<TKey, TItem>, TResult>> selector, CancellationToken cancellationToken = default)
     {
-        var arrayPath = ExtractArrayPath();
-        var groupFields = ParseGroupFields();
-        var aggregations = ParseAggregations(selector);
-        
-        // Extract alias for g.Key from selector and apply to groupFields
-        var keyAlias = ExtractKeyAliasFromSelector(selector);
-        if (!string.IsNullOrEmpty(keyAlias) && groupFields.Count > 0)
-        {
-            groupFields[0].Alias = keyAlias;
-        }
-        
-        var havingJson = BuildHavingJson();
-        var jsonResult = _filter != null
-            ? await _provider.ExecuteArrayGroupedAggregateAsync(
-                _schemeId, arrayPath, groupFields, aggregations, _filter, havingJson, cancellationToken: cancellationToken)
-            : await _provider.ExecuteArrayGroupedAggregateAsync(
-                _schemeId, arrayPath, groupFields, aggregations, _filterJson, havingJson, cancellationToken: cancellationToken);
-        
-        if (jsonResult == null) return new List<TResult>();
-        return MaterializeResults<TResult>(jsonResult, selector);
-    }
-    
-    private string? ExtractKeyAliasFromSelector<TResult>(Expression<Func<IRedbGrouping<TKey, TItem>, TResult>> selector)
-    {
-        if (selector.Body is NewExpression newExpr)
-        {
-            for (int i = 0; i < newExpr.Arguments.Count; i++)
-            {
-                var arg = newExpr.Arguments[i];
-                // Look for g.Key
-                if (arg is MemberExpression me && me.Member.Name == "Key")
-                {
-                    return newExpr.Members?[i]?.Name;
-                }
-            }
-        }
-        // G-1: DTO/MemberInit - ключ ищется и в биндингах.
-        if (selector.Body is MemberInitExpression initExpr)
-        {
-            foreach (var binding in initExpr.Bindings)
-            {
-                if (binding is MemberAssignment ma &&
-                    GroupSelectorMembers.StripConvert(ma.Expression) is MemberExpression kme &&
-                    kme.Member.Name == "Key")
-                    return binding.Member.Name;
-            }
-        }
-        return null;
+        var query = BuildQuery(selector, window: null);
+        var json = await _runner.ExecuteAsync(query, cancellationToken);
+        var rows = ArrayGroupMaterializer.Materialize<TResult>(json, selector, query.GroupFields, _runner.ProviderName, OwnerApi);
+        await ListItemGroupKeys.FillAsync(rows, _runner.ListItems, OwnerApi, cancellationToken);
+        return rows;
     }
 
     public async Task<int> CountAsync(CancellationToken cancellationToken = default)
     {
-        var arrayPath = ExtractArrayPath();
-        var groupFields = ParseGroupFields();
-        var aggregations = new[] { new AggregateRequest { FieldPath = "*", Function = AggregateFunction.Count, Alias = "cnt" } };
-        
-        var havingJson = BuildHavingJson();
-        var jsonResult = _filter != null
-            ? await _provider.ExecuteArrayGroupedAggregateAsync(
-                _schemeId, arrayPath, groupFields, aggregations, _filter, havingJson, cancellationToken: cancellationToken)
-            : await _provider.ExecuteArrayGroupedAggregateAsync(
-                _schemeId, arrayPath, groupFields, aggregations, _filterJson, havingJson, cancellationToken: cancellationToken);
-        
-        if (jsonResult == null) return 0;
-        return jsonResult.RootElement.GetArrayLength();
+        var query = new ArrayGroupQuery
+        {
+            SchemeId = _schemeId,
+            ArrayPath = ParseArrayPath(_arraySelector),
+            GroupFields = ParseGroupFields(alias: null),
+            Aggregations = new[] { new AggregateRequest { FieldPath = "*", Function = AggregateFunction.Count, Alias = "cnt" } },
+            Filter = _filter,
+            HavingJson = BuildHavingJson()
+        };
+        using var json = await _runner.ExecuteAsync(query, cancellationToken);
+        return ArrayGroupMaterializer.RequireArray(json, _runner.ProviderName, OwnerApi).GetArrayLength();
     }
-    
-    /// <summary>
-    /// Returns SQL string for array GroupBy query.
-    /// </summary>
+
     public Task<string> ToSqlStringAsync<TResult>(
         Expression<Func<IRedbGrouping<TKey, TItem>, TResult>> selector, CancellationToken cancellationToken = default)
+        => _runner.GetSqlAsync(BuildQuery(selector, window: null), cancellationToken);
+
+    public IGroupedWindowedQueryable<TKey, TItem> WithWindow(Action<IGroupedWindowSpec<TKey, TItem>> windowConfig)
     {
-        var arrayPath = ExtractArrayPath();
-        var groupFields = ParseGroupFields();
-        var aggregations = ParseAggregations(selector);
-        
-        // SQL preview not supported for array grouping yet
-        return Task.FromResult(
-            $"-- SQL preview not supported for array GroupBy\n" +
-            $"-- SchemeId: {_schemeId}\n" +
-            $"-- ArrayPath: {arrayPath}\n" +
-            $"-- GroupFields: {string.Join(", ", groupFields.Select(g => g.FieldPath))}\n" +
-            $"-- Aggregations: {string.Join(", ", aggregations.Select(a => $"{a.Function}({a.FieldPath})"))}\n" +
-            $"-- FilterJson: {_filterJson ?? "null"}");
-    }
-    
-    /// <summary>
-    /// WithWindow not supported for array grouping.
-    /// </summary>
-    public IGroupedWindowedQueryable<TKey, TItem> WithWindow(
-        Action<IGroupedWindowSpec<TKey, TItem>> windowConfig)
-    {
-        throw new NotSupportedException("WithWindow is not supported for array GroupBy. Use regular GroupBy instead.");
+        var windowSpec = new GroupedWindowSpec<TKey, TItem>();
+        windowConfig(windowSpec);
+        return new GroupedWindowedQueryable<TKey, TItem>(new ArrayWindowSource(this), windowSpec);
     }
 
     /// <inheritdoc />
-    public IRedbGroupedQueryable<TKey, TItem> Having(
-        Expression<Func<IRedbGrouping<TKey, TItem>, bool>> predicate)
+    public IRedbGroupedQueryable<TKey, TItem> Having(Expression<Func<IRedbGrouping<TKey, TItem>, bool>> predicate)
     {
         if (predicate is null) throw new ArgumentNullException(nameof(predicate));
-        // G-4 (ревью 2026-09-03): копирующий строитель - ветвление не заражает соседнюю ветку.
-        var copy = new RedbArrayGroupedQueryable<TKey, TItem, TProps>(
-            _provider, _schemeId, _filterJson, _filter,
-            (Expression<Func<TProps, IEnumerable<TItem>>>)_arraySelector,
-            (Expression<Func<TItem, TKey>>)_keySelector);
+        // G-4: a copying builder - a branch does not leak into its sibling.
+        var copy = new RedbArrayGroupedQueryable<TKey, TItem, TProps>(_runner, _schemeId, _filter, _arraySelector, _keySelector);
         copy._havingPredicates.AddRange(_havingPredicates);
         copy._havingPredicates.Add(predicate);
         return copy;
     }
 
+    // ----------------------------------------------------------------------------------------------------------------
+
+    private ArrayGroupQuery BuildQuery(LambdaExpression selector, ArrayGroupWindow? window)
+        => new()
+        {
+            SchemeId = _schemeId,
+            ArrayPath = ParseArrayPath(_arraySelector),
+            GroupFields = ParseGroupFields(KeyAliasFromSelector(selector)),
+            Aggregations = ParseAggregations(selector),
+            Filter = _filter,
+            HavingJson = BuildHavingJson(),
+            Window = window
+        };
 
     private string? BuildHavingJson()
     {
-        if (_havingJson != null) return _havingJson;
         if (_havingPredicates.Count == 0) return null;
-
-        if (_havingPredicates.Count == 1)
-        {
-            var single = (Expression<Func<IRedbGrouping<TKey, TItem>, bool>>)_havingPredicates[0];
-            _havingJson = HavingPredicateParser.ToJson(single);
-            return _havingJson;
-        }
-
         var param = Expression.Parameter(typeof(IRedbGrouping<TKey, TItem>), "g");
-        Expression body = ReplaceParam((Expression<Func<IRedbGrouping<TKey, TItem>, bool>>)_havingPredicates[0], param);
-        for (int i = 1; i < _havingPredicates.Count; i++)
+        Expression? body = null;
+        foreach (var p in _havingPredicates)
         {
-            var nextBody = ReplaceParam((Expression<Func<IRedbGrouping<TKey, TItem>, bool>>)_havingPredicates[i], param);
-            body = Expression.AndAlso(body, nextBody);
+            var next = new ParameterReplacer(p.Parameters[0], param).Visit(p.Body)!;
+            body = body == null ? next : Expression.AndAlso(body, next);
         }
-        var combined = Expression.Lambda<Func<IRedbGrouping<TKey, TItem>, bool>>(body, param);
-        _havingJson = HavingPredicateParser.ToJson(combined);
-        return _havingJson;
-    }
-
-    private static Expression ReplaceParam(
-        Expression<Func<IRedbGrouping<TKey, TItem>, bool>> lambda,
-        ParameterExpression newParam)
-    {
-        return new ParameterReplacer(lambda.Parameters[0], newParam).Visit(lambda.Body)!;
+        var combined = Expression.Lambda<Func<IRedbGrouping<TKey, TItem>, bool>>(body!, param);
+        return HavingPredicateParser.ToJson(combined, _kind);
     }
 
     private sealed class ParameterReplacer : ExpressionVisitor
@@ -201,190 +188,202 @@ public class RedbArrayGroupedQueryable<TKey, TItem, TProps> : IRedbGroupedQuerya
         public ParameterReplacer(ParameterExpression from, ParameterExpression to) { _from = from; _to = to; }
         protected override Expression VisitParameter(ParameterExpression node) => node == _from ? _to : base.VisitParameter(node);
     }
-    
-    private string ExtractArrayPath()
+
+    /// <summary>
+    /// What an element of the array is. A class other than string is an element with fields; a list item and an
+    /// object reference are refused by name; every other type is a simple value read from the element row.
+    /// </summary>
+    private static GroupItemKind ResolveItemKind()
     {
-        if (_arraySelector is LambdaExpression lambda)
-        {
-            return ExtractFieldPath(lambda.Body as MemberExpression) ?? "";
-        }
-        return "";
+        var t = Nullable.GetUnderlyingType(typeof(TItem)) ?? typeof(TItem);
+        if (t == typeof(string)) return GroupItemKind.ArrayValueElement;
+        if (typeof(IRedbListItem).IsAssignableFrom(t))
+            throw new NotSupportedException(
+                $"{OwnerApi} over an array of {t.Name} is not supported: group the objects by the list item instead " +
+                "(GroupBy(e => e.Field)), or keep the item id in a long field.");
+        if (typeof(IRedbObject).IsAssignableFrom(t))
+            throw new NotSupportedException(
+                $"{OwnerApi} over an array of object references ({t.Name}) is not supported: group the referenced objects " +
+                "by their own fields.");
+        if (t == typeof(byte[]))
+            throw new NotSupportedException($"{OwnerApi} over an array of byte[] is not supported.");
+        if (t.IsClass || t.IsInterface) return GroupItemKind.ArrayClassElement;
+        return GroupItemKind.ArrayValueElement;
     }
-    
-    private List<GroupFieldRequest> ParseGroupFields()
+
+    /// <summary>
+    /// The array path: a chain of fields (<c>e =&gt; e.Contacts</c>, <c>e =&gt; e.HomeAddress.Building.Amenities</c>) and
+    /// <c>SelectMany</c> over an inner array (<c>e =&gt; e.Contacts.SelectMany(c =&gt; c.Metadata)</c>), joined with dots.
+    /// </summary>
+    private static string ParseArrayPath(LambdaExpression selector)
+        => PathOf(selector.Body, selector.Parameters[0], selector);
+
+    private static string PathOf(Expression expression, ParameterExpression parameter, LambdaExpression whole)
     {
-        var fields = new List<GroupFieldRequest>();
-        
-        if (_keySelector is LambdaExpression lambda)
+        var e = GroupSelectorMembers.StripConvert(expression);
+
+        if (e is MethodCallExpression mc && mc.Method.Name == "SelectMany" && mc.Method.DeclaringType == typeof(Enumerable))
         {
-            var body = lambda.Body;
-            
-            // Unwrap Convert
-            while (body is UnaryExpression unary && 
-                   (unary.NodeType == ExpressionType.Convert || unary.NodeType == ExpressionType.ConvertChecked))
-            {
-                body = unary.Operand;
-            }
-            
-            if (body is NewExpression newExpr)
-            {
-                // Multiple fields: x => new { x.A, x.B }
-                for (int i = 0; i < newExpr.Arguments.Count; i++)
-                {
-                    var arg = GroupSelectorMembers.StripConvert(newExpr.Arguments[i]);
-                    var alias = newExpr.Members?[i]?.Name ?? $"Key{i}";
-                    // GRP-9 (review 2026-09-24): a key member that is not an item field is refused. It used to be
-                    // skipped, or read as a field path it is not, and the grouping ran on other keys without a word.
-                    var path = arg is MemberExpression memberArg && GroupSelectorMembers.IsFieldChain(memberArg)
-                        ? ExtractFieldPath(memberArg)
-                        : null;
-                    if (string.IsNullOrEmpty(path))
-                        throw new NotSupportedException(
-                            $"GroupByArray: key member '{alias}' is not a field of the array item ('{arg}'). Computed keys are not supported.");
-                    fields.Add(new GroupFieldRequest { FieldPath = path, Alias = alias });
-                }
-            }
-            else if (body is MemberExpression member)
-            {
-                // Single field: x => x.Category
-                var path = GroupSelectorMembers.IsFieldChain(member) ? ExtractFieldPath(member) : null;
-                if (string.IsNullOrEmpty(path))
-                    throw new NotSupportedException(
-                        $"GroupByArray: the key '{member}' is not a field of the array item. Computed keys are not supported.");
-                fields.Add(new GroupFieldRequest { FieldPath = path, Alias = member.Member.Name });
-            }
-            else
-            {
+            if (mc.Arguments.Count != 2)
                 throw new NotSupportedException(
-                    "GroupByArray supports an item field (c => c.Type) or an anonymous type of item fields " +
-                    $"(c => new {{ c.A, c.B }}). A computed key is not supported: '{body}'.");
-            }
+                    $"{OwnerApi}: SelectMany with a result selector is not supported in the array path ('{mc}'). Group the " +
+                    "inner array alone (e => e.Contacts.SelectMany(c => c.Metadata)); keys and aggregates read its elements.");
+            var inner = mc.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote } q ? q.Operand : mc.Arguments[1];
+            if (inner is not LambdaExpression lambda || lambda.Parameters.Count != 1)
+                throw new NotSupportedException(
+                    $"{OwnerApi}: SelectMany in the array path takes a lambda over the element (c => c.Inner); got '{mc.Arguments[1]}'.");
+            return PathOf(mc.Arguments[0], parameter, whole) + "." + FieldChainPath(lambda.Body, lambda.Parameters[0], whole);
         }
-        
+
+        if (e is MemberExpression)
+            return FieldChainPath(e, parameter, whole);
+
+        throw new NotSupportedException(
+            $"{OwnerApi}: the array path supports a chain of fields (e => e.Contacts, e => e.HomeAddress.Building.Amenities) " +
+            $"and SelectMany over an inner array (e => e.Contacts.SelectMany(c => c.Metadata)); got '{whole}'.");
+    }
+
+    private static string FieldChainPath(Expression expression, ParameterExpression parameter, LambdaExpression whole)
+    {
+        var e = GroupSelectorMembers.StripConvert(expression);
+        if (e is MemberExpression member && GroupSelectorMembers.IsFieldChain(member)
+            && GroupAggregateParser.TryMemberPath(member, parameter, out var path))
+        {
+            for (Expression? cur = member; cur is MemberExpression m; cur = m.Expression is null ? null : GroupSelectorMembers.StripConvert(m.Expression))
+            {
+                if (IsDictionary(m.Type))
+                    throw new NotSupportedException(
+                        $"{OwnerApi}: a dictionary in the array path is not supported ('{m}' in '{whole}').");
+            }
+            return path;
+        }
+        throw new NotSupportedException(
+            $"{OwnerApi}: '{expression}' in the array path '{whole}' is not a chain of stored fields.");
+    }
+
+    private static bool IsDictionary(Type type)
+        => type.GetInterfaces().Concat(new[] { type }).Any(i => i.IsGenericType &&
+            (i.GetGenericTypeDefinition() == typeof(IDictionary<,>) || i.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)));
+
+    /// <summary>
+    /// Keys: a field of the element (<c>c =&gt; c.Type</c>, <c>c =&gt; c.Address.City</c>), the element itself for an array
+    /// of simple values (<c>s =&gt; s</c>), or an anonymous type of those. A key is a stored value, never a class.
+    /// </summary>
+    private List<GroupFieldRequest> ParseGroupFields(string? alias)
+    {
+        var parameter = _keySelector.Parameters[0];
+        var body = GroupSelectorMembers.StripConvert(_keySelector.Body);
+        var fields = new List<GroupFieldRequest>();
+
+        if (body is NewExpression newExpr && newExpr.Members != null && body.Type.Name.Contains("AnonymousType"))
+        {
+            for (int i = 0; i < newExpr.Arguments.Count; i++)
+            {
+                var memberName = newExpr.Members[i].Name;
+                fields.Add(new GroupFieldRequest
+                {
+                    FieldPath = KeyPath(newExpr.Arguments[i], parameter, $"key member '{memberName}'"),
+                    Alias = memberName
+                });
+            }
+            return fields;
+        }
+
+        fields.Add(new GroupFieldRequest
+        {
+            FieldPath = KeyPath(body, parameter, "the key"),
+            Alias = alias ?? DefaultKeyAlias(body)
+        });
         return fields;
     }
-    
-    private List<AggregateRequest> ParseAggregations<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TItem>, TResult>> selector)
+
+    private static string DefaultKeyAlias(Expression body)
+        => body is MemberExpression m ? m.Member.Name : "Key";
+
+    private string KeyPath(Expression expression, ParameterExpression parameter, string what)
+    {
+        var e = GroupSelectorMembers.StripConvert(expression);
+        var type = Nullable.GetUnderlyingType(e.Type) ?? e.Type;
+        if (type != typeof(string) && (type.IsClass || type.IsInterface) && !typeof(IRedbListItem).IsAssignableFrom(type))
+            throw new NotSupportedException(
+                $"{OwnerApi}: {what} ('{expression}') is a class; a key is a stored value: name a field of it.");
+        return GroupAggregateParser.FieldPath(expression, parameter, _kind, OwnerApi, what);
+    }
+
+    /// <summary>The name the selector gives to g.Key (single key), used as the key's alias in SQL.</summary>
+    private static string? KeyAliasFromSelector(LambdaExpression selector)
+    {
+        var groupParam = selector.Parameters[0];
+        foreach (var (name, _, expr) in GroupSelectorMembers.Extract(selector, OwnerApi + ".SelectAsync"))
+        {
+            if (GroupSelectorMembers.StripConvert(expr) is MemberExpression { Member.Name: "Key" } m && m.Expression == groupParam)
+                return name;
+        }
+        return null;
+    }
+
+    private List<AggregateRequest> ParseAggregations(LambdaExpression selector)
     {
         var aggregations = new List<AggregateRequest>();
         var groupParam = selector.Parameters[0];
 
-        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, "GroupByArray.SelectAsync"))
+        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, OwnerApi + ".SelectAsync"))
         {
             var expr = GroupSelectorMembers.StripConvert(rawExpr);
 
             if (GroupSelectorMembers.IsKeyAccess(expr, groupParam))
                 continue;
 
-            if (expr is MethodCallExpression mc && mc.Method.DeclaringType == typeof(Agg))
+            if (GroupAggregateParser.IsAggCall(expr))
             {
-                var funcName = mc.Method.Name;
-                var function = funcName switch
-                {
-                    "Sum" => AggregateFunction.Sum,
-                    "Average" => AggregateFunction.Average,
-                    "Min" => AggregateFunction.Min,
-                    "Max" => AggregateFunction.Max,
-                    "Count" => AggregateFunction.Count,
-                    _ => throw new NotSupportedException($"Unknown aggregation: {funcName}")
-                };
-
-                string fieldPath = "*";
-                if (mc.Arguments.Count > 1)
-                    fieldPath = ExtractFieldPathFromLambda(mc.Arguments[1]) ?? "*";
-
-                aggregations.Add(new AggregateRequest { FieldPath = fieldPath, Function = function, Alias = name });
+                aggregations.Add(GroupAggregateParser.Parse((MethodCallExpression)expr, groupParam, name, _kind, OwnerApi + ".SelectAsync"));
                 continue;
             }
 
+            if (expr is MethodCallExpression wc && wc.Method.DeclaringType == typeof(Win))
+                continue; // a window function: the window over the groups reads it
+
             if (!GroupSelectorMembers.ReferencesParameter(expr, groupParam))
-                continue; // клиентское значение - вычислится при материализации
+                continue; // a client value, computed once at materialization
 
             throw new NotSupportedException(
-                $"GroupByArray.SelectAsync: член '{name}' использует группу, но не является ни g.Key, ни прямым Agg.* вызовом.");
+                $"{OwnerApi}.SelectAsync: member '{name}' uses the group but is neither g.Key nor a direct Agg.* call ('{rawExpr}').");
         }
 
         return aggregations;
     }
 
-    
-    private string? ExtractFieldPathFromLambda(Expression expr)
+    /// <summary>
+    /// The array grouping as the source of a window over its groups.
+    /// </summary>
+    private sealed class ArrayWindowSource : IGroupedWindowSource
     {
-        if (expr is UnaryExpression quote && quote.NodeType == ExpressionType.Quote)
-            expr = quote.Operand;
-        
-        if (expr is LambdaExpression lambda)
+        private readonly RedbArrayGroupedQueryable<TKey, TItem, TProps> _owner;
+        public ArrayWindowSource(RedbArrayGroupedQueryable<TKey, TItem, TProps> owner) => _owner = owner;
+
+        public string ProviderName => _owner._runner.ProviderName;
+        public redb.Core.Providers.IListProvider? ListItems => _owner._runner.ListItems;
+
+        public GroupItemKind Kind => _owner._kind;
+
+        public List<GroupFieldRequest> GroupFields(LambdaExpression selector)
+            => _owner.ParseGroupFields(KeyAliasFromSelector(selector));
+
+        public Task<JsonDocument> ExecuteAsync(LambdaExpression selector, List<AggregateRequest> aggregations, ArrayGroupWindow window, CancellationToken cancellationToken)
+            => _owner._runner.ExecuteAsync(Query(selector, aggregations, window), cancellationToken);
+
+        public Task<string> GetSqlAsync(LambdaExpression selector, List<AggregateRequest> aggregations, ArrayGroupWindow window, CancellationToken cancellationToken)
+            => _owner._runner.GetSqlAsync(Query(selector, aggregations, window), cancellationToken);
+
+        private ArrayGroupQuery Query(LambdaExpression selector, List<AggregateRequest> aggregations, ArrayGroupWindow window) => new()
         {
-            var body = lambda.Body;
-            while (body is UnaryExpression unary &&
-                   (unary.NodeType == ExpressionType.Convert || unary.NodeType == ExpressionType.ConvertChecked))
-            {
-                body = unary.Operand;
-            }
-            return ExtractFieldPath(body as MemberExpression);
-        }
-        return null;
+            SchemeId = _owner._schemeId,
+            ArrayPath = ParseArrayPath(_owner._arraySelector),
+            GroupFields = GroupFields(selector),
+            Aggregations = aggregations,
+            Filter = _owner._filter,
+            HavingJson = _owner.BuildHavingJson(),
+            Window = window
+        };
     }
-    
-    private string? ExtractFieldPath(MemberExpression? member)
-    {
-        if (member == null) return null;
-        
-        var parts = new List<string>();
-        var current = member;
-        
-        while (current != null)
-        {
-            if (current.Member.Name == "Props" || current.Member.Name == "props")
-                break;
-            parts.Insert(0, current.Member.Name);
-            current = current.Expression as MemberExpression;
-        }
-        
-        return parts.Count > 0 ? string.Join(".", parts) : null;
-    }
-    
-    private List<TResult> MaterializeResults<TResult>(JsonDocument json, LambdaExpression selector)
-    {
-        var results = new List<TResult>();
-        var root = json.RootElement;
-
-        if (root.ValueKind != JsonValueKind.Array) return results;
-
-        var members = GroupSelectorMembers.Extract(selector, "GroupByArray.SelectAsync");
-        var groupParam = selector.Parameters[0];
-
-        var clientValues = new object?[members.Count];
-        var isClient = new bool[members.Count];
-        for (int i = 0; i < members.Count; i++)
-        {
-            if (!GroupSelectorMembers.ReferencesParameter(GroupSelectorMembers.StripConvert(members[i].Expr), groupParam))
-            {
-                isClient[i] = true;
-                clientValues[i] = Expression.Lambda(members[i].Expr).Compile().DynamicInvoke();
-            }
-        }
-
-        foreach (var item in root.EnumerateArray())
-        {
-            var values = new object?[members.Count];
-            for (int i = 0; i < members.Count; i++)
-            {
-                if (isClient[i]) { values[i] = clientValues[i]; continue; }
-
-                var (name, type, _) = members[i];
-                // Case-insensitive поиск по JSON (сервер алиасует в своём регистре).
-                var jsonProp = item.EnumerateObject()
-                    .FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-                values[i] = jsonProp.Value.ValueKind != JsonValueKind.Undefined
-                    ? JsonValueConverter.Convert(jsonProp.Value, type)
-                    : JsonValueConverter.GetDefault(type);
-            }
-            results.Add(GroupSelectorMembers.Construct<TResult>(selector, values));
-        }
-
-        return results;
-    }
-
 }

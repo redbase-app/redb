@@ -33,7 +33,8 @@ public class MsSqlArrayGroupByFieldsTests
     {
         var sql = await BuildAsync("[{\"field\":\"Type\",\"alias\":\"Type\"},{\"field\":\"NoSuchField\",\"alias\":\"X\"}]", CountAll);
 
-        sql.Should().BeNull("grouping on the known key alone is a different grouping");
+        sql.Should().Be("--error: \"NoSuchField\" is not a field of the elements of \"Contacts\"",
+            "grouping on the known key alone is a different grouping");
     }
 
     [Fact]
@@ -41,7 +42,8 @@ public class MsSqlArrayGroupByFieldsTests
     {
         var sql = await BuildAsync("[{\"field\":\"NoSuchField\",\"alias\":\"X\"}]", CountAll);
 
-        sql.Should().BeNull("a flat list of items is not a grouping");
+        sql.Should().Be("--error: \"NoSuchField\" is not a field of the elements of \"Contacts\"",
+            "a flat list of items is not a grouping");
     }
 
     [Fact]
@@ -50,7 +52,8 @@ public class MsSqlArrayGroupByFieldsTests
         var sql = await BuildAsync("[{\"field\":\"Type\",\"alias\":\"Type\"}]",
             "[{\"field\":\"NoSuchField\",\"func\":\"MAX\",\"alias\":\"M\"}]");
 
-        sql.Should().BeNull("the aggregate would be missing from the result");
+        sql.Should().Be("--error: \"NoSuchField\" is not a field of the elements of \"Contacts\"",
+            "the aggregate would be missing from the result");
     }
 
     [Fact]
@@ -60,5 +63,26 @@ public class MsSqlArrayGroupByFieldsTests
             "[{\"field\":\"Value\",\"func\":\"MAX\",\"alias\":\"M\"}]");
 
         sql.Should().Contain("GROUP BY").And.Contain("AS [M]");
+    }
+
+    private async Task<string?> BuildOnAsync(string arrayPath, string groupByJson)
+    {
+        var scheme = await _redb.SyncSchemeAsync<EmployeeProps>();
+        return await _redb.Context.ExecuteScalarAsync<string>(
+            "SELECT dbo.pvt_build_array_groupby_sql(" + scheme.Id + ", $1, NULL, $2, NULL, NULL, N'flat')",
+            new object[] { arrayPath, groupByJson });
+    }
+
+    [Theory]
+    [InlineData("Contacts", "[{\"field\":\"$foo\",\"alias\":\"x\"}]", "--error: \"$foo\" is not a field of the elements of \"Contacts\"")]
+    [InlineData("Contacts", "[{\"field\":\"$element\",\"alias\":\"x\"}]", "--error: \"$element\" names the element itself*")]
+    [InlineData("Skills", "[{\"field\":\"Name\",\"alias\":\"x\"}]", "*simple values and have no field \"Name\"*")]
+    [InlineData("Contacts.Metadata", "[{\"field\":\"Type\",\"alias\":\"x\"}]", "--error: \"Type\" is not a field of the elements of \"Contacts.Metadata\"")]
+    [InlineData("PhoneDirectory", "[{\"field\":\"$element\",\"alias\":\"x\"}]", "*dictionary*")]
+    [InlineData("HomeAddress", "[{\"field\":\"City\",\"alias\":\"x\"}]", "--error: \"HomeAddress\" is not an array")]
+    public async Task WhatItCannotAnswer_ComesBackAsAnError(string arrayPath, string groupByJson, string message)
+    {
+        // A14: a scalar function cannot raise; the provider throws the text after "--error:".
+        (await BuildOnAsync(arrayPath, groupByJson)).Should().Match(message);
     }
 }

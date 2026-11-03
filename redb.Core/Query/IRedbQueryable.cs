@@ -177,12 +177,15 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     
     /// <summary>
     /// Filter by ancestors: find objects that have an ancestor of specified type matching condition.
-    /// Uses SQL operator $hasAncestor.
+    /// The objects of <typeparamref name="TTarget"/> that match are looked for below the start of the query, and every
+    /// descendant of a match is returned, however deep it lies below that match.
     /// Supports polymorphic trees - can search for ancestors of different type.
     /// </summary>
     /// <typeparam name="TTarget">Ancestor type to search for (may differ from TProps)</typeparam>
     /// <param name="ancestorCondition">Condition for ancestor search</param>
-    /// <param name="maxDepth">Maximum depth to search up the tree (null = to root)</param>
+    /// <param name="maxDepth">How deep below the start of the query a matching ancestor is looked for (1 = its
+    /// children; null = the whole subtree). It does not limit the distance between the ancestor and the object
+    /// returned.</param>
     /// <returns>Query with ancestor filter</returns>
     IRedbQueryable<TProps> WhereHasAncestor<TTarget>(
         Expression<Func<TTarget, bool>> ancestorCondition, 
@@ -207,7 +210,8 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// Filter by tree level.
     /// Uses SQL operator $level.
     /// </summary>
-    /// <param name="level">Tree level (0 = root)</param>
+    /// <param name="level">Tree level: 0 = the node the query starts from (the real root for TreeQuery&lt;T&gt;()), 1 = its
+    /// children; counted as the maxDepth of the same query</param>
     /// <returns>Query with level filter</returns>
     IRedbQueryable<TProps> WhereLevel(int level);
     
@@ -215,7 +219,8 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     /// Filter by tree level with comparison operator.
     /// Uses SQL operators $level: {$gt: N}, {$lt: N}, etc.
     /// </summary>
-    /// <param name="levelCondition">Condition for level (e.g.: level => level > 2)</param>
+    /// <param name="levelCondition">Condition for level (e.g.: level => level > 2); levels count from the node the
+    /// query starts from (0; the real root for TreeQuery&lt;T&gt;())</param>
     /// <returns>Query with level condition filter</returns>
     IRedbQueryable<TProps> WhereLevel(Expression<Func<int, bool>> levelCondition);
     
@@ -235,7 +240,8 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     
     /// <summary>
     /// Direct children of specified object.
-    /// Uses SQL operator $childrenOf.
+    /// The filter replaces the start of the query: the children of this object are returned whatever the root and the
+    /// maxDepth of the tree query are.
     /// </summary>
     /// <param name="parentId">Parent object ID</param>
     /// <returns>Query for object children</returns>
@@ -243,7 +249,8 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     
     /// <summary>
     /// Direct children of specified object.
-    /// Uses SQL operator $childrenOf.
+    /// The filter replaces the start of the query: the children of this object are returned whatever the root and the
+    /// maxDepth of the tree query are.
     /// </summary>
     /// <param name="parentObject">Parent object</param>
     /// <returns>Query for object children</returns>
@@ -251,19 +258,21 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     
     /// <summary>
     /// All descendants of specified object (recursive).
-    /// Uses SQL operator $descendantsOf.
+    /// The filter replaces the start of the query: the walk starts at this object, and the maxDepth of the tree query
+    /// counts from it when this filter has none.
     /// </summary>
     /// <param name="ancestorId">Ancestor ID</param>
-    /// <param name="maxDepth">Maximum search depth (null = unlimited)</param>
+    /// <param name="maxDepth">Maximum search depth below the object (null = the maxDepth of the tree query, if any)</param>
     /// <returns>Query for all object descendants</returns>
     IRedbQueryable<TProps> WhereDescendantsOf(long ancestorId, int? maxDepth = null);
     
     /// <summary>
     /// All descendants of specified object (recursive).
-    /// Uses SQL operator $descendantsOf.
+    /// The filter replaces the start of the query: the walk starts at this object, and the maxDepth of the tree query
+    /// counts from it when this filter has none.
     /// </summary>
     /// <param name="ancestorObject">Ancestor object</param>
-    /// <param name="maxDepth">Maximum search depth (null = unlimited)</param>
+    /// <param name="maxDepth">Maximum search depth below the object (null = the maxDepth of the tree query, if any)</param>
     /// <returns>Query for all object descendants</returns>
     IRedbQueryable<TProps> WhereDescendantsOf(IRedbObject ancestorObject, int? maxDepth = null);
     
@@ -460,19 +469,27 @@ public interface IRedbQueryable<TProps> where TProps : class, new()
     Grouping.IRedbGroupedQueryable<TKey, TProps> GroupByRedb<TKey>(Expression<Func<IRedbObject, TKey>> keySelector);
     
     /// <summary>
-    /// Group by array elements (Items[].Property).
+    /// Group by the elements of an array. The array is a chain of fields (<c>x =&gt; x.Items</c>,
+    /// <c>x =&gt; x.Address.Building.Amenities</c>) or an inner array reached with SelectMany
+    /// (<c>x =&gt; x.Contacts.SelectMany(c =&gt; c.Metadata)</c>). The key is a field of the element, an anonymous type
+    /// of fields, or the element itself for an array of simple values (<c>s =&gt; s</c>). Any other form throws
+    /// <see cref="NotSupportedException"/>.
     /// </summary>
     /// <example>
     /// var result = await query
     ///     .GroupByArray(x => x.Items, item => item.Category)
     ///     .SelectAsync(g => new {
     ///         Category = g.Key,
-    ///         TotalPrice = Agg.Sum(g, item => item.Price)
+    ///         TotalPrice = Agg.Sum(g, item => item.Price),
+    ///         Expensive = Agg.Count(g, item => item.Price > 100)
     ///     });
+    /// var skills = await query
+    ///     .GroupByArray(x => x.Skills, s => s)
+    ///     .SelectAsync(g => new { Skill = g.Key, People = Agg.Count(g) });
     /// </example>
     Grouping.IRedbGroupedQueryable<TKey, TItem> GroupByArray<TItem, TKey>(
         Expression<Func<TProps, IEnumerable<TItem>>> arraySelector,
-        Expression<Func<TItem, TKey>> keySelector) where TItem : class, new();
+        Expression<Func<TItem, TKey>> keySelector);
     
     // ===== WINDOW FUNCTIONS =====
     

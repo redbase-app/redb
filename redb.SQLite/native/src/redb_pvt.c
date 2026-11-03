@@ -30,6 +30,7 @@ SQLITE_EXTENSION_INIT3
 #include "redb_ext.h"
 #include "redb_pvt.h"
 #include <string.h>
+#include <stdlib.h>
 
 /* Checked by redb.SQLite at initialization against SqliteDialect.Query_PvtRequiredVersion():
  * bump both on every change of this module.
@@ -43,9 +44,19 @@ SQLITE_EXTENSION_INIT3
  *         Take died; DistinctBy and DistinctRedb partitioned by the first key entry only and never
  *         parsed the "0$:" base prefix, so DistinctRedb ignored eight of its nine columns; _ranked
  *         dropped the outer ORDER BY and returned rows in key order whatever the query asked for
- *         (2026-10-26). */
+ *         (2026-10-26).
+ * 0.6.10 - pvt_build_array_groupby_sql (GroupByArray): array paths through classes and arrays, "$element" of an
+ *         array of simple values, fields of classes inside the element, COUNT(*) with a filter, elements reached
+ *         from the ids of the filtered objects; every form it cannot answer reports its reason (2026-11-02).
+ * 0.6.11 - the pivot starts from the objects in every shape (LEFT JOIN _values): an object that stores no value
+ *         for the fields a statement reads kept no pivot row, and lists, counts, groups (the NULL group) and
+ *         windows lost it; the average over an array divided two integers as integers (2026-11-02).
+ * 0.6.12 - $isLeaf, $isRoot, $childrenOf in the filter: a second tree filter of a tree query
+ *         (WhereDescendantsOf(x).WhereLeaves()) was refused as unsupported (2026-11-02).
+ * 0.6.13 - pvt_build_query_sql: WhereLevel of a tree query that starts from nodes counts from them (the walk depth
+ *         of _pvt_tree), as maxDepth and Pro do; it counted from the root of the whole tree (2026-11-02). */
 #ifndef PVT_MODULE_VERSION
-#define PVT_MODULE_VERSION "0.6.9"
+#define PVT_MODULE_VERSION "0.6.13"
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -520,6 +531,13 @@ static void pvtAddField(PvtCollect *c, const char *path, const char *op_value){
   sqlite3_free(norm);
 }
 
+/* Whether a node is an aggregate ({"$count"|"$sum"|"$avg"|"$min"|"$max": ...}). */
+static int pvtNodeIsAggregate(sqlite3 *db, const char *node){
+  static const char *keys[] = { "$.\"$count\"", "$.\"$sum\"", "$.\"$avg\"", "$.\"$min\"", "$.\"$max\"" };
+  for(int i = 0; i < 5; i++){ char *t = jsonTypeAt(db, node, keys[i]); if(t){ sqlite3_free(t); return 1; } }
+  return 0;
+}
+
 static void pvtWalkFilter(PvtCollect *c, const char *node){
   if(c->err || !node) return;
   char *t = jsonTypeAt(c->db, node, "$");
@@ -560,6 +578,9 @@ static void pvtWalkFilter(PvtCollect *c, const char *node){
       }else if(ty && !strcmp(ty, "object")){
         pvtWalkFilter(c, v);
       }
+    }else if(!strcmp(k, "filter") && ty && !strcmp(ty, "object") && pvtNodeIsAggregate(c->db, node)){
+      /* the condition of an aggregate ({"$count":"*","filter":{...}}): an expression, not a field named "filter" */
+      pvtWalkFilter(c, v);
     }else{
       char *opv = 0;
       size_t kl = k ? strlen(k) : 0;
@@ -1162,6 +1183,22 @@ char *pvtBuildWhereFromJson(sqlite3 *db, const char *filter, const char *fields,
       frag = pvtBuildLevelCondition(db, v, kt, base_prefix);
       if(!frag) err = 1;
     }
+    else if(!strcmp(kl,"$isleaf") || !strcmp(kl,"$isroot")){
+      /* A second tree filter of a tree query (WhereDescendantsOf(x).WhereLeaves()): a node without children in the
+         whole tree, or a node without a parent. As PG and MSSQL 06_pvt_hierarchical. */
+      int on = kt && !strcmp(kt, "true");
+      if(!kt || (strcmp(kt, "true") && strcmp(kt, "false"))) err = 1;
+      else if(!strcmp(kl,"$isleaf"))
+        /* The node's _id stays outside the subquery: with no prefix (the wide shape) it would bind to _lc. */
+        frag = sqlite3_mprintf("%s_id %sIN (SELECT _lc._id_parent FROM _objects _lc WHERE _lc._id_parent IS NOT NULL)",
+                               base_prefix ? base_prefix : "", on ? "NOT " : "");
+      else
+        frag = sqlite3_mprintf("%s_id_parent IS %sNULL", base_prefix ? base_prefix : "", on ? "" : "NOT ");
+    }
+    else if(!strcmp(kl,"$childrenof")){
+      if(!kt || strcmp(kt, "integer")) err = 1;
+      else frag = sqlite3_mprintf("%s_id_parent = %lld", base_prefix ? base_prefix : "", (long long)strtoll(v, 0, 10));
+    }
     else if(kl[0]=='$'){
       /* hierarchical ($hasAncestor/...) + $regex/$fts: not yet ported (06/REGEXP). */
       err = 1;
@@ -1386,23 +1423,22 @@ char *pvtBuildCteSql(sqlite3 *db, sqlite3_int64 scheme, const char *fields,
     for(int i = 0; i < nsids; i++){ int dup = 0; for(int j = 0; j < i; j++) if(sids[j]==sids[i]){dup=1;break;} if(dup) continue;
       if(!first) sqlite3_str_append(sb, ", ", 2); first = 0; sqlite3_str_appendf(sb, "%lld", (long long)sids[i]); }
     char *sidtext = sqlite3_str_finish(sb);
-    sqlite3_str *ob = sqlite3_str_new(db);
-    sqlite3_str_appendf(ob, "(SELECT o._id FROM _objects o WHERE o._id_scheme = %lld", (long long)scheme);
-    if(extra_where && *extra_where) sqlite3_str_appendf(ob, " AND %s", extra_where);
-    if(tree_filter) sqlite3_str_appendf(ob, " AND %s", tree_filter);
-    sqlite3_str_append(ob, ")", 1);
-    char *objsubq = sqlite3_str_finish(ob);
+    /* From the objects: an object with no row for any requested structure (every field null) keeps its pivot row
+       with NULL columns. Starting from _values lost it, and with it a group, a count, a list row. SQLite takes the
+       pivot grouped straight from _objects LEFT JOIN _values as fast as before (E150 shape 449-460 ms against
+       455-461); pivoting _values first and joining the objects after, the form PG and SQL Server use, cost it
+       10-45 % (GroupBy Department 207 -> 300 ms). */
     inner = sqlite3_mprintf(
-      "SELECT\n            v._id_object%s\n        FROM _values v%s\n        WHERE v._id_structure IN (%s)\n          AND v._id_object IN %s\n        GROUP BY v._id_object",
-      pivot_cols,
+      "SELECT\n            o._id AS _id_object%s\n        FROM _objects o\n        LEFT JOIN _values v ON v._id_object = o._id AND v._id_structure IN (%s)%s\n        WHERE %s\n        GROUP BY o._id",
+      pivot_cols, sidtext,
       has_listitem_join ? "\n        LEFT JOIN _list_items li ON li._id = v._ListItem" : "",
-      sidtext, objsubq);
-    sqlite3_free(sidtext); sqlite3_free(objsubq);
+      wide_where);
+    sqlite3_free(sidtext);
   }else{
     inner = sqlite3_mprintf(
       "SELECT\n            %s%s\n        FROM _objects o\n        %s _values v ON v._id_object = o._id%s\n        WHERE %s\n        GROUP BY %s",
       PVT_BASE_COLS, pivot_cols,
-      force_outer ? "LEFT JOIN" : "INNER JOIN",
+      "LEFT JOIN",   /* always: an object that stores no value is still an object of the source */
       has_listitem_join ? "\n        LEFT JOIN _list_items li ON li._id = v._ListItem" : "",
       wide_where, PVT_BASE_COLS);
   }
@@ -1746,7 +1782,7 @@ static int pvtFilterHasBaseRefs(sqlite3 *db, const char *filter, const char *fie
     const char *ty = (const char*)sqlite3_column_text(it, 1);
     char *v = sqlite3_mprintf("%s", (const char*)sqlite3_column_text(it, 2));
     char lk[16]; int i = 0; for(; k && k[i] && i < 15; i++){ char ch = k[i]; lk[i] = (ch>='A'&&ch<='Z')?ch+32:ch; } lk[i] = 0;
-    if(!strcmp(lk,"$hasancestor")||!strcmp(lk,"$hasdescendant")||!strcmp(lk,"$level")||!strcmp(lk,"$isroot")||!strcmp(lk,"$isleaf")){ base = 1; }
+    if(!strcmp(lk,"$hasancestor")||!strcmp(lk,"$hasdescendant")||!strcmp(lk,"$level")||!strcmp(lk,"$isroot")||!strcmp(lk,"$isleaf")||!strcmp(lk,"$childrenof")){ base = 1; }
     else if(!strcmp(lk,"$and")||!strcmp(lk,"$or")){
       if(ty && !strcmp(ty,"array")){
         sqlite3_stmt *ai = 0; sqlite3_prepare_v2(db, "SELECT value FROM json_each(?1)", -1, &ai, 0);
@@ -1895,6 +1931,35 @@ static const char *pvtDistinctDir(sqlite3 *db, const char *order, const char *fi
   return res;
 }
 
+/* WhereLevel of a tree query that starts from nodes counts from them (the start is 0, its children 1), as the maxDepth
+** of the same query and Pro count it. The walk CTE _pvt_tree carries that depth; a node reached from two starts keeps
+** the first one. Returns the HAVING condition on min(depth) for a $level value (an integer or an operator object such
+** as {"$gte": 2}), or NULL for a value or operator it does not know. */
+static char *pvtSeedLevelHaving(sqlite3 *db, const char *value, const char *type){
+  if(type && !strcmp(type, "integer")) return sqlite3_mprintf("min(depth) = %lld", (long long)strtoll(value, 0, 10));
+  if(!type || strcmp(type, "object")) return 0;
+  sqlite3_str *acc = sqlite3_str_new(db);
+  int n = 0, err = 0;
+  sqlite3_stmt *it = 0;
+  sqlite3_prepare_v2(db, "SELECT key, type, value FROM json_each(?1)", -1, &it, 0);
+  if(it){
+    sqlite3_bind_text(it, 1, value, -1, SQLITE_TRANSIENT);
+    while(!err && sqlite3_step(it) == SQLITE_ROW){
+      const char *k = (const char*)sqlite3_column_text(it, 0);
+      const char *t = (const char*)sqlite3_column_text(it, 1);
+      const char *op = !strcmp(k,"$gt") ? ">" : !strcmp(k,"$gte") ? ">=" : !strcmp(k,"$lt") ? "<"
+                     : !strcmp(k,"$lte") ? "<=" : !strcmp(k,"$eq") ? "=" : !strcmp(k,"$ne") ? "<>" : 0;
+      if(!op || !t || strcmp(t, "integer")){ err = 1; break; }
+      sqlite3_str_appendf(acc, "%smin(depth) %s %lld", n ? " AND " : "", op, (long long)sqlite3_column_int64(it, 2));
+      n++;
+    }
+    sqlite3_finalize(it);
+  }
+  char *res = sqlite3_str_finish(acc);
+  if(err || !it){ sqlite3_free(res); return 0; }
+  if(n == 0){ sqlite3_free(res); return sqlite3_mprintf("TRUE"); }
+  return res;
+}
 static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *filter,
                               int has_limit, int limit, int offset, const char *order,
                               int has_max_depth, int max_depth, int distinct,
@@ -1903,6 +1968,29 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
   if(!source_mode) source_mode = "flat";
   int is_flat = !strcmp(source_mode, "flat");
   int no_tree = !tree_ids_json || !strcmp(tree_ids_json, "null");
+
+  /* WhereLevel below start nodes counts from them: $level leaves the filter and becomes a condition on the walk depth
+  ** (pushed with the base conditions below). Without start nodes (the whole scheme) the level stays absolute. */
+  char *seed_level = 0, *filter_nolevel = 0;
+  if(!no_tree && filter && (!strcmp(source_mode,"tree") || !strcmp(source_mode,"tree_descendants")
+     || !strcmp(source_mode,"tree_children") || !strcmp(source_mode,"tree_roots") || !strcmp(source_mode,"tree_leaves"))){
+    char *lt = jsonTypeAt(db, filter, "$.\"$level\"");
+    if(lt){
+      char *lv = jsonGetText(db, filter, "$.\"$level\"");
+      seed_level = lv ? pvtSeedLevelHaving(db, lv, lt) : 0;
+      sqlite3_free(lv); sqlite3_free(lt);
+      if(!seed_level) return 0;   /* unsupported $level */
+      sqlite3_stmt *rm = 0;
+      sqlite3_prepare_v2(db, "SELECT json_remove(?1, '$.\"$level\"')", -1, &rm, 0);
+      if(rm){
+        sqlite3_bind_text(rm, 1, filter, -1, SQLITE_TRANSIENT);
+        if(sqlite3_step(rm) == SQLITE_ROW) filter_nolevel = sqlite3_mprintf("%s", (const char*)sqlite3_column_text(rm, 0));
+        sqlite3_finalize(rm);
+      }
+      if(!filter_nolevel){ sqlite3_free(seed_level); return 0; }
+      filter = filter_nolevel;
+    }
+  }
 
   /* Collect from filter+order AND the distinct_on field, so it is pivoted into the CTE and the
   ** PARTITION BY expression can reference it. distinct_on shares the order array shape. */
@@ -1919,7 +2007,7 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
 
   char *fields = pvtCollectFields(db, scheme, filter, collect_src, 0);
   sqlite3_free(merged_order);
-  if(!fields) return 0;
+  if(!fields){ sqlite3_free(seed_level); sqlite3_free(filter_nolevel); return 0; }
 
   char *part_expr = have_dion ? pvtDistinctExpr(db, distinct_on, fields, "_pvt_cte.", "o.") : 0;
   char *part_wide = have_dion ? pvtDistinctExpr(db, distinct_on, fields, "_pvt_cte.", "_pvt_cte.") : 0;
@@ -1939,6 +2027,12 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
   char *push = 0, *resid = 0;
   pvtSplitFilter(db, filter, fields, &push, &resid);
   const char *outer = resid;   /* may be NULL */
+  if(seed_level){
+    /* The node id stays outside the subquery; _pvt_tree is the walk CTE of the same statement. */
+    char *lc = sqlite3_mprintf("o._id IN (SELECT _id FROM _pvt_tree GROUP BY _id HAVING %s)", seed_level);
+    char *np = (push && *push) ? sqlite3_mprintf("(%s) AND %s", push, lc) : sqlite3_mprintf("%s", lc);
+    sqlite3_free(lc); sqlite3_free(push); push = np;
+  }
 
   int has_prop = pvtHasPropFields(db, fields);
 
@@ -2065,6 +2159,7 @@ static char *pvtBuildQuerySql(sqlite3 *db, sqlite3_int64 scheme, const char *fil
 done:
   sqlite3_free(fields); sqlite3_free(push); sqlite3_free(resid); sqlite3_free(paging);
   sqlite3_free(part_expr); sqlite3_free(part_wide); sqlite3_free(part_flat);
+  sqlite3_free(seed_level); sqlite3_free(filter_nolevel);
   return result;
 }
 
@@ -2627,7 +2722,9 @@ static char *pvtBuildAggExpr(sqlite3 *db, const char *entry, const char *fields,
   char *filt = sqlite3_mprintf("");
   { char *ft = jsonTypeAt(db, entry, "$.filter");
     if(ft){ sqlite3_free(ft); char *fn=jsonGetText(db,entry,"$.filter"); char *be=fn?pvtBuildBoolExpr(db,fn,fields,prefix):0; sqlite3_free(fn);
-      if(be){ sqlite3_free(filt); filt=sqlite3_mprintf(" FILTER (WHERE %s)", be); sqlite3_free(be); } } }
+      if(be){ sqlite3_free(filt); filt=sqlite3_mprintf(" FILTER (WHERE %s)", be); sqlite3_free(be); }
+      else{ /* a filter that does not translate refuses the aggregate; it was dropped */
+        sqlite3_free(filt); sqlite3_free(func); sqlite3_free(operand); sqlite3_free(optype); return 0; } } }
 
   /* array-field operand detection */
   int is_arr_field = 0;
@@ -2657,7 +2754,8 @@ static char *pvtBuildAggExpr(sqlite3 *db, const char *entry, const char *fields,
       char *col = pvtBuildScalarExpr(db, operand, fields, prefix);
       if(col){
         if(!strcmp(fl,"$avg"))
-          res = sqlite3_mprintf("(SUM((SELECT SUM(value) FROM json_each(%s))) / NULLIF(SUM(COALESCE(json_array_length(%s),0)),0))%s", col, col, filt);
+          /* REAL: SQLite divides two integers as integers, the average of 1, 2, 2 is 1.67, not 1. */
+          res = sqlite3_mprintf("(CAST(SUM((SELECT SUM(value) FROM json_each(%s))) AS REAL) / NULLIF(SUM(COALESCE(json_array_length(%s),0)),0))%s", col, col, filt);
         else
           res = sqlite3_mprintf("%s((SELECT %s(value) FROM json_each(%s)))%s", fn, fn, col, filt);
       }
@@ -2834,217 +2932,328 @@ static char *pvtBuildGroupBySql(sqlite3 *db, sqlite3_int64 scheme, const char *f
 /* ------------------------------------------------------------------------- */
 /* 26_pvt_array_groupby.sql — GROUP BY over array elements                   */
 /* ------------------------------------------------------------------------- */
-/* Element fields are projected into an inner subquery via LEFT JOINs on
-   _values keyed by _array_parent_id; the outer query groups by inner aliases
-   and applies HAVING through pvt_build_bool_expr. Port of 26_pvt_array_groupby.sql. */
+/* GROUP BY over the elements of an array, the shape of the PostgreSQL and SQL Server modules and
+   of the Pro builder (docs/array-groupby/PLAN.md). The array path runs through classes and arrays
+   ('Contacts', 'Contacts.Metadata', 'HomeAddress.Building.Amenities'); the elements of its last
+   array are found by its structure. A field is a path inside the element ('Type', 'Address.City')
+   or '$element', the element itself of an array of simple values; every field is joined to its
+   element (or to its class inside the element) by _array_parent_id. With a condition the elements
+   are reached from the ids of the objects that satisfy it. COUNT of '*' with a filter counts the
+   elements that satisfy it. Everything it cannot answer sets *err to a message. */
 
-/* Add one element-field LEFT JOIN + inner projection. Resolves <array_path>[].<field>
-   to its element structure id and typed column. Returns 0 on resolve/type failure. */
-static int pvtArrGbAddJoin(sqlite3 *db, sqlite3_int64 scheme, sqlite3_int64 arr_sid,
-                           const char *field, const char *join_prefix, int join_idx,
-                           sqlite3_str *join_parts, sqlite3_str *inner_select,
-                           char **fields_map){
-  sqlite3_int64 fsid = 0; char *fdbt = 0; int fisarr = 0;
-  if(!pvtLookupStruct(db, scheme, field, 1, arr_sid, &fsid, &fdbt, &fisarr)){
-    sqlite3_free(fdbt); return 0;
-  }
-  const char *col = pvtDbTypeToValueColumn(fdbt ? fdbt : "");
-  sqlite3_free(fdbt);
-  if(!col) return 0;
-  char a[24]; sqlite3_snprintf(sizeof a, a, "%s%d", join_prefix, join_idx);
-  sqlite3_str_appendf(join_parts,
-    "%sLEFT JOIN _values \"%w\" ON \"%w\"._id_object = arr._id_object"
-    " AND \"%w\"._id_structure = %lld AND \"%w\"._array_parent_id = arr._id",
-    sqlite3_str_length(join_parts) ? "\n" : "",
-    a, a, a, (long long)fsid, a);
-  sqlite3_str_appendf(inner_select, "%s\"%w\".%s AS \"%w\"",
-    sqlite3_str_length(inner_select) ? ", " : "", a, col, field);
-  char *patch = sqlite3_mprintf("{\"%w\":{\"kind\":\"props\"}}", field);
-  *fields_map = pvtPatch(db, *fields_map, patch);
-  sqlite3_free(patch);
-  return 1;
+typedef struct { sqlite3_int64 sid; char *db_type; char *type_name; char *coll; } PvtArrMeta;
+
+static void pvtArrMetaFree(PvtArrMeta *m){
+  sqlite3_free(m->db_type); sqlite3_free(m->type_name); sqlite3_free(m->coll);
+  m->db_type = m->type_name = m->coll = 0; m->sid = 0;
 }
 
-static int pvtArrGbHas(sqlite3 *db, const char *fields_map, const char *field){
-  char *mp = sqlite3_mprintf("$.\"%w\"", field);
-  char *t = jsonTypeAt(db, fields_map, mp);
-  sqlite3_free(mp);
-  int has = t != 0; sqlite3_free(t);
-  return has;
+/* A field of the scheme by name under a parent structure (has_parent = 0: a root field). */
+static int pvtArrMetaLookup(sqlite3 *db, sqlite3_int64 scheme, const char *name,
+                            int has_parent, sqlite3_int64 parent, PvtArrMeta *m){
+  sqlite3_stmt *st = 0; int found = 0;
+  pvtArrMetaFree(m);
+  sqlite3_prepare_v2(db,
+    "SELECT _structure_id, db_type, type_name, collection_type_name FROM _scheme_metadata_cache"
+    " WHERE _scheme_id = ?1 AND _name = ?2"
+    " AND (CASE WHEN ?3 THEN _parent_structure_id = ?4 ELSE _parent_structure_id IS NULL END) LIMIT 1",
+    -1, &st, 0);
+  sqlite3_bind_int64(st, 1, scheme);
+  sqlite3_bind_text(st, 2, name, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(st, 3, has_parent);
+  sqlite3_bind_int64(st, 4, parent);
+  if(sqlite3_step(st) == SQLITE_ROW){
+    found = 1;
+    m->sid = sqlite3_column_int64(st, 0);
+    m->db_type = sqlite3_mprintf("%s", (const char*)sqlite3_column_text(st, 1));
+    m->type_name = sqlite3_mprintf("%s", (const char*)sqlite3_column_text(st, 2));
+    m->coll = sqlite3_column_type(st, 3) == SQLITE_NULL ? 0 : sqlite3_mprintf("%s", (const char*)sqlite3_column_text(st, 3));
+  }
+  sqlite3_finalize(st);
+  return found;
+}
+
+#define PVT_ARR_MAX 64
+
+typedef struct {
+  int n_paths; char *paths[PVT_ARR_MAX];
+  int n_joins; char *j_parent[PVT_ARR_MAX]; sqlite3_int64 j_sid[PVT_ARR_MAX];
+} PvtArrState;
+
+static void pvtArrAddPath(PvtArrState *s, const char *p, char **err){
+  if(*err || !p || !*p || !strcmp(p, "*")) return;
+  for(int i = 0; i < s->n_paths; i++) if(!strcmp(s->paths[i], p)) return;
+  if(s->n_paths >= PVT_ARR_MAX){ *err = sqlite3_mprintf("pvt_build_array_groupby_sql: too many element paths"); return; }
+  s->paths[s->n_paths++] = sqlite3_mprintf("%s", p);
+}
+
+/* Every {"$field": "..."} inside a JSON expression. */
+static void pvtArrAddExprPaths(sqlite3 *db, PvtArrState *s, const char *node, char **err){
+  if(!node || *err) return;
+  sqlite3_stmt *st = 0;
+  sqlite3_prepare_v2(db, "SELECT DISTINCT value FROM json_tree(?1) WHERE key = '$field' AND type = 'text'", -1, &st, 0);
+  sqlite3_bind_text(st, 1, node, -1, SQLITE_TRANSIENT);
+  while(!*err && sqlite3_step(st) == SQLITE_ROW) pvtArrAddPath(s, (const char*)sqlite3_column_text(st, 0), err);
+  sqlite3_finalize(st);
+}
+
+/* The join alias for (parent alias, structure), creating it when new. */
+static const char *pvtArrJoin(PvtArrState *s, const char *parent, sqlite3_int64 sid, char *buf, int bufsz, char **err){
+  for(int i = 0; i < s->n_joins; i++)
+    if(s->j_sid[i] == sid && !strcmp(s->j_parent[i], parent)){ sqlite3_snprintf(bufsz, buf, "e%d", i + 1); return buf; }
+  if(s->n_joins >= PVT_ARR_MAX){ *err = sqlite3_mprintf("pvt_build_array_groupby_sql: too many element joins"); return 0; }
+  s->j_parent[s->n_joins] = sqlite3_mprintf("%s", parent);
+  s->j_sid[s->n_joins] = sid;
+  s->n_joins++;
+  sqlite3_snprintf(bufsz, buf, "e%d", s->n_joins);
+  return buf;
+}
+
+/* The column of one element path ("alias.col"), or 0 with *err set. */
+static char *pvtArrElementColumn(sqlite3 *db, sqlite3_int64 scheme, const char *array_path,
+                                 const PvtArrMeta *arr, int is_class, const char *path,
+                                 PvtArrState *s, char **err){
+  if(!strcmp(path, "$element")){
+    if(is_class){ *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"$element\" names the element itself, but the elements of \"%s\" are classes; name a field of the element", array_path); return 0; }
+    const char *col = pvtDbTypeToValueColumn(arr->db_type ? arr->db_type : "");
+    if(!col){ *err = sqlite3_mprintf("pvt_build_array_groupby_sql: the elements of \"%s\" are stored as %s, which cannot be grouped or aggregated", array_path, arr->db_type ? arr->db_type : "?"); return 0; }
+    return sqlite3_mprintf("arr.%s", col);
+  }
+  if(path[0] == '$'){ *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"%s\" is not a field of the elements of \"%s\"", path, array_path); return 0; }
+  if(!is_class){ *err = sqlite3_mprintf("pvt_build_array_groupby_sql: the elements of \"%s\" are simple values and have no field \"%s\"; use the element itself", array_path, path); return 0; }
+
+  char *copy = sqlite3_mprintf("%s", path);
+  char alias[16]; char nbuf[16];
+  sqlite3_snprintf(sizeof alias, alias, "arr");
+  sqlite3_int64 parent = arr->sid;
+  PvtArrMeta f; memset(&f, 0, sizeof f);
+  char *result = 0;
+  int nseg = 1; for(const char *q = path; *q; q++) if(*q == '.') nseg++;
+  int i = 0;
+  for(char *seg = copy; seg && !*err; i++){
+    char *dot = strchr(seg, '.'); if(dot) *dot = 0;
+    int last = (i == nseg - 1);
+    char *prefix = sqlite3_mprintf("%.*s", (int)(seg - copy) + (int)strlen(seg), path);
+    if(!pvtArrMetaLookup(db, scheme, seg, 1, parent, &f))
+      *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"%s\" is not a field of the elements of \"%s\"", prefix, array_path);
+    else if(f.coll)
+      *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"%s\" is a collection inside the element of \"%s\"; group the inner collection instead", prefix, array_path);
+    else if(!last && strcmp(f.type_name ? f.type_name : "", "Class") != 0)
+      *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"%s\" is a value, not a class with fields", prefix);
+    else if(last && !strcmp(f.type_name ? f.type_name : "", "Class"))
+      *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"%s\" is a class; a key or aggregate reads a stored value", path);
+    else{
+      const char *a = pvtArrJoin(s, alias, f.sid, nbuf, sizeof nbuf, err);
+      if(a){ sqlite3_snprintf(sizeof alias, alias, "%s", a); parent = f.sid; }
+      if(!*err && last){
+        const char *col = pvtDbTypeToValueColumn(f.db_type ? f.db_type : "");
+        if(!col) *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"%s\" is stored as %s, which cannot be grouped or aggregated", path, f.db_type ? f.db_type : "?");
+        else result = sqlite3_mprintf("%s.%s", alias, col);
+      }
+    }
+    sqlite3_free(prefix);
+    seg = dot ? dot + 1 : 0;
+  }
+  pvtArrMetaFree(&f);
+  sqlite3_free(copy);
+  return result;
 }
 
 static char *pvtBuildArrayGroupBySql(sqlite3 *db, sqlite3_int64 scheme,
     const char *array_path, const char *filter, const char *group_by,
     const char *aggs, const char *having, const char *order,
-    int has_limit, int limit, int offset){
-  if(!array_path || !*array_path) return 0;
-  /* group_by must be a non-empty array */
+    int has_limit, int limit, int offset, char **err){
+  *err = 0;
+  if(!array_path || !*array_path){ *err = sqlite3_mprintf("pvt_build_array_groupby_sql: the array path is required"); return 0; }
   { char *t = jsonTypeAt(db, group_by, "$"); int ok = t && !strcmp(t,"array"); sqlite3_free(t);
-    if(!ok || pvtJsonArrayLen(db, group_by, "$") <= 0) return 0; }
+    if(!ok || pvtJsonArrayLen(db, group_by, "$") <= 0){ *err = sqlite3_mprintf("pvt_build_array_groupby_sql: the grouping needs at least one key"); return 0; } }
 
-  /* resolve array structure id */
-  sqlite3_int64 arr_sid = 0; char *arr_dbt = 0; int arr_isarr = 0;
-  if(!pvtLookupStruct(db, scheme, array_path, 0, 0, &arr_sid, &arr_dbt, &arr_isarr)){
-    sqlite3_free(arr_dbt); return 0;
+  /* ---- the array: every segment exists, none is a dictionary, the last one is an array */
+  PvtArrMeta arr; memset(&arr, 0, sizeof arr);
+  { char *copy = sqlite3_mprintf("%s", array_path); int has_parent = 0; sqlite3_int64 parent = 0;
+    for(char *seg = copy; seg && !*err; ){
+      char *dot = strchr(seg, '.'); if(dot) *dot = 0;
+      if(!pvtArrMetaLookup(db, scheme, seg, has_parent, parent, &arr))
+        *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"%s\" of the array path \"%s\" is not a field of scheme %lld", seg, array_path, (long long)scheme);
+      else if(arr.coll && !strcmp(arr.coll, "Dictionary"))
+        *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"%s\" in the array path \"%s\" is a dictionary; dictionaries are not supported in the array path", seg, array_path);
+      has_parent = 1; parent = arr.sid;
+      seg = dot ? dot + 1 : 0;
+    }
+    sqlite3_free(copy);
+    if(!*err && !(arr.coll && !strcmp(arr.coll, "Array")))
+      *err = sqlite3_mprintf("pvt_build_array_groupby_sql: \"%s\" is not an array", array_path);
   }
-  sqlite3_free(arr_dbt);
+  if(*err){ pvtArrMetaFree(&arr); return 0; }
+  int is_class = arr.type_name && !strcmp(arr.type_name, "Class");
 
-  /* outer object filter -> "arr._id_object IN (SELECT _id FROM (<inner>) _filt)" */
-  char *filter_clause = sqlite3_mprintf("");
-  if(filter){
-    char *t = jsonTypeAt(db, filter, "$"); int isobj = t && !strcmp(t,"object"); sqlite3_free(t);
-    char *probe = isobj ? jsonGetText(db, filter, "$") : 0;
-    int empty = probe && !strcmp(probe, "{}"); sqlite3_free(probe);
-    if(isobj && !empty){
-      char *fi = pvtBuildQuerySql(db, scheme, filter, 0, 0, 0, 0, 0, 0, 0, "flat", 0, 0, 1, 0);
-      if(!fi){ sqlite3_free(filter_clause); return 0; }
-      sqlite3_free(filter_clause);
-      filter_clause = sqlite3_mprintf(
-        "\n  AND arr._id_object IN (SELECT _id FROM (%s) _filt)", fi);
-      sqlite3_free(fi);
+  /* ---- every element path the statement reads */
+  PvtArrState s; memset(&s, 0, sizeof s);
+  { sqlite3_stmt *gi = 0;
+    sqlite3_prepare_v2(db, "SELECT json_extract(value, '$.field') FROM json_each(?1)", -1, &gi, 0);
+    sqlite3_bind_text(gi, 1, group_by, -1, SQLITE_TRANSIENT);
+    while(!*err && sqlite3_step(gi) == SQLITE_ROW){
+      const char *f = (const char*)sqlite3_column_text(gi, 0);
+      if(!f || !*f) *err = sqlite3_mprintf("pvt_build_array_groupby_sql: a key has no field");
+      else pvtArrAddPath(&s, f, err);
+    }
+    sqlite3_finalize(gi); }
+  if(!*err && aggs){
+    sqlite3_stmt *ai = 0;
+    sqlite3_prepare_v2(db, "SELECT json_extract(value, '$.field'), json_extract(value, '$.filter') FROM json_each(?1)", -1, &ai, 0);
+    sqlite3_bind_text(ai, 1, aggs, -1, SQLITE_TRANSIENT);
+    while(!*err && sqlite3_step(ai) == SQLITE_ROW){
+      pvtArrAddPath(&s, (const char*)sqlite3_column_text(ai, 0), err);
+      if(sqlite3_column_type(ai, 1) != SQLITE_NULL) pvtArrAddExprPaths(db, &s, (const char*)sqlite3_column_text(ai, 1), err);
+    }
+    sqlite3_finalize(ai);
+  }
+  if(!*err && having) pvtArrAddExprPaths(db, &s, having, err);
+
+  /* ---- the column of every path; inner projection aliased by path */
+  sqlite3_str *inner_select = sqlite3_str_new(db);
+  char *fields_map = sqlite3_mprintf("{}");
+  for(int i = 0; i < s.n_paths && !*err; i++){
+    char *col = pvtArrElementColumn(db, scheme, array_path, &arr, is_class, s.paths[i], &s, err);
+    if(col){
+      sqlite3_str_appendf(inner_select, "%s%s AS \"%w\"", sqlite3_str_length(inner_select) ? ", " : "", col, s.paths[i]);
+      char *patch = sqlite3_mprintf("{\"%w\":{\"kind\":\"props\"}}", s.paths[i]);
+      fields_map = pvtPatch(db, fields_map, patch);
+      sqlite3_free(patch); sqlite3_free(col);
     }
   }
+  sqlite3_str *join_parts = sqlite3_str_new(db);
+  for(int i = 0; i < s.n_joins; i++)
+    sqlite3_str_appendf(join_parts,
+      "\nLEFT JOIN _values e%d ON e%d._array_parent_id = %s._id AND e%d._id_structure = %lld AND e%d._array_parent_id IS NOT NULL",
+      i + 1, i + 1, s.j_parent[i], i + 1, (long long)s.j_sid[i], i + 1);
 
-  sqlite3_str *join_parts   = sqlite3_str_new(db);
-  sqlite3_str *inner_select = sqlite3_str_new(db);
+  /* ---- keys */
   sqlite3_str *select_parts = sqlite3_str_new(db);
   sqlite3_str *group_parts  = sqlite3_str_new(db);
-  char *fields_map = sqlite3_mprintf("{}");
-  int join_idx = 0, err = 0;
-
-  /* ---- group_by entries */
-  sqlite3_stmt *gi = 0;
-  sqlite3_prepare_v2(db, "SELECT value FROM json_each(?1)", -1, &gi, 0);
-  sqlite3_bind_text(gi, 1, group_by, -1, SQLITE_TRANSIENT);
-  while(!err && sqlite3_step(gi) == SQLITE_ROW){
-    char *e = sqlite3_mprintf("%s", (const char*)sqlite3_column_text(gi, 0));
-    char *field = jsonGetText(db, e, "$.field");
-    char *alias = jsonGetText(db, e, "$.alias"); if(!alias && field) alias = sqlite3_mprintf("%s", field);
-    if(!field){ err = 1; }
-    else{
-      join_idx++;
-      if(!pvtArrGbAddJoin(db, scheme, arr_sid, field, "g", join_idx,
-                          join_parts, inner_select, &fields_map)) err = 1;
-      else{
-        sqlite3_str_appendf(select_parts, "%s\"%w\" AS \"%w\"",
-          sqlite3_str_length(select_parts) ? ", " : "", field, alias ? alias : field);
-        sqlite3_str_appendf(group_parts, "%s\"%w\"",
-          sqlite3_str_length(group_parts) ? ", " : "", field);
-      }
+  if(!*err){
+    sqlite3_stmt *gi = 0;
+    sqlite3_prepare_v2(db, "SELECT json_extract(value, '$.field'), json_extract(value, '$.alias') FROM json_each(?1)", -1, &gi, 0);
+    sqlite3_bind_text(gi, 1, group_by, -1, SQLITE_TRANSIENT);
+    while(sqlite3_step(gi) == SQLITE_ROW){
+      const char *f = (const char*)sqlite3_column_text(gi, 0);
+      const char *a = sqlite3_column_type(gi, 1) == SQLITE_NULL ? f : (const char*)sqlite3_column_text(gi, 1);
+      sqlite3_str_appendf(select_parts, "%s\"%w\" AS \"%w\"", sqlite3_str_length(select_parts) ? ", " : "", f, a);
+      sqlite3_str_appendf(group_parts, "%s\"%w\"", sqlite3_str_length(group_parts) ? ", " : "", f);
     }
-    sqlite3_free(field); sqlite3_free(alias); sqlite3_free(e);
+    sqlite3_finalize(gi);
   }
-  sqlite3_finalize(gi);
 
-  /* ---- aggregations */
-  if(!err && aggs){
-    char *t = jsonTypeAt(db, aggs, "$"); int isarr = t && !strcmp(t,"array"); sqlite3_free(t);
-    if(isarr){
-      sqlite3_stmt *ai = 0;
-      sqlite3_prepare_v2(db, "SELECT value FROM json_each(?1)", -1, &ai, 0);
-      sqlite3_bind_text(ai, 1, aggs, -1, SQLITE_TRANSIENT);
-      while(!err && sqlite3_step(ai) == SQLITE_ROW){
-        char *e = sqlite3_mprintf("%s", (const char*)sqlite3_column_text(ai, 0));
-        char *field = jsonGetText(db, e, "$.field");
-        char *func = jsonGetText(db, e, "$.func");
-        char *alias = jsonGetText(db, e, "$.alias"); if(!alias && func) alias = sqlite3_mprintf("%s", func);
-        char ufunc[16]; pvtLc(ufunc, func ? func : "", sizeof ufunc);
-        for(char *p = ufunc; *p; p++) if(*p >= 'a' && *p <= 'z') *p -= 32;  /* upper */
-        if(!alias || !*alias){ err = 1; }
-        else if(!strcmp(ufunc,"COUNT") && (!field || !strcmp(field,"*"))){
-          sqlite3_str_appendf(select_parts, "%sCOUNT(*) AS \"%w\"",
-            sqlite3_str_length(select_parts) ? ", " : "", alias);
-        }else if(!field){ err = 1; }
+  /* ---- aggregates */
+  if(!*err && aggs){
+    sqlite3_stmt *ai = 0;
+    sqlite3_prepare_v2(db, "SELECT json_extract(value, '$.field'), json_extract(value, '$.func'), json_extract(value, '$.alias'),"
+                           " json_extract(value, '$.filter') FROM json_each(?1)", -1, &ai, 0);
+    sqlite3_bind_text(ai, 1, aggs, -1, SQLITE_TRANSIENT);
+    while(!*err && sqlite3_step(ai) == SQLITE_ROW){
+      const char *field = sqlite3_column_type(ai, 0) == SQLITE_NULL ? "*" : (const char*)sqlite3_column_text(ai, 0);
+      const char *func = (const char*)sqlite3_column_text(ai, 1);
+      char ufunc[16]; pvtLc(ufunc, func ? func : "", sizeof ufunc);
+      for(char *p = ufunc; *p; p++) if(*p >= 'a' && *p <= 'z') *p -= 32;
+      const char *alias = sqlite3_column_type(ai, 2) == SQLITE_NULL ? ufunc : (const char*)sqlite3_column_text(ai, 2);
+      int has_filter = sqlite3_column_type(ai, 3) != SQLITE_NULL;
+      if(strcmp(ufunc,"COUNT") && strcmp(ufunc,"SUM") && strcmp(ufunc,"AVG") && strcmp(ufunc,"MIN") && strcmp(ufunc,"MAX"))
+        *err = sqlite3_mprintf("pvt_build_array_groupby_sql: unknown aggregate function \"%s\"", func ? func : "");
+      else if(has_filter){
+        if(strcmp(ufunc, "COUNT") || strcmp(field, "*"))
+          *err = sqlite3_mprintf("pvt_build_array_groupby_sql: only COUNT(*) takes a filter (\"%s\")", alias);
         else{
-          if(!pvtArrGbHas(db, fields_map, field)){
-            join_idx++;
-            if(!pvtArrGbAddJoin(db, scheme, arr_sid, field, "a", join_idx,
-                                join_parts, inner_select, &fields_map)) err = 1;
-          }
-          if(!err)
-            sqlite3_str_appendf(select_parts, "%s%s(\"%w\") AS \"%w\"",
-              sqlite3_str_length(select_parts) ? ", " : "", ufunc, field, alias);
+          char *be = pvtBuildBoolExpr(db, (const char*)sqlite3_column_text(ai, 3), fields_map, "");
+          if(!be) *err = sqlite3_mprintf("pvt_build_array_groupby_sql: the condition of \"%s\" does not translate", alias);
+          else{ sqlite3_str_appendf(select_parts, ", COUNT(CASE WHEN %s THEN 1 END) AS \"%w\"", be, alias); sqlite3_free(be); }
         }
-        sqlite3_free(field); sqlite3_free(func); sqlite3_free(alias); sqlite3_free(e);
       }
-      sqlite3_finalize(ai);
+      else if(!strcmp(field, "*")){
+        if(strcmp(ufunc, "COUNT")) *err = sqlite3_mprintf("pvt_build_array_groupby_sql: %s needs a field (\"%s\")", ufunc, alias);
+        else sqlite3_str_appendf(select_parts, ", COUNT(*) AS \"%w\"", alias);
+      }
+      else sqlite3_str_appendf(select_parts, ", %s(\"%w\") AS \"%w\"", ufunc, field, alias);
     }
+    sqlite3_finalize(ai);
   }
 
-  /* ---- HAVING: register joins for any $field not yet projected, then translate */
+  /* ---- HAVING */
   char *having_sql = sqlite3_mprintf("");
-  if(!err && having){
+  if(!*err && having){
     char *t = jsonTypeAt(db, having, "$"); int isobj = t && !strcmp(t,"object"); sqlite3_free(t);
     char *probe = isobj ? jsonGetText(db, having, "$") : 0;
     int empty = probe && !strcmp(probe, "{}"); sqlite3_free(probe);
-    if(isobj && !empty){
-      sqlite3_stmt *hi = 0;
-      sqlite3_prepare_v2(db, "SELECT DISTINCT value FROM json_tree(?1) WHERE key = '$field'", -1, &hi, 0);
-      sqlite3_bind_text(hi, 1, having, -1, SQLITE_TRANSIENT);
-      while(!err && sqlite3_step(hi) == SQLITE_ROW){
-        const char *hf = (const char*)sqlite3_column_text(hi, 0);
-        if(hf && !pvtArrGbHas(db, fields_map, hf)){
-          join_idx++;
-          if(!pvtArrGbAddJoin(db, scheme, arr_sid, hf, "h", join_idx,
-                              join_parts, inner_select, &fields_map)) err = 1;
-        }
-      }
-      sqlite3_finalize(hi);
-      if(!err){
-        char *hb = pvtBuildBoolExpr(db, having, fields_map, "");
-        if(hb){ sqlite3_free(having_sql); having_sql = sqlite3_mprintf("\nHAVING %s", hb); sqlite3_free(hb); }
-        else err = 1;
-      }
+    if(!isobj || empty) *err = sqlite3_mprintf("pvt_build_array_groupby_sql: the HAVING is not a JSON expression");
+    else{
+      char *hb = pvtBuildBoolExpr(db, having, fields_map, "");
+      if(!hb) *err = sqlite3_mprintf("pvt_build_array_groupby_sql: the HAVING does not translate");
+      else{ sqlite3_free(having_sql); having_sql = sqlite3_mprintf("\nHAVING %s", hb); sqlite3_free(hb); }
     }
   }
 
-  /* ---- ORDER BY (over outer aliases) */
+  /* ---- ORDER BY / paging over the outer aliases */
   char *paging = sqlite3_mprintf("");
-  if(!err && order){
-    char *t = jsonTypeAt(db, order, "$"); int isarr = t && !strcmp(t,"array"); sqlite3_free(t);
-    if(isarr && pvtJsonArrayLen(db, order, "$") > 0){
-      sqlite3_str *ord = sqlite3_str_new(db);
-      sqlite3_stmt *oi = 0;
-      sqlite3_prepare_v2(db, "SELECT value FROM json_each(?1)", -1, &oi, 0);
-      sqlite3_bind_text(oi, 1, order, -1, SQLITE_TRANSIENT);
-      while(!err && sqlite3_step(oi) == SQLITE_ROW){
-        char *e = sqlite3_mprintf("%s", (const char*)sqlite3_column_text(oi, 0));
-        char *of = jsonGetText(db, e, "$.field");
-        char *asc = jsonGetText(db, e, "$.asc");
-        if(!of){ err = 1; }
-        else sqlite3_str_appendf(ord, "%s\"%w\"%s",
-          sqlite3_str_length(ord) ? ", " : "", of,
-          (asc && !strcmp(asc,"false")) ? " DESC" : "");
-        sqlite3_free(of); sqlite3_free(asc); sqlite3_free(e);
-      }
-      sqlite3_finalize(oi);
-      char *ords = sqlite3_str_finish(ord);
-      if(!err && ords && *ords){ sqlite3_free(paging); paging = sqlite3_mprintf("\nORDER BY %s", ords); }
-      sqlite3_free(ords);
+  if(!*err && order){
+    sqlite3_str *ord = sqlite3_str_new(db);
+    sqlite3_stmt *oi = 0;
+    sqlite3_prepare_v2(db, "SELECT json_extract(value, '$.field'), json_extract(value, '$.asc') FROM json_each(?1)", -1, &oi, 0);
+    sqlite3_bind_text(oi, 1, order, -1, SQLITE_TRANSIENT);
+    while(!*err && sqlite3_step(oi) == SQLITE_ROW){
+      const char *of = (const char*)sqlite3_column_text(oi, 0);
+      if(!of) *err = sqlite3_mprintf("pvt_build_array_groupby_sql: order entry missing \"field\"");
+      else sqlite3_str_appendf(ord, "%s\"%w\"%s", sqlite3_str_length(ord) ? ", " : "", of,
+             (sqlite3_column_type(oi, 1) == SQLITE_INTEGER && sqlite3_column_int(oi, 1) == 0) ? " DESC" : "");
     }
+    sqlite3_finalize(oi);
+    char *ords = sqlite3_str_finish(ord);
+    if(!*err && ords && *ords){ sqlite3_free(paging); paging = sqlite3_mprintf("\nORDER BY %s", ords); }
+    sqlite3_free(ords);
   }
-  if(!err && has_limit && limit >= 0){ char *p = sqlite3_mprintf("%s\nLIMIT %d", paging, limit); sqlite3_free(paging); paging = p; }
-  if(!err && offset > 0){ char *p = sqlite3_mprintf("%s\nOFFSET %d", paging, offset); sqlite3_free(paging); paging = p; }
+  if(!*err && has_limit && limit >= 0){ char *p = sqlite3_mprintf("%s\nLIMIT %d", paging, limit); sqlite3_free(paging); paging = p; }
+  if(!*err && offset > 0){ char *p = sqlite3_mprintf("%s\nOFFSET %d", paging, offset); sqlite3_free(paging); paging = p; }
+
+  /* ---- source of the elements */
+  char *from = 0;
+  char *joins = sqlite3_str_finish(join_parts);
+  if(!*err){
+    int has_filter = 0;
+    if(filter){
+      char *t = jsonTypeAt(db, filter, "$"); int isobj = t && !strcmp(t,"object"); sqlite3_free(t);
+      char *probe = isobj ? jsonGetText(db, filter, "$") : 0;
+      has_filter = isobj && !(probe && !strcmp(probe, "{}")); sqlite3_free(probe);
+    }
+    if(has_filter){
+      char *fi = pvtBuildQuerySql(db, scheme, filter, 0, 0, 0, 0, 0, 0, 0, "flat", 0, 0, 1, 0);
+      if(!fi) *err = sqlite3_mprintf("pvt_build_array_groupby_sql: the condition on the objects did not compile");
+      else{
+        from = sqlite3_mprintf(
+          "FROM (SELECT DISTINCT _id FROM (%s) _filt) f\nJOIN _objects o ON o._id = f._id AND o._id_scheme = %lld\n"
+          "JOIN _values arr ON arr._id_object = f._id AND arr._id_structure = %lld AND arr._array_index IS NOT NULL%s",
+          fi, (long long)scheme, (long long)arr.sid, joins ? joins : "");
+        sqlite3_free(fi);
+      }
+    }else
+      from = sqlite3_mprintf(
+        "FROM _values arr\nJOIN _objects o ON o._id = arr._id_object AND o._id_scheme = %lld%s\n"
+        "WHERE arr._id_structure = %lld AND arr._array_index IS NOT NULL",
+        (long long)scheme, joins ? joins : "", (long long)arr.sid);
+  }
 
   char *result = 0;
   char *insel = sqlite3_str_finish(inner_select);
-  char *joins = sqlite3_str_finish(join_parts);
   char *sels  = sqlite3_str_finish(select_parts);
   char *grps  = sqlite3_str_finish(group_parts);
-  if(!err && insel && *insel && sels && *sels && grps && *grps){
-    char *inner_sql = sqlite3_mprintf(
-      "SELECT %s\nFROM _values arr\nJOIN _objects o ON o._id = arr._id_object\n%s\n"
-      "WHERE o._id_scheme = %lld AND arr._id_structure = %lld AND arr._array_index IS NOT NULL%s",
-      insel, joins ? joins : "", (long long)scheme, (long long)arr_sid, filter_clause);
-    result = sqlite3_mprintf(
-      "SELECT %s\nFROM (\n%s\n) elements\nGROUP BY %s%s%s",
-      sels, inner_sql, grps, having_sql, paging);
-    sqlite3_free(inner_sql);
-  }
-  sqlite3_free(insel); sqlite3_free(joins); sqlite3_free(sels); sqlite3_free(grps);
-  sqlite3_free(fields_map); sqlite3_free(having_sql); sqlite3_free(paging); sqlite3_free(filter_clause);
+  if(!*err)
+    result = sqlite3_mprintf("SELECT %s\nFROM (\nSELECT %s\n%s\n) elements\nGROUP BY %s%s%s",
+                             sels, insel, from, grps, having_sql, paging);
+  sqlite3_free(insel); sqlite3_free(joins); sqlite3_free(sels); sqlite3_free(grps); sqlite3_free(from);
+  sqlite3_free(fields_map); sqlite3_free(having_sql); sqlite3_free(paging);
+  for(int i = 0; i < s.n_paths; i++) sqlite3_free(s.paths[i]);
+  for(int i = 0; i < s.n_joins; i++) sqlite3_free(s.j_parent[i]);
+  pvtArrMetaFree(&arr);
   return result;
 }
+
 
 /* ------------------------------------------------------------------------- */
 /* SQL function bindings                                                     */
@@ -3191,9 +3400,11 @@ static void pvtBuildArrayGroupBySqlFunc(sqlite3_context *ctx, int argc, sqlite3_
   int has_limit = AG(7); int limit = has_limit ? sqlite3_value_int(argv[7]) : 0;
   int offset = AG(8) ? sqlite3_value_int(argv[8]) : 0;
   #undef AG
-  char *s = pvtBuildArrayGroupBySql(db, scheme, array_path, filter, group_by, aggs, having, order, has_limit, limit, offset);
+  char *err = 0;
+  char *s = pvtBuildArrayGroupBySql(db, scheme, array_path, filter, group_by, aggs, having, order, has_limit, limit, offset, &err);
   if(s) sqlite3_result_text(ctx, s, -1, sqlite3_free);
-  else  sqlite3_result_error(ctx, "pvt_build_array_groupby_sql: unsupported", -1);
+  else  sqlite3_result_error(ctx, err ? err : "pvt_build_array_groupby_sql: unsupported", -1);
+  sqlite3_free(err);
 }
 
 /* pvt_build_query_sql(scheme, filter[, limit, offset, order, max_depth, distinct,

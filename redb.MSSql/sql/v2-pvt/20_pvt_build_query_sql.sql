@@ -45,6 +45,36 @@ BEGIN
         RETURN NULL;
     IF @source_mode IS NULL SET @source_mode = N'flat';
 
+    -- WhereLevel of a tree query that starts from nodes counts from them (the start is 0, its children 1), as the
+    -- maxDepth of the same query and Pro count it: $level leaves the filter and becomes a condition on the walk depth
+    -- of pvt_tree_descendants (the first depth of a node reached from two starts). Without start nodes (the whole
+    -- scheme) the level stays absolute, counted from the root.
+    DECLARE @seed_level_sql NVARCHAR(MAX) = NULL;
+    IF @source_mode IN (N'tree', N'tree_descendants', N'tree_children', N'tree_roots', N'tree_leaves')
+       AND @tree_ids IS NOT NULL AND ISJSON(@tree_ids) = 1 AND ISJSON(@filter) = 1
+       AND EXISTS (SELECT 1 FROM OPENJSON(@filter) WHERE [key] = N'$level')
+    BEGIN
+        DECLARE @lvl_value NVARCHAR(MAX), @lvl_type INT, @lvl_cond NVARCHAR(MAX);
+        SELECT @lvl_value = [value], @lvl_type = [type] FROM OPENJSON(@filter) WHERE [key] = N'$level';
+        IF @lvl_type = 2
+            SET @lvl_cond = N'depth = ' + CAST(CAST(@lvl_value AS INT) AS NVARCHAR(20));
+        ELSE IF @lvl_type = 5
+            SELECT @lvl_cond = STRING_AGG(N'depth '
+                + CASE [key] WHEN N'$gt' THEN N'>' WHEN N'$gte' THEN N'>=' WHEN N'$lt' THEN N'<'
+                             WHEN N'$lte' THEN N'<=' WHEN N'$eq' THEN N'=' WHEN N'$ne' THEN N'<>'
+                             ELSE dbo.pvt_fail(N'unsupported $level operator ' + [key]) END
+                + N' ' + CAST(CAST([value] AS INT) AS NVARCHAR(20)), N' AND ')
+            FROM OPENJSON(@lvl_value);
+        ELSE
+            SET @lvl_cond = dbo.pvt_fail(N'$level expects a number or an operator object');
+        SET @seed_level_sql = N'o.[_id] IN (SELECT _id FROM dbo.pvt_tree_descendants('
+            + CAST(@scheme_id AS NVARCHAR(40)) + N', N''' + REPLACE(@tree_ids, N'''', N'''''') + N''', '
+            + CASE WHEN @max_depth IS NULL THEN N'NULL' ELSE CAST(@max_depth AS NVARCHAR(20)) END + N', '
+            + CAST(COALESCE(@polymorphic, 1) AS NVARCHAR(1)) + N', 1) WHERE '
+            + COALESCE(@lvl_cond, N'1 = 1') + N')';
+        SET @filter = JSON_MODIFY(@filter, N'$."$level"', NULL);
+    END;
+
     -- Guard: @distinct=1 and @distinct_on not null are mutually exclusive.
     -- Scalar UDFs cannot THROW; force a runtime cast error whose message
     -- contains 'mutually exclusive' so callers can detect the guard.
@@ -201,6 +231,9 @@ BEGIN
         BEGIN
             DECLARE @splitT NVARCHAR(MAX) = dbo.pvt_split_filter(@filter, @fields);
             DECLARE @pushT  NVARCHAR(MAX) = JSON_VALUE(@splitT, N'$.push');
+            IF @seed_level_sql IS NOT NULL
+                SET @pushT = CASE WHEN @pushT IS NULL OR @pushT = N'' THEN @seed_level_sql
+                                  ELSE N'(' + @pushT + N') AND ' + @seed_level_sql END;
             DECLARE @resT   NVARCHAR(MAX) = JSON_QUERY(@splitT, N'$.residual');
             DECLARE @innerT NVARCHAR(MAX) = dbo.pvt_build_cte_sql(
                 @scheme_id, @fields, @source_mode, @tree_ids, @max_depth,
@@ -263,7 +296,14 @@ BEGIN
             -- childless descendants of the seed — not every leaf in the scheme (the cross-tree leak).
             -- pvt_is_descendant_of() is inclusive, so exclude the seed root itself (empty tree => none).
             SET @treeWhere = N'NOT EXISTS (SELECT 1 FROM dbo._objects _lc WHERE _lc.[_id_parent] = o.[_id])';
-            IF @escapedIds IS NOT NULL
+            -- Down to a depth: the leaves of the whole tree that lie within it (a node at the cut that has children
+            -- is not a leaf). pvt_is_descendant_of below has no depth.
+            IF @escapedIds IS NOT NULL AND @max_depth IS NOT NULL
+                SET @treeWhere += N' AND o.[_id] IN (SELECT _id FROM dbo.pvt_tree_descendants('
+                    + CAST(@scheme_id AS NVARCHAR(40)) + N', N''' + @escapedIds + N''', '
+                    + CAST(@max_depth AS NVARCHAR(20)) + N', '
+                    + CAST(COALESCE(@polymorphic, 1) AS NVARCHAR(1)) + N', 0))';
+            ELSE IF @escapedIds IS NOT NULL
                 SET @treeWhere += N' AND o.[_id] NOT IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))'
                     + N' AND EXISTS (SELECT 1 FROM OPENJSON(N''' + @escapedIds
                     + N''') _s WHERE dbo.pvt_is_descendant_of(o.[_id], CAST(_s.[value] AS BIGINT)) = 1)';
@@ -281,6 +321,16 @@ BEGIN
                 + CASE WHEN @max_depth IS NULL THEN N'NULL' ELSE CAST(@max_depth AS NVARCHAR(20)) END + N', '
                 + CAST(COALESCE(@polymorphic, 1) AS NVARCHAR(1)) + N'))';
         END;
+        ELSE IF @max_depth IS NOT NULL  -- tree_descendants down to a depth: the walk that counts levels
+        BEGIN
+            -- pvt_is_descendant_of below has no depth: with it TreeQuery(root, maxDepth) returned the whole subtree.
+            IF @escapedIds IS NULL RETURN NULL;
+            SET @treeWhere = N'o.[_id] IN (SELECT _id FROM dbo.pvt_tree_descendants('
+                + CAST(@scheme_id AS NVARCHAR(40)) + N', N''' + @escapedIds + N''', '
+                + CAST(@max_depth AS NVARCHAR(20)) + N', '
+                + CAST(COALESCE(@polymorphic, 1) AS NVARCHAR(1)) + N', '
+                + CAST(COALESCE(@include_seed, 1) AS NVARCHAR(1)) + N'))';
+        END;
         ELSE  -- tree_descendants: correlated pvt_is_descendant_of, no CTE
         BEGIN
             IF @escapedIds IS NULL RETURN NULL;
@@ -290,6 +340,8 @@ BEGIN
                 SET @treeWhere += N' AND o.[_id] NOT IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))';
         END;
 
+        IF @seed_level_sql IS NOT NULL
+            SET @treeWhere = N'(' + @treeWhere + N') AND ' + @seed_level_sql;
         DECLARE @baseFromT NVARCHAR(MAX) = N'FROM dbo._objects o'
              + CHAR(10) + N'WHERE o.[_id_scheme] = ' + CAST(@scheme_id AS NVARCHAR(40))
              + N' AND ' + @treeWhere

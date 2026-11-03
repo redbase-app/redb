@@ -71,7 +71,7 @@ public partial class SqliteQueryProvider
             filterJson, frameJson, take, skip);
 
         // SQLite has no json_agg/row_to_json: run the inner SQL and serialize rows in C#.
-        var jsonArray = await SqliteConn.QueryRowsAsJsonAsync(innerSql);
+        var jsonArray = await _context.QueryRowsAsJsonAsync(innerSql, System.Array.Empty<object>());
         if (string.IsNullOrEmpty(jsonArray))
             return null;
         return JsonDocument.Parse(jsonArray);

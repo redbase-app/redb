@@ -1799,7 +1799,7 @@ BEGIN
     -- ---- Tree-mode narrow assertion ------------------------------------
     -- Tree pushdown (Pro CHANGELOG 2.0.1 parity): when source_mode=tree
     -- the recursive `_pvt_tree` CTE is still emitted, but its
-    -- restriction (`o._id IN (SELECT _id FROM _pvt_tree)`) must be
+    -- restriction (`o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree))`) must be
     -- folded into the narrow IN-subquery rather than appended to a
     -- wide JOIN WHERE. We assert both signatures appear together and
     -- that the wide _values JOIN does NOT.
@@ -1814,7 +1814,7 @@ BEGIN
             '{"FirstName":{"$startsWith":"A"}} +tree', v_sql;
         IF position('WITH RECURSIVE' IN v_sql) = 0
            OR position('GROUP BY v._id_object' IN v_sql) = 0
-           OR position('o._id IN (SELECT _id FROM _pvt_tree)' IN v_sql) = 0
+           OR position('o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree))' IN v_sql) = 0
            OR position('JOIN _values v ON v._id_object = o._id' IN v_sql) > 0 THEN
             v_shape_fail_cnt := v_shape_fail_cnt + 1;
             RAISE NOTICE 'SHAPE-FAIL [NARROW: tree-mode pushdown]: expected WITH RECURSIVE _pvt_tree + narrow GROUP BY + tree filter folded into IN-subquery, no wide _values JOIN';
@@ -1830,7 +1830,7 @@ BEGIN
     --   tree_children / tree_roots / tree_leaves -> non-recursive WITH
     -- In every case the narrow pivot must be selected (no wide
     -- _values JOIN) and the tree restriction folded into the
-    -- IN-subquery (`o._id IN (SELECT _id FROM _pvt_tree...`).
+    -- ANY-array (`o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree...`).
     DECLARE
         v_tree_labels text[];
         v_tree_modes  text[];
@@ -1883,7 +1883,7 @@ BEGIN
                     IF NOT v_has_cte
                        OR NOT v_has_narrow_grp
                        OR v_has_wide_join
-                       OR position('o._id IN (SELECT _id FROM _pvt_tree' IN v_sql) = 0
+                       OR position('o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree' IN v_sql) = 0
                        OR (v_recursive[j] AND position('WITH RECURSIVE' IN v_sql) = 0)
                        OR (NOT v_recursive[j] AND position('WITH RECURSIVE' IN v_sql) > 0) THEN
                         v_shape_fail_cnt := v_shape_fail_cnt + 1;

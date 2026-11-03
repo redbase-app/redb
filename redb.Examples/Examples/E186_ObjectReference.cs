@@ -19,9 +19,9 @@ public class E186_ObjectReference : ExampleBase
     {
         var sw = Stopwatch.StartNew();
 
-        // Ensure schemes exist
-        var projectScheme = await redb.EnsureSchemeFromTypeAsync<ProjectMetricsProps>();
-        var employeeScheme = await redb.EnsureSchemeFromTypeAsync<EmployeeProps>();
+        // Schemes are synced at startup; read from the scheme cache
+        var projectScheme = (await redb.GetSchemeByTypeAsync<ProjectMetricsProps>())!;
+        var employeeScheme = (await redb.GetSchemeByTypeAsync<EmployeeProps>())!;
 
         // Create a project
         var project = new RedbObject<ProjectMetricsProps>

@@ -2,7 +2,6 @@ using System.Linq.Expressions;
 using System.Text.Json;
 using redb.Core.Query.Aggregation;
 using redb.Core.Query.Base;
-using redb.Core.Query.Utils;
 
 namespace redb.Core.Query.Grouping;
 
@@ -13,13 +12,14 @@ namespace redb.Core.Query.Grouping;
 public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TProps>
     where TProps : class, new()
 {
+    private const string OwnerApi = "Tree GroupBy";
+
     private readonly ITreeQueryProvider _treeProvider;
     private readonly TreeQueryContext<TProps> _treeContext;
     private readonly Expression _keySelector;
     private readonly string? _baseFilterJson;
     private readonly bool _isBaseFieldGrouping;
     private readonly List<LambdaExpression> _havingPredicates = new();
-    private string? _havingJson;
 
     public TreeGroupedQueryable(
         ITreeQueryProvider treeProvider,
@@ -38,52 +38,39 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
     public async Task<List<TResult>> SelectAsync<TResult>(
         Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector, CancellationToken cancellationToken = default)
     {
-        var groupFields = ParseGroupFields(_keySelector);
+        var groupFields = GroupKeyFields.Parse(_keySelector, _isBaseFieldGrouping, OwnerApi);
         var aggregations = ParseAggregations(selector);
-
-        // Use tree-aware execution with full context
-        var jsonResult = await _treeProvider.ExecuteTreeGroupedAggregateAsync(
+        var json = await _treeProvider.ExecuteTreeGroupedAggregateAsync(
             _treeContext, groupFields, aggregations, BuildHavingJson(), cancellationToken: cancellationToken);
-
-        return MaterializeResults<TResult>(jsonResult, selector, groupFields);
+        var rows = ArrayGroupMaterializer.Materialize<TResult>(json, selector, groupFields, _treeProvider.GetType().Name, OwnerApi + ".SelectAsync");
+        await ListItemGroupKeys.FillAsync(rows, (_treeProvider as IListItemKeySource)?.ListItems, OwnerApi + ".SelectAsync", cancellationToken);
+        return rows;
     }
 
     public async Task<int> CountAsync(CancellationToken cancellationToken = default)
     {
-        var groupFields = ParseGroupFields(_keySelector);
+        var groupFields = GroupKeyFields.Parse(_keySelector, _isBaseFieldGrouping, OwnerApi);
         var aggregations = new[] { new AggregateRequest { FieldPath = "*", Function = AggregateFunction.Count, Alias = "cnt" } };
-
-        var jsonResult = await _treeProvider.ExecuteTreeGroupedAggregateAsync(
+        using var json = await _treeProvider.ExecuteTreeGroupedAggregateAsync(
             _treeContext, groupFields, aggregations, BuildHavingJson(), cancellationToken: cancellationToken);
-
-        if (jsonResult == null) return 0;
-        return jsonResult.RootElement.GetArrayLength();
+        return ArrayGroupMaterializer.RequireArray(json, _treeProvider.GetType().Name, OwnerApi + ".CountAsync").GetArrayLength();
     }
 
-    public async Task<string> ToSqlStringAsync<TResult>(
+    public Task<string> ToSqlStringAsync<TResult>(
         Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector, CancellationToken cancellationToken = default)
-    {
-        var groupFields = ParseGroupFields(_keySelector);
-        var aggregations = ParseAggregations(selector);
+        => _treeProvider.GetTreeGroupBySqlPreviewAsync(
+            _treeContext, GroupKeyFields.Parse(_keySelector, _isBaseFieldGrouping, OwnerApi), ParseAggregations(selector),
+            BuildHavingJson(), cancellationToken: cancellationToken);
 
-        // Delegate to tree provider for real SQL preview
-        return await _treeProvider.GetTreeGroupBySqlPreviewAsync(
-            _treeContext, groupFields, aggregations, BuildHavingJson(), cancellationToken: cancellationToken);
-    }
-    
     /// <summary>
-    /// Apply window functions to grouped results (tree-aware).
+    /// Apply window functions to grouped results (tree-aware): the window runs over the groups that pass Having.
     /// </summary>
     public IGroupedWindowedQueryable<TKey, TProps> WithWindow(
         Action<IGroupedWindowSpec<TKey, TProps>> windowConfig)
     {
         var windowSpec = new GroupedWindowSpec<TKey, TProps>();
         windowConfig(windowSpec);
-        return new TreeGroupedWindowedQueryable<TKey, TProps>(
-            _treeProvider, _treeContext, _keySelector, windowSpec)
-        {
-            IsBaseFieldGrouping = _isBaseFieldGrouping
-        };
+        return new GroupedWindowedQueryable<TKey, TProps>(new TreeGroupWindowSource(this, BuildHavingJson()), windowSpec);
     }
 
     /// <inheritdoc />
@@ -102,33 +89,15 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
 
     private string? BuildHavingJson()
     {
-        if (_havingJson != null) return _havingJson;
         if (_havingPredicates.Count == 0) return null;
-
-        if (_havingPredicates.Count == 1)
-        {
-            var single = (Expression<Func<IRedbGrouping<TKey, TProps>, bool>>)_havingPredicates[0];
-            _havingJson = HavingPredicateParser.ToJson(single);
-            return _havingJson;
-        }
-
         var param = Expression.Parameter(typeof(IRedbGrouping<TKey, TProps>), "g");
-        Expression body = ReplaceParam((Expression<Func<IRedbGrouping<TKey, TProps>, bool>>)_havingPredicates[0], param);
-        for (int i = 1; i < _havingPredicates.Count; i++)
+        Expression? body = null;
+        foreach (var p in _havingPredicates)
         {
-            var nextBody = ReplaceParam((Expression<Func<IRedbGrouping<TKey, TProps>, bool>>)_havingPredicates[i], param);
-            body = Expression.AndAlso(body, nextBody);
+            var next = new ParameterReplacer(p.Parameters[0], param).Visit(p.Body)!;
+            body = body == null ? next : Expression.AndAlso(body, next);
         }
-        var combined = Expression.Lambda<Func<IRedbGrouping<TKey, TProps>, bool>>(body, param);
-        _havingJson = HavingPredicateParser.ToJson(combined);
-        return _havingJson;
-    }
-
-    private static Expression ReplaceParam(
-        Expression<Func<IRedbGrouping<TKey, TProps>, bool>> lambda,
-        ParameterExpression newParam)
-    {
-        return new ParameterReplacer(lambda.Parameters[0], newParam).Visit(lambda.Body)!;
+        return HavingPredicateParser.ToJson(Expression.Lambda<Func<IRedbGrouping<TKey, TProps>, bool>>(body!, param));
     }
 
     private sealed class ParameterReplacer : ExpressionVisitor
@@ -139,241 +108,65 @@ public class TreeGroupedQueryable<TKey, TProps> : IRedbGroupedQueryable<TKey, TP
         protected override Expression VisitParameter(ParameterExpression node) => node == _from ? _to : base.VisitParameter(node);
     }
 
-    #region Expression Parsing (same as RedbGroupedQueryable)
-
-    private List<GroupFieldRequest> ParseGroupFields(Expression keySelector)
-    {
-        var result = new List<GroupFieldRequest>();
-
-        if (keySelector is LambdaExpression lambda)
-        {
-            ParseGroupFieldsFromBody(lambda.Body, result);
-        }
-
-        return result;
-    }
-
-    private void ParseGroupFieldsFromBody(Expression body, List<GroupFieldRequest> result)
-    {
-        body = GroupSelectorMembers.StripConvert(body);
-        switch (body)
-        {
-            // GRP-9 (review 2026-09-24): a key member this parser does not understand is refused, like the flat
-            // grouping does (G-3). It used to be skipped without a word, and the grouping ran on fewer fields.
-            case MemberExpression member:
-                var path = ExtractFieldPath(member);
-                if (string.IsNullOrEmpty(path))
-                    throw new NotSupportedException(
-                        $"GroupBy on a tree: the key '{member}' is not a field. Group by a field or an anonymous type of fields.");
-                result.Add(new GroupFieldRequest
-                {
-                    FieldPath = path,
-                    Alias = member.Member.Name,
-                    IsBaseField = _isBaseFieldGrouping
-                });
-                break;
-
-            case NewExpression newExpr:
-                for (int i = 0; i < newExpr.Arguments.Count; i++)
-                {
-                    var arg = GroupSelectorMembers.StripConvert(newExpr.Arguments[i]);
-                    var alias = newExpr.Members?[i].Name ?? $"Key{i}";
-
-                    if (arg is not MemberExpression memberArg)
-                        throw new NotSupportedException(
-                            $"GroupBy on a tree: key member '{alias}' is not a field ('{arg}'). Computed keys are not supported.");
-                    var fieldPath = ExtractFieldPath(memberArg);
-                    if (string.IsNullOrEmpty(fieldPath))
-                        throw new NotSupportedException(
-                            $"GroupBy on a tree: key member '{alias}' is not a Props or base field ('{arg}').");
-                    result.Add(new GroupFieldRequest
-                    {
-                        FieldPath = fieldPath,
-                        Alias = alias,
-                        IsBaseField = _isBaseFieldGrouping
-                    });
-                }
-                break;
-
-            default:
-                throw new NotSupportedException(
-                    "GroupBy on a tree supports a field (x => x.Category) or an anonymous type of fields " +
-                    $"(x => new {{ x.A, x.B }}). A computed key is not supported: '{body}'.");
-        }
-    }
-
-    private List<AggregateRequest> ParseAggregations<TResult>(
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector)
+    private static List<AggregateRequest> ParseAggregations(LambdaExpression selector)
     {
         var result = new List<AggregateRequest>();
         var groupParam = selector.Parameters[0];
 
-        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, "TreeGroupBy.SelectAsync"))
+        foreach (var (name, _, rawExpr) in GroupSelectorMembers.Extract(selector, OwnerApi + ".SelectAsync"))
         {
             var expr = GroupSelectorMembers.StripConvert(rawExpr);
 
             if (GroupSelectorMembers.IsKeyAccess(expr, groupParam))
                 continue;
 
-            if (expr is MethodCallExpression methodCall && methodCall.Method.DeclaringType == typeof(Agg))
+            if (GroupAggregateParser.IsAggCall(expr))
             {
-                var funcName = methodCall.Method.Name;
-                var function = funcName switch
-                {
-                    "Sum" => AggregateFunction.Sum,
-                    "Average" => AggregateFunction.Average,
-                    "Min" => AggregateFunction.Min,
-                    "Max" => AggregateFunction.Max,
-                    "Count" => AggregateFunction.Count,
-                    _ => throw new NotSupportedException($"Unknown aggregation: {funcName}")
-                };
-
-                string fieldPath = "*";
-                if (methodCall.Arguments.Count >= 2)
-                    fieldPath = ExtractFieldPathFromLambda(methodCall.Arguments[1]);
-
-                result.Add(new AggregateRequest { FieldPath = fieldPath, Function = function, Alias = name });
+                result.Add(GroupAggregateParser.Parse((MethodCallExpression)expr, groupParam, name, GroupItemKind.Props, OwnerApi + ".SelectAsync"));
                 continue;
             }
 
             if (!GroupSelectorMembers.ReferencesParameter(expr, groupParam))
-                continue; // клиентское значение - вычислится при материализации
+                continue;
 
             throw new NotSupportedException(
-                $"TreeGroupBy.SelectAsync: член '{name}' использует группу, но не является ни g.Key, ни прямым Agg.* вызовом.");
+                $"{OwnerApi}.SelectAsync: member '{name}' uses the group but is neither g.Key nor a direct Agg.* call ('{rawExpr}').");
         }
 
         return result;
     }
 
-
-    private string ExtractFieldPath(MemberExpression? member)
-    {
-        if (member == null) return string.Empty;
-
-        var parts = new List<string>();
-        Expression? current = member;
-
-        while (current is MemberExpression m)
-        {
-            if (m.Member.Name != "Props")
-                parts.Insert(0, m.Member.Name);
-            current = m.Expression;
-        }
-
-        return string.Join(".", parts);
-    }
-
-    private string ExtractFieldPathFromLambda(Expression expr)
-    {
-        if (expr is UnaryExpression quote && quote.NodeType == ExpressionType.Quote)
-            expr = quote.Operand;
-
-        if (expr is LambdaExpression lambda)
-        {
-            var body = lambda.Body;
-
-            while (body is UnaryExpression unary &&
-                   (unary.NodeType == ExpressionType.Convert || unary.NodeType == ExpressionType.ConvertChecked))
-            {
-                body = unary.Operand;
-            }
-
-            var path = ExtractFieldPath(body as MemberExpression);
-            return string.IsNullOrEmpty(path) ? "*" : path;
-        }
-
-        return "*";
-    }
-
-    #endregion
-
-    #region Materialization
-
-    private List<TResult> MaterializeResults<TResult>(
-        JsonDocument? jsonResult,
-        Expression<Func<IRedbGrouping<TKey, TProps>, TResult>> selector,
-        List<GroupFieldRequest> groupFields)
-    {
-        var results = new List<TResult>();
-        if (jsonResult == null) return results;
-
-        var members = GroupSelectorMembers.Extract(selector, "TreeGroupBy.SelectAsync");
-        var groupParam = selector.Parameters[0];
-
-        var clientValues = new object?[members.Count];
-        var isClient = new bool[members.Count];
-        for (int i = 0; i < members.Count; i++)
-        {
-            if (!GroupSelectorMembers.ReferencesParameter(GroupSelectorMembers.StripConvert(members[i].Expr), groupParam))
-            {
-                isClient[i] = true;
-                clientValues[i] = Expression.Lambda(members[i].Expr).Compile().DynamicInvoke();
-            }
-        }
-
-        foreach (var element in jsonResult.RootElement.EnumerateArray())
-        {
-            var values = new object?[members.Count];
-            for (int i = 0; i < members.Count; i++)
-            {
-                if (isClient[i]) { values[i] = clientValues[i]; continue; }
-
-                var (name, type, rawExpr) = members[i];
-                if (element.TryGetProperty(name, out var prop))
-                    values[i] = JsonValueConverter.Convert(prop, type);
-                else
-                {
-                    var jsonAlias = ExtractJsonAliasFromArgument(GroupSelectorMembers.StripConvert(rawExpr), groupFields);
-                    if (!string.IsNullOrEmpty(jsonAlias) && element.TryGetProperty(jsonAlias, out prop))
-                        values[i] = JsonValueConverter.Convert(prop, type);
-                }
-            }
-            results.Add(GroupSelectorMembers.Construct<TResult>(selector, values));
-        }
-
-        return results;
-    }
-
-    
     /// <summary>
-    /// Extracts JSON field alias from selector argument.
-    /// Handles patterns:
-    ///   g.Key (single key) → returns the single GroupBy alias
-    ///   g.Key.Department (composite key) → returns alias for "Department"
-    ///   g.Key.SomeField.Id → returns "SomeField" (parent of .Id)
-    ///   g.Key.Id (single ListItem key) → returns the single GroupBy alias
+    /// The tree grouping as the source of a window over its groups.
     /// </summary>
-    private string? ExtractJsonAliasFromArgument(Expression arg, List<GroupFieldRequest> groupFields)
+    private sealed class TreeGroupWindowSource : IGroupedWindowSource
     {
-        if (arg is MemberExpression member)
+        private readonly TreeGroupedQueryable<TKey, TProps> _owner;
+        private readonly string? _havingJson;
+
+        public TreeGroupWindowSource(TreeGroupedQueryable<TKey, TProps> owner, string? havingJson)
         {
-            // g.Key → single key → return the only GroupBy alias
-            if (member.Member.Name == "Key" && groupFields.Count == 1)
-            {
-                return groupFields[0].Alias;
-            }
-
-            // g.Key.SomeField.Id → return parent field name "SomeField"
-            // g.Key.Id (single key) → return the only GroupBy alias
-            if (member.Member.Name == "Id" && member.Expression is MemberExpression idParent)
-            {
-                if (idParent.Member.Name == "Key" && groupFields.Count == 1)
-                    return groupFields[0].Alias;
-                return idParent.Member.Name;
-            }
-
-            // g.Key.Department (composite key) → find matching GroupBy alias
-            if (member.Expression is MemberExpression keyAccess && keyAccess.Member.Name == "Key")
-            {
-                var fieldName = member.Member.Name;
-                var matchingGroup = groupFields.FirstOrDefault(g =>
-                    g.Alias == fieldName || g.FieldPath == fieldName);
-                return matchingGroup?.Alias ?? fieldName;
-            }
+            _owner = owner;
+            _havingJson = havingJson;
         }
-        return null;
-    }
 
-    #endregion
+        public string ProviderName => _owner._treeProvider.GetType().Name;
+        public redb.Core.Providers.IListProvider? ListItems => (_owner._treeProvider as IListItemKeySource)?.ListItems;
+
+        public GroupItemKind Kind => GroupItemKind.Props;
+
+        public List<GroupFieldRequest> GroupFields(LambdaExpression selector)
+            => GroupKeyFields.Parse(_owner._keySelector, _owner._isBaseFieldGrouping, "Tree WithWindow");
+
+        public async Task<JsonDocument> ExecuteAsync(LambdaExpression selector, List<AggregateRequest> aggregations, ArrayGroupWindow window, CancellationToken cancellationToken)
+            => await _owner._treeProvider.ExecuteTreeGroupedWindowQueryAsync(
+                   _owner._treeContext, GroupFields(selector), aggregations, window.Functions, window.PartitionBy, window.OrderBy,
+                   _havingJson, cancellationToken)
+               ?? throw new InvalidOperationException($"Tree WithWindow: {ProviderName} returned no answer for the grouped window.");
+
+        public Task<string> GetSqlAsync(LambdaExpression selector, List<AggregateRequest> aggregations, ArrayGroupWindow window, CancellationToken cancellationToken)
+            => _owner._treeProvider.GetTreeGroupedWindowSqlPreviewAsync(
+                _owner._treeContext, GroupFields(selector), aggregations, window.Functions, window.PartitionBy, window.OrderBy,
+                _havingJson, cancellationToken);
+    }
 }

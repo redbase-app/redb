@@ -20,6 +20,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     where TProps : class, new()
 {
     protected readonly ITreeQueryProvider _treeProvider;
+    internal ITreeQueryProvider TreeProvider => _treeProvider;
     protected readonly TreeQueryContext<TProps> _treeContext;
     private readonly IFacetFilterBuilder _facetBuilder;
 
@@ -945,6 +946,18 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     {
         return new Grouping.TreeGroupedQueryable<TKey, TProps>(
             _treeProvider, _treeContext, keySelector, BuildFilterJson(), isBaseFieldGrouping: true);
+    }
+
+    /// <summary>
+    /// Override GroupByArray to respect tree context: only the elements of the objects of the subtree are grouped.
+    /// </summary>
+    public override Grouping.IRedbGroupedQueryable<TKey, TItem> GroupByArray<TItem, TKey>(
+        Expression<Func<TProps, IEnumerable<TItem>>> arraySelector,
+        Expression<Func<TItem, TKey>> keySelector)
+    {
+        return new Grouping.RedbArrayGroupedQueryable<TKey, TItem, TProps>(
+            new Grouping.TreeArrayGroupRunner<TProps>(_treeProvider, _treeContext.Clone()),
+            _treeContext.SchemeId, filter: null, arraySelector, keySelector);
     }
 
     /// <summary>

@@ -988,6 +988,9 @@ public class PostgreSqlDialect : ISqlDialect
     public string ListItems_SelectById() =>
         "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id = $1";
 
+    public string ListItems_SelectByIds() =>
+        "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id = ANY($1)";
+
     public string ListItems_SelectByListId() =>
         "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id_list = $1 ORDER BY _value";
 
@@ -1218,9 +1221,6 @@ public class PostgreSqlDialect : ISqlDialect
     public string Query_AggregateGroupedSql() =>
         throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_grouped)");
 
-    public string Query_AggregateArrayGroupedSql() =>
-        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_array_grouped)");
-
     public string Query_WindowSql() =>
         throw new NotSupportedException(LegacyPgRemovedMsg + " (query_with_window)");
 
@@ -1386,7 +1386,7 @@ public class PostgreSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
     // Bump together with the literal in redb.Postgres/sql/v2-pvt/99_module_version.sql.
-    public string? Query_PvtRequiredVersion() => "0.7.17";
+    public string? Query_PvtRequiredVersion() => "0.7.23";
 
     // ============================================================
     // Native PVT projection orchestrator (pvt_build_projection_sql).

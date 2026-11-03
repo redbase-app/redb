@@ -26,6 +26,9 @@ public class SqlRedbContext : RedbContextBase
     /// Bulk operations (SqlBulkCopy).
     /// </summary>
     protected override IBulkOperations BulkOperations => _bulkOperations;
+    /// <inheritdoc />
+    protected override Task<string> QueryRowsAsJsonCoreAsync(string sql, object[] parameters, System.Threading.CancellationToken cancellationToken)
+        => _connection.QueryRowsAsJsonAsync(sql, parameters, cancellationToken);
     
     /// <summary>
     /// Connection string (for direct access if needed).

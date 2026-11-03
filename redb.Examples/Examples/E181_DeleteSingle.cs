@@ -19,7 +19,7 @@ public class E181_DeleteSingle : ExampleBase
         var sw = Stopwatch.StartNew();
 
         // Create a temporary object to delete
-        var scheme = await redb.EnsureSchemeFromTypeAsync<EmployeeProps>();
+        var scheme = (await redb.GetSchemeByTypeAsync<EmployeeProps>())!;
         var tempObj = new RedbObject<EmployeeProps>
         {
             name = $"ToDelete_{DateTime.UtcNow.Ticks}",

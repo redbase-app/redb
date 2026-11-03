@@ -32,8 +32,8 @@ public class E188_SoftDeleteReference : ExampleBase
     {
         var sw = Stopwatch.StartNew();
 
-        var projectScheme = await redb.EnsureSchemeFromTypeAsync<ProjectMetricsProps>();
-        var employeeScheme = await redb.EnsureSchemeFromTypeAsync<EmployeeProps>();
+        var projectScheme = (await redb.GetSchemeByTypeAsync<ProjectMetricsProps>())!;
+        var employeeScheme = (await redb.GetSchemeByTypeAsync<EmployeeProps>())!;
 
         // Project that the employee will reference.
         var project = new RedbObject<ProjectMetricsProps>

@@ -13,8 +13,8 @@ namespace redb.Core.Query.Base;
 public abstract partial class QueryProviderBase
 {
     /// <summary>
-    /// Execute GroupBy with Window Functions.
-    /// Base implementation: throws NotSupportedException - Pro feature.
+    /// Execute GroupBy with Window Functions. A provider that supports it overrides this; one that does not refuses
+    /// with its own name.
     /// </summary>
     public virtual Task<JsonDocument?> ExecuteGroupedWindowQueryAsync(
         long schemeId,
@@ -23,15 +23,12 @@ public abstract partial class QueryProviderBase
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        string? filterJson = null, CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException(
-            "GroupBy + Window Functions are not implemented in this provider. " +
-            "Use the PostgreSQL or MSSQL provider that supports grouped window queries.");
-    }
-    
+        string? filterJson = null,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException($"GroupBy + WithWindow is not supported by {GetType().Name}.");
+
     /// <summary>
-    /// Execute GroupBy with Window Functions with FilterExpression (Pro version).
+    /// Execute GroupBy with Window Functions with FilterExpression.
     /// Free fallback: converts FilterExpression to facet-JSON.
     /// </summary>
     public virtual Task<JsonDocument?> ExecuteGroupedWindowQueryAsync(
@@ -41,15 +38,16 @@ public abstract partial class QueryProviderBase
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        FilterExpression? filter, CancellationToken cancellationToken = default)
+        FilterExpression? filter,
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
-        return ExecuteGroupedWindowQueryAsync(schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
+        return ExecuteGroupedWindowQueryAsync(schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson, havingJson, cancellationToken);
     }
-    
+
     /// <summary>
-    /// SQL preview for GroupBy + Window query.
-    /// Base implementation returns placeholder (overridden in Pro).
+    /// SQL preview for GroupBy + Window query. A provider that supports it overrides this; one that does not refuses
+    /// with its own name.
     /// </summary>
     public virtual Task<string> GetGroupedWindowSqlPreviewAsync(
         long schemeId,
@@ -58,19 +56,12 @@ public abstract partial class QueryProviderBase
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        string? filterJson = null, CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(
-            $"-- GroupBy + Window SQL Preview not available in Open Source version\n" +
-            $"-- SchemeId: {schemeId}\n" +
-            $"-- GroupFields: {string.Join(", ", groupFields.Select(g => g.FieldPath))}\n" +
-            $"-- Aggregations: {string.Join(", ", aggregations.Select(a => $"{a.Function}({a.FieldPath})"))}\n" +
-            $"-- WindowFuncs: {string.Join(", ", windowFuncs.Select(w => w.Func))}\n" +
-            $"-- Use Pro version for SQL preview");
-    }
-    
+        string? filterJson = null,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException($"GroupBy + WithWindow is not supported by {GetType().Name}.");
+
     /// <summary>
-    /// SQL preview for GroupBy + Window query with FilterExpression (Pro version).
+    /// SQL preview for GroupBy + Window query with FilterExpression.
     /// Free fallback: converts FilterExpression to facet-JSON.
     /// </summary>
     public virtual Task<string> GetGroupedWindowSqlPreviewAsync(
@@ -80,9 +71,35 @@ public abstract partial class QueryProviderBase
         IEnumerable<WindowFuncRequest> windowFuncs,
         IEnumerable<WindowFieldRequest> partitionBy,
         IEnumerable<WindowOrderRequest> orderBy,
-        FilterExpression? filter, CancellationToken cancellationToken = default)
+        FilterExpression? filter,
+        string? havingJson = null, CancellationToken cancellationToken = default)
     {
         var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
-        return GetGroupedWindowSqlPreviewAsync(schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
+        return GetGroupedWindowSqlPreviewAsync(schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson, havingJson, cancellationToken);
+    }
+
+    /// <summary>
+    /// SQL preview of a GroupBy. A provider that supports it overrides this; one that does not refuses with its own name.
+    /// </summary>
+    public virtual Task<string> GetGroupBySqlPreviewAsync(
+        long schemeId,
+        IEnumerable<GroupFieldRequest> groupFields,
+        IEnumerable<AggregateRequest> aggregations,
+        string? filterJson,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException($"GroupBy SQL preview is not supported by {GetType().Name}.");
+
+    /// <summary>
+    /// SQL preview of a GroupBy with FilterExpression. Free fallback: converts FilterExpression to facet-JSON.
+    /// </summary>
+    public virtual Task<string> GetGroupBySqlPreviewAsync(
+        long schemeId,
+        IEnumerable<GroupFieldRequest> groupFields,
+        IEnumerable<AggregateRequest> aggregations,
+        FilterExpression? filter,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+    {
+        var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
+        return GetGroupBySqlPreviewAsync(schemeId, groupFields, aggregations, filterJson, havingJson, cancellationToken);
     }
 }

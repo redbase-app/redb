@@ -3,6 +3,66 @@
 What to check and change when moving to a new version. Each section lists the changes that need action;
 [CHANGELOG.md](CHANGELOG.md) has the full list of what changed.
 
+## 4.6.0
+
+### Grouping: refusals instead of empty or default answers
+
+GroupBy, GroupByArray, their windows and their tree forms now throw where they used to answer with nothing or with a
+value that was not asked for:
+
+- `NotSupportedException` for a form that is not translated: a computed key or aggregate (`Agg.Sum(g, x => x.A * 2)`,
+  `c => c.Name.Length`), `SelectMany` with a result selector or a dictionary in the array path of `GroupByArray`, a
+  class as a key, an array of list items or object references, a string method in the condition of `Agg.Count`. A
+  computed aggregate used to become `*`; an array path that was not a chain of fields became empty.
+- `InvalidOperationException` when a provider returns no array of rows, or a row without a column the selector reads.
+  A missing column used to become the default value (0 for a number), which hid NULL keys dropped by SQL Server.
+- `ArgumentException` for a request without keys, where providers returned null and the query an empty list.
+
+`Having(...).WithWindow(...)` now keeps the HAVING (it was dropped), and `Win.Ntile(n)` uses `n` (it was always 4).
+A tree query's `GroupByArray` groups only its subtree (it grouped the whole scheme).
+
+Action: none for queries in the supported forms. A query that now throws was returning a wrong answer; rewrite the
+computation after the query, or group by a stored field.
+
+### Custom query providers: one method for array groupings
+
+Only for code that implements `IRedbQueryProvider` or `IRedbQueryable` itself:
+
+- The four `ExecuteArrayGroupedAggregateAsync` overloads are replaced by `ExecuteArrayGroupQueryAsync(ArrayGroupQuery)`
+  and `GetArrayGroupQuerySqlAsync(ArrayGroupQuery)`; tree providers add `ExecuteTreeArrayGroupQueryAsync` and
+  `GetTreeArrayGroupQuerySqlAsync`. `ArrayGroupQuery` carries the array path, keys, aggregates, condition, HAVING and
+  window; call `EnsureValid()` first.
+- `GetGroupBySqlPreviewAsync` (two overloads) is part of `IRedbQueryProvider`; the grouped window methods
+  (`ExecuteGroupedWindowQueryAsync`, `GetGroupedWindowSqlPreviewAsync` and their tree forms) take `havingJson`.
+- `IRedbQueryable.GroupByArray<TItem, TKey>` and the grouping interfaces (`IRedbGrouping`, `IRedbGroupedQueryable`,
+  `IGroupedWindowedQueryable`, `IGroupedWindowSpec`) no longer constrain the item type to `class, new()`: delete the
+  constraint from an implementation, or it does not compile.
+- `ISqlDialect.Query_AggregateArrayGroupedSql` is removed (every dialect threw from it).
+
+### Custom list providers: GetListItemsByIdsAsync
+
+Only for code that implements `IListProvider` or `ISqlDialect` itself:
+
+- `IListProvider.GetListItemsByIdsAsync(IEnumerable<long> itemIds, CancellationToken)` returns the list items of the
+  given ids: an id that names no item is left out, the order is free. A grouping whose key is a list item calls it
+  once per result to turn the ids it grouped by into the items, so read them in one query.
+- `ISqlDialect.ListItems_SelectByIds()` is the statement the stock list provider runs for it: the columns of
+  `ListItems_SelectById` for an array of ids passed as the first parameter.
+
+### Custom contexts: QueryRowsAsJsonAsync
+
+Only for code that implements `IRedbContext` or derives from `RedbContextBase` itself:
+
+- `IRedbContext.QueryRowsAsJsonAsync(string sql, object[] parameters, CancellationToken)` returns the rows of `sql` as
+  a JSON array of objects keyed by column name, NULL values included, `[]` when there are none. It is one command and
+  one telemetry span, like the other methods of the context. The SQLite providers read their grouping, window and
+  aggregate results through it; they used to read them on the raw connection, which opened no span.
+- `RedbContextBase` implements it inside the span over a new `protected abstract Task<string>
+  QueryRowsAsJsonCoreAsync(string sql, object[] parameters, CancellationToken)`. A context derived from it implements
+  that method on its connection: read every row and serialize each as an object of its columns. The stock PostgreSQL,
+  SQL Server and SQLite contexts do so.
+- A context that wraps another one (a decorator) forwards the call.
+
 ## 4.4.2
 
 ### Duplicate root structures

@@ -31,7 +31,6 @@ public class E089_TreeCreate : ExampleBase
 
     public override async Task<ExampleResult> RunAsync(IRedbService redb)
     {
-        await redb.SyncSchemeAsync<DepartmentProps>();
         // Run E087 first to cleanup existing data
 
         // Measure sequential creation

@@ -100,7 +100,7 @@ public static class GroupedWindowNames
     private static bool Matches(AggregateRequest aggregate, AggregateFunction function, string? field)
         => aggregate.Function == function
            && (function == AggregateFunction.Count
-               ? string.IsNullOrEmpty(aggregate.FieldPath) || aggregate.FieldPath == "*" || aggregate.FieldPath == field
+               ? aggregate.ConditionJson == null && (string.IsNullOrEmpty(aggregate.FieldPath) || aggregate.FieldPath == "*" || aggregate.FieldPath == field)
                : aggregate.FieldPath == field);
 
     private static bool TryParseAggregateName(string path, out AggregateFunction function, out string? field)

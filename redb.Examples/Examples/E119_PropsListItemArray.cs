@@ -38,9 +38,6 @@ public class E119_PropsListItemArray : ExampleBase
                 "Need at least 2 items. Run E115 first.");
         }
 
-        // Sync Person scheme
-        await redb.SyncSchemeAsync<PersonProps>();
-
         // Create person with Roles field (List<ListItem>)
         var person = new RedbObject<PersonProps>
         {

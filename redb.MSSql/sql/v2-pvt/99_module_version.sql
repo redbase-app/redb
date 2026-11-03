@@ -203,7 +203,29 @@ BEGIN
     --          of @distinct_on, and the wrapper keeps _rn = 1 ordered by _ord. Until 0.2.30 the first key only was
     --          partitioned, ranked by (SELECT 1), with the ordering applied outside, where a Props column does not
     --          resolve: TreeQuery(...).DistinctBy(x => x.IsActive) failed with "Invalid column name 'IsActive'".
-    RETURN N'0.2.31';
+    -- 0.2.39 - pvt_build_cte_sql, narrow shape over a tree source: the objects read their values through OUTER APPLY,
+    --          so the walk (pvt_tree_descendants) runs once; joined to the pivot it ran on both sides, and a filter over
+    --          a 100 thousand node subtree took 3.3 s instead of 1.8 s (2026-11-02).
+    -- 0.2.38 - pvt_build_query_sql: WhereLevel of a tree query that starts from nodes counts from them (the walk depth
+    --          of pvt_tree_descendants), as maxDepth and Pro do; it counted from the root of the whole tree (2026-11-02).
+    -- 0.2.37 - tree_leaves with a depth (TreeQuery(root, maxDepth).WhereLeaves()): the leaves of the whole tree
+    --          within the depth, in pvt_build_query_sql and pvt_build_cte_sql; the leaves below the depth were
+    --          returned (2026-11-02).
+    -- 0.2.36 - pvt_build_query_sql, tree without props: tree_descendants with a depth walks pvt_tree_descendants;
+    --          the descendant check it used has no depth, and TreeQuery(root, maxDepth) returned the whole subtree
+    --          (2026-11-02).
+    --          0.2.35 was a structure condition in the nested-dictionary join, withdrawn before release; some
+    --          databases ran it, hence the next number.
+    -- 0.2.34 - the pivot starts from the objects in every shape (LEFT JOIN _values): an object that stores no value
+    --          for the fields a statement reads (a null field has no row) kept no pivot row, and lists, counts,
+    --          groups (the NULL group) and windows lost it (2026-11-02).
+    -- 0.2.32 - dbo.pvt_build_array_groupby_sql (GroupByArray): array paths through classes and arrays, '$element'
+    --          of an array of simple values, fields of classes inside the element, COUNT(*) with a filter, elements
+    --          reached from the ids of the filtered objects, element fields joined by _array_parent_id with
+    --          _array_parent_id IS NOT NULL (the filtered covering index: 950 -> 160 ms on 200 thousand elements);
+    --          what it cannot answer returns '--error: <text>' instead of NULL. The outer filter that fails to
+    --          compile is refused; it used to be dropped (2026-11-02).
+    RETURN N'0.2.39';
 END;
 GO
 

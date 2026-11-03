@@ -31,7 +31,7 @@ public class MsSqlArrayHavingTranslatorTests
     {
         var sql = await BuildAsync("{\"$regex\":[{\"$count\":\"*\"},{\"$const\":\"x\"}]}");
 
-        sql.Should().BeNull("a HAVING the translator cannot read must not be replaced by 1=1");
+        sql.Should().Be("--error: the HAVING does not translate", "a HAVING the translator cannot read must not be replaced by 1=1");
     }
 
     [Fact]

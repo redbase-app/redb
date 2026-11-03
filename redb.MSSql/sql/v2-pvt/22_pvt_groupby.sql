@@ -94,7 +94,7 @@ BEGIN
     IF @node IS NULL OR ISJSON(@node) = 0 RETURN NULL;
 
     DECLARE @k NVARCHAR(200), @v NVARCHAR(MAX), @t INT;
-    SELECT TOP 1 @k = [key], @v = [value], @t = [type] FROM OPENJSON(@node);
+    SELECT TOP 1 @k = [key], @v = [value], @t = [type] FROM OPENJSON(@node) WHERE [key] <> N'filter';
     IF @k IS NULL RETURN NULL;
 
     IF @k = N'$and' OR @k = N'$or'
@@ -124,6 +124,16 @@ BEGIN
                     THEN N'NOT (' + dbo.pvt_build_groupby_having_expr(@v, @fields, @base_prefix) + N')'
                     ELSE NULL END;
 
+    -- A null test and a bare field: the filter of a conditional count reads fields of the row.
+    IF @k IN (N'$isnull', N'$notnull')
+        RETURN CASE WHEN @t = 5
+                    THEN N'(' + dbo.pvt_build_groupby_having_expr(@v, @fields, @base_prefix)
+                         + CASE @k WHEN N'$isnull' THEN N' IS NULL)' ELSE N' IS NOT NULL)' END
+                    ELSE NULL END;
+
+    IF @k = N'$field'
+        RETURN CASE WHEN @t = 1 THEN dbo.pvt_agg_field_ref(@v, @fields, @base_prefix) ELSE NULL END;
+
     IF @k IN (N'$count', N'$sum', N'$avg', N'$min', N'$max')
     BEGIN
         -- pvt_build_agg_expr refuses what it cannot compile (dbo.pvt_fail), so its result is SQL.
@@ -131,7 +141,7 @@ BEGIN
     END;
 
     IF @k = N'$const'
-        RETURN CASE WHEN @t IN (4, 5) THEN NULL ELSE dbo.pvt_jsonb_to_sql_literal(@v, @t) END;
+        RETURN CASE WHEN @t IN (0, 4, 5) THEN NULL ELSE dbo.pvt_jsonb_to_sql_literal(@v, @t) END;
 
     DECLARE @symbol NVARCHAR(5) = CASE @k
         WHEN N'$eq'  THEN N' = '

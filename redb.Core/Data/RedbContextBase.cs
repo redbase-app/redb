@@ -148,6 +148,18 @@ namespace redb.Core.Data
                 ? RedbTelemetry.RunAsync(RedbTelemetry.Json, () => Db.ExecuteJsonListAsync(sql, parameters, cancellationToken))
                 : Db.ExecuteJsonListAsync(sql, parameters, cancellationToken);
 
+        /// <inheritdoc />
+        public Task<string> QueryRowsAsJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken = default)
+            => RedbTelemetry.Enabled
+                ? RedbTelemetry.RunAsync(RedbTelemetry.Json, () => QueryRowsAsJsonCoreAsync(sql, parameters, cancellationToken))
+                : QueryRowsAsJsonCoreAsync(sql, parameters, cancellationToken);
+
+        /// <summary>
+        /// The provider's row-to-JSON read behind <see cref="QueryRowsAsJsonAsync"/>, run on <see cref="Db"/>: every
+        /// row of <paramref name="sql"/> as an object keyed by column name, NULL values included; "[]" for none.
+        /// </summary>
+        protected abstract Task<string> QueryRowsAsJsonCoreAsync(string sql, object[] parameters, CancellationToken cancellationToken);
+
         // === TRANSACTION SHORTCUTS ===
         
         /// <summary>

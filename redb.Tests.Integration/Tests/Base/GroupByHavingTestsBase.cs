@@ -359,4 +359,43 @@ public abstract class GroupByHavingTestsBase
             r.Count.Should().BeGreaterThan(0);
         });
     }
+
+    [Fact]
+    public async Task GroupBy_Having_ConditionalCount()
+    {
+        var ids = await SeedAsync();
+        var objects = await Seeded(ids).ToListAsync();
+
+        var rows = await Seeded(ids)
+            .GroupBy(e => e.Department)
+            .Having(g => Agg.Count(g, e => e.IsRemote) >= 2)
+            .SelectAsync(g => new { Dept = g.Key, C = Agg.Count(g) });
+
+        var expected = objects.GroupBy(o => o.Props.Department).Where(g => g.Count(o => o.Props.IsRemote) >= 2).Select(g => g.Key);
+        rows.Select(r => r.Dept).Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
+    public async Task GroupBy_Having_ThenWindow_RunsOverTheGroupsThatPass()
+    {
+        // A18: WithWindow did not receive the HAVING, so every group came back.
+        var ids = await SeedAsync();
+
+        var none = await Seeded(ids)
+            .GroupBy(e => e.Department)
+            .Having(g => Agg.Count(g) > 1_000_000)
+            .WithWindow(w => w.OrderBy(g => g.Key))
+            .SelectAsync(g => new { Dept = g.Key, Row = Win.RowNumber() });
+        none.Should().BeEmpty();
+
+        var objects = await Seeded(ids).ToListAsync();
+        var some = await Seeded(ids)
+            .GroupBy(e => e.Department)
+            .Having(g => Agg.Count(g, e => e.IsRemote) >= 2)
+            .WithWindow(w => w.OrderBy(g => g.Key))
+            .SelectAsync(g => new { Dept = g.Key, Row = Win.RowNumber() });
+        var expected = objects.GroupBy(o => o.Props.Department).Where(g => g.Count(o => o.Props.IsRemote) >= 2).Select(g => g.Key);
+        some.Select(r => r.Dept).Should().BeEquivalentTo(expected);
+        some.Select(r => r.Row).Should().BeEquivalentTo(Enumerable.Range(1, some.Count).Select(i => (long)i));
+    }
 }

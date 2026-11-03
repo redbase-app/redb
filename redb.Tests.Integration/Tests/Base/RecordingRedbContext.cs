@@ -156,6 +156,9 @@ public sealed class RecordingRedbContext : IRedbContext
     public Task<List<string>> ExecuteJsonListAsync(string sql, object[] parameters, CancellationToken cancellationToken)
         => _inner.ExecuteJsonListAsync(Note(sql), parameters, cancellationToken);
 
+    public Task<string> QueryRowsAsJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken = default)
+        => _inner.QueryRowsAsJsonAsync(Note(sql), parameters, cancellationToken);
+
     public IRedbTransaction? CurrentTransaction => _inner.CurrentTransaction;
     public bool IsInTransaction => _inner.IsInTransaction;
 

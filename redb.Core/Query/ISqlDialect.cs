@@ -1082,6 +1082,11 @@ public interface ISqlDialect
     string ListItems_SelectById();
     
     /// <summary>
+    /// SELECT list items by their ids. Params: $1=itemIds (long[])
+    /// </summary>
+    string ListItems_SelectByIds();
+    
+    /// <summary>
     /// SELECT list items by list ID. Params: $1=listId
     /// </summary>
     string ListItems_SelectByListId();
@@ -1357,11 +1362,6 @@ public interface ISqlDialect
     /// SQL for grouped aggregation.
     /// </summary>
     string Query_AggregateGroupedSql();
-    
-    /// <summary>
-    /// SQL for array grouped aggregation.
-    /// </summary>
-    string Query_AggregateArrayGroupedSql();
     
     /// <summary>
     /// SQL for window query.

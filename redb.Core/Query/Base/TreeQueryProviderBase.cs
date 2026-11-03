@@ -28,8 +28,11 @@ namespace redb.Core.Query.Base;
 /// Base tree query provider for executing hierarchical LINQ queries via search_tree_objects_with_facets.
 /// Database-specific implementations should inherit and provide ISqlDialect.
 /// </summary>
-public abstract class TreeQueryProviderBase : ITreeQueryProvider
+public abstract class TreeQueryProviderBase : ITreeQueryProvider, Grouping.IListItemKeySource
 {
+    // The list provider of the service: the groupings read their list item keys through it (ListItemGroupKeys).
+    IListProvider? Grouping.IListItemKeySource.ListItems { get; set; }
+
     protected readonly IRedbContext _context;
     protected readonly IRedbObjectSerializer _serializer;
     protected readonly IFilterExpressionParser _filterParser;
@@ -188,36 +191,19 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         return await baseProvider.ExecuteGroupedAggregateAsync(schemeId, groupFields, aggregations, filter, havingJson);
     }
 
-    public virtual async Task<System.Text.Json.JsonDocument?> ExecuteArrayGroupedAggregateAsync(
-        long schemeId,
-        string arrayPath,
-        IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
-        IEnumerable<AggregateRequest> aggregations,
-        string? filterJson = null,
-        string? havingJson = null, CancellationToken cancellationToken = default)
-    {
-        var baseProvider = CreateQueryProvider();
-        // TQP-1: the HAVING goes along - this overload used to drop it, so a tree array grouping without a Where
-        // returned every group (with a Where the other overload passed it on).
-        return await baseProvider.ExecuteArrayGroupedAggregateAsync(schemeId, arrayPath, groupFields, aggregations, filterJson, havingJson, cancellationToken);
-    }
+    /// <summary>
+    /// Array grouping without a tree: the flat provider answers it.
+    /// </summary>
+    public virtual Task<System.Text.Json.JsonDocument> ExecuteArrayGroupQueryAsync(
+        redb.Core.Query.Grouping.ArrayGroupQuery query, CancellationToken cancellationToken = default)
+        => CreateQueryProvider().ExecuteArrayGroupQueryAsync(query, cancellationToken);
 
     /// <summary>
-    /// Execute array-element GroupBy with FilterExpression (Pro version).
-    /// Default impl forwards to the underlying QueryProvider so Pro overrides
-    /// can short-circuit the facet-JSON conversion.
+    /// SQL of <see cref="ExecuteArrayGroupQueryAsync"/>.
     /// </summary>
-    public virtual async Task<System.Text.Json.JsonDocument?> ExecuteArrayGroupedAggregateAsync(
-        long schemeId,
-        string arrayPath,
-        IEnumerable<redb.Core.Query.Grouping.GroupFieldRequest> groupFields,
-        IEnumerable<AggregateRequest> aggregations,
-        QueryExpressions.FilterExpression? filter,
-        string? havingJson = null, CancellationToken cancellationToken = default)
-    {
-        var baseProvider = CreateQueryProvider();
-        return await baseProvider.ExecuteArrayGroupedAggregateAsync(schemeId, arrayPath, groupFields, aggregations, filter, havingJson);
-    }
+    public virtual Task<string> GetArrayGroupQuerySqlAsync(
+        redb.Core.Query.Grouping.ArrayGroupQuery query, CancellationToken cancellationToken = default)
+        => CreateQueryProvider().GetArrayGroupQuerySqlAsync(query, cancellationToken);
 
     // ===== WINDOW FUNCTIONS (delegate to QueryProviderBase) =====
     // virtual for override in Pro version
@@ -269,61 +255,69 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
 
     // ===== GROUPED WINDOW (delegated to base provider) =====
 
-    public virtual async Task<System.Text.Json.JsonDocument?> ExecuteGroupedWindowQueryAsync(
+    public virtual Task<System.Text.Json.JsonDocument?> ExecuteGroupedWindowQueryAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? filterJson = null, CancellationToken cancellationToken = default)
-    {
-        var baseProvider = CreateQueryProvider();
-        return await baseProvider.ExecuteGroupedWindowQueryAsync(
-            schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
-    }
+        string? filterJson = null,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+        => CreateQueryProvider().ExecuteGroupedWindowQueryAsync(
+            schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson, havingJson, cancellationToken);
 
-    public virtual async Task<System.Text.Json.JsonDocument?> ExecuteGroupedWindowQueryAsync(
+    public virtual Task<System.Text.Json.JsonDocument?> ExecuteGroupedWindowQueryAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        QueryExpressions.FilterExpression? filter, CancellationToken cancellationToken = default)
-    {
-        var baseProvider = CreateQueryProvider();
-        return await baseProvider.ExecuteGroupedWindowQueryAsync(
-            schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filter);
-    }
+        QueryExpressions.FilterExpression? filter,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+        => CreateQueryProvider().ExecuteGroupedWindowQueryAsync(
+            schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filter, havingJson, cancellationToken);
 
-    public virtual async Task<string> GetGroupedWindowSqlPreviewAsync(
+    public virtual Task<string> GetGroupedWindowSqlPreviewAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        string? filterJson = null, CancellationToken cancellationToken = default)
-    {
-        var baseProvider = CreateQueryProvider();
-        return await baseProvider.GetGroupedWindowSqlPreviewAsync(
-            schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
-    }
+        string? filterJson = null,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+        => CreateQueryProvider().GetGroupedWindowSqlPreviewAsync(
+            schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson, havingJson, cancellationToken);
 
-    public virtual async Task<string> GetGroupedWindowSqlPreviewAsync(
+    public virtual Task<string> GetGroupedWindowSqlPreviewAsync(
         long schemeId,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
-        QueryExpressions.FilterExpression? filter, CancellationToken cancellationToken = default)
-    {
-        var baseProvider = CreateQueryProvider();
-        return await baseProvider.GetGroupedWindowSqlPreviewAsync(
-            schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filter);
-    }
+        QueryExpressions.FilterExpression? filter,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+        => CreateQueryProvider().GetGroupedWindowSqlPreviewAsync(
+            schemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filter, havingJson, cancellationToken);
+
+    public virtual Task<string> GetGroupBySqlPreviewAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        string? filterJson,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+        => CreateQueryProvider().GetGroupBySqlPreviewAsync(schemeId, groupFields, aggregations, filterJson, havingJson, cancellationToken);
+
+    public virtual Task<string> GetGroupBySqlPreviewAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        QueryExpressions.FilterExpression? filter,
+        string? havingJson = null, CancellationToken cancellationToken = default)
+        => CreateQueryProvider().GetGroupBySqlPreviewAsync(schemeId, groupFields, aggregations, filter, havingJson, cancellationToken);
 
     // ===== ITreeQueryProvider IMPLEMENTATION (TREE FUNCTIONALITY) =====
 
@@ -1610,6 +1604,60 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
     }
 
     /// <summary>
+    /// Array grouping over the objects of a subtree. Base implementation: the ids of the subtree (roots, depth and
+    /// Where of the context) become the object condition of the flat array grouping. Pro overrides it with a tree CTE.
+    /// </summary>
+    public virtual async Task<System.Text.Json.JsonDocument> ExecuteTreeArrayGroupQueryAsync<TProps>(
+        TreeQueryContext<TProps> context,
+        Grouping.ArrayGroupQuery query,
+        CancellationToken cancellationToken = default) where TProps : class, new()
+    {
+        var treeObjectIds = await GetTreeObjectIdsForArrayGroupAsync(context, query, cancellationToken);
+        if (treeObjectIds.Count == 0)
+            return System.Text.Json.JsonDocument.Parse("[]"); // no object in the subtree, so no element and no group
+        return await CreateQueryProvider().ExecuteArrayGroupQueryAsync(
+            WithObjectIds(query, treeObjectIds), cancellationToken);
+    }
+
+    /// <summary>
+    /// SQL of <see cref="ExecuteTreeArrayGroupQueryAsync"/>: the flat array grouping over the ids of the subtree.
+    /// </summary>
+    public virtual async Task<string> GetTreeArrayGroupQuerySqlAsync<TProps>(
+        TreeQueryContext<TProps> context,
+        Grouping.ArrayGroupQuery query,
+        CancellationToken cancellationToken = default) where TProps : class, new()
+    {
+        var treeObjectIds = await GetTreeObjectIdsForArrayGroupAsync(context, query, cancellationToken);
+        if (treeObjectIds.Count == 0)
+            return "-- the subtree has no objects: the grouping runs no SQL and returns no groups";
+        return await CreateQueryProvider().GetArrayGroupQuerySqlAsync(
+            WithObjectIds(query, treeObjectIds), cancellationToken);
+    }
+
+    private async Task<List<long>> GetTreeObjectIdsForArrayGroupAsync<TProps>(
+        TreeQueryContext<TProps> context, Grouping.ArrayGroupQuery query, CancellationToken cancellationToken)
+        where TProps : class, new()
+    {
+        if (query.Filter != null || !string.IsNullOrEmpty(query.FilterJson))
+            throw new ArgumentException(
+                "A tree array grouping takes its object condition from the tree context; the request must not carry one.",
+                nameof(query));
+        query.EnsureValid();
+        return await GetTreeObjectIdsAsync(context, cancellationToken);
+    }
+
+    private Grouping.ArrayGroupQuery WithObjectIds(Grouping.ArrayGroupQuery query, List<long> objectIds) => new()
+    {
+        SchemeId = query.SchemeId,
+        ArrayPath = query.ArrayPath,
+        GroupFields = query.GroupFields,
+        Aggregations = query.Aggregations,
+        FilterJson = BuildObjectIdsFilterJson(objectIds),
+        HavingJson = query.HavingJson,
+        Window = query.Window
+    };
+
+    /// <summary>
     /// Gets object IDs matching tree query context.
     /// </summary>
     private async Task<List<long>> GetTreeObjectIdsAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken)
@@ -1711,45 +1759,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         var filterJson = BuildObjectIdsFilterJson(treeObjectIds);
         var baseProvider = CreateQueryProvider();
 
-        // GetGroupBySqlPreviewAsync is provider-specific (not on IRedbQueryProvider)
-        // — reach for it via reflection, mirroring RedbGroupedQueryable.ToSqlStringAsync.
-        var providerType = baseProvider.GetType();
-        var method = providerType.GetMethod("GetGroupBySqlPreviewAsync", new[]
-        {
-            typeof(long),
-            typeof(IEnumerable<Grouping.GroupFieldRequest>),
-            typeof(IEnumerable<Aggregation.AggregateRequest>),
-            typeof(string),
-            typeof(string),
-            typeof(CancellationToken)
-        });
-        object?[] methodArgs;
-        if (method == null)
-        {
-            method = providerType.GetMethod("GetGroupBySqlPreviewAsync", new[]
-            {
-                typeof(long),
-                typeof(IEnumerable<Grouping.GroupFieldRequest>),
-                typeof(IEnumerable<Aggregation.AggregateRequest>),
-                typeof(string),
-                typeof(CancellationToken)
-            });
-            methodArgs = new object?[] { context.SchemeId, groupFields, aggregations, filterJson, cancellationToken };
-        }
-        else
-        {
-            methodArgs = new object?[] { context.SchemeId, groupFields, aggregations, filterJson, havingJson, cancellationToken };
-        }
-        if (method == null)
-        {
-            return $"-- Tree GroupBy SQL Preview not supported by {providerType.Name}\n" +
-                   $"-- SchemeId: {context.SchemeId}\n" +
-                   $"-- RootObjectId: {context.RootObjectId}\n" +
-                   $"-- GroupFields: {string.Join(", ", groupFields.Select(g => g.FieldPath))}\n" +
-                   $"-- Aggregations: {string.Join(", ", aggregations.Select(a => $"{a.Function}({a.FieldPath})"))}";
-        }
-        var task = method.Invoke(baseProvider, methodArgs) as Task<string>;
-        var preview = task != null ? await task : "-- SQL preview failed";
+        var preview = await baseProvider.GetGroupBySqlPreviewAsync(
+            context.SchemeId, groupFields, aggregations, filterJson, havingJson, cancellationToken);
         return $"-- Tree GroupBy: subtree resolved to {treeObjectIds.Count} object(s) (RootObjectId={context.RootObjectId})\n" + preview;
     }
 
@@ -1766,7 +1777,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
-        IEnumerable<Window.WindowOrderRequest> orderBy, CancellationToken cancellationToken = default) where TProps : class, new()
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        string? havingJson = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         // Base implementation: get tree object IDs first, then filter grouping + window
         var treeObjectIds = await GetTreeObjectIdsAsync(context, cancellationToken);
@@ -1780,7 +1792,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         // Delegate to base grouped window query with ID filter
         var baseProvider = CreateQueryProvider();
         return await baseProvider.ExecuteGroupedWindowQueryAsync(
-            context.SchemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
+            context.SchemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson, havingJson, cancellationToken);
     }
 
     /// <summary>
@@ -1793,7 +1805,8 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         IEnumerable<Aggregation.AggregateRequest> aggregations,
         IEnumerable<Window.WindowFuncRequest> windowFuncs,
         IEnumerable<Window.WindowFieldRequest> partitionBy,
-        IEnumerable<Window.WindowOrderRequest> orderBy, CancellationToken cancellationToken = default) where TProps : class, new()
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        string? havingJson = null, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var treeObjectIds = await GetTreeObjectIdsAsync(context, cancellationToken);
         if (treeObjectIds.Count == 0)
@@ -1803,7 +1816,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider
         var filterJson = BuildObjectIdsFilterJson(treeObjectIds);
         var baseProvider = CreateQueryProvider();
         var preview = await baseProvider.GetGroupedWindowSqlPreviewAsync(
-            context.SchemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson);
+            context.SchemeId, groupFields, aggregations, windowFuncs, partitionBy, orderBy, filterJson, havingJson, cancellationToken);
         return $"-- Tree GroupBy + Window: subtree resolved to {treeObjectIds.Count} object(s) (RootObjectId={context.RootObjectId})\n" + preview;
     }
 }

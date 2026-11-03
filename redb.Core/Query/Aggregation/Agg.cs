@@ -84,34 +84,40 @@ public static class Agg
     /// Sum in a group: Agg.Sum(g, x => x.Stock)
     /// </summary>
     public static TValue Sum<TKey, TProps, TValue>(Grouping.IRedbGrouping<TKey, TProps> group, System.Linq.Expressions.Expression<Func<TProps, TValue>> selector) 
-        where TProps : class, new()
         => throw new NotSupportedException("Agg.Sum for GroupBy");
     
     /// <summary>
     /// Average in a group: Agg.Average(g, x => x.Age)
     /// </summary>
     public static double Average<TKey, TProps, TValue>(Grouping.IRedbGrouping<TKey, TProps> group, System.Linq.Expressions.Expression<Func<TProps, TValue>> selector) 
-        where TProps : class, new()
         => throw new NotSupportedException("Agg.Average for GroupBy");
     
     /// <summary>
     /// Minimum in a group: Agg.Min(g, x => x.Price)
     /// </summary>
     public static TValue Min<TKey, TProps, TValue>(Grouping.IRedbGrouping<TKey, TProps> group, System.Linq.Expressions.Expression<Func<TProps, TValue>> selector) 
-        where TProps : class, new()
         => throw new NotSupportedException("Agg.Min for GroupBy");
     
     /// <summary>
     /// Maximum in a group: Agg.Max(g, x => x.Price)
     /// </summary>
     public static TValue Max<TKey, TProps, TValue>(Grouping.IRedbGrouping<TKey, TProps> group, System.Linq.Expressions.Expression<Func<TProps, TValue>> selector) 
-        where TProps : class, new()
         => throw new NotSupportedException("Agg.Max for GroupBy");
     
     /// <summary>
     /// Count in a group: Agg.Count(g)
     /// </summary>
-    public static int Count<TKey, TProps>(Grouping.IRedbGrouping<TKey, TProps> group) 
-        where TProps : class, new()
+    public static int Count<TKey, TProps>(Grouping.IRedbGrouping<TKey, TProps> group)
+        => throw new NotSupportedException("Agg.Count for GroupBy");
+
+    /// <summary>
+    /// Count of the members of a group that satisfy a condition: <c>Agg.Count(g, c =&gt; c.IsVerified)</c>.
+    /// Works in SelectAsync and in Having, for GroupBy, GroupByArray and their tree forms. The condition may
+    /// compare fields with constants or with each other, combine comparisons with &amp;&amp;, || and !, test a
+    /// field for null and use a boolean field alone.
+    /// </summary>
+    public static int Count<TKey, TProps>(
+        Grouping.IRedbGrouping<TKey, TProps> group,
+        System.Linq.Expressions.Expression<Func<TProps, bool>> predicate)
         => throw new NotSupportedException("Agg.Count for GroupBy");
 }

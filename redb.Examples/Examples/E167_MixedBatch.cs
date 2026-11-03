@@ -38,7 +38,7 @@ public class E167_MixedBatch : ExampleBase
         });
 
         // Add generic objects with Props=null
-        var scheme = await redb.EnsureSchemeFromTypeAsync<EmployeeProps>();
+        var scheme = (await redb.GetSchemeByTypeAsync<EmployeeProps>())!;
         
         var gen1 = new RedbObject<EmployeeProps>
         {

@@ -19,7 +19,7 @@ public class E182_DeleteBatch : ExampleBase
         var sw = Stopwatch.StartNew();
 
         // Create temporary objects to delete
-        var scheme = await redb.EnsureSchemeFromTypeAsync<EmployeeProps>();
+        var scheme = (await redb.GetSchemeByTypeAsync<EmployeeProps>())!;
         var batchId = DateTime.UtcNow.Ticks;
         var tempObjects = new List<RedbObject<EmployeeProps>>();
 

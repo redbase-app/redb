@@ -22,7 +22,6 @@ public class E206_WhereRedbNarrowsFirst : ExampleBase
     public override async Task<ExampleResult> RunAsync(IRedbService redb)
     {
         var sw = Stopwatch.StartNew();
-        await redb.SyncSchemeAsync<EmployeeProps>();
 
         // A team lead and twenty employees under it: the parent is a system column (_id_parent),
         // no Props field is needed to tell the team apart.

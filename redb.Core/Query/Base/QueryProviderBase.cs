@@ -23,8 +23,11 @@ namespace redb.Core.Query.Base;
 /// Base query provider for executing LINQ queries via search_objects_with_facets.
 /// Database-specific implementations should inherit and provide ISqlDialect.
 /// </summary>
-public abstract partial class QueryProviderBase : IRedbQueryProvider
+public abstract partial class QueryProviderBase : IRedbQueryProvider, Grouping.IListItemKeySource
 {
+    // The list provider of the service: the groupings read their list item keys through it (ListItemGroupKeys).
+    IListProvider? Grouping.IListItemKeySource.ListItems { get; set; }
+
     protected readonly IRedbContext _context;
     protected readonly IRedbObjectSerializer _serializer;
     protected readonly IFilterExpressionParser _filterParser;

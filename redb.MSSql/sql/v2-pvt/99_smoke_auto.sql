@@ -809,7 +809,7 @@ ELSE
     PRINT N'SKIP [Employee / groupby block] scheme not found';
 
 -- =====================================================================
--- 5. ARRAY GROUPBY (file 26 — not yet implemented)
+-- 5. ARRAY GROUPBY (file 26)
 -- =====================================================================
 IF OBJECT_ID(N'dbo.pvt_build_array_groupby_sql') IS NOT NULL
 BEGIN
@@ -817,7 +817,12 @@ BEGIN
     BEGIN
         BEGIN TRY
             DECLARE @ag_build NVARCHAR(MAX) = dbo.pvt_build_array_groupby_sql(
-                @emp_id, N'Skills', NULL, NULL, NULL, NULL, N'flat');
+                @emp_id, N'Skills', NULL,
+                N'[{"field":"$element","alias":"Skill"}]',
+                N'[{"field":"*","func":"COUNT","alias":"Count"}]',
+                NULL, N'flat');
+            IF @ag_build LIKE N'--error:%'
+                THROW 50000, @ag_build, 1;
             DECLARE @ag_wrap NVARCHAR(MAX) =
                 N'SELECT (SELECT * FROM (' + @ag_build + N') _ag FOR JSON PATH, INCLUDE_NULL_VALUES)';
             DECLARE @ag_result NVARCHAR(MAX);

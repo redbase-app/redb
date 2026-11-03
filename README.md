@@ -572,6 +572,19 @@ providers, and the one trap worth knowing.
 | Composite key | `.GroupBy(x => new { x.Department, x.Position })` | Multi-field grouping |
 | Group by base field | `.GroupByRedb(x => x.OwnerId)` | GROUP BY on `_objects` — direct |
 | Group by array element | `.GroupByArray(e => e.Contacts!, c => c.Type)` | Expands arrays into groups |
+| Inner array | `.GroupByArray(e => e.Contacts!.SelectMany(c => c.Metadata!), m => m.Label)` | Groups the elements of an array inside an element |
+| Array of simple values | `.GroupByArray(e => e.Skills!, s => s)`, `.GroupByArray(e => e.Address!.Building!.Amenities!, a => a)` | The element itself is the key; `Agg.Sum(g, x => x)` sums it |
+| Field of a class in the element | `.GroupByArray(e => e.Items!, i => i.Place!.City)` | Nested classes of the element |
+| Conditional count | `Agg.Count(g, c => c.IsVerified && c.Type == "email")` | In `SelectAsync` and `Having`, for `GroupBy` and `GroupByArray` |
+| Window over array groups | `.GroupByArray(...).WithWindow(w => w.OrderBy(g => g.Key))` | Same windows as `GroupBy(...).WithWindow(...)` |
+| SQL of an array grouping | `.GroupByArray(...).ToSqlStringAsync(g => ...)` | The statement that runs |
+
+The array of `GroupByArray` is a chain of fields or `SelectMany` over an inner array; its key is a stored field, an
+anonymous type of fields, or the element itself. A condition of `Agg.Count` compares fields with constants or with each
+other, combines them with `&&`, `||`, `!`, tests for null and reads boolean fields. Everything else (a `SelectMany`
+with a result selector, a dictionary in the path, a computed key or aggregate, a string method in a condition, an array
+of list items or object references) throws `NotSupportedException` naming the form. A tree query groups only the
+elements of its subtree.
 
 ### Window Functions
 

@@ -106,29 +106,42 @@ public interface IRedbQueryProvider
         CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Execute GroupBy aggregation on array (SQL function aggregate_array_grouped).
+    /// The SQL <see cref="ExecuteGroupedAggregateAsync(long, IEnumerable{Grouping.GroupFieldRequest}, IEnumerable{AggregateRequest}, string?, string?, CancellationToken)"/>
+    /// runs, for <c>ToSqlStringAsync</c>.
     /// </summary>
-    Task<System.Text.Json.JsonDocument?> ExecuteArrayGroupedAggregateAsync(
+    Task<string> GetGroupBySqlPreviewAsync(
         long schemeId,
-        string arrayPath,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
-        string? filterJson = null,
+        string? filterJson,
         string? havingJson = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Execute GroupBy aggregation on array with FilterExpression (Pro version).
-    /// Provides direct access to outer filter for proper inline SQL compilation
-    /// without delegating to PVT SQL functions.
+    /// The SQL <see cref="ExecuteGroupedAggregateAsync(long, IEnumerable{Grouping.GroupFieldRequest}, IEnumerable{AggregateRequest}, FilterExpression?, string?, CancellationToken)"/>
+    /// runs, for <c>ToSqlStringAsync</c>.
     /// </summary>
-    Task<System.Text.Json.JsonDocument?> ExecuteArrayGroupedAggregateAsync(
+    Task<string> GetGroupBySqlPreviewAsync(
         long schemeId,
-        string arrayPath,
         IEnumerable<Grouping.GroupFieldRequest> groupFields,
         IEnumerable<AggregateRequest> aggregations,
         FilterExpression? filter,
         string? havingJson = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs a grouping over the elements of an array (GroupByArray, with or without a window over the groups) and
+    /// returns its rows as a JSON array of objects, one property per key and aggregate alias, NULL values included.
+    /// </summary>
+    Task<System.Text.Json.JsonDocument> ExecuteArrayGroupQueryAsync(
+        Grouping.ArrayGroupQuery query,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The SQL <see cref="ExecuteArrayGroupQueryAsync"/> runs for the same request, for <c>ToSqlStringAsync</c>.
+    /// </summary>
+    Task<string> GetArrayGroupQuerySqlAsync(
+        Grouping.ArrayGroupQuery query,
         CancellationToken cancellationToken = default);
     
     // ===== WINDOW FUNCTIONS =====
@@ -212,6 +225,7 @@ public interface IRedbQueryProvider
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
         string? filterJson = null,
+        string? havingJson = null,
         CancellationToken cancellationToken = default);
     
     /// <summary>
@@ -225,6 +239,7 @@ public interface IRedbQueryProvider
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
         FilterExpression? filter,
+        string? havingJson = null,
         CancellationToken cancellationToken = default);
     
     /// <summary>
@@ -238,6 +253,7 @@ public interface IRedbQueryProvider
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
         string? filterJson = null,
+        string? havingJson = null,
         CancellationToken cancellationToken = default);
     
     /// <summary>
@@ -251,6 +267,7 @@ public interface IRedbQueryProvider
         IEnumerable<Window.WindowFieldRequest> partitionBy,
         IEnumerable<Window.WindowOrderRequest> orderBy,
         FilterExpression? filter,
+        string? havingJson = null,
         CancellationToken cancellationToken = default);
     
     // ===== DELETE =====

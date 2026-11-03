@@ -213,6 +213,23 @@ public partial class MssqlTreeQueryProvider
                 merged["$level"] = tf.FilterConditions;
         }
 
+        // The tree filters after the one that gave the source narrow it, as conditions of the filter
+        // (WhereDescendantsOf(x).WhereLeaves(): the leaves under x). Only the first one used to be read.
+        var source = descendantsOf != null ? TreeFilterOperator.DescendantsOf
+            : childrenOf != null ? TreeFilterOperator.ChildrenOf
+            : isRoot ? TreeFilterOperator.IsRoot
+            : isLeaf ? TreeFilterOperator.IsLeaf
+            : (TreeFilterOperator?)null;
+        foreach (var tf in treeFilters)
+        {
+            if (tf.Operator == source) continue;
+            if (tf.Operator == TreeFilterOperator.ChildrenOf)
+                merged["$childrenOf"] = Convert.ToInt64(tf.Value, CultureInfo.InvariantCulture);
+            else if (tf.Operator == TreeFilterOperator.IsRoot)
+                merged["$isRoot"] = true;
+            else if (tf.Operator == TreeFilterOperator.IsLeaf)
+                merged["$isLeaf"] = true;
+        }
         var filterJson = merged.Count == 0
             ? "{}"
             : JsonSerializer.Serialize(merged, new JsonSerializerOptions
@@ -272,7 +289,12 @@ public partial class MssqlTreeQueryProvider
             : null;
         var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
 
-        var maxDepth = context.MaxRecursionDepth ?? 10;
+        // The depth of the tree walk (TreeQuery(root, maxDepth)); none: the whole subtree. This passed MaxRecursionDepth, the
+        // depth of nested props, so maxDepth was ignored and every subtree stopped at 10 levels.
+        // WhereDescendantsOf(node, maxDepth) walks from that node, to its own depth when it has one.
+        var walkDepth = context.TreeFilters?.FirstOrDefault(f => f.Operator == TreeFilterOperator.DescendantsOf)?.MaxDepth
+            ?? context.MaxDepth;
+        var maxDepth = walkDepth?.ToString(CultureInfo.InvariantCulture) ?? "NULL";
         var limitArg = ignoreLimitOffset || !context.Limit.HasValue
             ? "NULL"
             : context.Limit.Value.ToString(CultureInfo.InvariantCulture);
@@ -294,7 +316,7 @@ public partial class MssqlTreeQueryProvider
             + ", $1, " + limitArg
             + ", " + offsetArg
             + ", " + orderArg
-            + ", " + maxDepth.ToString(CultureInfo.InvariantCulture)
+            + ", " + maxDepth
             + ", " + (context.IsDistinct ? "1" : "0")
             + ", N'" + route.SourceMode + "'"
             + ", " + treeIdsLiteral

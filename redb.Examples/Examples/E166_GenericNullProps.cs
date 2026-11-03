@@ -20,8 +20,8 @@ public class E166_GenericNullProps : ExampleBase
     {
         var sw = Stopwatch.StartNew();
 
-        // Ensure scheme exists
-        var scheme = await redb.EnsureSchemeFromTypeAsync<EmployeeProps>();
+        // Schemes are synced at startup; read from the scheme cache
+        var scheme = (await redb.GetSchemeByTypeAsync<EmployeeProps>())!;
 
         // Create generic object but with Props=null (only base fields)
         var obj = new RedbObject<EmployeeProps>

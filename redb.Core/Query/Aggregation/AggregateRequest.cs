@@ -18,6 +18,14 @@ public class AggregateRequest
     public string? Alias { get; set; }
 
     /// <summary>
+    /// Condition of a conditional count (<c>Agg.Count(g, x =&gt; x.IsVerified)</c>): a boolean expression in the JSON
+    /// form HAVING uses (<c>$and/$or/$not</c>, <c>$eq/$ne/$gt/$gte/$lt/$lte</c>, <c>$isnull/$notnull</c>,
+    /// <c>$field</c>, <c>$const</c>). Null for an aggregate without a condition. Only <see cref="AggregateFunction.Count"/>
+    /// carries one.
+    /// </summary>
+    public string? ConditionJson { get; set; }
+
+    /// <summary>
     /// True when the path names a field of the object itself (x.Id, x.Name) and not a Props field.
     /// The path alone cannot tell: x.Props.Name and x.Name both read "Name". A path marked "0$:" is a
     /// base field whatever this says.

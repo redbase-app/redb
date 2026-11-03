@@ -115,7 +115,7 @@ public partial class SqliteQueryProvider
 
         // SQLite has no row_to_json: execute the (fully-literal) inner SQL and
         // serialize its single result row to a JSON object in C#.
-        var jsonRow = await SqliteConn.QueryFirstRowAsJsonAsync(innerSql!);
+        var jsonRow = await FirstRowAsJsonAsync(innerSql!);
 
         var result = new AggregateResult();
         if (!string.IsNullOrEmpty(jsonRow))
@@ -170,6 +170,9 @@ public partial class SqliteQueryProvider
                     ["$field"] = NormalizePvtFieldName(r.FieldPath, r.IsBaseField)
                 };
             }
+            // Agg.Count(g, x => condition): the module compiles it as a per-aggregate filter.
+            if (r.ConditionJson != null)
+                entry["filter"] = JsonDocument.Parse(r.ConditionJson).RootElement.Clone();
             entries.Add(entry);
         }
         return JsonSerializer.Serialize(entries);

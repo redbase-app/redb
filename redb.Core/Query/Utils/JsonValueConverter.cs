@@ -5,7 +5,7 @@ using redb.Core.Models.Entities;
 namespace redb.Core.Query.Utils;
 
 /// <summary>
-/// Unified converter JsonElement → CLR types for EAV
+/// Unified converter JsonElement → CLR types for redb props values
 /// Supports all types: string, numeric, bool, DateTime, Guid
 /// </summary>
 public static class JsonValueConverter
@@ -61,6 +61,11 @@ public static class JsonValueConverter
             // Guid
             Type t when t == typeof(Guid) => elem.TryGetGuid(out var g) ? g : Guid.Empty,
             
+            // Enums are stored by name; a number is read as the underlying value.
+            Type t when t.IsEnum => elem.ValueKind == JsonValueKind.String
+                ? Enum.Parse(t, elem.GetString()!, ignoreCase: false)
+                : Enum.ToObject(t, (long)ReadIntegral(elem)),
+
             // Fallback
             _ => elem.GetRawText()
         };

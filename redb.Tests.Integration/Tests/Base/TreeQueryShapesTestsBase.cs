@@ -190,4 +190,34 @@ public abstract class TreeQueryShapesTestsBase
         shallowWithDepth.Where(o => o.Props?.Next != null).Should().OnlyContain(o => !o.Props.Next!.IsPropsLoaded,
             "a depth limit on the tree does not undo the props depth set before it");
     }
+
+    [Fact]
+    public async Task TreeArrayGrouping_CountsOnlyTheSubtree()
+    {
+        // A10: TreeQueryableBase did not override GroupByArray, so the grouping ran over the whole scheme.
+        var rootId = await SeedEmployeeTreeAsync();
+        var nodes = await Redb.TreeQuery<EmployeeProps>(rootId).ToListAsync();
+        nodes.Should().NotBeEmpty("precondition: the subtree holds employees");
+
+        var rows = await Redb.TreeQuery<EmployeeProps>(rootId)
+            .GroupByArray(e => e.Contacts!, c => c.Type)
+            .SelectAsync(g => new { Type = g.Key, Count = Agg.Count(g) });
+
+        var expected = nodes.SelectMany(n => n.Props.Contacts ?? []).GroupBy(c => c.Type).ToDictionary(g => g.Key, g => g.Count());
+        rows.ToDictionary(r => r.Type, r => r.Count).Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
+    public async Task TreeArrayGrouping_WithWhereAndLevel_CountsTheNodesTheListReturns()
+    {
+        var rootId = await SeedEmployeeTreeAsync();
+        var nodes = await Redb.TreeQuery<EmployeeProps>(rootId).WhereLevel(1).Where(e => e.Salary > 1500m).ToListAsync();
+
+        var rows = await Redb.TreeQuery<EmployeeProps>(rootId).WhereLevel(1).Where(e => e.Salary > 1500m)
+            .GroupByArray(e => e.Contacts!, c => c.Type)
+            .SelectAsync(g => new { Type = g.Key, Count = Agg.Count(g) });
+
+        var expected = nodes.SelectMany(n => n.Props.Contacts ?? []).GroupBy(c => c.Type).ToDictionary(g => g.Key, g => g.Count());
+        rows.ToDictionary(r => r.Type, r => r.Count).Should().BeEquivalentTo(expected);
+    }
 }

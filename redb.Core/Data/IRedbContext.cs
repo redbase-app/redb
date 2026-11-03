@@ -114,6 +114,13 @@ namespace redb.Core.Data
 
         /// <summary>Cancellable form.</summary>
         Task<List<string>> ExecuteJsonListAsync(string sql, object[] parameters, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// The rows of <paramref name="sql"/> as a JSON array of objects keyed by column name, NULL values included;
+        /// "[]" when there are none. For statements whose columns are known only at run time (analytics of a provider
+        /// without row_to_json); one command, as every other method here.
+        /// </summary>
+        Task<string> QueryRowsAsJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken = default);
         
         // === TRANSACTION SHORTCUTS ===
         

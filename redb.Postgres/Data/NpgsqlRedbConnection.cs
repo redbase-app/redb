@@ -959,6 +959,35 @@ namespace redb.Postgres.Data
             return results;
         }
 
+        /// <summary>
+        /// Execute SQL and serialize the result rows to a JSON array string in C# (column names from the reader),
+        /// NULL values included; "[]" when there are no rows. Behind RedbContextBase.QueryRowsAsJsonAsync.
+        /// </summary>
+        public async Task<string> QueryRowsAsJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                await using var cmd = CreateCommand(conn, sql, parameters);
+                await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                var rows = new List<Dictionary<string, object?>>();
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    var row = new Dictionary<string, object?>(reader.FieldCount);
+                    for (int i = 0; i < reader.FieldCount; i++)
+                        row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                    rows.Add(row);
+                }
+                return JsonSerializer.Serialize(rows);
+            }
+            catch (Exception ex)
+            {
+                await RollbackOrphanTransactionAsync(conn, ex);
+                throw;
+            }
+        }
+
         // === DISPOSE ===
         
         public async ValueTask DisposeAsync()

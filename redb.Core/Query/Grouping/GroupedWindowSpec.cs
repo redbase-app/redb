@@ -9,7 +9,6 @@ namespace redb.Core.Query.Grouping;
 /// Window specification for grouped queries.
 /// </summary>
 public class GroupedWindowSpec<TKey, TProps> : IGroupedWindowSpec<TKey, TProps>
-    where TProps : class, new()
 {
     internal List<LambdaExpression> PartitionByExpressions { get; } = [];
     internal List<(LambdaExpression Expression, bool Descending)> OrderByExpressions { get; } = [];

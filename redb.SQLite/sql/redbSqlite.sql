@@ -609,14 +609,18 @@ CREATE INDEX IF NOT EXISTS "IX__objects__scheme_name"
     ON _objects (_id_scheme, _name, _id);
 
 -- Ancestor/descendant (INCLUDE folded into key)
+-- _date_modify is deliberately NOT in these three covering _objects indexes (as in PostgreSQL, 2026-10-12). It
+-- changes on every save, so an index that carries it is rewritten for every saved object. Queries that go through
+-- them read the object row anyway. An existing file keeps the old definitions:
+-- sql/maintenance/rebuild_objects_indexes_without_date_modify.sql.
 CREATE INDEX IF NOT EXISTS "IX__objects__parent_id_descendant_lookup"
-    ON _objects (_id_parent, _id_scheme, _id, _id_owner, _date_create, _date_modify) WHERE _id_parent IS NOT NULL;
+    ON _objects (_id_parent, _id_scheme, _id, _id_owner, _date_create) WHERE _id_parent IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent_date_create"
-    ON _objects (_id_scheme, _id_parent, _date_create DESC, _id, _id_owner, _date_modify);
+    ON _objects (_id_scheme, _id_parent, _date_create DESC, _id, _id_owner);
 CREATE INDEX IF NOT EXISTS "IX__objects__id_parent_scheme"
     ON _objects (_id, _id_parent, _id_scheme) WHERE _id_parent IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent_owner"
-    ON _objects (_id_scheme, _id_parent, _id, _id_owner, _date_create, _date_modify, _name) WHERE _id_parent IS NOT NULL;
+    ON _objects (_id_scheme, _id_parent, _id, _id_owner, _date_create, _name) WHERE _id_parent IS NOT NULL;
 
 -- Tree walk that needs the object hash (transparent cache). Analogue of
 -- IX__objects__id_parent in redbMSSQL.sql, whose INCLUDE (_id, _hash, _id_scheme) is

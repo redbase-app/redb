@@ -86,70 +86,17 @@ public abstract partial class QueryProviderBase
     }
 
     /// <summary>
-    /// Performs GroupBy aggregation on an array via the aggregate_array_grouped SQL function
+    /// Grouping over the elements of an array. Every provider that supports GroupByArray overrides it; a provider
+    /// that does not refuses with its own name instead of answering with nothing.
     /// </summary>
-    public virtual async Task<JsonDocument?> ExecuteArrayGroupedAggregateAsync(
-        long schemeId,
-        string arrayPath,
-        IEnumerable<GroupFieldRequest> groupFields,
-        IEnumerable<AggregateRequest> aggregations,
-        string? filterJson = null,
-        string? havingJson = null, CancellationToken cancellationToken = default)
-    {
-        if (!string.IsNullOrEmpty(havingJson))
-        {
-            throw new NotSupportedException(
-                "HAVING is not supported by aggregate_array_grouped. Tracked under Phase 2.G.3.");
-        }
-        // CRITICAL: Adding the "0$:" prefix for base RedbObject fields!
-        var groupFieldsJson = JsonSerializer.Serialize(
-            groupFields.Select(g => new {
-                field = g.IsBaseField ? $"0$:{g.FieldPath}" : g.FieldPath,
-                alias = g.Alias
-            }));
-
-        var aggregationsJson = JsonSerializer.Serialize(
-            aggregations.Select(a => new {
-                field = a.FieldPath,
-                func = a.Function switch
-                {
-                    AggregateFunction.Average => "AVG",
-                    _ => a.Function.ToString().ToUpper()
-                },
-                alias = a.Alias
-            }));
-
-        _logger?.LogDebug("GroupByArray: arrayPath={Array}, groupFields={GroupFields}, aggregations={Aggregations}",
-            arrayPath, groupFieldsJson, aggregationsJson);
-
-        var result = await _context.QueryFirstOrDefaultAsync<GroupedResult>(_sql.Query_AggregateArrayGroupedSql(), new object[] { schemeId,
-                arrayPath,
-                groupFieldsJson,
-                aggregationsJson,
-                filterJson ?? "null" }, cancellationToken);
-
-        if (result?.result == null)
-            return null;
-
-        return JsonDocument.Parse(result.result);
-    }
+    public virtual Task<JsonDocument> ExecuteArrayGroupQueryAsync(
+        ArrayGroupQuery query, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException($"GroupByArray is not supported by {GetType().Name}.");
 
     /// <summary>
-    /// Performs GroupBy aggregation on an array with FilterExpression (Pro version).
-    /// Free version fallback: converts FilterExpression to facet-JSON and delegates
-    /// to the string-based overload (which routes through the PVT SQL function).
+    /// SQL of <see cref="ExecuteArrayGroupQueryAsync"/>; see there.
     /// </summary>
-    public virtual async Task<JsonDocument?> ExecuteArrayGroupedAggregateAsync(
-        long schemeId,
-        string arrayPath,
-        IEnumerable<GroupFieldRequest> groupFields,
-        IEnumerable<AggregateRequest> aggregations,
-        FilterExpression? filter,
-        string? havingJson = null, CancellationToken cancellationToken = default)
-    {
-        var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
-        if (filterJson == "{}") filterJson = null;
-        return await ExecuteArrayGroupedAggregateAsync(
-            schemeId, arrayPath, groupFields, aggregations, filterJson, havingJson);
-    }
+    public virtual Task<string> GetArrayGroupQuerySqlAsync(
+        ArrayGroupQuery query, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException($"GroupByArray is not supported by {GetType().Name}.");
 }

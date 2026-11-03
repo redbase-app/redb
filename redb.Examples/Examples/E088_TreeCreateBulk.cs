@@ -36,7 +36,6 @@ public class E088_TreeCreateBulk : ExampleBase
 
     public override async Task<ExampleResult> RunAsync(IRedbService redb)
     {
-        await redb.SyncSchemeAsync<DepartmentProps>();
         // Run E087 first to cleanup existing data
 
         var totalNodes = 1 + OfficeCount + (OfficeCount * DeptPerOffice) + (TeamsForFirstDepts * TeamsPerDept);

@@ -97,9 +97,9 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Generic recursion over every operand.
+    -- Generic recursion over every operand, and the "filter" of an aggregate ({"$count":"*","filter":...}).
     FOR k, v IN SELECT key, value FROM jsonb_each(p_node) LOOP
-        IF left(k, 1) <> '$' THEN
+        IF left(k, 1) <> '$' AND k <> 'filter' THEN
             CONTINUE;
         END IF;
         -- $case has named branches {when,then,else}: descend into values only.
