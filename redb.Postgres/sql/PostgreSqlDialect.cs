@@ -619,6 +619,79 @@ public class PostgreSqlDialect : ISqlDialect
     public string Structures_CreateRootKey() =>
         $"CREATE UNIQUE INDEX \"{RootKeyName}\" ON _structures (_id_scheme, _name) WHERE _id_parent IS NULL";
 
+    // === STRING COLLATION INDEX ===
+    // With StringCollation set, an ignore-case search reads (_String COLLATE "<c>") ILIKE, which only a trigram
+    // index over that same expression serves (see StringCollationIndex).
+
+    /// <summary>
+    /// Whether <c>_values</c> has a trigram index that serves <c>(_String COLLATE "$1") ILIKE</c>: a GIN index of one
+    /// key column with opclass <c>gin_trgm_ops</c> over <c>_string</c> under collation <c>$1</c>. PostgreSQL stores
+    /// <c>(_String COLLATE "c")</c> as the column itself with a collation of its own, not as an expression, so the key
+    /// column is matched by attribute and collation. Matched by structure, not by name: an index made by hand under any
+    /// name counts. Column <c>Valid</c>: NULL when there is none, false when every one is INVALID (an interrupted
+    /// CONCURRENTLY build), true when one is usable. Column <c>Ctype</c>: the ctype of the database, which decides what
+    /// pg_trgm takes for a letter (under <c>C</c> it finds no trigrams in a non-ASCII word, whatever the collation).
+    /// The collation is resolved with <c>to_regcollation(quote_ident($1))</c>, the way the <c>COLLATE "$1"</c> of the
+    /// search resolves it (search path, pg_catalog first), not by <c>pg_collation.collname</c>: a collation of the same
+    /// name in another schema would match the name and still serve no search. Params: $1 = collation name.
+    /// </summary>
+    public string Values_StringCollationIndexState() =>
+        """
+        SELECT
+            (SELECT bool_or(i.indisvalid)
+             FROM pg_index i
+             JOIN pg_class t ON t.oid = i.indrelid
+             JOIN pg_namespace n ON n.oid = t.relnamespace
+             JOIN pg_class ic ON ic.oid = i.indexrelid
+             JOIN pg_am am ON am.oid = ic.relam
+             JOIN pg_opclass oc ON oc.oid = i.indclass[0]
+             JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+             WHERE t.relname = '_values' AND n.nspname = current_schema()
+               AND am.amname = 'gin' AND oc.opcname = 'gin_trgm_ops'
+               AND i.indnkeyatts = 1 AND a.attname = '_string'
+               AND i.indcollation[0] = to_regcollation(quote_ident($1))::oid) AS "Valid",
+            (SELECT datctype FROM pg_database WHERE datname = current_database()) AS "Ctype"
+        """;
+
+    /// <summary>
+    /// The statement that builds the index serving <c>(_String COLLATE "collation") ILIKE</c> under
+    /// <see cref="StringCollationIndexName"/>, CONCURRENTLY: it runs on a connection of its own, outside any
+    /// transaction. The collation is a validated name (CollationNameValidator).
+    /// </summary>
+    public string Values_CreateStringCollationIndex(string collation) =>
+        $"CREATE INDEX CONCURRENTLY IF NOT EXISTS \"{StringCollationIndexName(collation)}\" " +
+        $"ON _values USING gin ((_String COLLATE {CollationNameValidator.Quote(collation)}) gin_trgm_ops) " +
+        "WHERE _String IS NOT NULL";
+
+    /// <summary>Drops an INVALID leftover of an interrupted build of <see cref="Values_CreateStringCollationIndex"/>.</summary>
+    public string Values_DropStringCollationIndex(string collation) =>
+        $"DROP INDEX CONCURRENTLY IF EXISTS \"{StringCollationIndexName(collation)}\"";
+
+    /// <summary>Whether the index named by <see cref="StringCollationIndexName"/> exists and is INVALID. Params: $1 = index name.</summary>
+    public string Values_StringCollationIndexInvalid() =>
+        """
+        SELECT NOT i.indisvalid
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indexrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relname = $1 AND n.nspname = current_schema()
+        """;
+
+    /// <summary>The trigram operator classes; redb_init creates the extension, a database restored without it lacks them.</summary>
+    public string Extension_CreateTrigram() => "CREATE EXTENSION IF NOT EXISTS pg_trgm";
+
+    /// <summary>
+    /// <c>IX__values__String_pattern_&lt;slug&gt;</c>: the collation lowercased, every character other than a letter or a
+    /// digit replaced by an underscore (<c>und-x-icu</c> gives <c>IX__values__String_pattern_und_x_icu</c>).
+    /// </summary>
+    public string StringCollationIndexName(string collation)
+    {
+        var slug = new System.Text.StringBuilder(collation.Length);
+        foreach (var ch in collation.ToLowerInvariant())
+            slug.Append(char.IsAsciiLetterOrDigit(ch) ? ch : '_');
+        return "IX__values__String_pattern_" + slug;
+    }
+
     public string Structures_SelectRootDuplicates() =>
         """
         SELECT s._id, s._id_parent, s._id_scheme, s._name

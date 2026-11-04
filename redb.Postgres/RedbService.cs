@@ -27,7 +27,10 @@ public class RedbService : RedbServiceBase
     /// </summary>
     public RedbService(IServiceProvider serviceProvider) : base(serviceProvider)
     {
+        _postgresLogger = serviceProvider.GetService(typeof(ILogger<RedbService>)) as ILogger;
     }
+
+    private readonly ILogger? _postgresLogger;
 
     // === POSTGRESQL-SPECIFIC IMPLEMENTATIONS ===
     
@@ -134,6 +137,46 @@ public class RedbService : RedbServiceBase
 
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
+    }
+
+    /// <summary>
+    /// The module pass of the base class, then the step of
+    /// <see cref="RedbServiceConfiguration.CreateStringCollationIndex"/> (<see cref="EnsureStringCollationIndexAsync"/>).
+    /// </summary>
+    protected override async Task EnsurePvtModuleDeployedAsync()
+    {
+        await base.EnsurePvtModuleDeployedAsync();
+
+        if (Configuration.CreateStringCollationIndex && Configuration.StringCollation is null)
+        {
+            _postgresLogger?.LogWarning(
+                "CreateStringCollationIndex is on, but StringCollation is not set: there is no collation to build an index for.");
+            return;
+        }
+
+        await EnsureStringCollationIndexAsync();
+    }
+
+    /// <summary>
+    /// The trigram index of <see cref="RedbServiceConfiguration.StringCollation"/>. The free forms pivot the values of an
+    /// object first and filter the pivoted value, so no trigram index ever serves their string search: with
+    /// <see cref="RedbServiceConfiguration.CreateStringCollationIndex"/> on, one Warning and nothing built. Pro with the
+    /// planner on builds and checks the index.
+    /// </summary>
+    protected virtual Task EnsureStringCollationIndexAsync()
+    {
+        WarnStringCollationIndexHasNoEffect("free provider");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The Warning of <see cref="RedbServiceConfiguration.CreateStringCollationIndex"/> on a tier that reads no trigram index.</summary>
+    protected void WarnStringCollationIndexHasNoEffect(string tier)
+    {
+        if (!Configuration.CreateStringCollationIndex)
+            return;
+        _postgresLogger?.LogWarning(
+            "CreateStringCollationIndex is on, but it has no effect on this tier ({Tier}): only Pro with EnablePvtPrefilter " +
+            "on reads a trigram index for a string search. Nothing is built.", tier);
     }
 
     /// <inheritdoc />

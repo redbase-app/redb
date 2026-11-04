@@ -493,8 +493,28 @@ providers, and the one trap worth knowing.
 > ```csharp
 > .Configure(c => c.StringCollation = "und-x-icu")
 > ```
-> It changes how PostgreSQL uses indexes and it does not make search accent-insensitive. Read
-> **[COLLATION.md](COLLATION.md)** before switching it on.
+> It does not make search accent-insensitive, and on PostgreSQL it changes which index serves the search.
+> Read **[COLLATION.md](COLLATION.md)** before switching it on.
+>
+> **On PostgreSQL, check the database ctype first**
+> (`SELECT datctype FROM pg_database WHERE datname = current_database()`). With a UTF-8 ctype
+> (`en_US.utf8`, `ru_RU.utf8`) plain `ILIKE` already folds every script: leave `StringCollation` unset, and
+> the stock trigram index keeps serving the search. With ctype `C` or `POSIX` the setting gives correct
+> folding, but pg_trgm builds no trigram from non-ASCII text under that ctype, so a non-ASCII substring
+> search reads every row whatever the index; only a database with a UTF-8 ctype makes it indexed.
+>
+> With the setting on, Pro (planner on, the default) stops reading `IX__values__String_pattern` for
+> ignore-case searches. It needs a trigram index over the same collation, and the index must match the
+> configured collation exactly, so it differs per project:
+> ```sql
+> CREATE INDEX CONCURRENTLY "IX__values__String_pattern_und_x_icu"
+>     ON _values USING gin ((_String COLLATE "und-x-icu") gin_trgm_ops) WHERE _String IS NOT NULL;
+> ```
+> Start-up logs a Warning while it is missing,
+> [`redb.Postgres/sql/maintenance/string_collation_index.sql`](redb.Postgres/sql/maintenance/string_collation_index.sql)
+> builds it for any collation, and `c.CreateStringCollationIndex = true` has Pro build it at start-up
+> (`CREATE INDEX CONCURRENTLY`; under ctype `C` it serves ASCII patterns only). The free provider reads no trigram index for a substring search, with or
+> without the setting.
 
 ### Nested Properties
 

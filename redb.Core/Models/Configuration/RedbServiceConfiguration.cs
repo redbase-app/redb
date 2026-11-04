@@ -165,10 +165,14 @@ namespace redb.Core.Models.Configuration
         /// </para>
         ///
         /// <para>
-        /// <b>Cost on PostgreSQL.</b> A collated operand cannot use an index built with the database's
-        /// own collation, so a trigram index on the text column stops being usable and the search
-        /// degrades to a full scan, silently. Add a matching expression index yourself:
-        /// <c>CREATE INDEX ... USING gin ((_String COLLATE "und-x-icu") gin_trgm_ops)</c>.
+        /// <b>Cost on PostgreSQL.</b> Pro with <see cref="EnablePvtPrefilter"/> on pushes an ignore-case
+        /// search onto <c>_values</c> as <c>(_String COLLATE "und-x-icu") ILIKE</c>, which the stock trigram
+        /// index over bare <c>_String</c> cannot serve: the search reads every row, silently. It needs an
+        /// index over the same collation,
+        /// <c>CREATE INDEX ... USING gin ((_String COLLATE "und-x-icu") gin_trgm_ops)</c>; start-up logs a
+        /// Warning while it is missing. The free forms read no trigram index in either case. On a database
+        /// with a UTF-8 ctype plain ILIKE already folds every script and the setting is not needed; under
+        /// ctype C pg_trgm builds no trigram from non-ASCII text, so no index serves a non-ASCII pattern.
         /// </para>
         ///
         /// Default is null: behaviour is exactly what it was, on every provider.
@@ -184,6 +188,25 @@ namespace redb.Core.Models.Configuration
                 _stringCollation = normalised;
             }
         }
+
+        /// <summary>
+        /// PostgreSQL Pro with <see cref="EnablePvtPrefilter"/> on: build at start-up the trigram index that serves an
+        /// ignore-case search under <see cref="StringCollation"/>,
+        /// <c>IX__values__String_pattern_&lt;collation&gt; ON _values USING gin ((_String COLLATE "&lt;collation&gt;") gin_trgm_ops)</c>,
+        /// when the database has none. On a database with ctype C it serves patterns with ASCII letters only: pg_trgm
+        /// builds no trigram from other text there.
+        ///
+        /// <para>
+        /// The build is <c>CREATE INDEX CONCURRENTLY</c> on a connection of its own under the schema lock: reads and
+        /// writes go on, start-up waits for it (minutes on a large <c>_values</c>). An index left INVALID by an
+        /// interrupted build is dropped and built again. Nothing is built with <see cref="AutoApplyDatabaseUpgrades"/>
+        /// off or without the right to create an index: start-up logs a Warning and goes on. The free provider and Pro
+        /// with the planner off read no trigram index; there the option logs one Warning and builds nothing.
+        /// </para>
+        ///
+        /// Default is false: start-up only checks for the index and warns while it is missing.
+        /// </summary>
+        public bool CreateStringCollationIndex { get; set; } = false;
 
         /// <summary>
         /// V4 (LAZY Л2): lazy references. With the option on, the JSON builders emit a STUB for
@@ -500,6 +523,7 @@ namespace redb.Core.Models.Configuration
             ThrowOnObjectNotFound = source.ThrowOnObjectNotFound;
             EnablePvtPrefilter = source.EnablePvtPrefilter;
             StringCollation = source.StringCollation;
+            CreateStringCollationIndex = source.CreateStringCollationIndex;
             EnableLazyReferences = source.EnableLazyReferences;
             LazyReferenceAccess = source.LazyReferenceAccess;
             LazyLoadWithoutScope = source.LazyLoadWithoutScope;

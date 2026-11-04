@@ -216,6 +216,10 @@ BEGIN
             SET @call = N'NTILE(' + ISNULL(@args_sql, N'4') + N')';
         ELSE IF @func = N'count'
             SET @call = N'COUNT(' + CASE WHEN @args_sql = N'' THEN N'*' ELSE @args_sql END + N')';
+        -- AVG keeps the type of its operand in T-SQL: over a bigint field it cut the fraction off (32 for 32.25).
+        -- Cast as pvt_agg_expr does for the aggregate form.
+        ELSE IF @func = N'avg'
+            SET @call = N'AVG(CAST(' + @args_sql + N' AS NUMERIC(38, 10)))';
         ELSE
             SET @call = UPPER(@func) + N'(' + @args_sql + N')';
     END;

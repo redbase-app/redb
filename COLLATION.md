@@ -33,6 +33,23 @@ SELECT 'Привет' ILIKE '%привет%';   -- false means you are affected
 
 For SQLite there is nothing to check. It is always affected.
 
+### PostgreSQL: decide by the database ctype
+
+```sql
+SELECT datctype FROM pg_database WHERE datname = current_database();
+```
+
+The ctype of the database decides both whether you need the setting and whether a substring search can
+be indexed at all.
+
+| `datctype` | What to do |
+|---|---|
+| UTF-8 (`en_US.utf8`, `ru_RU.utf8`, `C.UTF-8`) | Plain `ILIKE` already folds non-ASCII case. Leave `StringCollation` unset; the stock trigram index `IX__values__String_pattern` serves the search. Setting it here buys no correctness and costs the index (see below). |
+| `C` or `POSIX` | `StringCollation` gives correct folding. But pg_trgm takes letters from the database ctype, not from the collation, and under `C` it builds no trigram from non-ASCII text (`show_trgm('привет')` is empty). A non-ASCII substring search therefore reads every row on every tier, and no index changes that. The only way to an indexed non-ASCII search is a database with a UTF-8 ctype (a new database, or dump and restore), after which the row above applies. |
+
+On a `C` ctype with the setting on, the index described below keeps patterns with ASCII letters indexed;
+it does nothing for the others.
+
 ---
 
 ## What the setting fixes
@@ -94,48 +111,83 @@ per-field or per-query collation, which RedBase does not offer today.
 
 ## The cost on PostgreSQL: indexes
 
-**Read this one twice.** A collated operand cannot use an index built with the database's own
-collation. Turn the setting on without acting, and a trigram search silently stops using its index and
-becomes a full scan. Nothing errors. Only the response time changes.
+A collated operand cannot use an index built with the database's own collation. Which searches that
+touches depends on the tier, because only one of them reads a trigram index at all:
 
-Measured on 40 000 rows, forcing the planner to prefer an index:
+| Tier | How a `Contains` / `StartsWith` / `EndsWith` filter runs | Trigram index read |
+|---|---|---|
+| **Pro, planner on** (`EnablePvtPrefilter`, on by default in `RedbServiceConfiguration` and in Tsak) | the predicate goes down to `_values`: `dv._String LIKE`, or `(dv._String COLLATE "<collation>") ILIKE` with the setting on | yes |
+| **Pro, planner off** | the free forms (row below) | no |
+| **Free** | the values of an object are pivoted first, then the pivoted value is filtered | no, with or without the setting |
 
-| Query | Plan |
-|---|---|
-| `s ILIKE '%привет%'` | Bitmap Index Scan |
-| `(s COLLATE "und-x-icu") ILIKE '%привет%'` | Seq Scan, and the index cannot be used at all |
+So the setting costs an index on Pro with the planner on, and only there. Turn it on without acting
+and every ignore-case search of that tier stops reading `IX__values__String_pattern` and reads every row
+of `_values` instead. Nothing errors. The index shows no reads and only the response time changes.
 
-The fix is an index whose expression matches the predicate. RedBase does not create it for you,
-because indexes on `_values` are a decision about your data volume, not something a library should
-make behind your back:
+Measured on 1 000 000 string values of one field, 100 of them holding `ПРИВЕТ`, PostgreSQL 18, the
+predicate Pro pushes down (`... ILIKE '%привет%'`):
+
+| Database ctype | Index on `_values` | Predicate | Plan | Time |
+|---|---|---|---|---|
+| `en_US.utf8` | stock `IX__values__String_pattern` | `_String ILIKE` (setting off) | Bitmap Index Scan | 0.34 ms |
+| `en_US.utf8` | stock | `(_String COLLATE "und-x-icu") ILIKE` | Seq Scan | 564 ms |
+| `en_US.utf8` | trigram over `(_String COLLATE "und-x-icu")` | same | Bitmap Index Scan | 0.68 ms |
+| `C` | either | same, Cyrillic pattern | Seq Scan (no trigrams, see the ctype section) | 550 ms |
+| `C` | trigram over the collated column | same, pattern `'%number 12345%'` | Bitmap Index Scan | 28 ms |
+
+The fix is an index over the same expression as the predicate. It must match the configured collation
+exactly, so it differs per project:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-CREATE INDEX CONCURRENTLY ix_values_string_trgm_icu
-    ON _values USING gin ((_String COLLATE "und-x-icu") gin_trgm_ops);
+CREATE INDEX CONCURRENTLY "IX__values__String_pattern_und_x_icu"
+    ON _values USING gin ((_String COLLATE "und-x-icu") gin_trgm_ops)
+    WHERE _String IS NOT NULL;
 ```
 
-With that index in place the plan returns to a Bitmap Index Scan. The cost is a second index on the
-largest table in the database, so weigh it against how much case-insensitive searching you actually do.
+[`redb.Postgres/sql/maintenance/string_collation_index.sql`](redb.Postgres/sql/maintenance/string_collation_index.sql)
+runs it for any collation (`psql -v collation=und-x-icu -f string_collation_index.sql`) and rebuilds an
+index left INVALID by an interrupted build. RedBase finds the index by what it is, not by its name: a GIN
+index on `_values` with `gin_trgm_ops` over `_String` under the configured collation. Pro with the
+planner on checks for it at every start and logs a Warning while it is missing or INVALID, naming the
+collation, the statement, the script and what the ctype of the database means for it.
+
+### Building it at start-up: `CreateStringCollationIndex`
+
+**Under ctype `C` the index serves patterns with ASCII letters only; under a UTF-8 ctype, leaving
+`StringCollation` unset serves every pattern with the stock index and needs no second index.** With that
+in mind:
+
+```csharp
+.Configure(c =>
+{
+    c.StringCollation = "und-x-icu";
+    c.CreateStringCollationIndex = true;   // Tsak: Tsak:Redb:CreateStringCollationIndex
+})
+```
+
+Off by default. On, Pro with the planner on builds `IX__values__String_pattern_<collation>` at start-up
+when no index of the collation exists (the name takes the collation in lower case, every character other
+than a letter or a digit as `_`). The build is `CREATE INDEX CONCURRENTLY` on a connection of its own, under
+the schema lock, so several nodes starting together build it once; reads and writes go on, and start-up
+waits until it is built, which takes minutes on a large `_values`. An index left INVALID by an interrupted
+build is dropped and built again. An index that already serves the collation, under any name, is kept.
+
+Nothing is built, and start-up logs a Warning and goes on, when `AutoApplyDatabaseUpgrades` is off or the
+role may not create an index: run the script instead. The free provider and Pro with the planner off read
+no trigram index; there the option logs one Warning and builds nothing.
+
+### Its price
+
+The cost is a second index on the largest table, about the size of the table itself (138 MB beside a
+120 MB `_values` in the measurement above, 20 s to build), updated on each save of a string value.
+
+`IX__values__String_pattern` is not dead once the collation is set: case-sensitive `Contains`,
+`StartsWith` and `EndsWith` still run as plain `LIKE` without `COLLATE` and read it. Drop it only if the
+project does no case-sensitive substring search; the statement is at the end of the script, commented out.
 
 SQLite needs no such thing: `LIKE '%x%'` never used an index there in the first place.
-
-### Planned: RedBase should offer to create it
-
-Leaving this to the reader is the weak part of the current design. The setting that causes the
-regression ships in the box, the index that repairs it does not, and the failure mode is silence —
-nothing errors, the query just gets slower, and whoever turns `StringCollation` on months later has
-no reason to connect the two.
-
-What is intended for a later release: an opt-in that creates the matching expression index as part of
-schema initialisation, keyed off the configured collation, so the index and the predicate cannot
-drift apart. Opt-in rather than automatic, because a second GIN index on `_values` is a real cost on
-a large installation and `CREATE INDEX CONCURRENTLY` cannot run inside the transaction that
-initialisation uses — it needs its own connection and its own decision.
-
-Until that exists, the statement above is the supported answer, and this section is the reminder that
-we know it is homework we handed to you.
 
 ---
 

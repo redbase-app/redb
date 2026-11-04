@@ -25,6 +25,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Pending changes live in `changelog/unreleased/` until the release; `pwsh scripts/changelog.ps1 -Preview` shows them.
 
+## [4.6.1] — 2026-11-04
+
+### Added
+
+- **`CreateStringCollationIndex` builds the trigram index of `StringCollation` at start-up.** Off by default. PostgreSQL
+  Pro with the planner on builds `IX__values__String_pattern_<collation>` with `CREATE INDEX CONCURRENTLY` when no index
+  serves the collation; under database ctype C it serves ASCII patterns only. The free provider logs that it has no
+  effect there. See "Building it at start-up" in COLLATION.md. Packages: `redb.Core`, `redb.Postgres`, `redb.Postgres.Pro`.
+
+### Changed
+
+- **PostgreSQL Pro warns at start-up when `StringCollation` has no index to search with.** With the setting on, Pro
+  (planner on) runs ignore-case searches over `(_String COLLATE "<collation>")`, which the stock trigram index cannot
+  serve; the Warning gives the matching `CREATE INDEX`, the script `redb.Postgres/sql/maintenance/string_collation_index.sql`
+  and what the database ctype means for it. See "PostgreSQL: decide by the database ctype" in COLLATION.md. Packages: `redb.Postgres`, `redb.Postgres.Pro`.
+
+### Fixed
+
+- **SQL Server: the average of an integer field keeps its fraction in every form.** A window average (`Win.Avg`) on the
+  free provider, and `AverageRedbAsync` / `AggregateRedbAsync` over a base field such as `Id` on Pro, returned 32 for
+  32.25. The free module moves to 0.2.40 and is applied at the next start. Packages: `redb.MSSql`, `redb.MSSql.Pro`.
+
 ## [4.6.0] — 2026-11-03
 
 ### Breaking

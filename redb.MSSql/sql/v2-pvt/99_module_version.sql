@@ -203,6 +203,8 @@ BEGIN
     --          of @distinct_on, and the wrapper keeps _rn = 1 ordered by _ord. Until 0.2.30 the first key only was
     --          partitioned, ranked by (SELECT 1), with the ordering applied outside, where a Props column does not
     --          resolve: TreeQuery(...).DistinctBy(x => x.IsActive) failed with "Invalid column name 'IsActive'".
+    -- 0.2.40 - pvt_build_window_sql: AVG casts its operand to NUMERIC(38, 10), as pvt_agg_expr does; over a bigint
+    --          field the window average cut the fraction off (32 for 32.25) (2026-11-03).
     -- 0.2.39 - pvt_build_cte_sql, narrow shape over a tree source: the objects read their values through OUTER APPLY,
     --          so the walk (pvt_tree_descendants) runs once; joined to the pivot it ran on both sides, and a filter over
     --          a 100 thousand node subtree took 3.3 s instead of 1.8 s (2026-11-02).
