@@ -8,7 +8,7 @@
 
     <!-- One place for the RedBase version. The module runs in the redb-identity-full image of the same
          release (deploy/docker-compose.yml): keep the two in step. -->
-    <RedbVersion>4.6.1</RedbVersion>
+    <RedbVersion>4.6.2</RedbVersion>
     <!-- Versions live in these files: the project is created where no central Directory.Packages.props applies. -->
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
