@@ -1,0 +1,26 @@
+@inherits LayoutComponentBase
+
+<header>
+    <a class="brand" href="">RedbIdentityApp</a>
+    <AuthorizeView>
+        <Authorized>
+            <NavLink href="notes">Notes</NavLink>
+            <NavLink href="me">Me</NavLink>
+            <AuthorizeView Policy="admin" Context="admin">
+                <NavLink href="admin/users">Users</NavLink>
+            </AuthorizeView>
+            <span class="who">@context.User.Identity?.Name</span>
+            @* A plain POST: sign-out clears the cookie and goes to Identity, which only a plain request can do. *@
+            <form method="post" action="account/logout" data-enhance="false">
+                <AntiforgeryToken />
+                <button type="submit" class="link">Sign out</button>
+            </form>
+        </Authorized>
+        <NotAuthorized>
+            <a class="who" href="account/login" data-enhance-nav="false">Sign in</a>
+        </NotAuthorized>
+    </AuthorizeView>
+</header>
+<main>
+    @Body
+</main>

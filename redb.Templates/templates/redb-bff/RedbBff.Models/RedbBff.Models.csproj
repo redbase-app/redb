@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What the web server and the backend exchange. No RedBase here: the redb Props classes stay in the
+       backend (RedbBff.Backend/Props). -->
+
+</Project>

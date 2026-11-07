@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>RedbApp</RootNamespace>
+    <!-- One place for the RedBase version. -->
+    <RedbVersion>4.7.0</RedbVersion>
+    <!-- Versions live in this file: the project is created where no central Directory.Packages.props applies. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+  </ItemGroup>
+
+  <!-- Provider packages. Exactly one group below is generated, matching the db option you picked.
+       To switch provider later, replace it with one of:
+         redb.Postgres / redb.Postgres.Pro
+         redb.MSSql    / redb.MSSql.Pro
+         redb.SQLite   / redb.SQLite.Pro
+       and uncomment the matching .Use*() line in Program.cs. -->
+  <!--#if (UsePostgres && pro) -->
+  <ItemGroup>
+    <PackageReference Include="redb.Postgres.Pro" Version="$(RedbVersion)" />
+  </ItemGroup>
+  <!--#endif -->
+  <!--#if (UsePostgres && !pro) -->
+  <ItemGroup>
+    <PackageReference Include="redb.Postgres" Version="$(RedbVersion)" />
+  </ItemGroup>
+  <!--#endif -->
+  <!--#if (UseMsSql && pro) -->
+  <ItemGroup>
+    <PackageReference Include="redb.MSSql.Pro" Version="$(RedbVersion)" />
+  </ItemGroup>
+  <!--#endif -->
+  <!--#if (UseMsSql && !pro) -->
+  <ItemGroup>
+    <PackageReference Include="redb.MSSql" Version="$(RedbVersion)" />
+  </ItemGroup>
+  <!--#endif -->
+  <!--#if (UseSqlite && pro) -->
+  <ItemGroup>
+    <PackageReference Include="redb.SQLite.Pro" Version="$(RedbVersion)" />
+  </ItemGroup>
+  <!--#endif -->
+  <!--#if (UseSqlite && !pro) -->
+  <ItemGroup>
+    <PackageReference Include="redb.SQLite" Version="$(RedbVersion)" />
+  </ItemGroup>
+  <!--#endif -->
+
+</Project>

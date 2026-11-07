@@ -1,0 +1,7 @@
+@inject NavigationManager Navigation
+
+@code {
+    // A full page load: the sign-in page is not interactive.
+    protected override void OnInitialized() =>
+        Navigation.NavigateTo($"login?returnUrl={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}", forceLoad: true);
+}

@@ -1,0 +1,13 @@
+{
+  "ContextName": "redbapp",
+  "AutoStart": true,
+  "Api": {
+    "Host": "0.0.0.0",
+    "Port": 5092,
+    "CorsOrigins": "http://localhost:5082"
+  },
+  "Auth": {
+    "Issuer": "redbapp",
+    "TokenLifetimeMinutes": 480
+  }
+}

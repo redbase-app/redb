@@ -1,0 +1,56 @@
+@page "/categories"
+@inject BackendClient Api
+
+<PageTitle>Categories</PageTitle>
+
+<h1>Categories</h1>
+
+<div class="filters">
+    <input placeholder="New top-level category" @bind="newRootName" />
+    <button disabled="@string.IsNullOrWhiteSpace(newRootName)" @onclick="() => AddAsync(null, newRootName!)">Add</button>
+</div>
+
+@if (error is not null)
+{
+    <p class="error">@error</p>
+}
+
+<CategoryNodeList Nodes="roots" OnAddChild="r => AddAsync(r.ParentId, r.Name)" OnDelete="DeleteAsync" />
+
+@code {
+    private List<CategoryNode> roots = [];
+    private string? newRootName;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task LoadAsync() => RunAsync(async () => roots = await Api.CategoriesAsync());
+
+    private async Task AddAsync(long? parentId, string name)
+    {
+        await RunAsync(() => Api.AddCategoryAsync(new NewCategory { Name = name.Trim(), ParentId = parentId }));
+        if (parentId is null)
+            newRootName = null;
+        await LoadAsync();
+    }
+
+    // Deleting a node deletes its whole subtree.
+    private async Task DeleteAsync(long id)
+    {
+        await RunAsync(() => Api.DeleteCategoryAsync(id));
+        await LoadAsync();
+    }
+
+    private async Task RunAsync(Func<Task> call)
+    {
+        error = null;
+        try
+        {
+            await call();
+        }
+        catch (BackendException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

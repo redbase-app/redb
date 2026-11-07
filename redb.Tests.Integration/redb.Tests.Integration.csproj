@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\redb.Core\redb.Core.csproj" />
+    <PackageReference Include="redb.Core.Pro" />
+    <ProjectReference Include="..\redb.Export\redb.Export.csproj" />
+    <ProjectReference Include="..\redb.MSSql\redb.MSSql.csproj" />
+    <PackageReference Include="redb.MSSql.Pro" />
+    <ProjectReference Include="..\redb.Postgres\redb.Postgres.csproj" />
+    <PackageReference Include="redb.Postgres.Pro" />
+    <ProjectReference Include="..\redb.SQLite\redb.SQLite.csproj" />
+    <PackageReference Include="redb.SQLite.Pro" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- The SQL modules' own smoke runners (review SQ-4), run against the fixture databases by
+         PostgresModuleSmokeTests and MsSqlModuleSmokeTests: the file in the provider's source is the one run. -->
+    <Content Include="..\redb.Postgres\sql\v2-pvt\99_smoke_auto.sql" Link="Smoke\postgres_99_smoke_auto.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\redb.MSSql\sql\v2-pvt\99_smoke_auto.sql" Link="Smoke\mssql_99_smoke_auto.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

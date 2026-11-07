@@ -1,0 +1,116 @@
+@page "/"
+@inject RedbWork Work
+
+<PageTitle>Products</PageTitle>
+
+<h1>Products</h1>
+
+<div class="filters">
+    <input type="search" placeholder="Search by name" @bind="search" @bind:after="ReloadFromFirstPage" />
+    <label><input type="checkbox" @bind="inStockOnly" @bind:after="ReloadFromFirstPage" /> In stock only</label>
+    <select @bind="sort" @bind:after="ReloadFromFirstPage">
+        <option value="name">Name</option>
+        <option value="category">Category</option>
+        <option value="price">Price, low to high</option>
+        <option value="-price">Price, high to low</option>
+    </select>
+    <a href="products/new">New product</a>
+</div>
+
+<p class="muted">@total product(s)</p>
+
+<table>
+    <thead>
+        <tr><th>Name</th><th>Category</th><th class="num">Price</th><th>In stock</th><th></th></tr>
+    </thead>
+    <tbody>
+    @foreach (var item in items)
+    {
+        <tr>
+            <td><a href="products/@item.Id">@item.Name</a></td>
+            <td>@item.Props!.Category</td>
+            <td class="num">@item.Props.Price.ToString("F2")</td>
+            <td>@(item.Props.InStock ? "yes" : "no")</td>
+            <td><button class="link" @onclick="() => DeleteAsync(item.Id)">Delete</button></td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<nav class="pager">
+    <button disabled="@(pageNumber <= 1)" @onclick="() => GoToAsync(pageNumber - 1)">Previous</button>
+    <span>Page @pageNumber of @PageCount</span>
+    <button disabled="@(pageNumber >= PageCount)" @onclick="() => GoToAsync(pageNumber + 1)">Next</button>
+</nav>
+
+@code {
+    private const int PageSize = 10;
+
+    private string? search;
+    private bool inStockOnly;
+    private string sort = "name";
+    private int pageNumber = 1;
+    private int total;
+    private List<RedbObject<Product>> items = [];
+
+    private int PageCount => Math.Max(1, (total + PageSize - 1) / PageSize);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task ReloadFromFirstPage()
+    {
+        pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private Task GoToAsync(int target)
+    {
+        pageNumber = target;
+        return LoadAsync();
+    }
+
+    private async Task DeleteAsync(long id)
+    {
+        await Work.RunAsync(redb => redb.DeleteAsync(id));
+        await LoadAsync();
+    }
+
+    // Count and page in one unit of work. Search, sorting and paging all run in the database.
+    private async Task LoadAsync()
+    {
+        (total, items) = await Work.RunAsync(async redb =>
+        {
+            var count = await Filtered(redb).CountAsync();
+            pageNumber = Math.Clamp(pageNumber, 1, Math.Max(1, (count + PageSize - 1) / PageSize));
+            var list = await Sorted(Filtered(redb))
+                .Skip((pageNumber - 1) * PageSize)
+                .Take(PageSize)
+                .ToListAsync();
+            return (count, list);
+        });
+    }
+
+    private IRedbQueryable<Product> Filtered(IRedbService redb)
+    {
+        var query = redb.Query<Product>();
+
+        // Name is the object's own field, so it is filtered with WhereRedb; Props fields use Where.
+        // The value goes through a local, so the expression captures a plain value.
+        var term = search?.Trim();
+        if (!string.IsNullOrEmpty(term))
+            query = query.WhereRedb(x => x.Name.Contains(term));
+
+        if (inStockOnly)
+            query = query.Where(x => x.InStock);
+
+        return query;
+    }
+
+    private IRedbQueryable<Product> Sorted(IRedbQueryable<Product> query) => sort switch
+    {
+        "price" => query.OrderBy(x => x.Price),
+        "-price" => query.OrderByDescending(x => x.Price),
+        "category" => query.OrderBy(x => x.Category),
+        _ => query.OrderByRedb(x => x.Name),
+    };
+}

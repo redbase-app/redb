@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Writer: a JSON order every {{orders.period:20000}} ms into {{s3.inbox:incoming}}/orders/. In a real module
+       another system writes there; keyName takes expressions. -->
+  <route id="modulectx-s3-write" description="Writes a test order object into the inbox bucket">
+    <from uri="timer://modulectx-s3-write?period={{orders.period:20000}}"/>
+    <setBody expr='{"id":"order-${header.CamelTimerCounter}","amount":${header.CamelTimerCounter}}'/>
+    <to uri="s3://{{s3.inbox:incoming}}?connectionFactory=s3&amp;keyName=orders/order-${header.CamelTimerCounter}.json&amp;contentType=application/json&amp;autoCreateBucket=true"/>
+    <log level="Information" showRouteId="true">
+      <message>written ${header.redbS3.ProducedBucketName}/${header.redbS3.ProducedKey}, ETag ${header.redbS3.ETag}</message>
+    </log>
+  </route>
+
+  <!-- Reader: every 5 seconds up to 10 new objects under orders/ whose name matches *.json, one exchange each.
+       Only an exchange that succeeded moves its object to {{s3.archive:archive}}; a failed one stays and is read
+       again on the next poll. -->
+  <route id="modulectx-s3-read" description="Processes the new order objects and archives them">
+    <from uri="s3://{{s3.inbox:incoming}}?connectionFactory=s3&amp;prefix=orders/&amp;include=*.json&amp;delay=5000&amp;moveAfterRead=true&amp;deleteAfterRead=false&amp;destinationBucket={{s3.archive:archive}}&amp;autoCreateBucket=true"/>
+    <!-- The object arrives as bytes; the log wants the text. -->
+    <convertBody type="System.String"/>
+    <log level="Information" showRouteId="true">
+      <message>read ${header.redbS3.Key} (${header.redbS3.ContentLength} bytes): ${body}</message>
+    </log>
+  </route>
+
+</routes>

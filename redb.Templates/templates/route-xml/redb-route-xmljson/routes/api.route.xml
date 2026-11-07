@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- A body that is not an order: JSON that does not parse, a key the schema has no place for, or an XML that
+       fails the schema. The caller gets 400 with the reason instead of 500. -->
+  <onException exceptions="System.Text.Json.JsonException,System.InvalidOperationException,redb.Route.Validation.ValidationException" handled="true">
+    <log level="Warning" showRouteId="true">
+      <message>order refused: ${exception.message}</message>
+    </log>
+    <setHeader name="redbHttp.ResponseCode" value="400"/>
+    <setBody value='{"error":"the body is not an order of resources/order.xsd"}'/>
+  </onException>
+
+  <!-- The API listens on port 5181 (redb-route-rest uses 5180); the OpenAPI document is served at /api/openapi.json. -->
+  <rest path="/api" port="5181" produces="application/json" title="RouteModule API" version="1.0.0">
+    <post path="/orders" consumes="application/json" to="direct://modulectx-order-in"/>
+  </rest>
+
+  <!-- JSON back to XML: the schema gives every element the namespace urn:example:orders and its place in the
+       sequence, whatever the order of the keys. Whether the required elements are there is the job of
+       validateXsd after the step. -->
+  <route id="modulectx-order-in" description="Turns a JSON order back into XML and checks it against the XSD">
+    <from uri="direct://modulectx-order-in"/>
+    <convertBody type="System.String"/>
+    <unmarshal format="orders-json" target="System.String"/>
+    <validateXsd file="resources/order.xsd" targetNamespace="urn:example:orders" throwOnFailure="true"/>
+    <log level="Information" showRouteId="true">
+      <message>xml: ${body}</message>
+    </log>
+    <setHeader name="redbHttp.ResponseCode" value="202"/>
+    <setBody value='{"accepted":true}'/>
+  </route>
+
+</routes>

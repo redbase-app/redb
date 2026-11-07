@@ -1,0 +1,83 @@
+@page "/products/new"
+@page "/products/{Id:long}"
+@inject ApiClient Api
+@inject Session Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(Id is null ? "New product" : "Edit product")</PageTitle>
+
+<h1>@(Id is null ? "New product" : "Edit product")</h1>
+
+@if (error is not null)
+{
+    <p class="error">@error</p>
+}
+
+@if (product is not null)
+{
+    <EditForm Model="product" OnValidSubmit="SaveAsync" class="form">
+        <DataAnnotationsValidator />
+
+        <label>Name</label>
+        <InputText @bind-Value="product.Name" />
+        <ValidationMessage For="() => product.Name" />
+
+        <label>Category</label>
+        <InputText @bind-Value="product.Category" />
+        <ValidationMessage For="() => product.Category" />
+
+        <label>Price</label>
+        <InputNumber @bind-Value="product.Price" step="0.01" />
+        <ValidationMessage For="() => product.Price" />
+
+        <label><InputCheckbox @bind-Value="product.InStock" /> In stock</label>
+
+        <label>Description</label>
+        <InputTextArea @bind-Value="product.Description" rows="4" />
+        <ValidationMessage For="() => product.Description" />
+
+        <div class="actions">
+            <button type="submit">Save</button>
+            <a href="">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public long? Id { get; set; }
+
+    private ProductDto? product;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsSignedIn)
+            return;
+        if (Id is null)
+        {
+            product = new ProductDto();
+            return;
+        }
+        try
+        {
+            product = await Api.ProductAsync(Id.Value);
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            await Api.SaveProductAsync(product!);
+            Navigation.NavigateTo("");
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+    }
+}

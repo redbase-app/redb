@@ -1,0 +1,95 @@
+@using redb.PropsEditor.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@inject PropsMetadataService MetadataService
+
+@* Renders a nested object with expandable properties *@
+
+<div style="width: 100%;">
+    <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 3px; cursor: pointer; user-select: none;"
+         @onclick="() => isExpanded = !isExpanded">
+        <span style="font-size: 10px;">@(isExpanded ? "▼" : "▶")</span>
+        <span style="font-size: 12px; color: #666;">@GetTypeName()</span>
+        @if (Value == null)
+        {
+            <span style="font-size: 11px; color: #999; font-style: italic;">(null)</span>
+            @if (!IsReadOnly)
+            {
+                <FluentButton Appearance="Appearance.Lightweight"
+                              Size="ButtonSize.Small"
+                              OnClick="@CreateInstance"
+                              Style="margin-left: auto; font-size: 11px;">
+                    Create
+                </FluentButton>
+            }
+        }
+    </div>
+
+    @if (isExpanded && Value != null)
+    {
+        <div style="margin-left: 12px; margin-top: 4px; border-left: 2px solid #e0e0e0; padding-left: 8px;">
+            @foreach (var prop in GetProperties())
+            {
+                <PropertyField Metadata="@prop"
+                               Target="@Value"
+                               OnValueChanged="NotifyChanged" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// The type of the nested object.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public required Type PropertyType { get; set; }
+
+    /// <summary>
+    /// The current value of the object.
+    /// </summary>
+    [Parameter]
+    public object? Value { get; set; }
+
+    /// <summary>
+    /// Called when the value changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<object?> OnValueChanged { get; set; }
+
+    /// <summary>
+    /// Whether the editor is read-only.
+    /// </summary>
+    [Parameter]
+    public bool IsReadOnly { get; set; }
+
+    private bool isExpanded = false;
+
+    private string GetTypeName()
+    {
+        return PropertyType.Name;
+    }
+
+    private IEnumerable<PropertyMetadata> GetProperties()
+    {
+        return MetadataService.GetProperties(PropertyType);
+    }
+
+    private async Task NotifyChanged()
+    {
+        await OnValueChanged.InvokeAsync(Value);
+    }
+
+    private async Task CreateInstance()
+    {
+        try
+        {
+            Value = Activator.CreateInstance(PropertyType);
+            isExpanded = true;
+            await OnValueChanged.InvokeAsync(Value);
+        }
+        catch
+        {
+            // Cannot create instance
+        }
+    }
+}

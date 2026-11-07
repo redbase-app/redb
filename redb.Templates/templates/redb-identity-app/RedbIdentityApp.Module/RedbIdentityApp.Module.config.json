@@ -1,0 +1,44 @@
+{
+  "ContextName": "redbidentityapp",
+  "AutoStart": true,
+  "Api": {
+    // 127.0.0.1: the web server shares the worker's network namespace (deploy/docker-compose.yml), so
+    // the API needs no published port.
+    "Host": "127.0.0.1",
+    "Port": 5094
+  },
+  "Identity": {
+    // The module's own client at Identity: a resource server that may introspect the access tokens
+    // issued for its API. Its secret comes from the environment:
+    // Tsak__Contexts__redbidentityapp__Override__Identity__ResourceClientSecret.
+    "ResourceClientId": "redbidentityapp-api",
+    // The scope a client requests to call the API. Its Resources name the resource client above, so a
+    // token issued with it carries that client in "aud", and only then may the module introspect it.
+    "ApiScope": "redbidentityapp.api",
+    // The scope of the administrative endpoints. Identity issues it only to users whose role carries
+    // it: the module attaches it to the "admin" role, and Identity must list it in
+    // AdminScopeEntitlement:GatedScopes (deploy/docker-compose.yml).
+    "AdminScope": "redbidentityapp.admin",
+    // The service client the module sets things up with and reads the management API with: Identity's
+    // SeedBackchannelClient, which holds identity:manage. Secret:
+    // Tsak__Contexts__redbidentityapp__Override__Identity__ManagementClientSecret.
+    "ManagementClientId": "identity-backchannel",
+//#if (web)
+    // The web server's client (code flow with PKCE, refresh tokens). The module creates it and keeps its
+    // redirect addresses as listed here. Secret:
+    // Tsak__Contexts__redbidentityapp__Override__Identity__WebClientSecret.
+    "WebClientId": "redbidentityapp-web",
+    "WebRedirectUris": "http://localhost:5085/signin-oidc",
+    "WebPostLogoutRedirectUris": "http://localhost:5085/signout-callback-oidc",
+//#endif
+    "Introspection": {
+      // How long an introspection answer is reused. Never past the token's own expiry; a revocation
+      // that Identity reports (see README, "Revocation") drops it at once.
+      "CacheSeconds": 60,
+      // How long a token Identity called inactive is answered 401 without asking again.
+      "InactiveCacheSeconds": 10,
+      // How long the module waits for Identity before it answers 503.
+      "TimeoutSeconds": 5
+    }
+  }
+}

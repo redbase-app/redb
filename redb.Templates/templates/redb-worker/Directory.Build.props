@@ -1,0 +1,15 @@
+<Project>
+
+  <!-- Shared settings of both projects. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- One place for the RedBase version. -->
+    <RedbVersion>4.7.0</RedbVersion>
+    <!-- Versions live in these files: the project is created where no central Directory.Packages.props applies. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+</Project>

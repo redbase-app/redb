@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its beans.
+
+     AS4 (eDelivery AS4 1.16 common profile) needs three things: our node with its key, one agreement per trading
+     partner, and a memory of the message ids already received. Paths and party ids come from the context
+     configuration; the password of our key has no default, so the module does not start until the deployment
+     supplies it. deploy/docker-compose.holodeck.yml makes test keys and runs a local exchange with Holodeck B2B. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- Our key pair (PKCS#12): it signs what we send and every receipt, and decrypts what partners encrypt for us. -->
+  <bean name="as4-key" type="System.Security.Cryptography.X509Certificates.X509Certificate2, System.Security.Cryptography">
+    <constructorArg type="System.String" value="{{as4.keyFile}}"/>
+    <constructorArg type="System.String" value="{{as4.keyPassword}}"/>
+  </bean>
+
+  <!-- The partner's certificate: it verifies the partner's signatures and receipts, and we encrypt for it. -->
+  <bean name="partner-cert" type="System.Security.Cryptography.X509Certificates.X509Certificate2, System.Security.Cryptography">
+    <constructorArg type="System.String" value="{{as4.partnerCertificateFile}}"/>
+  </bean>
+
+  <!-- The agreement with one partner: the partner half of an ebMS P-Mode. Signing, encryption, compression and a
+       signed receipt in the HTTP response are not options here, the profile mandates them. The partner's
+       certificate is pinned; for trust in a certification authority instead see PartnerTrustAnchors in the
+       redb.Route.As4 README. -->
+  <bean name="partner" type="redb.Route.As4.As4Partner, redb.Route.As4">
+    <property key="Name" value="partner"/>
+    <property key="PartyId" value="{{as4.partnerPartyId:urn:redb:example:holodeck}}"/>
+    <!-- Its access point (P-Mode Protocol.Address): every as4:?partner=partner endpoint posts here. -->
+    <property key="Address" value="{{as4.partnerAddress:http://holodeck:8080/holodeckb2b/as4}}"/>
+    <!-- eb:AgreementRef: the partner selects its P-Mode by it, and we select this agreement by it on receipt. -->
+    <property key="AgreementRef" value="{{as4.agreement:urn:redb:example:agreement}}"/>
+    <property key="Service" value="{{as4.service:urn:redb:example:as4}}"/>
+    <property key="Action" value="{{as4.action:StoreMessage}}"/>
+    <!-- Point to point: the four-corner properties (originalSender, finalRecipient) are not required. -->
+    <property key="RequireFourCornerProperties" value="false"/>
+    <property key="PartnerSigningCertificates"><list><ref bean="partner-cert"/></list></property>
+    <property key="PartnerEncryptionCertificate" ref="partner-cert"/>
+  </bean>
+
+  <!-- Our access point: what every as4: endpoint of the module names with connectionFactory=as4-node. -->
+  <bean name="as4-node" type="redb.Route.As4.As4ConnectionFactory, redb.Route.As4">
+    <property key="OurPartyId" value="{{as4.ourPartyId:urn:redb:example:module}}"/>
+    <!-- The host part of the message ids we generate: a public name of the access point, never a machine name. -->
+    <property key="ExternalHostName" value="{{as4.hostName:module.example}}"/>
+    <property key="SigningCertificate" ref="as4-key"/>
+    <property key="DecryptionCertificates"><list><ref bean="as4-key"/></list></property>
+    <property key="Partners"><list><ref bean="partner"/></list></property>
+  </bean>
+
+  <!-- Reception awareness: a partner resends a message whose receipt it did not get. The resend gets the receipt
+       again and is not delivered twice. In memory the ids are forgotten when the worker restarts; to keep them in
+       the worker's redb store (and share them between the nodes of a cluster), replace the bean with
+         <redb><idempotentRepository name="as4-received" ttl="7.00:00:00"/></redb> -->
+  <bean name="as4-received" type="redb.Route.Processors.InMemoryIdempotentRepository, redb.Route"/>
+
+
+  <!-- Routes written in C#: routes/CreditNoteSendRoute.cs sends credit notes to the same partner. -->
+  <routeBuilder type="RouteModule.Routes.CreditNoteSendRoute, RouteModule"/>
+
+</context>

@@ -1,0 +1,40 @@
+@page "/me"
+@attribute [Authorize]
+@inject ModuleClient Module
+
+<PageTitle>Me</PageTitle>
+
+<h1>Who the module sees</h1>
+
+<ModuleError Error="error" />
+
+@if (me is not null)
+{
+    <table>
+        <tbody>
+            <tr><th>Subject</th><td>@me.Subject</td></tr>
+            <tr><th>User id</th><td>@me.UserId</td></tr>
+            <tr><th>User name</th><td>@me.UserName</td></tr>
+            <tr><th>Client</th><td>@me.ClientId</td></tr>
+            <tr><th>Scopes</th><td>@string.Join(" ", me.Scopes)</td></tr>
+            <tr><th>Token expires</th><td>@me.ExpiresAt?.ToLocalTime().ToString("u")</td></tr>
+        </tbody>
+    </table>
+}
+
+@code {
+    private MeDto? me;
+    private Exception? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            me = await Module.MeAsync();
+        }
+        catch (Exception ex) when (ex is SessionEndedException or IdentityUnavailableException or ModuleException)
+        {
+            error = ex;
+        }
+    }
+}

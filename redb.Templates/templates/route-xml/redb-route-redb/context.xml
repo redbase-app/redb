@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- The redb bridge. storage="local" is the named redb instance of this context: its provider,
+       connection string, Pro, ChangeTracking and caches are set in the context configuration
+       (config/context.sample.json, section Redb.local). syncScheme brings the scheme of the props
+       class up to date once at context start, before any route runs. -->
+  <redb storage="local">
+    <syncScheme type="RouteModule.Props.OrderProps, RouteModule"/>
+  </redb>
+
+  <!-- Routes written in C#: routes/OrdersReportRoute.cs reports the same objects with a typed query. -->
+  <routeBuilder type="RouteModule.Routes.OrdersReportRoute, RouteModule"/>
+
+</context>

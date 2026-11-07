@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RedbWorker.Module/RedbWorker.Module.csproj" />
+  <Project Path="RedbWorker.Host/RedbWorker.Host.csproj" />
+</Solution>

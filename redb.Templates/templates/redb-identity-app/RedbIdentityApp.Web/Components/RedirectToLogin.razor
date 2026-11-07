@@ -1,0 +1,7 @@
+@inject NavigationManager Navigation
+
+@code {
+    // A full page load: the sign-in endpoint redirects to Identity.
+    protected override void OnInitialized() =>
+        Navigation.NavigateTo($"account/login?returnUrl={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}", forceLoad: true);
+}

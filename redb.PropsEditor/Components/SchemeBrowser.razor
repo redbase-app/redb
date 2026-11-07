@@ -1,0 +1,59 @@
+@using Microsoft.FluentUI.AspNetCore.Components
+
+@* Displays list of available Props types for editing *@
+
+<div class="scheme-browser">
+    <h2>Available Schemes</h2>
+    <p style="color: #666; margin-bottom: 1rem;">
+        Select a Props type to manage. Use PropsGrid component with specific TProps type.
+    </p>
+
+    @if (Schemes.Count == 0)
+    {
+        <div style="color: #666; padding: 1rem;">
+            No schemes configured. Add scheme cards to display available types.
+        </div>
+    }
+    else
+    {
+        <div class="scheme-cards">
+            @foreach (var scheme in Schemes)
+            {
+                <div class="scheme-card">
+                    <h4>@scheme.Name</h4>
+                    @if (!string.IsNullOrEmpty(scheme.Description))
+                    {
+                        <div style="color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">@scheme.Description</div>
+                    }
+                    <FluentButton Appearance="Appearance.Outline"
+                                  OnClick="@(() => OnSchemeSelected.InvokeAsync(scheme.Name))">
+                        Manage
+                    </FluentButton>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// List of available schemes to display.
+    /// </summary>
+    [Parameter]
+    public List<SchemeInfo> Schemes { get; set; } = [];
+
+    /// <summary>
+    /// Called when a scheme is selected.
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnSchemeSelected { get; set; }
+
+    /// <summary>
+    /// Information about a Props scheme.
+    /// </summary>
+    public class SchemeInfo
+    {
+        public required string Name { get; init; }
+        public string? Description { get; init; }
+    }
+}

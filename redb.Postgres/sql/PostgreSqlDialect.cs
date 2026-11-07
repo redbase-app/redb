@@ -1,0 +1,1665 @@
+using redb.Core.Query;
+using redb.Core.Utils;
+
+namespace redb.Postgres.Sql;
+
+/// <summary>
+/// PostgreSQL implementation of ISqlDialect.
+/// Uses CASE WHEN for PVT (tested - 15 ms on 15K objects!).
+/// </summary>
+public class PostgreSqlDialect : ISqlDialect
+{
+    /// <summary>
+    /// Collation attached to case-folding expressions, or null to leave SQL exactly as it was.
+    /// Validated by <see cref="CollationNameValidator"/> before it reaches here.
+    /// </summary>
+    private readonly string? _stringCollation;
+
+    /// <summary>Default construction: no collation, generated SQL is unchanged.</summary>
+    public PostgreSqlDialect() : this(null) { }
+
+    public PostgreSqlDialect(string? stringCollation)
+    {
+        if (!string.IsNullOrWhiteSpace(stringCollation))
+        {
+            // Re-validated here rather than trusted: this constructor is public and is also
+            // reachable from provider code that did not go through RedbServiceConfiguration.
+            CollationNameValidator.Validate(stringCollation!);
+            _stringCollation = stringCollation;
+        }
+    }
+
+    public string ProviderName => "PostgreSQL";
+
+    /// <summary>
+    /// <c>(expr COLLATE "und-x-icu")</c>. The parentheses are not decoration: without them
+    /// <c>COLLATE</c> binds tighter than expected inside a larger expression and the clause can
+    /// attach to the wrong operand.
+    /// </summary>
+    public string FoldCase(string expression)
+        => _stringCollation is null
+            ? expression
+            : $"({expression} COLLATE {CollationNameValidator.Quote(_stringCollation)})";
+
+    public string FormatPagination(int? limit, int? offset)
+    {
+        var parts = new List<string>();
+        if (limit.HasValue) parts.Add($"LIMIT {limit.Value}");
+        if (offset.HasValue && offset.Value > 0) parts.Add($"OFFSET {offset.Value}");
+        return string.Join(" ", parts);
+    }
+
+    public string WrapSubquery(string subquery, string alias)
+        => $"({subquery}) AS {alias}";
+
+    /// <summary>
+    /// PVT via array_agg with GROUP BY.
+    /// Test showed: 0.293 ms vs 0.339 ms (subquery) - 15% faster!
+    /// Works for ALL types including UUID.
+    /// </summary>
+    public string FormatPvtColumn(long structureId, string dbColumn, string alias)
+        => $"(array_agg({dbColumn}) FILTER (WHERE _id_structure = {structureId}))[1] AS \"{alias}\"";
+
+    public string FormatArrayContains(string column, string paramName)
+        => $"{column} = ANY({paramName})";
+
+    public string GetDbTypeName(string redbType) => redbType switch
+    {
+        "Long" => "bigint",
+        "String" => "text",
+        "Boolean" => "boolean",
+        "DateTime" => "timestamptz",
+        "DateTimeOffset" => "timestamptz",
+        "Double" => "double precision",
+        "Numeric" => "numeric",
+        "Guid" => "uuid",
+        "ByteArray" => "bytea",
+        _ => "text"
+    };
+
+    public string FormatParameter(int index)
+        => $"${index}";
+
+    public string QuoteIdentifier(string name)
+        // PostgreSQL escapes a double quote by doubling it. Without this a name like
+        // `a"b` closes the identifier and the rest becomes SQL (SQLI-PoC p.7).
+        => "\"" + name.Replace("\"", "\"\"") + "\"";
+
+    public string FormatCaseInsensitiveLike(string column, string parameter)
+        => $"{FoldCase(column)} ILIKE {parameter}";
+
+    public string FormatDateTimeLiteral(DateTime dt)
+        => $"'{DateTimeConverter.NormalizeForStorage(dt):yyyy-MM-ddTHH:mm:ss.ffffffZ}'::timestamptz";
+
+    public string FormatDateTimeOffsetLiteral(DateTimeOffset dto)
+        => $"'{dto.UtcDateTime:yyyy-MM-ddTHH:mm:ss.ffffffZ}'::timestamptz";
+
+    // ============================================================
+    // === ROLES SQL ===
+    // ============================================================
+
+    public string Roles_SelectById() =>
+        "SELECT _id AS Id, _name AS Name, _id_configuration AS IdConfiguration FROM _roles WHERE _id = $1";
+
+    public string Roles_SelectByName() =>
+        "SELECT _id AS Id, _name AS Name, _id_configuration AS IdConfiguration FROM _roles WHERE _name = $1";
+
+    public string Roles_SelectAll() =>
+        "SELECT _id AS Id, _name AS Name, _id_configuration AS IdConfiguration FROM _roles ORDER BY _name";
+
+    public string Roles_Insert() =>
+        "INSERT INTO _roles (_id, _name) VALUES ($1, $2)";
+
+    public string Roles_UpdateName() =>
+        "UPDATE _roles SET _name = $1 WHERE _id = $2";
+
+    public string Roles_Delete() =>
+        "DELETE FROM _roles WHERE _id = $1";
+
+    public string Roles_ExistsByName() =>
+        "SELECT _id FROM _roles WHERE _name = $1";
+
+    public string Roles_ExistsByNameExcluding() =>
+        "SELECT _id FROM _roles WHERE _name = $1 AND _id != $2";
+
+    public string Roles_Count() =>
+        "SELECT COUNT(*) FROM _roles";
+
+    public string Roles_UpdateConfiguration() =>
+        "UPDATE _roles SET _id_configuration = $1 WHERE _id = $2";
+
+    public string Roles_SelectConfigurationId() =>
+        "SELECT _id_configuration FROM _roles WHERE _id = $1";
+
+    // ============================================================
+    // === USERS_ROLES SQL ===
+    // ============================================================
+
+    public string UsersRoles_Insert() =>
+        "INSERT INTO _users_roles (_id, _id_user, _id_role) VALUES ($1, $2, $3)";
+
+    public string UsersRoles_Delete() =>
+        "DELETE FROM _users_roles WHERE _id_user = $1 AND _id_role = $2";
+
+    public string UsersRoles_DeleteByUser() =>
+        "DELETE FROM _users_roles WHERE _id_user = $1";
+
+    public string UsersRoles_DeleteByRole() =>
+        "DELETE FROM _users_roles WHERE _id_role = $1";
+
+    public string UsersRoles_Exists() =>
+        "SELECT _id FROM _users_roles WHERE _id_user = $1 AND _id_role = $2";
+
+    public string UsersRoles_SelectRolesByUser() =>
+        """
+        SELECT r._id AS Id, r._name AS Name, r._id_configuration AS IdConfiguration
+        FROM _roles r
+        INNER JOIN _users_roles ur ON ur._id_role = r._id
+        WHERE ur._id_user = $1
+        ORDER BY r._name
+        """;
+
+    public string UsersRoles_SelectUsersByRole() =>
+        """
+        SELECT u._id, u._login, u._name, u._password, u._phone, u._email,
+               u._enabled, u._date_register, u._date_dismiss,
+               u._key, u._code_int, u._code_string, u._code_guid, u._note, u._hash
+        FROM _users u
+        INNER JOIN _users_roles ur ON ur._id_user = u._id
+        WHERE ur._id_role = $1
+        ORDER BY u._name
+        """;
+
+    public string UsersRoles_CountByRole() =>
+        "SELECT COUNT(*) FROM _users_roles WHERE _id_role = $1";
+
+    // ============================================================
+    // === USERS SQL ===
+    // ============================================================
+
+    public string Users_ExistsById() =>
+        "SELECT _id FROM _users WHERE _id = $1";
+
+    public string Users_SelectIdByLogin() =>
+        "SELECT _id FROM _users WHERE _login = $1";
+
+    // ============================================================
+    // === PERMISSIONS SQL ===
+    // ============================================================
+
+    public string Permissions_DeleteByRole() =>
+        "DELETE FROM _permissions WHERE _id_role = $1";
+
+    /// <summary>
+    /// CRITICAL: Uses PostgreSQL function get_user_permissions_for_object()!
+    /// This function implements complex recursive permission logic.
+    /// For MSSQL this must be replaced with CTE/JOIN query.
+    /// </summary>
+    public string Permissions_GetEffectiveForObject() =>
+        "SELECT * FROM get_user_permissions_for_object($1, $2)";
+
+    public string Permissions_GetEffectiveForObjects() =>
+        """
+        SELECT ids.id AS object_id, p.user_id, p.permission_source_id, p.permission_type, p._id_role, p._id_user,
+               p.can_select, p.can_insert, p.can_update, p.can_delete
+        FROM unnest($1::bigint[]) AS ids(id)
+        CROSS JOIN LATERAL get_user_permissions_for_object(ids.id, $2) p
+        """;
+
+    public string Permissions_SelectReadableObjectIds() =>
+        """
+        SELECT DISTINCT object_id FROM v_user_permissions
+        WHERE user_id = $1 AND can_select = true
+        """;
+
+    public string Permissions_Insert() =>
+        """
+        INSERT INTO _permissions (_id, _id_user, _id_role, _id_ref, _select, _insert, _update, _delete)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """;
+
+    public string Permissions_Update() =>
+        "UPDATE _permissions SET _select = $1, _insert = $2, _update = $3, _delete = $4 WHERE _id = $5";
+
+    public string Permissions_Delete() =>
+        "DELETE FROM _permissions WHERE _id = $1";
+
+    public string Permissions_SelectById() =>
+        """
+        SELECT _id AS Id, _id_user AS IdUser, _id_role AS IdRole, _id_ref AS IdRef,
+               _select AS "Select", _insert AS "Insert", _update AS "Update", _delete AS "Delete"
+        FROM _permissions WHERE _id = $1
+        """;
+
+    public string Permissions_SelectAllColumns() =>
+        """
+        SELECT _id AS Id, _id_user AS IdUser, _id_role AS IdRole, _id_ref AS IdRef,
+               _select AS "Select", _insert AS "Insert", _update AS "Update", _delete AS "Delete"
+        FROM _permissions
+        """;
+
+    public string Permissions_CountFrom() =>
+        "SELECT COUNT(*) FROM _permissions";
+
+    public string Permissions_SelectByUser() =>
+        """
+        SELECT _id AS Id, _id_user AS IdUser, _id_role AS IdRole, _id_ref AS IdRef,
+               _select AS "Select", _insert AS "Insert", _update AS "Update", _delete AS "Delete"
+        FROM _permissions WHERE _id_user = $1
+        """;
+
+    public string Permissions_SelectByRole() =>
+        """
+        SELECT _id AS Id, _id_user AS IdUser, _id_role AS IdRole, _id_ref AS IdRef,
+               _select AS "Select", _insert AS "Insert", _update AS "Update", _delete AS "Delete"
+        FROM _permissions WHERE _id_role = $1
+        """;
+
+    public string Permissions_SelectByObject() =>
+        """
+        SELECT _id AS Id, _id_user AS IdUser, _id_role AS IdRole, _id_ref AS IdRef,
+               _select AS "Select", _insert AS "Insert", _update AS "Update", _delete AS "Delete"
+        FROM _permissions WHERE _id_ref = $1 OR _id_ref = 0
+        """;
+
+    public string Permissions_SelectByUserRoleObject() =>
+        """
+        SELECT _id AS Id, _select AS "Select", _insert AS "Insert", _update AS "Update", _delete AS "Delete"
+        FROM _permissions
+        WHERE _id_user IS NOT DISTINCT FROM $1 AND _id_role IS NOT DISTINCT FROM $2 AND _id_ref = $3
+        """;
+
+    public string Permissions_DeleteByUserRoleObject() =>
+        """
+        DELETE FROM _permissions
+        WHERE _id_user IS NOT DISTINCT FROM $1 AND _id_role IS NOT DISTINCT FROM $2 AND _id_ref = $3
+        """;
+
+    public string Permissions_DeleteByUser() =>
+        "DELETE FROM _permissions WHERE _id_user = $1";
+
+    public string Permissions_Count() =>
+        "SELECT COUNT(*) FROM _permissions";
+
+    public string Permissions_CountByUser() =>
+        "SELECT COUNT(*) FROM _permissions WHERE _id_user = $1";
+
+    public string Permissions_CountByRole() =>
+        "SELECT COUNT(*) FROM _permissions WHERE _id_role = $1";
+
+    public string Permissions_SelectUserRoleIds() =>
+        "SELECT _id_role AS IdRole FROM _users_roles WHERE _id_user = $1";
+
+    // ============================================================
+    // === USERS SQL (full) ===
+    // ============================================================
+
+    public string Users_SelectAllColumns() =>
+        """
+        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password,
+               _phone AS Phone, _email AS Email, _enabled AS Enabled,
+               _date_register AS DateRegister, _date_dismiss AS DateDismiss,
+               _key AS Key, _code_int AS CodeInt, _code_string AS CodeString,
+               _code_guid AS CodeGuid, _note AS Note, _hash AS Hash
+        FROM _users
+        """;
+
+    public string Users_CountFrom() =>
+        "SELECT COUNT(*) FROM _users";
+
+    public string Users_SelectById() =>
+        """
+        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password,
+               _phone AS Phone, _email AS Email, _enabled AS Enabled,
+               _date_register AS DateRegister, _date_dismiss AS DateDismiss,
+               _key AS Key, _code_int AS CodeInt, _code_string AS CodeString,
+               _code_guid AS CodeGuid, _note AS Note, _hash AS Hash
+        FROM _users WHERE _id = $1
+        """;
+
+    public string Users_SelectByIds() =>
+        """
+        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password,
+               _phone AS Phone, _email AS Email, _enabled AS Enabled,
+               _date_register AS DateRegister, _date_dismiss AS DateDismiss,
+               _key AS Key, _code_int AS CodeInt, _code_string AS CodeString,
+               _code_guid AS CodeGuid, _note AS Note, _hash AS Hash
+        FROM _users WHERE _id = ANY($1)
+        """;
+
+    public string Users_SelectByLogin() =>
+        """
+        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password,
+               _phone AS Phone, _email AS Email, _enabled AS Enabled,
+               _date_register AS DateRegister, _date_dismiss AS DateDismiss,
+               _key AS Key, _code_int AS CodeInt, _code_string AS CodeString,
+               _code_guid AS CodeGuid, _note AS Note, _hash AS Hash
+        FROM _users WHERE _login = $1
+        """;
+
+    // Case-insensitive email lookup. Returns the FIRST match — email isn't enforced
+    // unique at the schema level; callers that need uniqueness probe with their own
+    // policy. Filters out soft-deleted rows (_enabled = false) so a stale row whose
+    // address was anonymised by an admin update doesn't shadow a real new account.
+    public string Users_SelectByEmail() =>
+        """
+        SELECT _id AS Id, _login AS Login, _name AS Name, _password AS Password,
+               _phone AS Phone, _email AS Email, _enabled AS Enabled,
+               _date_register AS DateRegister, _date_dismiss AS DateDismiss,
+               _key AS Key, _code_int AS CodeInt, _code_string AS CodeString,
+               _code_guid AS CodeGuid, _note AS Note, _hash AS Hash
+        FROM _users WHERE LOWER(_email) = LOWER($1) AND _enabled = TRUE
+        LIMIT 1
+        """;
+
+    public string Users_Insert() =>
+        """
+        INSERT INTO _users (_id, _login, _password, _name, _phone, _email, _enabled,
+                           _date_register, _date_dismiss, _key, _code_int, _code_string,
+                           _code_guid, _note, _hash)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        """;
+
+    public string Users_Update() =>
+        """
+        UPDATE _users SET _login = $1, _name = $2, _phone = $3, _email = $4, _enabled = $5,
+                         _date_dismiss = $6, _key = $7, _code_int = $8, _code_string = $9,
+                         _code_guid = $10, _note = $11, _hash = $12
+        WHERE _id = $13
+        """;
+
+    // _login is immutable per the protect_system_users trigger — soft-delete must NOT
+    // touch it. Tombstoning happens on _name (mutable). Login slot stays occupied so
+    // re-registration with the same login is blocked while the soft-deleted row exists;
+    // freeing the login requires an explicit hard DELETE (separate admin operation).
+    public string Users_SoftDelete() =>
+        "UPDATE _users SET _name = $1, _enabled = $2, _date_dismiss = $3 WHERE _id = $4";
+
+    public string Users_UpdatePassword() =>
+        "UPDATE _users SET _password = $1 WHERE _id = $2";
+
+    public string Users_UpdateStatus() =>
+        "UPDATE _users SET _enabled = $1, _date_dismiss = $2 WHERE _id = $3";
+
+    public string Users_ExistsByLogin() =>
+        "SELECT _id FROM _users WHERE _login = $1";
+
+    public string Users_ExistsByLoginExcluding() =>
+        "SELECT _id FROM _users WHERE _login = $1 AND _id != $2";
+
+    public string Users_ExistsByEmail() =>
+        "SELECT _id FROM _users WHERE _email = $1 LIMIT 1";
+
+    public string Users_Count() =>
+        "SELECT COUNT(*) FROM _users";
+
+    public string Users_CountEnabled() =>
+        "SELECT COUNT(*) FROM _users WHERE _enabled = true";
+
+    public string Users_SelectConfigurationId() =>
+        "SELECT _id_configuration FROM _users WHERE _id = $1";
+
+    public string Users_UpdateConfiguration() =>
+        "UPDATE _users SET _id_configuration = $1 WHERE _id = $2";
+
+    public string Roles_SelectIdByName() =>
+        "SELECT _id AS Id FROM _roles WHERE _name = $1";
+
+    public string Roles_ExistsById() =>
+        "SELECT _id FROM _roles WHERE _id = $1";
+
+    // ============================================================
+    // === SCHEMES SQL ===
+    // ============================================================
+
+    public string Schemes_SelectByName() =>
+        "SELECT _id, _name, _alias, _name_space, _structure_hash, _tags, _type FROM _schemes WHERE _name = $1";
+
+    public string Schemes_SelectById() =>
+        "SELECT _id, _name, _alias, _name_space, _structure_hash, _tags, _type FROM _schemes WHERE _id = $1";
+
+    public string Schemes_SelectAll() =>
+        "SELECT _id, _name, _alias, _name_space, _structure_hash, _tags, _type FROM _schemes";
+
+    public string Schemes_Insert() =>
+        "INSERT INTO _schemes (_id, _name, _alias, _type) VALUES ($1, $2, $3, $4)";
+
+    // ON CONFLICT keeps the transaction alive: a raised unique violation would abort it and make the
+    // follow-up SELECT fail with 25P02.
+    public string Schemes_InsertIfAbsent() =>
+        "INSERT INTO _schemes (_id, _name, _alias, _type, _name_space) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (_name) DO NOTHING";
+
+    public string Schemes_UpdateHash() =>
+        "UPDATE _schemes SET _structure_hash = $1 WHERE _id = $2";
+
+    public string Schemes_UpdateName() =>
+        "UPDATE _schemes SET _name = $1 WHERE _id = $2";
+
+    public string Schemes_UpdateAlias() =>
+        "UPDATE _schemes SET _alias = $1 WHERE _id = $2";
+
+    public string Schemes_UpdateNameSpace() =>
+        "UPDATE _schemes SET _name_space = $1 WHERE _id = $2";
+
+    public string Schemes_SelectHashById() =>
+        "SELECT _structure_hash FROM _schemes WHERE _id = $1";
+
+    public string Schemes_ExistsByName() =>
+        "SELECT _id FROM _schemes WHERE _name = $1 LIMIT 1";
+
+    public string Schemes_SelectObjectByName() =>
+        "SELECT _id, _name, _alias, _name_space, _structure_hash, _type FROM _schemes WHERE _name = $1 AND _type = $2";
+
+    public string Schemes_InsertObject() =>
+        "INSERT INTO _schemes (_id, _name, _type) VALUES ($1, $2, $3)";
+
+    public string Schemes_InsertObjectIfAbsent() =>
+        "INSERT INTO _schemes (_id, _name, _type) VALUES ($1, $2, $3) ON CONFLICT (_name) DO NOTHING";
+
+    // ============================================================
+    // === STRUCTURES SQL ===
+    // ============================================================
+
+    public string Structures_SelectByScheme() =>
+        """
+        SELECT _id, _id_parent, _id_scheme, _id_override, _id_type, _id_list,
+               _name, _alias, _order, _readonly, _allow_not_null,
+               _collection_type, _key_type, _is_compress, _store_null,
+               _unique, _unique_version, _unique_scope, _lazy, _tags,
+               _default_value, _default_editor
+        FROM _structures WHERE _id_scheme = $1
+        """;
+
+    public string Structures_SelectBySchemeShort() =>
+        "SELECT _id, _id_parent, _id_scheme, _id_type, _name, _order, _collection_type, _key_type, _allow_not_null, _store_null, _unique, _unique_scope, _lazy FROM _structures WHERE _id_scheme = $1";
+
+    public string Structures_SelectBySchemeCacheable() =>
+        """
+        SELECT _id, _id_parent, _id_scheme, _id_type, _name, _alias, _order,
+               _readonly, _allow_not_null, _collection_type, _key_type,
+               _unique, _unique_version, _unique_scope, _lazy
+        FROM _structures WHERE _id_scheme = $1
+        """;
+
+    public string Structures_Insert() =>
+        """
+        INSERT INTO _structures (_id, _id_scheme, _id_parent, _name, _alias, _id_type, _allow_not_null, _collection_type, _key_type, _order, _lazy)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        """;
+
+    public string Structures_UpdateType() =>
+        "UPDATE _structures SET _id_type = $1 WHERE _id = $2";
+
+    public string Structures_UpdateCollectionType() =>
+        "UPDATE _structures SET _collection_type = $1 WHERE _id = $2";
+
+    public string Structures_UpdateKeyType() =>
+        "UPDATE _structures SET _key_type = $1 WHERE _id = $2";
+
+    public string Structures_UpdateAlias() =>
+        "UPDATE _structures SET _alias = $1 WHERE _id = $2";
+
+    public string Structures_UpdateAllowNotNull() =>
+        "UPDATE _structures SET _allow_not_null = $1 WHERE _id = $2";
+
+    public string Structures_UpdateLazy() =>
+        "UPDATE _structures SET _lazy = $1 WHERE _id = $2";
+
+    public string Session_SetLazyRefs() =>
+        "SELECT set_config('redb.lazy_refs', CASE WHEN $1 = 1 THEN '1' ELSE '0' END, false)";
+
+    public string Structures_UpdateUnique() =>
+        "UPDATE _structures SET _unique = $1, _unique_version = $2, _unique_scope = $3 WHERE _id = $4";
+
+    public string Structures_UpdateTags() =>
+        "UPDATE _structures SET _tags = $1 WHERE _id = $2";
+
+    public string Schemes_UpdateTags() =>
+        "UPDATE _schemes SET _tags = $1 WHERE _id = $2";
+
+    public string Structures_SelectById() =>
+        """
+        SELECT _id, _id_parent, _id_scheme, _id_override, _id_type, _id_list,
+               _name, _alias, _order, _readonly, _allow_not_null,
+               _collection_type, _key_type, _is_compress, _store_null,
+               _unique, _unique_version, _unique_scope, _lazy, _tags,
+               _default_value, _default_editor
+        FROM _structures WHERE _id = $1
+        """;
+
+    // Keyable rows only (root scalars and S2 nested scalars - never collection elements, which
+    // carry _array_index), live objects only: the trash (-10) released its keys and must not get
+    // them back from a recompute.
+    public string Values_SelectRootScalarsByStructure() =>
+        """
+        SELECT v._id as Id, v._id_structure as IdStructure, v._id_object as IdObject,
+               v._String as String, v._Long as Long, v._Guid as Guid, v._Double as Double,
+               v._DateTimeOffset as DateTimeOffset, v._Boolean as Boolean, v._ByteArray as ByteArray,
+               v._Numeric as Numeric, v._unique as "Unique"
+        FROM _values v
+        JOIN _objects o ON o._id = v._id_object AND o._id_scheme <> -10
+        WHERE v._id_structure = $1 AND v._array_index IS NULL
+        ORDER BY v._id
+        """;
+
+    public string Values_SelectElementRowsByStructure() =>
+        """
+        SELECT v._id as Id, v._id_structure as IdStructure, v._id_object as IdObject,
+               v._String as String, v._Long as Long, v._Guid as Guid, v._Double as Double,
+               v._DateTimeOffset as DateTimeOffset, v._Boolean as Boolean, v._ByteArray as ByteArray,
+               v._Numeric as Numeric, v._ListItem as ListItem, v._Object as Object,
+               v._array_parent_id as ArrayParentId, v._unique as "Unique"
+        FROM _values v
+        JOIN _objects o ON o._id = v._id_object AND o._id_scheme <> -10
+        WHERE v._id_structure = $1 AND v._array_index IS NOT NULL
+        ORDER BY v._id
+        """;
+
+    public string Values_UpdateUnique() =>
+        "UPDATE _values SET _unique = $1 WHERE _id = $2";
+
+    public string Values_ClearUniqueByStructure() =>
+        "UPDATE _values SET _unique = NULL WHERE _id_structure = $1 AND _unique IS NOT NULL";
+
+    // No positional filter: UIX__values__structure_unique guarantees at most one row per
+    // (structure, key) across root, nested and element rows alike.
+    public string Values_SelectObjectIdByUnique() =>
+        "SELECT _id_object FROM _values WHERE _id_structure = $1 AND _unique = $2";
+
+    public string Values_ExistsUnhashedByStructure(string typedColumn) =>
+        $"""
+        SELECT 1 FROM _values v
+        JOIN _objects o ON o._id = v._id_object AND o._id_scheme <> -10
+        WHERE v._id_structure = $1 AND v._unique IS NULL AND v.{typedColumn} IS NOT NULL
+          AND v._array_index IS NULL
+        LIMIT 1
+        """;
+
+    public string Values_SelectByStructure() =>
+        """
+        SELECT v._id as Id, v._id_structure as IdStructure, v._id_object as IdObject,
+               v._String as String, v._Long as Long, v._Guid as Guid, v._Double as Double,
+               v._DateTimeOffset as DateTimeOffset, v._Boolean as Boolean, v._ByteArray as ByteArray,
+               v._Numeric as Numeric, v._array_parent_id as ArrayParentId, v._array_index as ArrayIndex
+        FROM _values v WHERE v._id_structure = $1
+        """;
+
+    public string Values_SetByteArrayScalar() =>
+        "UPDATE _values SET _ByteArray = $1, _Guid = NULL, _Long = NULL WHERE _id = $2";
+
+    public string Values_DeleteByteArrayElements() =>
+        "DELETE FROM _values WHERE _id_structure = $1 AND _array_parent_id IN (SELECT _id FROM _values WHERE _id_structure = $1)";
+
+    public string Structures_DeleteByIds(IEnumerable<long> ids) =>
+        $"DELETE FROM _structures WHERE _id IN ({string.Join(",", ids)})";
+
+    // === SCHEMA LOCK ===
+    // Not part of ISqlDialect: the lock runs on a connection of its own (RedbService.OpenSchemaLockAsync), outside the
+    // context. A session advisory lock, never waited for in the server (see RedbService.AdvisoryLock).
+
+    /// <summary>One attempt at the session advisory lock of the schema; returns a boolean. Params: $1 = key (bigint).</summary>
+    public string SchemaLock_TryAcquire() => "SELECT pg_try_advisory_lock($1)";
+
+    /// <summary>Releases the session advisory lock of the schema. Params: $1 = key (bigint).</summary>
+    public string SchemaLock_Release() => "SELECT pg_advisory_unlock($1)";
+
+    // === ROOT STRUCTURE KEY ===
+    // PostgreSQL 14 has no NULLS NOT DISTINCT: a partial unique index over the root rows.
+
+    private const string RootKeyName = "UX__structures__root";
+
+    // The structure $1 and every structure below it, as CTE t.
+    private const string SubtreeCte =
+        "WITH RECURSIVE t(_id) AS (SELECT _id FROM _structures WHERE _id = $1 " +
+        "UNION ALL SELECT c._id FROM _structures c JOIN t ON c._id_parent = t._id)";
+
+    public string? Structures_RootKeyExists() =>
+        $"SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND indexname = '{RootKeyName}'";
+
+    public string Structures_CreateRootKey() =>
+        $"CREATE UNIQUE INDEX \"{RootKeyName}\" ON _structures (_id_scheme, _name) WHERE _id_parent IS NULL";
+
+    // === STRING COLLATION INDEX ===
+    // With StringCollation set, an ignore-case search reads (_String COLLATE "<c>") ILIKE, which only a trigram
+    // index over that same expression serves (see StringCollationIndex).
+
+    /// <summary>
+    /// Whether <c>_values</c> has a trigram index that serves <c>(_String COLLATE "$1") ILIKE</c>: a GIN index of one
+    /// key column with opclass <c>gin_trgm_ops</c> over <c>_string</c> under collation <c>$1</c>. PostgreSQL stores
+    /// <c>(_String COLLATE "c")</c> as the column itself with a collation of its own, not as an expression, so the key
+    /// column is matched by attribute and collation. Matched by structure, not by name: an index made by hand under any
+    /// name counts. Column <c>Valid</c>: NULL when there is none, false when every one is INVALID (an interrupted
+    /// CONCURRENTLY build), true when one is usable. Column <c>Ctype</c>: the ctype of the database, which decides what
+    /// pg_trgm takes for a letter (under <c>C</c> it finds no trigrams in a non-ASCII word, whatever the collation).
+    /// The collation is resolved with <c>to_regcollation(quote_ident($1))</c>, the way the <c>COLLATE "$1"</c> of the
+    /// search resolves it (search path, pg_catalog first), not by <c>pg_collation.collname</c>: a collation of the same
+    /// name in another schema would match the name and still serve no search. Params: $1 = collation name.
+    /// </summary>
+    public string Values_StringCollationIndexState() =>
+        """
+        SELECT
+            (SELECT bool_or(i.indisvalid)
+             FROM pg_index i
+             JOIN pg_class t ON t.oid = i.indrelid
+             JOIN pg_namespace n ON n.oid = t.relnamespace
+             JOIN pg_class ic ON ic.oid = i.indexrelid
+             JOIN pg_am am ON am.oid = ic.relam
+             JOIN pg_opclass oc ON oc.oid = i.indclass[0]
+             JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+             WHERE t.relname = '_values' AND n.nspname = current_schema()
+               AND am.amname = 'gin' AND oc.opcname = 'gin_trgm_ops'
+               AND i.indnkeyatts = 1 AND a.attname = '_string'
+               AND i.indcollation[0] = to_regcollation(quote_ident($1))::oid) AS "Valid",
+            (SELECT datctype FROM pg_database WHERE datname = current_database()) AS "Ctype"
+        """;
+
+    /// <summary>
+    /// The statement that builds the index serving <c>(_String COLLATE "collation") ILIKE</c> under
+    /// <see cref="StringCollationIndexName"/>, CONCURRENTLY: it runs on a connection of its own, outside any
+    /// transaction. The collation is a validated name (CollationNameValidator).
+    /// </summary>
+    public string Values_CreateStringCollationIndex(string collation) =>
+        $"CREATE INDEX CONCURRENTLY IF NOT EXISTS \"{StringCollationIndexName(collation)}\" " +
+        $"ON _values USING gin ((_String COLLATE {CollationNameValidator.Quote(collation)}) gin_trgm_ops) " +
+        "WHERE _String IS NOT NULL";
+
+    /// <summary>Drops an INVALID leftover of an interrupted build of <see cref="Values_CreateStringCollationIndex"/>.</summary>
+    public string Values_DropStringCollationIndex(string collation) =>
+        $"DROP INDEX CONCURRENTLY IF EXISTS \"{StringCollationIndexName(collation)}\"";
+
+    /// <summary>Whether the index named by <see cref="StringCollationIndexName"/> exists and is INVALID. Params: $1 = index name.</summary>
+    public string Values_StringCollationIndexInvalid() =>
+        """
+        SELECT NOT i.indisvalid
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indexrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relname = $1 AND n.nspname = current_schema()
+        """;
+
+    /// <summary>The trigram operator classes; redb_init creates the extension, a database restored without it lacks them.</summary>
+    public string Extension_CreateTrigram() => "CREATE EXTENSION IF NOT EXISTS pg_trgm";
+
+    /// <summary>
+    /// <c>IX__values__String_pattern_&lt;slug&gt;</c>: the collation lowercased, every character other than a letter or a
+    /// digit replaced by an underscore (<c>und-x-icu</c> gives <c>IX__values__String_pattern_und_x_icu</c>).
+    /// </summary>
+    public string StringCollationIndexName(string collation)
+    {
+        var slug = new System.Text.StringBuilder(collation.Length);
+        foreach (var ch in collation.ToLowerInvariant())
+            slug.Append(char.IsAsciiLetterOrDigit(ch) ? ch : '_');
+        return "IX__values__String_pattern_" + slug;
+    }
+
+    public string Structures_SelectRootDuplicates() =>
+        """
+        SELECT s._id, s._id_parent, s._id_scheme, s._name
+        FROM _structures s
+        JOIN (SELECT _id_scheme, _name FROM _structures WHERE _id_parent IS NULL
+              GROUP BY _id_scheme, _name HAVING COUNT(*) > 1) d
+          ON d._id_scheme = s._id_scheme AND d._name = s._name
+        WHERE s._id_parent IS NULL
+        ORDER BY s._id_scheme, s._name, s._id
+        """;
+
+    public string? Structures_LockSubtree() =>
+        SubtreeCte + " SELECT s._id FROM _structures s JOIN t ON s._id = t._id FOR UPDATE OF s";
+
+    public string Structures_SubtreeIsReferenced(bool withMigrations) =>
+        SubtreeCte + " SELECT CASE WHEN " +
+        "EXISTS (SELECT 1 FROM _values v JOIN t ON v._id_structure = t._id) OR " +
+        "EXISTS (SELECT 1 FROM _structures o JOIN t ON o._id_override = t._id)" +
+        (withMigrations ? " OR EXISTS (SELECT 1 FROM _migrations m JOIN t ON m._structure_id = t._id)" : "") +
+        " THEN 1 ELSE 0 END";
+
+    public string Structures_DeleteSubtreeMetadataCache() =>
+        $"DELETE FROM _scheme_metadata_cache WHERE _structure_id IN ({SubtreeCte} SELECT _id FROM t)";
+
+    public string Structures_DeleteById() =>
+        "DELETE FROM _structures WHERE _id = $1";
+
+    public string Schemes_CountMetadataCache() =>
+        "SELECT COUNT(*)::bigint FROM _scheme_metadata_cache WHERE _scheme_id = $1";
+
+    // ============================================================
+    // === TYPES SQL ===
+    // ============================================================
+
+    public string Types_SelectByName() =>
+        "SELECT _id, _name FROM _types WHERE _name = $1";
+
+    public string Types_SelectAll() =>
+        "SELECT _id AS Id, _name AS Name, _db_type AS DbType, _type AS Type1 FROM _types";
+
+    // ============================================================
+    // === SCHEME FUNCTIONS (PostgreSQL-specific) ===
+    // ============================================================
+
+    public string Schemes_SyncMetadataCache() =>
+        "SELECT sync_metadata_cache_for_scheme($1)";
+
+    public string Schemes_MigrateStructureType() =>
+        "SELECT * FROM migrate_structure_type($1, $2, $3, $4)";
+
+    public string Schemes_GetStructureTree() =>
+        "SELECT get_scheme_structure_tree($1)";
+
+    // ============================================================
+    // === TREE SQL ===
+    // ============================================================
+
+    public string Tree_GetObjectJson() =>
+        "SELECT get_object_json($1, $2)";
+
+    public string Tree_SelectChildrenJson() =>
+        """
+        SELECT json_data
+        FROM (
+            SELECT get_object_json(o._id, 1) as json_data
+            FROM _objects o
+            WHERE o._id_parent = $1
+              AND o._id_scheme = $2
+            ORDER BY o._name, o._id
+        ) subquery
+        WHERE json_data IS NOT NULL
+        """;
+
+    public string Tree_SelectPolymorphicChildren() =>
+        """
+        SELECT o._id as ObjectId, o._id_scheme as SchemeId, get_object_json(o._id, 1)::text as JsonData
+        FROM _objects o
+        WHERE o._id_parent = $1
+        ORDER BY o._name, o._id
+        """;
+
+    public string Tree_SelectChildrenIds() =>
+        "SELECT o._id FROM _objects o WHERE o._id_parent = $1 ORDER BY o._name, o._id";
+
+    public string Tree_SelectSchemeAndJson() =>
+        "SELECT _id_scheme as SchemeId, get_object_json(_id, 1)::text as JsonData FROM _objects WHERE _id = $1";
+
+    public string Tree_SelectChildrenBySchemeBase() =>
+        """
+        SELECT _id as Id, _id_parent as IdParent, _id_scheme as IdScheme, _name as Name,
+               _id_owner as IdOwner, _id_who_change as IdWhoChange,
+               _date_create as DateCreate, _date_modify as DateModify,
+               _date_begin as DateBegin, _date_complete as DateComplete,
+               _key as Key, _value_long as ValueLong, _value_string as ValueString,
+               _value_guid as ValueGuid, _value_bool as ValueBool, _value_double as ValueDouble,
+               _value_numeric as ValueNumeric, _value_datetime as ValueDatetime,
+               _value_bytes as ValueBytes, _note as Note, _hash as Hash, _value_unique as ValueUnique
+        FROM _objects
+        WHERE _id_parent = $1 AND _id_scheme = $2
+        ORDER BY _name, _id
+        """;
+
+    public string Tree_SelectChildrenBase() =>
+        """
+        SELECT _id as Id, _id_parent as IdParent, _id_scheme as IdScheme, _name as Name,
+               _id_owner as IdOwner, _id_who_change as IdWhoChange,
+               _date_create as DateCreate, _date_modify as DateModify,
+               _date_begin as DateBegin, _date_complete as DateComplete,
+               _key as Key, _value_long as ValueLong, _value_string as ValueString,
+               _value_guid as ValueGuid, _value_bool as ValueBool, _value_double as ValueDouble,
+               _value_numeric as ValueNumeric, _value_datetime as ValueDatetime,
+               _value_bytes as ValueBytes, _note as Note, _hash as Hash, _value_unique as ValueUnique
+        FROM _objects
+        WHERE _id_parent = $1
+        ORDER BY _name, _id
+        """;
+
+    public string Tree_ObjectExists() =>
+        "SELECT _id FROM _objects WHERE _id = $1 LIMIT 1";
+
+    public string Tree_SelectParentId() =>
+        "SELECT _id_parent FROM _objects WHERE _id = $1";
+
+    public string Tree_UpdateParent() =>
+        // _hash = NULL: the parent is part of the object hash and this update bypasses the save
+        // path - a cached copy must not keep answering with the old parent.
+        "UPDATE _objects SET _id_parent = $1, _date_modify = $2, _id_who_change = $3, _hash = NULL WHERE _id = $4";
+
+    public string Tree_DeleteValuesByObjectIds() =>
+        "DELETE FROM _values WHERE _id_object = ANY($1)";
+
+    public string Tree_DeleteObjectsByIds() =>
+        "DELETE FROM _objects WHERE _id = ANY($1)";
+
+    public string Tree_SelectSubtreeRows() =>
+        """
+        WITH RECURSIVE sub AS (
+            SELECT o._id, o._id_parent, o._id_scheme, o._name, 1 AS depth
+            FROM _objects o
+            WHERE o._id_parent = $1 AND ($2::bigint IS NULL OR o._id_scheme = $2::bigint)
+            UNION ALL
+            SELECT o._id, o._id_parent, o._id_scheme, o._name, s.depth + 1
+            FROM _objects o
+            JOIN sub s ON o._id_parent = s._id
+            WHERE s.depth < $3 AND ($2::bigint IS NULL OR o._id_scheme = $2::bigint)
+        )
+        SELECT _id AS Id, _id_parent AS IdParent, _id_scheme AS IdScheme, depth AS Depth
+        FROM sub
+        ORDER BY _name, _id
+        """;
+
+    public string Tree_SelectAncestorRows() =>
+        """
+        WITH RECURSIVE up AS (
+            SELECT o._id, o._id_parent, o._id_scheme, 0 AS depth
+            FROM _objects o
+            WHERE o._id = $1
+            UNION ALL
+            SELECT o._id, o._id_parent, o._id_scheme, u.depth + 1
+            FROM _objects o
+            JOIN up u ON o._id = u._id_parent
+            WHERE u.depth < $2
+        )
+        SELECT _id AS Id, _id_parent AS IdParent, _id_scheme AS IdScheme, depth AS Depth
+        FROM up
+        ORDER BY depth
+        """;
+
+    public string Tree_SelectIdsWithAncestors() =>
+        """
+        WITH RECURSIVE up AS (
+            SELECT o._id, o._id_parent, 0 AS depth
+            FROM _objects o
+            WHERE o._id = ANY($1)
+            UNION ALL
+            SELECT o._id, o._id_parent, u.depth + 1
+            FROM _objects o
+            JOIN up u ON o._id = u._id_parent
+            WHERE u.depth < $2
+        )
+        SELECT DISTINCT _id FROM up
+        """;
+
+    // ============================================================
+    // === OBJECT STORAGE SQL ===
+    // ============================================================
+
+    public string ObjectStorage_SelectObjectById() =>
+        """
+        SELECT _id as Id, _id_scheme as IdScheme, _hash as Hash, _name as Name,
+               _id_parent as IdParent, _id_owner as IdOwner, _id_who_change as IdWhoChange,
+               _date_create as DateCreate, _date_modify as DateModify,
+               _date_begin as DateBegin, _date_complete as DateComplete,
+               _key as Key, _value_long as ValueLong, _value_string as ValueString,
+               _value_guid as ValueGuid, _value_bool as ValueBool, _value_double as ValueDouble,
+               _value_numeric as ValueNumeric, _value_datetime as ValueDatetime,
+               _value_bytes as ValueBytes, _note as Note, _value_unique as ValueUnique
+        FROM _objects WHERE _id = $1
+        """;
+
+    public string ObjectStorage_SelectIdHash() =>
+        "SELECT _id as Id, _hash as Hash FROM _objects WHERE _id = $1";
+
+    public string ObjectStorage_SelectIdBySchemeValueUnique() =>
+        "SELECT _id FROM _objects WHERE _id_scheme = $1 AND _value_unique = $2";
+
+    // P7: an in-batch key exchange releases before it takes - inside the batch transaction.
+    public string ObjectStorage_ClearValueUniqueByIds(IEnumerable<long> ids) =>
+        $"UPDATE _objects SET _value_unique = NULL WHERE _value_unique IS NOT NULL AND _id IN ({string.Join(",", ids)})";
+
+    public string Values_ClearUniqueByValueIds(IEnumerable<long> ids) =>
+        $"UPDATE _values SET _unique = NULL WHERE _unique IS NOT NULL AND _id IN ({string.Join(",", ids)})";
+
+    public string ObjectStorage_SelectIdHashScheme() =>
+        "SELECT _id as Id, _hash as Hash, _id_scheme as IdScheme FROM _objects WHERE _id = $1";
+
+    public string ObjectStorage_SelectObjectsByIds() =>
+        """
+        SELECT _id as Id, _id_scheme as IdScheme, _id_parent as IdParent, _id_owner as IdOwner,
+               _id_who_change as IdWhoChange, _name as Name, _hash as Hash,
+               _date_create as DateCreate, _date_modify as DateModify, _date_begin as DateBegin,
+               _date_complete as DateComplete, _key as Key, _note as Note,
+               _value_long as ValueLong, _value_string as ValueString, _value_guid as ValueGuid,
+               _value_bool as ValueBool, _value_double as ValueDouble, _value_numeric as ValueNumeric,
+               _value_datetime as ValueDatetime, _value_bytes as ValueBytes, _value_unique as ValueUnique
+        FROM _objects WHERE _id = ANY($1)
+        """;
+
+    public string ObjectStorage_DeleteById() =>
+        "DELETE FROM _objects WHERE _id = $1";
+
+    public string ObjectStorage_DeleteByIds() =>
+        "DELETE FROM _objects WHERE _id = ANY($1)";
+
+    public string ObjectStorage_InsertObject() => """
+        INSERT INTO _objects (
+            _id, _id_scheme, _name, _note, _date_create, _date_modify,
+            _id_owner, _id_who_change, _id_parent, _hash,
+            _value_string, _value_long, _value_guid, _value_bool,
+            _value_double, _value_numeric, _value_datetime, _value_bytes,
+            _key, _date_begin, _date_complete, _value_unique
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        """;
+
+    public string ObjectStorage_UpdateObject() => """
+        UPDATE _objects SET
+            _name = $1, _note = $2, _date_modify = $3, _id_who_change = $4, _hash = $5,
+            _value_string = $6, _value_long = $7, _value_guid = $8, _value_bool = $9,
+            _value_double = $10, _value_numeric = $11, _value_datetime = $12, _value_bytes = $13,
+            _key = $14, _date_begin = $15, _date_complete = $16, _value_unique = $17
+        WHERE _id = $18
+        """;
+
+    public string ObjectStorage_DeleteValuesByObjectId() =>
+        "DELETE FROM _values WHERE _id_object = $1";
+
+    public string ObjectStorage_GetObjectJson() =>
+        "SELECT get_object_json($1, $2)::text";
+
+    public string ObjectStorage_GetObjectsJsonBulk() =>
+        """
+        SELECT get_object_json(id, $2)::text
+        FROM unnest($1::bigint[]) AS id
+        """;
+
+    public string ObjectStorage_SelectStructuresWithMetadata() =>
+        """
+        SELECT s._id as Id, s._id_parent as IdParent, s._name as Name,
+               COALESCE(t._db_type, 'String') as DbType,
+               s._collection_type as CollectionType, s._key_type as KeyType,
+               COALESCE(s._store_null, false) as StoreNull,
+               COALESCE(s._unique, false) as "Unique",
+               s._unique_scope as UniqueScope,
+               COALESCE(t._type, 'string') as TypeSemantic
+        FROM _structures s
+        LEFT JOIN _types t ON s._id_type = t._id
+        WHERE s._id_scheme = $1
+        """;
+
+    public string ObjectStorage_SelectTypeById() =>
+        "SELECT _id as Id, _name as Name, _db_type as DbType, _type as Type1 FROM _types WHERE _id = $1";
+
+    public string ObjectStorage_CheckObjectExists() =>
+        "SELECT _id FROM _objects WHERE _id = $1 LIMIT 1";
+
+    public string ObjectStorage_SelectSchemeById() =>
+        "SELECT _id as Id, _name as Name FROM _schemes WHERE _id = $1";
+
+    public string ObjectStorage_SelectValuesForObjects() =>
+        """
+        SELECT _id as Id, _id_structure as IdStructure, _id_object as IdObject,
+               _string as String, _long as Long, _guid as Guid, _double as Double,
+               _datetimeoffset as DateTimeOffset, _boolean as Boolean, _bytearray as ByteArray,
+               _numeric as Numeric, _listitem as ListItem, _object as Object,
+               _array_parent_id as ArrayParentId, _array_index as ArrayIndex
+        FROM _values
+        WHERE _id_object = ANY($1)
+        """;
+
+    public string ObjectStorage_SelectSchemeIdsForObjects() =>
+        "SELECT _id as ObjectId, _id_scheme as SchemeId FROM _objects WHERE _id = ANY($1)";
+
+    public string ObjectStorage_SelectValueById() =>
+        """
+        SELECT _id as Id, _id_structure as IdStructure, _id_object as IdObject,
+               _string as String, _long as Long, _guid as Guid, _double as Double,
+               _datetimeoffset as DateTimeOffset, _boolean as Boolean, _bytearray as ByteArray,
+               _numeric as Numeric, _listitem as ListItem, _object as Object,
+               _array_parent_id as ArrayParentId, _array_index as ArrayIndex
+        FROM _values WHERE _id = $1
+        """;
+
+    public string ObjectStorage_SelectAllTypes() =>
+        "SELECT _id as Id, _name as Name, _db_type as DbType, _type as Type1 FROM _types";
+
+    public string ObjectStorage_SelectExistingIds() =>
+        "SELECT _id as Id FROM _objects WHERE _id = ANY($1)";
+
+    public string ObjectStorage_SelectExistingCreateDates() =>
+        "SELECT _id as Id, _date_create as DateCreate FROM _objects WHERE _id = ANY($1)";
+
+    public string ObjectStorage_SelectIdHashPairs() =>
+        "SELECT _id as Id, _hash as Hash FROM _objects WHERE _id = ANY($1)";
+
+    public string ObjectStorage_SelectSchemesByIds() =>
+        """
+        SELECT _id as Id, _name as Name, _alias as Alias, _name_space as NameSpace,
+               _structure_hash as StructureHash, _type as Type
+        FROM _schemes WHERE _id = ANY($1)
+        """;
+
+    public string ObjectStorage_LockObjectsForUpdate() =>
+        "SELECT _id FROM _objects WHERE _id = ANY($1) ORDER BY _id FOR UPDATE";
+
+    public string ObjectStorage_SelectSchemeIdByObjectId() =>
+        "SELECT _id_scheme FROM _objects WHERE _id = $1";
+
+    // ============================================================
+    // === LIST SQL ===
+    // ============================================================
+
+    public string Lists_SelectById() =>
+        "SELECT _id, _name FROM _lists WHERE _id = $1";
+
+    public string Lists_SelectByName() =>
+        "SELECT _id, _name FROM _lists WHERE _name = $1";
+
+    public string Lists_SelectAll() =>
+        "SELECT _id, _name FROM _lists ORDER BY _name";
+
+    public string Lists_Insert() =>
+        "INSERT INTO _lists (_id, _name, _alias) VALUES ($1, $2, $3)";
+
+    public string Lists_Update() =>
+        "UPDATE _lists SET _name = $1, _alias = $2 WHERE _id = $3";
+
+    public string Lists_Delete() =>
+        "DELETE FROM _lists WHERE _id = $1";
+
+    public string Lists_IsUsedInStructures() =>
+        "SELECT _id FROM _structures WHERE _id_list = $1 LIMIT 1";
+
+    // ============================================================
+    // === LIST ITEMS SQL ===
+    // ============================================================
+
+    public string ListItems_SelectById() =>
+        "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id = $1";
+
+    public string ListItems_SelectByIds() =>
+        "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id = ANY($1)";
+
+    public string ListItems_SelectByListId() =>
+        "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id_list = $1 ORDER BY _value";
+
+    public string ListItems_SelectByListIdAndValue() =>
+        "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id_list = $1 AND _value = $2";
+
+    public string ListItems_Insert() =>
+        "INSERT INTO _list_items (_id, _id_list, _value, _alias, _id_object) VALUES ($1, $2, $3, $4, $5)";
+
+    public string ListItems_UpdateAliasAndObject() =>
+        "UPDATE _list_items SET _alias = $1, _id_object = $2 WHERE _id = $3";
+
+    public string ListItems_Update() =>
+        "UPDATE _list_items SET _value = $1, _alias = $2, _id_object = $3 WHERE _id = $4";
+
+    public string ListItems_Delete() =>
+        "DELETE FROM _list_items WHERE _id = $1";
+
+    public string ListItems_SelectByObjectId() =>
+        "SELECT _id, _id_list, _value, _alias, _id_object FROM _list_items WHERE _id_object = $1";
+
+    // ============================================================
+    // === MAINTENANCE SQL ===
+    // ============================================================
+
+    public string Maintenance_Analyze(int analysisLimit) => "ANALYZE";
+
+    // pg_stat_user_indexes carries one combined scan counter (idx_scan) - it lands in Seeks;
+    // Scans/Updates have no PostgreSQL counterpart. last_idx_scan exists from PG16 on, so it
+    // is read defensively via to_jsonb of the row (older servers yield NULL, not an error).
+    public string Maintenance_SelectIndexStats() =>
+        """
+        SELECT i.schemaname                                AS "Schema",
+               c.relname                                   AS "Table",
+               i.indexrelname                              AS "Name",
+               x.indisunique                               AS "IsUnique",
+               (SELECT string_agg(a.attname, ',' ORDER BY k.ord)
+                  FROM unnest(x.indkey) WITH ORDINALITY AS k(attnum, ord)
+                  JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum
+                 WHERE k.ord <= x.indnkeyatts)             AS "ColumnsCsv",
+               (SELECT string_agg(a.attname, ',' ORDER BY k.ord)
+                  FROM unnest(x.indkey) WITH ORDINALITY AS k(attnum, ord)
+                  JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum
+                 WHERE k.ord > x.indnkeyatts)              AS "IncludedColumnsCsv",
+               x.indisprimary                              AS "IsPrimaryKey",
+               EXISTS (SELECT 1 FROM pg_constraint con
+                        WHERE con.conindid = x.indexrelid AND con.contype IN ('p', 'u', 'x'))
+                                                           AS "IsUniqueConstraint",
+               NULL::boolean                               AS "IsClustered",
+               EXISTS (SELECT 1 FROM pg_constraint fk
+                        WHERE fk.contype = 'f' AND fk.conrelid = x.indrelid
+                          AND fk.conkey <@ x.indkey::smallint[])
+                                                           AS "BacksForeignKey",
+               pg_relation_size(i.indexrelid)              AS "SizeBytes",
+               GREATEST(ic.reltuples::bigint, 0)           AS "EstimatedRows",
+               i.idx_scan                                  AS "Seeks",
+               NULL::bigint                                AS "Scans",
+               NULL::bigint                                AS "Updates",
+               (to_jsonb(i) ->> 'last_idx_scan')::timestamptz AS "LastUsed"
+        FROM pg_stat_user_indexes i
+        JOIN pg_class c  ON c.oid  = i.relid
+        JOIN pg_class ic ON ic.oid = i.indexrelid
+        JOIN pg_index x  ON x.indexrelid = i.indexrelid
+        ORDER BY c.relname, i.indexrelname
+        """;
+
+    public string Maintenance_AnalyzeTable(string? schema, string table, int analysisLimit)
+        => $"ANALYZE {QuoteIdentifier(schema ?? "public")}.{QuoteIdentifier(table)}";
+
+    public string Maintenance_SelectTableExists() =>
+        """
+        SELECT count(*) FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relkind IN ('r', 'p') AND c.relname = $1 AND n.nspname = COALESCE($2, 'public')
+        """;
+
+    public string Maintenance_SelectTableStats() =>
+        """
+        SELECT t.schemaname                                        AS "Schema",
+               t.relname                                           AS "Table",
+               GREATEST(c.reltuples::bigint, 0)                    AS "EstimatedRows",
+               pg_table_size(c.oid)                                AS "DataSizeBytes",
+               pg_indexes_size(c.oid)                              AS "IndexesSizeBytes",
+               t.n_dead_tup                                        AS "DeadRows",
+               t.last_analyze                                      AS "LastAnalyze",
+               t.last_autoanalyze                                  AS "LastAutoAnalyze",
+               GREATEST(t.last_vacuum, t.last_autovacuum)          AS "LastVacuum",
+               (t.last_analyze IS NOT NULL OR t.last_autoanalyze IS NOT NULL) AS "HasStatistics"
+        FROM pg_stat_user_tables t
+        JOIN pg_class c ON c.oid = t.relid
+        ORDER BY t.schemaname, t.relname
+        """;
+
+    public System.Collections.Generic.IReadOnlyList<string> Maintenance_SelectTableStatsForms()
+        => new[] { Maintenance_SelectTableStats() };
+
+    public string Maintenance_SelectStatisticsWindow() =>
+        """
+        SELECT COALESCE(pg_stat_get_db_stat_reset_time(oid), pg_postmaster_start_time()) AS "CountersSince",
+               pg_is_in_recovery()                 AS "IsReplica"
+        FROM pg_database WHERE datname = current_database()
+        """;
+
+    public string Maintenance_SelectIndexStatsNoSize() => Maintenance_SelectIndexStats();
+
+    // ============================================================
+    // === VALIDATION SQL ===
+    // ============================================================
+
+    public string Validation_SelectAllTypes() =>
+        "SELECT _id, _name, _db_type, _type FROM _types";
+
+    public string Validation_SelectSchemeByName() =>
+        "SELECT _id, _id_parent, _name, _alias, _name_space, _structure_hash, _type FROM _schemes WHERE _name = $1";
+
+    public string Validation_SelectStructuresBySchemeId() =>
+        @"SELECT s._id, s._id_parent, s._id_scheme, s._id_override, s._id_type, s._id_list,
+                 s._name, s._alias, s._order, s._readonly, s._allow_not_null,
+                 s._collection_type, s._key_type, s._is_compress, s._store_null,
+                 s._unique, s._unique_version,
+                 s._default_value, s._default_editor
+          FROM _structures s WHERE s._id_scheme = $1";
+
+    // ============================================================
+    // === LAZY LOADER SQL ===
+    // ============================================================
+
+    public string LazyLoader_SelectObjectBase() =>
+        @"SELECT _id, _id_scheme, _hash, _name, _id_parent, _id_owner, _id_who_change,
+                 _date_create, _date_modify, _date_begin, _date_complete,
+                 _key, _value_long, _value_string, _value_guid, _value_bool,
+                 _value_double, _value_numeric, _value_datetime, _value_bytes, _note
+          FROM _objects WHERE _id = $1";
+
+    public string LazyLoader_GetObjectJson() =>
+        "SELECT get_object_json($1, $2)::text";
+
+    public string LazyLoader_GetObjectJsonBatch() =>
+        @"SELECT id::bigint AS ""Id"", get_object_json(id, $2)::text AS ""JsonData""
+          FROM unnest($1::bigint[]) AS id";
+
+    public string LazyLoader_SelectObjectHash() =>
+        "SELECT _hash FROM _objects WHERE _id = $1";
+
+    public string Transaction_SavepointBegin() => "SAVEPOINT redb_batch_save";
+    public string? Transaction_SavepointRelease() => "RELEASE SAVEPOINT redb_batch_save";
+    public string Transaction_SavepointRollback() => "ROLLBACK TO SAVEPOINT redb_batch_save";
+
+    // ============================================================
+    // === QUERY PROVIDER SQL ===
+    // ============================================================
+
+    public string Query_SearchObjectsFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_with_facets)");
+
+    public string Query_SearchObjectsBaseFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_with_facets_base)");
+
+    public string Query_SearchObjectsProjectionByPathsFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_with_projection_by_paths)");
+
+    public string Query_SearchObjectsProjectionByIdsFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_with_projection_by_ids)");
+
+    public string Query_SearchTreeObjectsFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_tree_objects_with_facets)");
+
+    public string Query_SearchTreeObjectsBaseFunction() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_tree_objects_with_facets_base)");
+
+    public string Query_CountTemplate() =>
+        "SELECT ({0}($1, $2::jsonb, NULL, NULL, NULL, $3))->>'total_count'";
+
+    public string Query_SearchTemplate() =>
+        "SELECT {0}($1, $2::jsonb, $3, $4, $5::jsonb, $6) as result";
+
+    public string Query_SearchWithDistinctTemplate() =>
+        "SELECT {0}($1, $2::jsonb, $3, $4, $5::jsonb, $6, $7) as result";
+
+    public string Query_SearchFullTemplate() =>
+        "SELECT {0}($1, $2::jsonb, $3, $4, $5::jsonb, $6, $7, $8) as result";
+
+    public string Query_JsonCast() => "::jsonb";
+
+    public string Query_TextArrayCast() => "::text[]";
+
+    public string Query_BigintArrayCast() => "::bigint[]";
+
+    public string Query_ProjectionByPathsTemplate() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (projection_by_paths template)");
+
+    public string Query_ProjectionByIdsTemplate(string structureIdsArray) =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (projection_by_ids template)");
+
+    public string Query_CheckPermissionSql() =>
+        "SELECT EXISTS(SELECT 1 FROM get_user_permissions_for_object($1, $2) WHERE can_select = true) as has_permission";
+
+    // --------------------------------------------------------
+    // Legacy aggregate/window/grouped SQL — DEPRECATED for Postgres.
+    // PG free path is fully PVT (see PostgresQueryProvider.Aggregation.cs /
+    // .Grouping.cs / .Window.cs / .GroupedWindow.cs which override base methods
+    // and call pvt_build_aggregate_sql / pvt_build_groupby_sql /
+    // pvt_build_array_groupby_sql / pvt_build_window_sql).
+    // Throwing here makes any regression on PG immediately visible in tests.
+    // MSSql still uses its own MsSqlDialect implementations.
+    // --------------------------------------------------------
+    private const string LegacyPgRemovedMsg =
+        "Legacy PostgreSQL SQL path is removed. PG provider must use the v2-pvt pipeline.";
+
+    public string Query_AggregateBatchPreviewSql() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_batch_preview)");
+
+    public string Query_AggregateFieldSql() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_field)");
+
+    public string Query_SqlPreviewTemplate() =>
+        "SELECT {0}($1, $2::jsonb, $3, $4, $5::jsonb, $6, $7) as sql_preview";
+
+    public string Query_AggregateBatchSql() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_batch)");
+
+    /// <summary>
+    /// Simple search for Delete operations - LEGACY. PG must migrate to PVT pipeline.
+    /// </summary>
+    public string Query_SearchObjectsSimpleSql() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (search_objects_simple)");
+
+    public string Query_AggregateGroupedSql() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (aggregate_grouped)");
+
+    public string Query_WindowSql() =>
+        throw new NotSupportedException(LegacyPgRemovedMsg + " (query_with_window)");
+
+    public string Query_TreeCountNormalSql(string functionName) =>
+        $"SELECT (result->>'total_count')::int FROM {functionName}($1, $2::jsonb, 1, 0, NULL::jsonb, $3) as result";
+
+    public string Query_TreeSearchNormalSql(string functionName) =>
+        $"SELECT result->>'objects' FROM {functionName}($1, $2::jsonb, $3, $4, $5::jsonb, $6) as result";
+
+    /// <summary>
+    /// Tree search with parent_ids array (8 params).
+    /// </summary>
+    public string Query_TreeSearchWithParentIdsSql(string functionName) =>
+        $"SELECT result->>'objects' FROM {functionName}($1, $2, $3::jsonb, $4, $5, $6::jsonb, $7, $8) as result";
+
+    /// <summary>
+    /// HasAncestor with tree function (8 params).
+    /// </summary>
+    public string Query_HasAncestorTreeSql(string functionName) =>
+        $@"WITH search_result AS (
+            SELECT result->>'objects' as objects_json
+            FROM {functionName}($1, $2, $3::jsonb, NULL, 0, NULL::jsonb, $4, 10) as result
+        )
+        SELECT jsonb_array_elements(objects_json::jsonb)->>'id' as ""Value""
+        FROM search_result
+        WHERE objects_json IS NOT NULL AND objects_json != 'null'";
+
+    /// <summary>
+    /// HasAncestor with normal function (6 params).
+    /// </summary>
+    public string Query_HasAncestorNormalSql(string functionName) =>
+        $@"WITH search_result AS (
+            SELECT result->>'objects' as objects_json
+            FROM {functionName}($1, $2::jsonb, NULL, 0, NULL::jsonb, 10) as result
+        )
+        SELECT jsonb_array_elements(objects_json::jsonb)->>'id' as ""Value""
+        FROM search_result
+        WHERE objects_json IS NOT NULL AND objects_json != 'null'";
+
+    /// <summary>
+    /// HasDescendant with normal function (6 params).
+    /// </summary>
+    public string Query_HasDescendantSql(string functionName) =>
+        $@"WITH search_result AS (
+            SELECT result->>'objects' as objects_json
+            FROM {functionName}($1, $2::jsonb, NULL, 0, NULL::jsonb, 10) as result
+        )
+        SELECT jsonb_array_elements(objects_json::jsonb)->>'id' as ""Value""
+        FROM search_result
+        WHERE objects_json IS NOT NULL AND objects_json != 'null'";
+
+    /// <summary>
+    /// PostgreSQL: WITH RECURSIVE for traversing ancestors.
+    /// </summary>
+    public string Query_GetParentIdsFromDescendantsSql(string idsString, int depthLimit) =>
+        $@"WITH RECURSIVE ancestors AS (
+            SELECT _id, _id_parent, 0 as level
+            FROM _objects
+            WHERE _id IN ({idsString})
+            UNION ALL
+            SELECT o._id, o._id_parent, ancestors.level + 1
+            FROM _objects o
+            INNER JOIN ancestors ON ancestors._id_parent = o._id
+            WHERE ancestors.level < {depthLimit}
+        )
+        SELECT DISTINCT _id FROM ancestors WHERE _id_parent IS NULL OR level > 0";
+
+    /// <summary>
+    /// PostgreSQL: extract total_count from tree function result.
+    /// </summary>
+    public string Query_TreeCountWithParentIdsSql(string functionName) =>
+        $"SELECT (result->>'total_count')::int as \"Value\" FROM {functionName}($1, $2, $3::jsonb, 1, 0, NULL::jsonb, $4, $5) as result";
+
+    /// <summary>
+    /// PostgreSQL: Load objects by IDs as JSON using get_object_json function.
+    /// </summary>
+    public string Query_LoadObjectsByIdsSql(string idsString, int maxDepth) =>
+        $@"SELECT get_object_json(id, {maxDepth})::text as ""Value""
+           FROM unnest(ARRAY[{idsString}]) as id
+           ORDER BY id";
+
+    public string Query_TreeSqlPreviewTemplate(string functionName) =>
+        $"SELECT {functionName}($1, $2, $3::jsonb, $4, $5, $6::jsonb, $7, $8) as sql_preview";
+
+    // ============================================================
+    // === SQL PREVIEW FUNCTION NAMES ===
+    // ============================================================
+
+    public string Query_SqlPreviewFunction() => "get_search_sql_preview";
+
+    public string Query_TreeSqlPreviewFunction() => "get_search_tree_sql_preview";
+
+    public string Query_TreeSqlPreviewBaseFunction() => "get_search_tree_sql_preview_base";
+
+    // ============================================================
+    // === v2-pvt MODULE ENTRY-POINTS (free Postgres) ===
+    // Two-step pipeline: ask DB to BUILD the inner _id-list SQL,
+    // then wrap on the C# side with a materializer/COUNT/EXISTS.
+    // The v2-pvt SQL module must be deployed (see redb.Postgres/sql/v2-pvt/).
+    // Init-time check lives in RedbServiceBase.InitializeAsync using
+    // Query_PvtModuleVersionFunction().
+    // ============================================================
+
+    public string? Query_BuildPvtSqlFunction() => "pvt_build_query_sql";
+
+    public string? Query_BuildPvtSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false)
+    {
+        var limitArg    = limit.HasValue ? limit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "NULL";
+        var offsetArg   = offset.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var maxDepthArg = maxDepth.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var distinctArg = distinct ? "true" : "false";
+        var modeArg     = sourceMode switch
+        {
+            "tree" => "'tree'",
+            _      => "'flat'",
+        };
+        string treeArg;
+        if (treeIds is null || treeIds.Length == 0)
+        {
+            treeArg = "NULL::bigint[]";
+        }
+        else
+        {
+            treeArg = "ARRAY[" + string.Join(",", treeIds.Select(
+                i => i.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]::bigint[]";
+        }
+        var distinctOnArg = hasDistinctOn ? "$3::jsonb" : "NULL::jsonb";
+        // pvt_build_query_sql signature:
+        //   p_scheme_id, p_filter, p_limit, p_offset, p_order, p_max_depth,
+        //   p_distinct, p_source_mode, p_tree_ids, p_include_seed,
+        //   p_polymorphic, p_distinct_on
+        return "SELECT pvt_build_query_sql("
+             + schemeId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+             + ", $1::jsonb, " + limitArg
+             + ", " + offsetArg
+             + ", $2::jsonb, " + maxDepthArg
+             + ", " + distinctArg
+             + ", " + modeArg
+             + ", " + treeArg
+             + ", false"   // p_include_seed
+             + ", true"    // p_polymorphic
+             + ", " + distinctOnArg
+             + ") AS \"Value\"";
+    }
+
+    public string? Query_WrapPvtWithObjectJson(string innerSql, int maxDepth) =>
+        $"SELECT get_object_json(t._id, {maxDepth})::text AS \"Value\" FROM ({innerSql}) t";
+
+    public string? Query_WrapPvtWithCount(string innerSql) =>
+        $"SELECT count(*)::bigint AS \"Value\" FROM ({innerSql}) t";
+
+    public string? Query_WrapPvtWithExists(string innerSql) =>
+        $"SELECT EXISTS ({innerSql}) AS \"Value\"";
+
+    public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
+
+    // Bump together with the literal in redb.Postgres/sql/v2-pvt/99_module_version.sql.
+    public string? Query_PvtRequiredVersion() => "0.7.23";
+
+    // ============================================================
+    // Native PVT projection orchestrator (pvt_build_projection_sql).
+    // Mirrors the pvt_build_query_sql plumbing but the outer SELECT
+    // yields the requested scalar columns. The C# layer wraps the
+    // resulting SQL into a JSON-row shape via Query_WrapPvtProjectionRowsAsJson
+    // so the existing materializer can consume it.
+    // ============================================================
+
+    public string? Query_BuildPvtProjectionSqlFunction() => "pvt_build_projection_sql";
+
+    public string? Query_BuildPvtProjectionSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false)
+    {
+        var limitArg    = limit.HasValue ? limit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "NULL";
+        var offsetArg   = offset.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var maxDepthArg = maxDepth.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var distinctArg = distinct ? "true" : "false";
+        var modeArg     = sourceMode switch
+        {
+            "tree" => "'tree'",
+            _      => "'flat'",
+        };
+        string treeArg;
+        if (treeIds is null || treeIds.Length == 0)
+        {
+            treeArg = "NULL::bigint[]";
+        }
+        else
+        {
+            treeArg = "ARRAY[" + string.Join(",", treeIds.Select(
+                i => i.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]::bigint[]";
+        }
+        var distinctOnArg = hasDistinctOn ? "$4::jsonb" : "NULL::jsonb";
+        // pvt_build_projection_sql signature:
+        //   p_scheme_id, p_projection, p_filter, p_limit, p_offset, p_order,
+        //   p_max_depth, p_distinct, p_source_mode, p_tree_ids,
+        //   p_include_seed, p_polymorphic, p_distinct_on
+        return "SELECT pvt_build_projection_sql("
+             + schemeId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+             + ", $1::jsonb"
+             + ", $2::jsonb, " + limitArg
+             + ", " + offsetArg
+             + ", $3::jsonb, " + maxDepthArg
+             + ", " + distinctArg
+             + ", " + modeArg
+             + ", " + treeArg
+             + ", false"   // p_include_seed
+             + ", true"    // p_polymorphic
+             + ", " + distinctOnArg
+             + ") AS \"Value\"";
+    }
+
+    public string? Query_WrapPvtProjectionRowsAsJson(string innerSql, bool includeId)
+    {
+        // The inner projection SQL yields one column per projection entry.
+        // We wrap it so each row becomes a JSON object shaped like a partial
+        // RedbObject<T>: {"id": <_id|0>, "properties": { ...projected scalar columns... }}.
+        // ConvertFlatPropertiesToHierarchy on the C# side then turns dotted
+        // aliases (e.g. "Address.City") into nested objects.
+        if (includeId)
+        {
+            return $"SELECT (jsonb_build_object('id', t._id, 'properties', (to_jsonb(t) - '_id')))::text AS \"Value\" FROM ({innerSql}) t";
+        }
+        // No _id column — every projected column is a property; id defaults to 0.
+        return $"SELECT (jsonb_build_object('id', 0, 'properties', to_jsonb(t)))::text AS \"Value\" FROM ({innerSql}) t";
+    }
+
+    // ============================================================
+    // === SOFT DELETE ===
+    // ============================================================
+
+    /// <summary>
+    /// Calls mark_for_deletion function to soft-delete objects.
+    /// Params: $1=objectIds (bigint[]), $2=userId (bigint), $3=trashParentId (bigint, nullable)
+    /// Returns: trash_id, marked_count
+    /// </summary>
+    public string SoftDelete_MarkForDeletion() =>
+        "SELECT * FROM mark_for_deletion($1, $2, $3)";
+
+    /// <summary>
+    /// Calls purge_trash function to physically delete objects from trash.
+    /// Params: $1=trashId (bigint), $2=batchSize (integer)
+    /// Returns: deleted_count, remaining_count
+    /// </summary>
+    public string SoftDelete_PurgeTrash() =>
+        "SELECT * FROM purge_trash($1, $2)";
+
+    /// <summary>
+    /// Objects of a trash container referenced by live objects, with the referencing objects.
+    /// Params: $1=trashId (bigint). Returns: referenced_id, referencing_id (at most 100 pairs).
+    /// </summary>
+    public string SoftDelete_SelectLiveReferrersOfTrash() => """
+        SELECT DISTINCT o._id AS referenced_id, r._id AS referencing_id
+        FROM _objects o
+        INNER JOIN _values v ON v._Object = o._id
+        INNER JOIN _objects r ON r._id = v._id_object
+        WHERE o._id_parent = $1
+          AND r._id_scheme <> -10
+        ORDER BY 1, 2
+        LIMIT 100
+        """;
+
+    /// <summary>
+    /// Gets deletion progress for a specific trash container.
+    /// Params: $1=trashId (bigint)
+    /// Returns: trash_id, total, deleted, status, started_at, owner_id
+    /// </summary>
+    public string SoftDelete_GetDeletionProgress() => """
+        SELECT
+            _id AS trash_id,
+            COALESCE(_value_long, 0) AS total,
+            COALESCE(_key, 0) AS deleted,
+            COALESCE(_value_string, 'pending') AS status,
+            _date_create AS started_at,
+            _id_owner AS owner_id
+        FROM _objects
+        WHERE _id = $1 AND _id_scheme = -10
+        """;
+
+    /// <summary>
+    /// Gets all active deletions for a user.
+    /// Params: $1=userId (bigint)
+    /// Returns: trash_id, total, deleted, status, started_at, owner_id
+    /// </summary>
+    public string SoftDelete_GetUserActiveDeletions() => """
+        SELECT
+            _id AS trash_id,
+            COALESCE(_value_long, 0) AS total,
+            COALESCE(_key, 0) AS deleted,
+            COALESCE(_value_string, 'pending') AS status,
+            _date_create AS started_at,
+            _id_owner AS owner_id
+        FROM _objects
+        WHERE _id_owner = $1
+          AND _id_scheme = -10
+          AND _id_parent IS NULL
+          AND _value_string IN ('pending', 'running')
+        ORDER BY _date_create DESC
+        """;
+
+    /// <summary>
+    /// Gets orphaned deletion tasks for recovery at startup.
+    /// CLUSTER-SAFE: Only returns pending OR running with stale _date_modify.
+    /// Params: $1=timeoutMinutes (int)
+    /// Returns: trash_id, total, deleted, status, owner_id
+    /// </summary>
+    public string SoftDelete_GetOrphanedTasks() => """
+        SELECT
+            _id AS trash_id,
+            COALESCE(_value_long, 0) AS total,
+            COALESCE(_key, 0) AS deleted,
+            COALESCE(_value_string, 'pending') AS status,
+            _id_owner AS owner_id
+        FROM _objects
+        WHERE _id_scheme = -10
+          AND _id_parent IS NULL
+          AND (
+            _value_string = 'pending'
+            OR (
+              _value_string = 'running'
+              AND _date_modify < NOW() - INTERVAL '1 minute' * $1
+            )
+          )
+        ORDER BY _date_create
+        """;
+
+    /// <summary>
+    /// Atomically claim an orphaned task for processing.
+    /// CLUSTER-SAFE: UPDATE with condition prevents race.
+    /// Params: $1=trashId, $2=timeoutMinutes
+    /// Returns: claimed count (1=success, 0=already taken)
+    /// </summary>
+    public string SoftDelete_ClaimOrphanedTask() => """
+        UPDATE _objects
+        SET _value_string = 'running',
+            _date_modify = NOW()
+        WHERE _id = $1
+          AND _id_scheme = -10
+          AND (
+            _value_string = 'pending'
+            OR (
+              _value_string = 'running'
+              AND _date_modify < NOW() - INTERVAL '1 minute' * $2
+            )
+          )
+        """;
+
+    // ============================================================
+    // === METADATA CACHE WARMUP ===
+    // ============================================================
+
+    public string Warmup_AllMetadataCaches() =>
+        "SELECT scheme_id, structures_count, scheme_name FROM warmup_all_metadata_caches()";
+}
+

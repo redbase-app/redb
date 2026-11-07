@@ -1,0 +1,7 @@
+**/bin/
+**/obj/
+*.db
+*.db-shm
+*.db-wal
+deploy/output/
+deploy/.env

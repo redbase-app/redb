@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <StartupObject>redb.Examples.Program</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Versions come from the root Directory.Packages.props (central package management). -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Indexes an EF developer adds for the EF twins' queries; E203_ef applies them after its seed. -->
+    <None Update="Ef\developer_indexes.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- EF Core side of the redb vs EF comparison (redb.Export/doc/PLAN_EF_BENCHMARK.md), over the flat
+         database produced by `redb flat`. Design is only for `dotnet ef dbcontext scaffold`. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Local projects instead of NuGet packages: the PVT planner work is checked here against the sources. -->
+    <PackageReference Include="redb.Core.Pro" />
+    <PackageReference Include="redb.Postgres.Pro" />
+    <PackageReference Include="redb.MSSql.Pro" />
+    <PackageReference Include="redb.SQLite.Pro" />
+  </ItemGroup>
+
+</Project>

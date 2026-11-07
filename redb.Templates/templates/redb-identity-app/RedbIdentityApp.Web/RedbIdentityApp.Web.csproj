@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The web server: Blazor (Interactive Server), the backend-for-frontend. Users sign in at redb.Identity
+       with OpenID Connect (code flow with PKCE); the browser holds only this server's session cookie, and
+       the tokens stay on the server (Auth/UserTokenStore.cs). The module's API is called with the user's
+       access token. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\RedbIdentityApp.Contracts\RedbIdentityApp.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="$(AspNetCoreVersion)" />
+  </ItemGroup>
+
+</Project>

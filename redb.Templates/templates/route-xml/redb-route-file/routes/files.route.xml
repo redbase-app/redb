@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Test input: every {{files.period:20000}} ms an order file into {{files.inbox:inbox}}; every fifth one is not XML.
+       In a real module a partner or another system puts the files there; delete this route. -->
+  <route id="modulectx-files-feed" description="Puts a test order file into the inbox">
+    <from uri="timer://modulectx-files-feed?period={{files.period:20000}}"/>
+    <choice>
+      <when expr="header.CamelTimerCounter % 5 == 4">
+        <setBody value="this is not an order"/>
+      </when>
+      <otherwise>
+        <setBody expr='&lt;order id="${header.CamelTimerCounter}"&gt;&lt;amount&gt;${header.CamelTimerCounter}&lt;/amount&gt;&lt;/order&gt;'/>
+      </otherwise>
+    </choice>
+    <to uri="file://{{files.inbox:inbox}}?connectionFactory=remote&amp;fileName=order-${header.CamelTimerCounter}.xml"/>
+  </route>
+
+  <!-- The inbox: every 5 seconds the *.xml files, one exchange each. A file the route finished moves to done/, a
+       failed one to error/, so nothing is read twice and a bad file is kept for a person. For each good file a
+       receipt goes to {{files.outbox:outbox}}. -->
+  <route id="modulectx-files-in" description="Processes the files of the inbox">
+    <from uri="file://{{files.inbox:inbox}}?connectionFactory=remote&amp;antInclude=*.xml&amp;delay=5000&amp;moveTo=done&amp;moveFailed=error"/>
+    <!-- A file arrives as bytes; the checks and the log want the text. -->
+    <convertBody type="System.String"/>
+    <validateXsd file="resources/order.xsd" throwOnFailure="true"/>
+    <log level="Information" showRouteId="true">
+      <message>processed ${header.redbFile.NameOnly}: ${body}</message>
+    </log>
+    <setBody expr="received ${header.redbFile.NameOnly}"/>
+    <to uri="file://{{files.outbox:outbox}}?connectionFactory=remote&amp;fileName=${header.redbFile.NameOnly}.receipt"/>
+  </route>
+
+</routes>

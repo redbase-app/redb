@@ -1,0 +1,20 @@
+{
+  "//": [
+    "Deployment sample: copy it as context.json next to the package on the host. Never put real secrets here.",
+    "The merged configuration, later layers win:",
+    "  1. host appsettings, Contexts default section",
+    "  2. host appsettings, this context's section",
+    "  3. this file: Contexts.default, then Contexts.modulectx",
+    "  4. in-package config/routemodule.config.json: ContextName and AutoStart only",
+    "  5. Override: environment variables (secrets live here)",
+    "Every {{key}} without a {{key:default}} in the XML must get a value from one of these layers:",
+    "the built package lists them in manifest.json under RequiredConfigKeys, and the module stops at init when one is missing."
+  ],
+  "Contexts": {
+    "default": {},
+    "modulectx": {
+      "quotes.period": "3000",
+      "bulk.period": "5000"
+    }
+  }
+}

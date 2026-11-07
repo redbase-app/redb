@@ -1,0 +1,35 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+
+<PageTitle>Sign in</PageTitle>
+
+<h1>Sign in</h1>
+
+@if (Error is not null)
+{
+    <p class="error">@(Error == "stale" ? "The form expired. Please try again." : "Wrong login or password.")</p>
+}
+
+@* data-enhance=false: a full-page POST, so the answer can set the session cookie. *@
+<form method="post" action="auth/login" data-enhance="false" class="form">
+    <AntiforgeryToken />
+    <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+
+    <label for="login">Login</label>
+    <input id="login" name="login" autocomplete="username" required />
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+    <div class="actions">
+        <button type="submit">Sign in</button>
+    </div>
+</form>
+
+<p class="muted">The users are in RedbBff.Web/appsettings.json (Web:Users).</p>
+
+@code {
+    [SupplyParameterFromQuery] private string? Error { get; set; }
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+}

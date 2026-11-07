@@ -1,0 +1,184 @@
+using redb.Core;
+using redb.Core.Query.Aggregation;
+using redb.Tests.Integration.Helpers;
+using redb.Tests.Integration.Models;
+
+namespace redb.Tests.Integration.Tests.Base;
+
+/// <summary>
+/// Формы селектора GroupBy(...).SelectAsync(...) (ревью 2026-09-03, G-1/G-2/G-3; решения
+/// владельца: DTO/MemberInit поддерживаем, всё нераспознанное - громко). До этого набора:
+/// DTO-класс в SelectAsync молча давал строки из default-значений, вычисление вокруг Agg
+/// молча возвращало null, а вычисляемый ключ группировки молча давал пустой GROUP BY.
+/// </summary>
+public abstract class GroupBySelectShapesTestsBase
+{
+    protected readonly IRedbService Redb;
+
+    protected GroupBySelectShapesTestsBase(IRedbService redb) => Redb = redb;
+
+    // Queries read only the objects their test seeded: other test classes share the database and may leave
+    // employees without salary or department behind.
+    private redb.Core.Query.IRedbQueryable<EmployeeProps> Seeded(List<long> ids)
+        => Redb.Query<EmployeeProps>().WhereRedb(o => ids.Contains(o.Id));
+
+    private Task<List<long>> SeedAsync() => TestDataFactory.SeedEmployees(Redb, 20);
+
+    public class DeptRowDto
+    {
+        public string? Dept { get; set; }
+        public long Cnt { get; set; }
+        public decimal Total { get; set; }
+    }
+
+    [Fact]
+    public async Task SelectAsync_IntoDtoMemberInit_MaterializesEveryMember()
+    {
+        // G-1: MemberInit раньше не разбирался - каждая строка приходила как default!.
+        var ids = await SeedAsync();
+
+        var rows = await Seeded(ids)
+            .GroupBy(e => e.Department)
+            .SelectAsync(g => new DeptRowDto
+            {
+                Dept = g.Key,
+                Cnt = Agg.Count(g),
+                Total = Agg.Sum(g, x => x.Salary),
+            });
+
+        rows.Should().NotBeEmpty();
+        rows.Should().AllSatisfy(r =>
+        {
+            r.Should().NotBeNull("DTO-строка обязана материализоваться, а не приходить null");
+            r.Dept.Should().NotBeNullOrEmpty();
+            r.Cnt.Should().BeGreaterThan(0);
+            r.Total.Should().BeGreaterThan(0);
+        });
+    }
+
+    [Fact]
+    public async Task SelectAsync_ComputedAroundAgg_IsLoud()
+    {
+        // G-2: вычисление вокруг агрегата не заказывается у сервера - раньше член молча
+        // оставался null/0. Контракт: громкий отказ с именем члена.
+        var ids = await SeedAsync();
+
+        var act = async () => await Seeded(ids)
+            .GroupBy(e => e.Department)
+            .SelectAsync(g => new { Doubled = Agg.Count(g) * 2 });
+
+        (await act.Should().ThrowAsync<NotSupportedException>(
+                "молча вернуть null вместо вычисления - худший исход"))
+            .WithMessage("*Doubled*");
+    }
+
+    [Fact]
+    public async Task GroupBy_ComputedKey_IsLoud()
+    {
+        // G-3: вычисляемый ключ группировки раньше молча давал пустой GROUP BY.
+        var ids = await SeedAsync();
+
+        var act = async () => await Seeded(ids)
+            .GroupBy(e => e.Age + 1)
+            .SelectAsync(g => new { Cnt = Agg.Count(g) });
+
+        await act.Should().ThrowAsync<NotSupportedException>(
+            "группировка по вычисляемому ключу не поддерживается и обязана отказывать громко");
+    }
+
+
+    public class ArrayGroupRowDto
+    {
+        public string? Type { get; set; }
+        public long Cnt { get; set; }
+    }
+
+    [Fact]
+    public async Task ArrayGroupBy_SelectAsync_IntoDtoMemberInit()
+    {
+        // G-1 доехал до GroupByArray (решение владельца 2026-09-04): раньше здесь стоял
+        // громкий отказ на DTO.
+        var ids = await SeedAsync();
+
+        var rows = await Seeded(ids)
+            .GroupByArray(e => e.Contacts!, c => c.Type)
+            .SelectAsync(g => new ArrayGroupRowDto { Type = g.Key, Cnt = Agg.Count(g) });
+
+        rows.Should().NotBeEmpty();
+        rows.Should().AllSatisfy(r =>
+        {
+            r.Type.Should().NotBeNullOrEmpty();
+            r.Cnt.Should().BeGreaterThan(0);
+        });
+    }
+
+    [Fact]
+    public async Task SelectAsync_ClientConstantMember_IsEvaluated()
+    {
+        // Член, не ссылающийся на группу, - клиентская константа: вычисляется на клиенте,
+        // а не молча null (раньше материализатор искал его в JSON и не находил).
+        var ids = await SeedAsync();
+        var tag = "fixed-tag";
+
+        var rows = await Seeded(ids)
+            .GroupBy(e => e.Department)
+            .SelectAsync(g => new { Dept = g.Key, Tag = tag, Cnt = Agg.Count(g) });
+
+        rows.Should().NotBeEmpty();
+        rows.Should().AllSatisfy(r => r.Tag.Should().Be("fixed-tag"));
+    }
+
+    [Fact]
+    public async Task ConditionalCount_InAGroupBy()
+    {
+        var ids = await SeedAsync();
+        var objects = await Seeded(ids).ToListAsync();
+
+        var rows = await Seeded(ids)
+            .GroupBy(e => e.Department)
+            .SelectAsync(g => new
+            {
+                Dept = g.Key,
+                All = Agg.Count(g),
+                Remote = Agg.Count(g, e => e.IsRemote),
+                Rated = Agg.Count(g, e => e.Rating != null),
+                RichRemote = Agg.Count(g, e => e.IsRemote && e.Salary >= 100000m)
+            });
+
+        rows.Should().HaveCount(objects.Select(o => o.Props.Department).Distinct().Count());
+        foreach (var r in rows)
+        {
+            var group = objects.Where(o => o.Props.Department == r.Dept).Select(o => o.Props).ToList();
+            r.All.Should().Be(group.Count);
+            r.Remote.Should().Be(group.Count(e => e.IsRemote));
+            r.Rated.Should().Be(group.Count(e => e.Rating != null));
+            r.RichRemote.Should().Be(group.Count(e => e.IsRemote && e.Salary >= 100000m));
+        }
+    }
+
+    [Fact]
+    public async Task ComputedAggregate_InAGroupBy_IsRefused()
+    {
+        var act = async () => await Redb.Query<EmployeeProps>()
+            .GroupBy(e => e.Department)
+            .SelectAsync(g => new { Dept = g.Key, Twice = Agg.Sum(g, e => e.Salary * 2) });
+
+        await act.Should().ThrowAsync<NotSupportedException>();
+    }
+
+    [Fact]
+    public async Task GroupedWindow_Ntile_UsesItsBucketCount()
+    {
+        // A21: the bucket count never reached the provider; every NTILE was NTILE(4).
+        var ids = await SeedAsync();
+        var departments = (await Seeded(ids).ToListAsync()).Select(o => o.Props.Department).Distinct().Count();
+        departments.Should().BeGreaterThan(2, "precondition: more groups than buckets");
+
+        var rows = await Seeded(ids)
+            .GroupBy(e => e.Department)
+            .WithWindow(w => w.OrderBy(g => g.Key))
+            .SelectAsync(g => new { Dept = g.Key, Bucket = Win.Ntile(2) });
+
+        rows.Select(r => r.Bucket).Distinct().Should().BeEquivalentTo(new[] { 1, 2 });
+    }
+}

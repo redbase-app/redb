@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its beans,
+     and its onInit runs before any route starts. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- The database of the module. ProviderName picks the driver the worker registered:
+       Microsoft.Data.Sqlite, Npgsql or Microsoft.Data.SqlClient. To switch, change ProviderName,
+       the connection string in the configuration and the CREATE TABLE below. -->
+  <bean name="main-db" type="redb.Route.Sql.Connection.SqlConnectionFactory, redb.Route.Sql">
+    <constructorArg>
+      <bean type="redb.Route.Sql.Connection.SqlConnectionOptions, redb.Route.Sql">
+<!--#if (db == "sqlite") -->
+        <property key="ProviderName" value="Microsoft.Data.Sqlite"/>
+        <property key="ConnectionString" value="{{db.connection:Data Source=modulectx.db}}"/>
+<!--#elseif (db == "postgres") -->
+        <property key="ProviderName" value="Npgsql"/>
+        <property key="ConnectionString" value="{{db.connection}}"/>
+<!--#else -->
+        <property key="ProviderName" value="Microsoft.Data.SqlClient"/>
+        <property key="ConnectionString" value="{{db.connection}}"/>
+<!--#endif -->
+      </bean>
+    </constructorArg>
+  </bean>
+
+  <!-- Routes written in C#: routes/OutboxReportRoute.cs reports the table through the same main-db bean. -->
+  <routeBuilder type="RouteModule.Routes.OutboxReportRoute, RouteModule"/>
+
+  <!-- The table, created once before the routes start. -->
+  <onInit>
+<!--#if (db == "sqlite") -->
+    <to uri="sql:CREATE TABLE IF NOT EXISTS orders_outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT NOT NULL, status INTEGER NOT NULL DEFAULT 0, error TEXT)?dataSource=#main-db"/>
+<!--#elseif (db == "postgres") -->
+    <to uri="sql:CREATE TABLE IF NOT EXISTS orders_outbox (id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, payload TEXT NOT NULL, status INT NOT NULL DEFAULT 0, error TEXT)?dataSource=#main-db"/>
+<!--#else -->
+    <to uri="sql:IF OBJECT_ID('orders_outbox') IS NULL CREATE TABLE orders_outbox (id BIGINT IDENTITY(1,1) PRIMARY KEY, payload NVARCHAR(4000) NOT NULL, status INT NOT NULL DEFAULT 0, error NVARCHAR(4000))?dataSource=#main-db"/>
+<!--#endif -->
+  </onInit>
+
+</context>

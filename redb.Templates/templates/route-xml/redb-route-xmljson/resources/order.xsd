@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The order the module turns into JSON and back. The xmljson format reads it for three answers: Item repeats
+     (maxOccurs), so it is a JSON array even when an order has one; Qty, Price and Express are a number, a number
+     and a boolean in JSON; and on the way back every element gets the namespace and its place in the sequence. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:example:orders"
+           xmlns="urn:example:orders" elementFormDefault="qualified">
+  <xs:element name="Order">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Customer" type="xs:string"/>
+        <xs:element name="Express" type="xs:boolean"/>
+        <xs:element name="Items">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="Item" minOccurs="1" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Sku" type="xs:string"/>
+                    <xs:element name="Qty" type="xs:positiveInteger"/>
+                    <xs:element name="Price" type="xs:decimal"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

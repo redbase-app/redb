@@ -1,0 +1,397 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using redb.Core.Models.Entities;
+using redb.Core.Query.Base;
+using redb.Core.Query.QueryExpressions;
+
+#pragma warning disable CS0672 // Member overrides obsolete member (legacy fallback retained for HasAncestor/HasDescendant + flat search)
+#pragma warning disable CS0618 // Type or member is obsolete
+
+namespace redb.MSSql.Query;
+
+/// <summary>
+/// Routes tree-subtree LINQ queries through the MSSql v2-pvt engine.
+/// The free MSSql provider has no working <c>search_tree_objects_with_facets_base</c>
+/// helper, so every tree request is compiled into a <c>dbo.pvt_build_query_sql</c>
+/// invocation and materialized via <c>FOR JSON PATH</c>.
+/// Port of the PostgreSQL PostgresTreeQueryProvider PVT partials.
+/// </summary>
+public partial class MssqlTreeQueryProvider
+{
+    /// <summary>
+    /// Describes how a tree LINQ query is mapped onto the v2-pvt
+    /// <c>pvt_build_query_sql</c> orchestrator: which source mode to use,
+    /// which seed ids (if any) feed the recursive walks, whether to keep
+    /// the seed rows in the output, and which filter JSON to bind.
+    /// </summary>
+    private readonly struct PvtTreeRoute
+    {
+        public PvtTreeRoute(string sourceMode, long[] treeIds, bool includeSeed, string filterJson)
+        {
+            SourceMode = sourceMode;
+            TreeIds = treeIds;
+            IncludeSeed = includeSeed;
+            FilterJson = filterJson;
+        }
+
+        public string SourceMode { get; }
+        public long[] TreeIds { get; }
+        public bool IncludeSeed { get; }
+        public string FilterJson { get; }
+    }
+
+    /// <inheritdoc />
+    protected override async Task<object> ExecuteTreeToListAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken = default)
+    {
+        // Free MSSql: HasAncestor / HasDescendant are routed through PVT here
+        // because the legacy search_*_base SQL functions throw on this dialect.
+        var hasAncestorFilter = GetOptimizableHasAncestorFilter(context);
+        if (hasAncestorFilter != null)
+            return await ExecutePvtHasAncestorToListAsync(context, hasAncestorFilter);
+
+        var hasDescendantFilter = GetOptimizableHasDescendantFilter(context);
+        if (hasDescendantFilter != null)
+            return await ExecutePvtHasDescendantToListAsync(context, hasDescendantFilter);
+
+        if (!ShouldRoutePvtTree(context, out var route))
+            return await base.ExecuteTreeToListAsync<TProps>(context, cancellationToken);
+
+        try
+        {
+            var objectsJson = await ExecutePvtTreeAsync(context, route, applyPaging: true);
+            var result = DeserializeTreeObjects<TProps>(objectsJson);
+
+            if (result.Count > 0 && _lazyPropsLoader != null)
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var baseObjects = result.Cast<redb.Core.Models.Entities.RedbObject<TProps>>().ToList();
+                await _lazyPropsLoader.LoadPropsForManyAsync(baseObjects, context.PropsDepth);
+                sw.Stop();
+                _logger?.LogInformation("Props loaded via batch (PVT tree) in {ElapsedMs} ms", sw.ElapsedMilliseconds);
+            }
+
+            return (object)result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error executing PVT tree ToList query");
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task<int> ExecuteTreeCountAsync<TProps>(TreeQueryContext<TProps> context, CancellationToken cancellationToken = default)
+    {
+        var hasAncestorFilter = GetOptimizableHasAncestorFilter(context);
+        if (hasAncestorFilter != null)
+        {
+            var list = await ExecutePvtHasAncestorToListAsync(context, hasAncestorFilter);
+            return ((IList<TreeRedbObject<TProps>>)list).Count;
+        }
+        var hasDescendantFilter = GetOptimizableHasDescendantFilter(context);
+        if (hasDescendantFilter != null)
+        {
+            var list = await ExecutePvtHasDescendantToListAsync(context, hasDescendantFilter);
+            return ((IList<TreeRedbObject<TProps>>)list).Count;
+        }
+
+        if (!ShouldRoutePvtTree(context, out var route))
+            return await base.ExecuteTreeCountAsync<TProps>(context, cancellationToken);
+
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: true);
+        var sql = "SELECT CAST(COUNT(*) AS BIGINT) AS [Value] FROM (" + inner + ") t";
+        object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
+        var orderByJson = context.Orderings.Count > 0
+            ? _facetBuilder.BuildOrderBy(context.Orderings)
+            : null;
+        var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
+        long? count;
+        if (hasOrder)
+            count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam, orderByJson! }, cancellationToken);
+        else
+            count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam }, cancellationToken);
+        return checked((int)(count ?? 0));
+    }
+
+    /// <summary>
+    /// Returns true when the request can be served by the v2-pvt orchestrator.
+    /// See the PostgresTreeQueryProvider.ShouldRoutePvtTree routing matrix.
+    /// </summary>
+    private bool ShouldRoutePvtTree<TProps>(TreeQueryContext<TProps> context, out PvtTreeRoute route)
+        where TProps : class, new()
+    {
+        route = new PvtTreeRoute("flat", Array.Empty<long>(), false, "{}");
+
+        if (context.TreeFilters != null && context.TreeFilters.Any(f =>
+                f.Operator == TreeFilterOperator.HasAncestor ||
+                f.Operator == TreeFilterOperator.HasDescendant))
+            return false;
+        if (GetOptimizableHasAncestorFilter(context) != null) return false;
+        if (GetOptimizableHasDescendantFilter(context) != null) return false;
+
+        var treeFilters = context.TreeFilters ?? new List<TreeFilter>();
+
+        var sourceMode = "flat";
+        long[] treeIds = Array.Empty<long>();
+        var includeSeed = false;
+
+        var childrenOf = treeFilters.FirstOrDefault(f => f.Operator == TreeFilterOperator.ChildrenOf);
+        var descendantsOf = treeFilters.FirstOrDefault(f => f.Operator == TreeFilterOperator.DescendantsOf);
+        var isRoot = treeFilters.Any(f => f.Operator == TreeFilterOperator.IsRoot);
+        var isLeaf = treeFilters.Any(f => f.Operator == TreeFilterOperator.IsLeaf);
+
+        if (descendantsOf != null)
+        {
+            sourceMode = "tree_descendants";
+            treeIds = new[] { Convert.ToInt64(descendantsOf.Value, CultureInfo.InvariantCulture) };
+            includeSeed = false;
+        }
+        else if (childrenOf != null)
+        {
+            sourceMode = "tree_children";
+            treeIds = new[] { Convert.ToInt64(childrenOf.Value, CultureInfo.InvariantCulture) };
+        }
+        else if (isRoot)
+        {
+            sourceMode = "tree_roots";
+            // Respect root scoping: TreeQuery(rootObj).WhereRoots() means "the root of THIS tree",
+            // not every root in the scheme. Seed with the scoped root so the SQL restricts to it;
+            // an empty seed keeps the whole-scheme "all roots" behavior.
+            if (context.ParentIds != null && context.ParentIds.Length > 0)
+                treeIds = context.ParentIds;
+            else if (context.RootObjectId.HasValue)
+                treeIds = new[] { context.RootObjectId.Value };
+        }
+        else if (isLeaf)
+        {
+            sourceMode = "tree_leaves";
+            // Respect root scoping: TreeQuery(rootObj).WhereLeaves() means "leaves of THIS subtree",
+            // not every leaf in the scheme (the cross-tree leak). Seed with the scoped root so the SQL
+            // descends from it and applies the leaf predicate over its subtree; an empty seed keeps the
+            // whole-scheme "all leaves" behavior.
+            if (context.ParentIds != null && context.ParentIds.Length > 0)
+                treeIds = context.ParentIds;
+            else if (context.RootObjectId.HasValue)
+                treeIds = new[] { context.RootObjectId.Value };
+        }
+        else if (context.RootObjectId.HasValue
+                 || (context.ParentIds != null && context.ParentIds.Length > 0))
+        {
+            sourceMode = "tree_descendants";
+            treeIds = (context.ParentIds != null && context.ParentIds.Length > 0)
+                ? context.ParentIds
+                : new[] { context.RootObjectId!.Value };
+            includeSeed = false;
+        }
+
+        var merged = new Dictionary<string, object?>();
+        if (context.Filter != null)
+        {
+            var userJson = _facetBuilder.BuildFacetFilters(context.Filter);
+            if (!string.IsNullOrEmpty(userJson) && userJson != "{}")
+            {
+                using var doc = JsonDocument.Parse(userJson);
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                    merged[prop.Name] = prop.Value.Clone();
+            }
+        }
+
+        foreach (var tf in treeFilters)
+        {
+            if (tf.Operator != TreeFilterOperator.Level) continue;
+            if (tf.Value is int lvl)
+                merged["$level"] = lvl;
+            else if (tf.FilterConditions != null)
+                merged["$level"] = tf.FilterConditions;
+        }
+
+        // The tree filters after the one that gave the source narrow it, as conditions of the filter
+        // (WhereDescendantsOf(x).WhereLeaves(): the leaves under x). Only the first one used to be read.
+        var source = descendantsOf != null ? TreeFilterOperator.DescendantsOf
+            : childrenOf != null ? TreeFilterOperator.ChildrenOf
+            : isRoot ? TreeFilterOperator.IsRoot
+            : isLeaf ? TreeFilterOperator.IsLeaf
+            : (TreeFilterOperator?)null;
+        foreach (var tf in treeFilters)
+        {
+            if (tf.Operator == source) continue;
+            if (tf.Operator == TreeFilterOperator.ChildrenOf)
+                merged["$childrenOf"] = Convert.ToInt64(tf.Value, CultureInfo.InvariantCulture);
+            else if (tf.Operator == TreeFilterOperator.IsRoot)
+                merged["$isRoot"] = true;
+            else if (tf.Operator == TreeFilterOperator.IsLeaf)
+                merged["$isLeaf"] = true;
+        }
+        var filterJson = merged.Count == 0
+            ? "{}"
+            : JsonSerializer.Serialize(merged, new JsonSerializerOptions
+            {
+                WriteIndented = false,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
+
+        route = new PvtTreeRoute(sourceMode, treeIds, includeSeed, filterJson);
+        return true;
+    }
+
+    /// <summary>
+    /// MSSql tree_ids contract: NULL or a JSON array of bigints,
+    /// e.g. <c>'[1,2,3]'</c>. <c>dbo.pvt_build_query_sql</c> parses it via OPENJSON.
+    /// </summary>
+    private static string FormatTreeIds(long[] ids) =>
+        ids.Length == 0
+            ? "NULL"
+            : "N'[" + string.Join(",", ids.Select(id => id.ToString(CultureInfo.InvariantCulture))) + "]'";
+
+    /// <summary>
+    /// Builds the inner <c>SELECT _id ...</c> SQL via <c>dbo.pvt_build_query_sql</c>.
+    /// The resulting SQL binds <c>@p0</c> = filter, and (when present) <c>@p1</c> = order.
+    /// </summary>
+    /// <summary>
+    /// SQL preview of a tree query: the statement <c>dbo.pvt_build_query_sql</c> compiles for it, with the values it
+    /// binds listed above it. The base implementation asks the database for
+    /// <c>dbo.get_search_tree_sql_preview_base</c>, a procedure of the retired search module that this provider no
+    /// longer installs, so <c>ToSqlStringAsync</c> on a tree query failed with "Could not find stored procedure".
+    /// </summary>
+    public override async Task<string> GetSqlPreviewAsync<TProps>(
+        TreeQueryContext<TProps> context, CancellationToken cancellationToken = default)
+    {
+        if (!ShouldRoutePvtTree(context, out var route))
+            return await base.GetSqlPreviewAsync(context, cancellationToken);
+
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: false, cancellationToken);
+        var orderByJson = context.Orderings.Count > 0 ? _facetBuilder.BuildOrderBy(context.Orderings) : null;
+
+        var sb = new StringBuilder();
+        sb.Append("-- $1 (filter) = ")
+          .AppendLine(string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson);
+        if (!string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]")
+            sb.Append("-- $2 (order)  = ").AppendLine(orderByJson);
+        sb.Append(inner);
+        return sb.ToString();
+    }
+
+    private async Task<string> BuildPvtTreeInnerSqlAsync<TProps>(
+        TreeQueryContext<TProps> context,
+        PvtTreeRoute route,
+        bool ignoreLimitOffset, CancellationToken cancellationToken = default) where TProps : class, new()
+    {
+        var orderByJson = context.Orderings.Count > 0
+            ? _facetBuilder.BuildOrderBy(context.Orderings)
+            : null;
+        var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
+
+        // The depth of the tree walk (TreeQuery(root, maxDepth)); none: the whole subtree. This passed MaxRecursionDepth, the
+        // depth of nested props, so maxDepth was ignored and every subtree stopped at 10 levels.
+        // WhereDescendantsOf(node, maxDepth) walks from that node, to its own depth when it has one.
+        var walkDepth = context.TreeFilters?.FirstOrDefault(f => f.Operator == TreeFilterOperator.DescendantsOf)?.MaxDepth
+            ?? context.MaxDepth;
+        var maxDepth = walkDepth?.ToString(CultureInfo.InvariantCulture) ?? "NULL";
+        var limitArg = ignoreLimitOffset || !context.Limit.HasValue
+            ? "NULL"
+            : context.Limit.Value.ToString(CultureInfo.InvariantCulture);
+        var offsetArg = ignoreLimitOffset
+            ? "0"
+            : (context.Offset ?? 0).ToString(CultureInfo.InvariantCulture);
+
+        var treeIdsLiteral = FormatTreeIds(route.TreeIds);
+
+        // dbo.pvt_build_query_sql signature (12 params, all required):
+        //   @scheme_id, @filter, @limit, @offset, @order, @max_depth,
+        //   @distinct, @source_mode, @tree_ids, @include_seed,
+        //   @polymorphic, @distinct_on
+        // A distinct key binds $3; the order then always binds $2, NULL when there is none.
+        var distinctOnJson = BuildPvtDistinctOnJson(context);
+        var orderArg = hasOrder || distinctOnJson != null ? "$2" : "NULL";
+        var invocation = "SELECT dbo.pvt_build_query_sql("
+            + context.SchemeId.ToString(CultureInfo.InvariantCulture)
+            + ", $1, " + limitArg
+            + ", " + offsetArg
+            + ", " + orderArg
+            + ", " + maxDepth
+            + ", " + (context.IsDistinct ? "1" : "0")
+            + ", N'" + route.SourceMode + "'"
+            + ", " + treeIdsLiteral
+            + ", " + (route.IncludeSeed ? "1" : "0")
+            + ", 1"          // @polymorphic=1 matches Pro default
+            + (distinctOnJson != null ? ", $3)" : ", NULL)")   // @distinct_on
+            + " AS [Value]";
+
+        object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
+
+        string? inner;
+        if (distinctOnJson != null)
+            inner = await _context.ExecuteScalarAsync<string>(invocation,
+                new object[] { filterParam, hasOrder ? (object)orderByJson! : DBNull.Value, distinctOnJson }, cancellationToken);
+        else if (hasOrder)
+            inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, orderByJson! }, cancellationToken);
+        else
+            inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam }, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(inner))
+            throw new InvalidOperationException(
+                "dbo.pvt_build_query_sql returned an empty SQL string for tree query (scheme " + context.SchemeId + ").");
+        return inner;
+    }
+
+    /// <summary>
+    /// Wraps the inner <c>_id</c> list with <c>FOR JSON PATH</c> over the 21
+    /// <c>_objects</c> columns to produce the same shape consumed by
+    /// <see cref="TreeQueryProviderBase.DeserializeTreeObjects{TProps}"/>.
+    /// </summary>
+    private async Task<string?> ExecutePvtTreeAsync<TProps>(
+        TreeQueryContext<TProps> context,
+        PvtTreeRoute route,
+        bool applyPaging, CancellationToken cancellationToken = default) where TProps : class, new()
+    {
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: !applyPaging);
+
+        // FOR JSON PATH column aliases drive the JSON keys; mirror PG's
+        // jsonb_build_object key naming exactly so the deserializer reuses
+        // the same property map across providers.
+        var sql =
+            "SELECT (SELECT "
+            + "o.[_id] AS id,"
+            + "o.[_name] AS name,"
+            + "o.[_id_scheme] AS scheme_id,"
+            + "o.[_id_parent] AS parent_id,"
+            + "o.[_id_owner] AS owner_id,"
+            + "o.[_id_who_change] AS who_change_id,"
+            + "o.[_date_create] AS date_create,"
+            + "o.[_date_modify] AS date_modify,"
+            + "o.[_date_begin] AS date_begin,"
+            + "o.[_date_complete] AS date_complete,"
+            + "o.[_key] AS [key],"
+            + "o.[_value_long] AS value_long,"
+            + "o.[_value_string] AS value_string,"
+            + "o.[_value_unique] AS value_unique,"
+            + "o.[_value_guid] AS value_guid,"
+            + "o.[_note] AS note,"
+            + "o.[_value_bool] AS value_bool,"
+            + "o.[_value_double] AS value_double,"
+            + "o.[_value_numeric] AS value_numeric,"
+            + "o.[_value_datetime] AS value_datetime,"
+            + "o.[_value_bytes] AS value_bytes,"
+            + "o.[_hash] AS hash"
+            + " FROM (" + inner + ") sub JOIN dbo._objects o ON o._id = sub._id"
+            + " FOR JSON PATH, INCLUDE_NULL_VALUES) AS [Value]";
+
+        object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
+        var orderByJson = context.Orderings.Count > 0
+            ? _facetBuilder.BuildOrderBy(context.Orderings)
+            : null;
+        var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
+
+        if (hasOrder)
+            return await _context.ExecuteScalarAsync<string>(sql, new object[] { filterParam, orderByJson! }, cancellationToken);
+        return await _context.ExecuteScalarAsync<string>(sql, new object[] { filterParam }, cancellationToken);
+    }
+}

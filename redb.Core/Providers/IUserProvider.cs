@@ -1,0 +1,273 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using redb.Core.Models.Contracts;
+using redb.Core.Models.Users;
+
+namespace redb.Core.Providers
+{
+    /// <summary>
+    /// Provider for user management.
+    /// Provides CRUD operations and business logic for working with users.
+    /// </summary>
+    public interface IUserProvider
+    {
+        // === CRUD OPERATIONS ===
+        
+        /// <summary>
+        /// Create new user.
+        /// </summary>
+        /// <param name="request">User creation data</param>
+        /// <param name="currentUser">Current user (for audit)</param>
+        /// <returns>Created user</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbUser> CreateUserAsync(CreateUserRequest request, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Update user data.
+        /// </summary>
+        /// <param name="user">User to update</param>
+        /// <param name="request">New user data</param>
+        /// <param name="currentUser">Current user (for audit)</param>
+        /// <returns>Updated user</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbUser> UpdateUserAsync(IRedbUser user, UpdateUserRequest request, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Delete user (soft delete - deactivation).
+        /// System users (ID 0, 1) cannot be deleted.
+        /// </summary>
+        /// <param name="user">User to delete</param>
+        /// <param name="currentUser">Current user (for audit)</param>
+        /// <returns>true if user deleted</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> DeleteUserAsync(IRedbUser user, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
+        
+        // === SEARCH AND RETRIEVAL ===
+        
+        /// <summary>
+        /// Get user by ID.
+        /// </summary>
+        /// <param name="userId">User ID</param>
+        /// <returns>User or null if not found</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbUser?> GetUserByIdAsync(long userId,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Get multiple users by IDs in a single query.
+        /// </summary>
+        Task<List<IRedbUser>> GetUsersByIdsAsync(IEnumerable<long> userIds,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Get user by login.
+        /// </summary>
+        /// <param name="login">User login</param>
+        /// <returns>User or null if not found</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbUser?> GetUserByLoginAsync(string login,
+        CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Get the first user whose <c>_email</c> matches the supplied address
+        /// (case-insensitive). Email is NOT enforced unique at the schema level —
+        /// one address may legitimately be reused after a prior account is soft-deleted
+        /// or whoever owned it changed their address. Callers that need a uniqueness
+        /// invariant (e.g. federation-conflict probes) should still verify the result
+        /// against their own policy.
+        /// </summary>
+        /// <param name="email">Email address to search by. Whitespace and surrounding
+        /// punctuation are NOT trimmed — pass a canonicalised value.</param>
+        /// <returns>First matching active user, or <c>null</c> when no row matches.</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbUser?> GetUserByEmailAsync(string email,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Load user by login (throws exception if not found).
+        /// </summary>
+        /// <param name="login">User login</param>
+        /// <returns>User</returns>
+        /// <exception cref="ArgumentException">If user not found</exception>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbUser> LoadUserAsync(string login,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Load user by ID (throws exception if not found).
+        /// </summary>
+        /// <param name="userId">User ID</param>
+        /// <returns>User</returns>
+        /// <exception cref="ArgumentException">If user not found</exception>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbUser> LoadUserAsync(long userId,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Get list of users with filtering.
+        /// </summary>
+        /// <param name="criteria">Search criteria (can be null)</param>
+        /// <returns>List of users</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<List<IRedbUser>> GetUsersAsync(UserSearchCriteria? criteria = null,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Count users matching criteria without loading data.
+        /// </summary>
+        Task<int> CountUsersAsync(UserSearchCriteria? criteria = null,
+        CancellationToken cancellationToken = default);
+        
+        // === AUTHENTICATION ===
+        
+        /// <summary>
+        /// Validate user login and password.
+        /// </summary>
+        /// <param name="login">Login</param>
+        /// <param name="password">Password (plain text)</param>
+        /// <returns>User if credentials valid, null if invalid</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<IRedbUser?> ValidateUserAsync(string login, string password,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Change user password.
+        /// </summary>
+        /// <param name="user">User</param>
+        /// <param name="currentPassword">Current password (for verification)</param>
+        /// <param name="newPassword">New password</param>
+        /// <param name="currentUser">Current user (for audit)</param>
+        /// <returns>true if password changed</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> ChangePasswordAsync(IRedbUser user, string currentPassword, string newPassword, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Set new password for user (without checking old password).
+        /// For administrators only.
+        /// </summary>
+        /// <param name="user">User</param>
+        /// <param name="newPassword">New password</param>
+        /// <param name="currentUser">Current user (for audit)</param>
+        /// <returns>true if password set</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> SetPasswordAsync(IRedbUser user, string newPassword, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Store a password hash computed elsewhere, for example an administrator password given in
+        /// configuration as a hash rather than in plain text. The hash is written as is, so it must be
+        /// one the configured <see cref="redb.Core.Security.IPasswordHasher"/> verifies: with the
+        /// default hasher, a BCrypt hash (<c>$2a$</c>, <c>$2b$</c> or <c>$2y$</c>).
+        /// Same access rules as <see cref="SetPasswordAsync"/>.
+        /// </summary>
+        /// <param name="user">User</param>
+        /// <param name="passwordHash">Password hash</param>
+        /// <param name="currentUser">Current user (for audit)</param>
+        /// <returns>true if the hash was stored</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> SetPasswordHashAsync(IRedbUser user, string passwordHash, IRedbUser? currentUser = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException($"{GetType().Name} does not support setting a password hash.");
+        
+        // === STATUS MANAGEMENT ===
+        
+        /// <summary>
+        /// Activate user.
+        /// </summary>
+        /// <param name="user">User</param>
+        /// <param name="currentUser">Current user (for audit)</param>
+        /// <returns>true if user activated</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> EnableUserAsync(IRedbUser user, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Deactivate user.
+        /// System users (ID 0, 1) cannot be deactivated.
+        /// </summary>
+        /// <param name="user">User</param>
+        /// <param name="currentUser">Current user (for audit)</param>
+        /// <returns>true if user deactivated</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> DisableUserAsync(IRedbUser user, IRedbUser? currentUser = null,
+        CancellationToken cancellationToken = default);
+        
+        // === VALIDATION ===
+        
+        /// <summary>
+        /// Validate user data correctness.
+        /// </summary>
+        /// <param name="request">Data to validate</param>
+        /// <returns>Validation result</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<UserValidationResult> ValidateUserDataAsync(CreateUserRequest request,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Check login availability.
+        /// </summary>
+        /// <param name="login">Login to check</param>
+        /// <param name="excludeUserId">User ID to exclude (for update)</param>
+        /// <returns>true if login available</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<bool> IsLoginAvailableAsync(string login, long? excludeUserId = null,
+        CancellationToken cancellationToken = default);
+        
+        // === STATISTICS ===
+        
+        /// <summary>
+        /// Get user count.
+        /// </summary>
+        /// <param name="includeDisabled">Include deactivated users</param>
+        /// <returns>Number of users</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<int> GetUserCountAsync(bool includeDisabled = false,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Get active user count for period.
+        /// </summary>
+        /// <param name="fromDate">Start date</param>
+        /// <param name="toDate">End date</param>
+        /// <returns>Number of active users</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<int> GetActiveUserCountAsync(DateTimeOffset fromDate, DateTimeOffset toDate,
+        CancellationToken cancellationToken = default);
+        
+        // === CONFIGURATION MANAGEMENT ===
+        
+        /// <summary>
+        /// Get user configuration ID.
+        /// </summary>
+        /// <param name="userId">User ID</param>
+        /// <returns>Configuration ID or null if not set</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<long?> GetUserConfigurationIdAsync(long userId,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Set user configuration.
+        /// </summary>
+        /// <param name="userId">User ID</param>
+        /// <param name="configId">Configuration ID (RedbObject&lt;UserConfigurationProps&gt;) or null to reset</param>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task SetUserConfigurationAsync(long userId, long? configId,
+        CancellationToken cancellationToken = default);
+        
+        /// <summary>
+        /// Get user roles.
+        /// Used for building effective configuration.
+        /// </summary>
+        /// <param name="userId">User ID</param>
+        /// <returns>List of user roles</returns>
+        /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+        Task<List<IRedbRole>> GetUserRolesAsync(long userId,
+        CancellationToken cancellationToken = default);
+    }
+}

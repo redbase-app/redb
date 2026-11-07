@@ -1,0 +1,63 @@
+using redb.Core.Query;
+using redb.Core.Data;
+using redb.Core.Models.Contracts;
+using redb.Core.Providers.Base;
+using redb.Core.Security;
+using redb.Postgres.Sql;
+using Microsoft.Extensions.Logging;
+
+namespace redb.Postgres.Providers;
+
+/// <summary>
+/// PostgreSQL implementation of user provider.
+/// Inherits all business logic from UserProviderBase.
+/// Only provides PostgreSQL-specific SQL dialect and password hasher.
+/// 
+/// Usage:
+/// services.AddScoped&lt;IUserProvider, PostgresUserProvider&gt;();
+/// </summary>
+public class PostgresUserProvider : UserProviderBase
+{
+    /// <summary>
+    /// Creates a new PostgreSQL user provider.
+    /// </summary>
+    /// <param name="context">Database context for executing queries</param>
+    /// <param name="securityContext">Security context for authorization</param>
+    /// <param name="logger">Optional logger for diagnostics</param>
+    /// <param name="dialect">
+    /// Configured dialect. Optional so hand-construction keeps working, but DI supplies the
+    /// singleton built from <c>RedbServiceConfiguration</c>, and that is how <c>StringCollation</c>
+    /// reaches user search. This provider is the only one that needs it: its base class is the sole
+    /// caller of <c>FormatCaseInsensitiveLike</c>. The other Postgres providers construct a bare
+    /// dialect deliberately, because they use it only for pagination, quoting and literals.
+    /// </param>
+    public PostgresUserProvider(
+        IRedbContext context,
+        IRedbSecurityContext securityContext,
+        ILogger? logger = null,
+        ISqlDialect? dialect = null)
+        : base(context, securityContext, dialect ?? new PostgreSqlDialect(), new BcryptPasswordHasher(), logger)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new PostgreSQL user provider with custom password hasher.
+    /// </summary>
+    /// <param name="context">Database context for executing queries</param>
+    /// <param name="securityContext">Security context for authorization</param>
+    /// <param name="passwordHasher">Custom password hasher implementation</param>
+    /// <param name="logger">Optional logger for diagnostics</param>
+    public PostgresUserProvider(
+        IRedbContext context, 
+        IRedbSecurityContext securityContext, 
+        IPasswordHasher passwordHasher,
+        ILogger? logger = null,
+        ISqlDialect? dialect = null)
+        : base(context, securityContext, dialect ?? new PostgreSqlDialect(), passwordHasher, logger)
+    {
+    }
+
+    // All business logic is inherited from UserProviderBase.
+    // PostgreSQL-specific SQL is provided by PostgreSqlDialect.
+    // Password hashing defaults to BcryptPasswordHasher (a custom IPasswordHasher can be injected).
+}

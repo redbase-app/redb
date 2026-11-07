@@ -1,0 +1,46 @@
+# SQL Server instead of SQLite, on top of docker-compose.yml. RedBase creates its tables but not the
+# database: create it once, then start everything. From the project folder:
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.mssql.yml up -d db
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.mssql.yml exec db /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "Change_me_123" -Q "CREATE DATABASE redb_identity_app"
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.mssql.yml up -d --build
+#
+# One database for Identity and the module; every Identity context gets the override, as in
+# docker-compose.postgres.yml.
+
+x-identity-mssql: &identity-mssql "Server=db,1433;Database=redb_identity_app;User Id=sa;Password=Change_me_123;TrustServerCertificate=true"
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Change_me_123"
+    volumes:
+      - mssqldata:/var/opt/mssql
+
+  identity:
+    depends_on:
+      - db
+    environment:
+      # The image runs the worker in cluster mode; with a database server the Quartz job store is shared
+      # and must be clustered too, even for one node.
+      Quartz__quartz.jobStore.clustered: "true"
+      # The worker's default redb: the module's notes.
+      Tsak__Redb__Provider: mssql
+      ConnectionStrings__MSSql: *identity-mssql
+      # Every Identity context on the same store.
+      Tsak__Contexts__identity.contracts__Override__RedbInstanceName: identity-mssql
+      Tsak__Contexts__identity.contracts__Override__Redb__identity-mssql__ConnectionString: *identity-mssql
+      Tsak__Contexts__identity.core__Override__RedbInstanceName: identity-mssql
+      Tsak__Contexts__identity.core__Override__Identity__RedbInstanceName: identity-mssql
+      Tsak__Contexts__identity.core__Override__Redb__identity-mssql__ConnectionString: *identity-mssql
+      Tsak__Contexts__identity.http__Override__RedbInstanceName: identity-mssql
+      Tsak__Contexts__identity.http__Override__Redb__identity-mssql__ConnectionString: *identity-mssql
+      Tsak__Contexts__identity.grpc__Override__RedbInstanceName: identity-mssql
+      Tsak__Contexts__identity.grpc__Override__Redb__identity-mssql__ConnectionString: *identity-mssql
+      Tsak__Contexts__identity.soap__Override__RedbInstanceName: identity-mssql
+      Tsak__Contexts__identity.soap__Override__Redb__identity-mssql__ConnectionString: *identity-mssql
+
+volumes:
+  mssqldata:

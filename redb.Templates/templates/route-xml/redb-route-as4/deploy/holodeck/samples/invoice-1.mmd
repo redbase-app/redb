@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Submission to Holodeck: copy this file and invoice-1.xml into data/msg_out of the holodeck container. Holodeck
+     sends the message to the module under P-Mode holodeck-to-module and renames this file to .accepted. -->
+<MessageMetaData xmlns="http://holodeck-b2b.org/schemas/2014/06/mmd">
+    <CollaborationInfo>
+        <AgreementRef pmode="holodeck-to-module"/>
+        <ConversationId>urn:redb:example:conversation:1</ConversationId>
+    </CollaborationInfo>
+    <PayloadInfo deleteFilesAfterSubmit="true">
+        <PartInfo containment="attachment" mimeType="application/xml" location="invoice-1.xml"/>
+    </PayloadInfo>
+</MessageMetaData>

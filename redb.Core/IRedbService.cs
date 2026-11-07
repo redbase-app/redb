@@ -1,0 +1,215 @@
+﻿using redb.Core.Query;
+using redb.Core.Providers;
+using redb.Core.Data;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
+using redb.Core.Models.Contracts;
+using redb.Core.Models.Configuration;
+
+namespace redb.Core
+{
+    /// <summary>
+    /// Main REDB service interface - composition of all providers.
+    /// </summary>
+    public interface IRedbService : 
+        ISchemeSyncProvider,
+        IObjectStorageProvider,
+        ITreeProvider,
+        IPermissionProvider,
+        IQueryableProvider,
+        IValidationProvider,
+        IRedbScopeSource
+    {
+        // === DATABASE CONTEXT ===
+        
+        /// <summary>
+        /// Database context for direct SQL queries.
+        /// Replaces EF Core RedbContext.
+        /// </summary>
+        IRedbContext Context { get; }
+        
+        // === PROVIDERS ===
+        
+        /// <summary>
+        /// Provider for user management.
+        /// </summary>
+        IUserProvider UserProvider { get; }
+        
+        /// <summary>
+        /// Provider for role management.
+        /// </summary>
+        IRoleProvider RoleProvider { get; }
+        
+        /// <summary>
+        /// Provider for list management.
+        /// </summary>
+        IListProvider ListProvider { get; }
+
+        /// <summary>
+        /// Makes this service the scope lazy loads run on, for the returned block (owner decision 2026-09-15): a data
+        /// object owns no connection, and <c>RedbListItem.Object</c> or the Props of a reference stub load on the live redb
+        /// scope of whoever reads them. A service is current by itself in the flow that resolved it; UI event handlers
+        /// (Blazor Server, WebAssembly, MAUI) and callbacks that run in another execution context wrap their reads in
+        /// <c>using (redb.BeginAccess()) { ... }</c>.
+        /// </summary>
+        IDisposable BeginAccess();
+
+        /// <summary>
+        /// Loads the linked objects of <paramref name="items"/> in one query on this service's connection, publishes them
+        /// on the items and returns them by id. Items already carrying their object and items without a link are skipped;
+        /// an object that does not exist is absent from the result and its item stays lazy.
+        /// </summary>
+        Task<System.Collections.Generic.IReadOnlyDictionary<long, IRedbObject>> LoadLinkedObjectsAsync(
+            System.Collections.Generic.IEnumerable<Models.Entities.RedbListItem> items, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Storage maintenance: planner statistics (<c>AnalyzeAsync</c> after bulk writes) and
+        /// index health (<c>GetIndexStatsAsync</c>). Explicit calls only - never a side effect.
+        /// </summary>
+        IMaintenanceProvider Maintenance { get; }
+        
+        // === CONFIGURATION ===
+        
+        /// <summary>
+        /// Current service configuration.
+        /// </summary>
+        RedbServiceConfiguration Configuration { get; }
+        
+        /// <summary>
+        /// Cache domain identifier for this service instance.
+        /// Used to isolate caches between different database connections.
+        /// </summary>
+        string CacheDomain { get; }
+        
+        /// <summary>
+        /// Update configuration.
+        /// </summary>
+        void UpdateConfiguration(Action<RedbServiceConfiguration> configure);
+        
+        /// <summary>
+        /// Update configuration via builder.
+        /// </summary>
+        void UpdateConfiguration(Action<RedbServiceConfigurationBuilder> configureBuilder);
+        
+        // === SECURITY CONTEXT ===
+        
+        /// <summary>
+        /// Security context for user and permission management.
+        /// </summary>
+        IRedbSecurityContext SecurityContext { get; }
+        
+        /// <summary>
+        /// Set current user.
+        /// </summary>
+        void SetCurrentUser(IRedbUser user);
+        
+        /// <summary>
+        /// Create temporary system context.
+        /// </summary>
+        IDisposable CreateSystemContext();
+        
+        /// <summary>
+        /// Get effective user ID with fallback logic.
+        /// </summary>
+        long GetEffectiveUserId();
+        
+        // === INITIALIZATION ===
+        
+        /// <summary>
+        /// Initialize REDB system at application startup.
+        /// Automatically performs:
+        /// 1. Synchronization of all schemes with RedbSchemeAttribute
+        /// 2. RedbObjectFactory initialization
+        /// 3. AutomaticTypeRegistry initialization
+        /// 4. GlobalPropsCache initialization (if enabled in configuration)
+        /// 5. Setting global scheme provider for RedbObject
+        /// </summary>
+        /// <param name="assemblies">Assemblies to scan. If not specified - all loaded assemblies are scanned</param>
+        Task InitializeAsync(params Assembly[] assemblies);
+
+        // === DATABASE METADATA ===
+        
+        /// <summary>
+        /// Database version.
+        /// </summary>
+
+        // === DATABASE SCHEMA MANAGEMENT ===
+        
+        /// <summary>
+        /// Ensures the REDB database schema exists.
+        /// If the core tables are not found, executes the full initialization script.
+        /// Safe to call on every startup — idempotent.
+        /// </summary>
+        Task EnsureDatabaseAsync();
+
+        /// <summary>
+        /// Returns the full SQL script that creates the REDB schema.
+        /// Useful for manual database setup or CI/CD pipelines.
+        /// </summary>
+        string GetSchemaScript();
+
+        /// <summary>
+        /// Returns the SQL script that brings an existing database up to the module version this
+        /// build requires — the same text start-up applies automatically when the connected role is
+        /// allowed to. Hand it to the schema owner when it is not (see
+        /// <see cref="Exceptions.RedbSchemaOutdatedException"/>). Idempotent: safe to re-run.
+        /// Returns <c>null</c> for providers that have no versioned module (SQLite upgrades itself,
+        /// the database file belongs to the process).
+        /// </summary>
+        string? GetUpgradeScript();
+
+        /// <summary>
+        /// Problems of the database schema that do not stop the service but need a person, as found by the last
+        /// <see cref="InitializeAsync"/>, <see cref="CheckSchemaAsync"/> or scheme synchronization: each is logged as
+        /// an error when found, at every start until resolved. Empty when the schema is sound. Shared by every instance
+        /// of the service on one database (cache domain): a scoped instance of a health check sees what the start found
+        /// in its own scope. Meant for a health check (Degraded while not empty); cheap, reads no database.
+        /// </summary>
+        IReadOnlyList<Models.RedbSchemaProblem> SchemaProblems => Array.Empty<Models.RedbSchemaProblem>();
+
+        /// <summary>
+        /// Looks for schema problems in the database again (read only, no schema lock) and returns the current list,
+        /// the one <see cref="SchemaProblems"/> holds from then on.
+        /// </summary>
+        Task<IReadOnlyList<Models.RedbSchemaProblem>> CheckSchemaAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(SchemaProblems);
+
+        /// <summary>
+        /// Initialize REDB system at application startup, optionally creating the database schema first.
+        /// </summary>
+        /// <param name="ensureCreated">If true, calls <see cref="EnsureDatabaseAsync"/> before initialization.
+        /// If false and the database has no redb schema yet, initialization stops with
+        /// <see cref="Exceptions.RedbSchemaMissingException"/> - creation is opt-in, never a side effect.</param>
+        /// <param name="assemblies">Assemblies to scan. If not specified — all loaded assemblies are scanned.</param>
+        Task InitializeAsync(bool ensureCreated, params Assembly[] assemblies);
+
+        string dbVersion { get; }
+        
+        /// <summary>
+        /// Database type (e.g., "PostgreSQL").
+        /// </summary>
+        string dbType { get; }
+        
+        /// <summary>
+        /// Database migration version.
+        /// </summary>
+        string dbMigration { get; }
+        
+        /// <summary>
+        /// Database size in bytes, as the server reports it (optional).
+        /// </summary>
+        long? dbSize { get; }
+
+        /// <summary>
+        /// Asynchronously retrieves the database version using the provider-specific version SQL.
+        /// Intended for health probes and other non-blocking callers (the synchronous <see cref="dbVersion"/>
+        /// blocks the calling thread and must not be used from request-pipeline code).
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token propagated to the underlying ADO.NET call.</param>
+        /// <returns>Version string returned by the database, or <c>null</c> when the query yields no row.</returns>
+        Task<string?> GetDbVersionAsync(CancellationToken cancellationToken = default);
+    }
+}

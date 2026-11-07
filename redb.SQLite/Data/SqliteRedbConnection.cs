@@ -1,0 +1,1401 @@
+using Microsoft.Data.Sqlite;
+using redb.Core.Data;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Transactions;
+
+namespace redb.SQLite.Data
+{
+    /// <summary>
+    /// SQLite implementation of IRedbConnection using Sqlite.
+    /// Provides pure ADO.NET database access with automatic transaction management.
+    /// </summary>
+    public class SqliteRedbConnection : IRedbConnection
+    {
+        private readonly SqliteDataSource _dataSource;
+        private SqliteConnection? _connection;
+        private SqliteRedbTransaction? _currentTransaction;
+        // The current command's hold on the ambient transaction's connection; released with the command.
+        private AmbientLease? _ambientLease;
+        // Identity of the database in AmbientConnectionRegistry (computed on first use).
+        private string? _databaseKey;
+        private bool _disposed = false;
+        public bool IsDisposed => _disposed;
+
+        /// <summary>
+        /// One command: this wrapper's gate and, inside an ambient transaction, the lease on the
+        /// transaction's connection taken by <see cref="GetOpenConnectionAsync"/> - both released when the
+        /// command ends.
+        /// </summary>
+        private readonly struct CommandScope : IDisposable
+        {
+            private readonly SqliteRedbConnection _owner;
+            private readonly CommandGate.Releaser _releaser;
+
+            public CommandScope(SqliteRedbConnection owner, CommandGate.Releaser releaser)
+            {
+                _owner = owner;
+                _releaser = releaser;
+            }
+
+            public void Dispose()
+            {
+                var lease = _owner._ambientLease;
+                _owner._ambientLease = null;
+                try
+                {
+                    lease?.Dispose();
+                }
+                finally
+                {
+                    _releaser.Dispose();
+                }
+            }
+        }
+
+        /// <summary>The database file: two connection strings reaching the same file share one key.</summary>
+        private string DatabaseKey => _databaseKey ??= DatabaseKeyOf(_dataSource.ConnectionString);
+
+        private string? _sessionSignature;
+        // This configuration in AmbientConnectionRegistry: the cache domain of the connection string plus the
+        // per-connection settings. The file is the database key; the transaction's connection to it is shared only
+        // when they match.
+        private string SessionSignature => _sessionSignature ??=
+            redb.Core.Models.Configuration.RedbServiceConfiguration.ComputeCacheDomain(_dataSource.ConnectionString)
+            + $"|case_folding={(_dataSource.UnicodeCaseFolding ? 1 : 0)};lazy_refs={(_dataSource.LazyReferences ? 1 : 0)}";
+
+        private static string DatabaseKeyOf(string connectionString)
+        {
+            var dataSource = new SqliteConnectionStringBuilder(connectionString).DataSource;
+            var isFile = !string.IsNullOrEmpty(dataSource)
+                         && dataSource != ":memory:"
+                         && !dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase);
+            return "sqlite|" + (isFile ? System.IO.Path.GetFullPath(dataSource) : connectionString);
+        }
+
+        /// <summary>Opens the connection an ambient transaction holds (pragmas and extension applied by the data source).</summary>
+        private async Task<System.Data.Common.DbConnection> OpenAmbientAsync(CancellationToken cancellationToken)
+            => await _dataSource.OpenConnectionAsync();
+
+        /// <summary>Synchronous <see cref="OpenAmbientAsync"/>.</summary>
+        private System.Data.Common.DbConnection OpenAmbient() => _dataSource.OpenConnection();
+
+        /// <summary>
+        /// Microsoft.Data.Sqlite never takes part in System.Transactions, so redb begins the transaction the
+        /// scope commits or rolls back. BEGIN IMMEDIATE takes the single write lock up front, as every
+        /// explicit redb transaction on SQLite does; it is held until the scope ends (owner decision P4).
+        /// </summary>
+        private static System.Data.Common.DbTransaction BeginAmbientTransaction(System.Data.Common.DbConnection connection)
+            => ((SqliteConnection)connection).BeginTransaction(deferred: false);
+
+        // Fail-fast concurrency guard. This connection holds ONE persistent SqliteConnection reused for all
+        // Commands and teardown share ONE exclusion (CommandGate, tsum garage report
+        // 2026-09-11): this connection is NOT thread-safe, and racing a native SQLite query
+        // with a handle close is worse than an exception. Two concurrent commands fail fast;
+        // a command after teardown began is refused with ObjectDisposedException (the lazy
+        // loader falls back to a detached scope); DisposeAsync WAITS for the in-flight
+        // command instead of closing under it.
+        private readonly CommandGate _gate = new(nameof(SqliteRedbConnection));
+        private CommandScope EnterCommand() => new(this, _gate.Enter());
+
+        // ── [Diag-TXLOCK] process-wide BeginTransaction tracker ────────────
+        //
+        // Every BeginTransactionAsync call registers an entry keyed by this
+        // SqliteRedbConnection's HashCode and dumps the current registry
+        // contents before attempting BEGIN IMMEDIATE. A SqliteException
+        // (BUSY / locked) on the BEGIN call triggers a second dump so the
+        // operator can see WHO else is holding a write tx when the failure
+        // hit. Active entries are removed on Commit / Rollback / Dispose.
+        // Set DiagEnabled=true to enable [Diag-TXLOCK] BEGIN tracking dump
+        // (single-writer concurrency triage). Off by default — the instrumentation
+        // stays in code so it can be flipped back on without a recompile when the
+        // next live writer-conflict scenario needs to be investigated.
+        private sealed record BeginEntry(
+            int ConnHash, int ThreadId, DateTime BeginUtc,
+            string AmbientTxId, string CallerStack);
+
+        private static readonly ConcurrentDictionary<int, BeginEntry> _activeBegins = new();
+        public static bool DiagEnabled { get; set; } = false;
+        
+        /// <summary>
+        /// Connection string.
+        /// </summary>
+        public string ConnectionString => _dataSource.ConnectionString;
+        
+        /// <summary>
+        /// Current active transaction.
+        /// </summary>
+        public IRedbTransaction? CurrentTransaction => _currentTransaction;
+
+        /// <summary>
+        /// The connection and transaction that hold the write lock for this scope, for the key
+        /// generator's bypass (see SqliteKeyGenerator): the scope's explicit transaction, or - inside a
+        /// TransactionScope - the transaction redb began on the transaction's connection. Null when
+        /// neither exists. A refill on a separate connection would wait for that very lock.
+        /// </summary>
+        internal (Microsoft.Data.Sqlite.SqliteConnection Connection, Microsoft.Data.Sqlite.SqliteTransaction Transaction)? TryGetAmbientTransaction()
+        {
+            var tx = _currentTransaction;
+            if (_connection != null && tx is { IsActive: true })
+                return (_connection, tx.SqliteTransaction);
+            if (Transaction.Current is { } ambient)
+            {
+                var entry = AmbientConnectionRegistry.GetOrOpen(ambient, DatabaseKey, SessionSignature, OpenAmbient, BeginAmbientTransaction);
+                return ((SqliteConnection)entry.Connection, (Microsoft.Data.Sqlite.SqliteTransaction)entry.OwnTransaction!);
+            }
+            return null;
+        }
+        
+        /// <summary>
+        /// Whether any transaction is active — explicit or ambient TransactionScope.
+        /// EF Core pattern: checks both CurrentTransaction and Transaction.Current.
+        /// </summary>
+        public bool IsInTransaction =>
+            (_currentTransaction != null && _currentTransaction.IsActive) ||
+            Transaction.Current != null;
+
+        /// <summary>
+        /// Create connection from data source.
+        /// </summary>
+        /// <param name="dataSource">Sqlite data source (pooled).</param>
+        public SqliteRedbConnection(SqliteDataSource dataSource)
+        {
+            _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        }
+        
+        /// <summary>
+        /// Create connection from connection string.
+        /// </summary>
+        /// <param name="connectionString">SQLite connection string.</param>
+        public SqliteRedbConnection(string connectionString)
+        {
+            if (string.IsNullOrEmpty(connectionString))
+                throw new ArgumentNullException(nameof(connectionString));
+            
+            _dataSource = SqliteDataSource.Create(connectionString);
+        }
+
+        // === CONNECTION MANAGEMENT ===
+        
+        /// <summary>
+        /// Get underlying connection (for bulk operations).
+        /// This ensures all operations use the same connection and transaction.
+        /// </summary>
+        public async Task<System.Data.Common.DbConnection> GetUnderlyingConnectionAsync(CancellationToken cancellationToken = default)
+        {
+            // Outside a command: no lease, which would hold the transaction connection's gate past the command
+            // and stall the end of the transaction.
+            if (!_disposed && _currentTransaction is not { IsActive: true } && Transaction.Current is { } ambient)
+                return (await AmbientConnectionRegistry.GetOrOpenAsync(ambient, DatabaseKey, SessionSignature, OpenAmbientAsync, BeginAmbientTransaction, cancellationToken)).Connection;
+            return await GetOpenConnectionAsync(cancellationToken);
+        }
+
+        private async Task<SqliteConnection> GetOpenConnectionAsync(CancellationToken cancellationToken = default)
+        {
+            // Dispose nulls _connection; without this check a call after Dispose would open a NEW
+            // connection on a wrapper whose second Dispose is a no-op, and it would never be closed.
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(SqliteRedbConnection),
+                    "The scope that owned this connection has ended. Resolve a fresh scoped IRedbService " +
+                    "instead of reusing one from a finished scope or exchange.");
+
+            // Inside an ambient transaction the TRANSACTION holds the connection (AmbientConnectionRegistry)
+            // and redb's own transaction on it: the driver cannot enlist, and a second connection would wait
+            // for the write lock that transaction holds. An explicit transaction of this wrapper keeps its own.
+            if (_currentTransaction is not { IsActive: true } && Transaction.Current is { } ambient)
+            {
+                _ambientLease ??= await AmbientConnectionRegistry.AcquireAsync(ambient, DatabaseKey, SessionSignature, OpenAmbientAsync, BeginAmbientTransaction, cancellationToken);
+                return (SqliteConnection)_ambientLease.Entry.Connection;
+            }
+
+            if (_connection == null)
+            {
+                _connection = await _dataSource.OpenConnectionAsync();
+            }
+            else if (_connection.State != System.Data.ConnectionState.Open)
+            {
+                await _connection.OpenAsync();
+            }
+            return _connection;
+        }
+        
+        private SqliteCommand CreateCommand(SqliteConnection connection, string sql, object[] parameters)
+        {
+            // Convert @p0, @p1 format to SQLite $1, $2 format for cross-platform compatibility
+            var convertedSql = ConvertParameters(sql, parameters.Length);
+            var cmd = new SqliteCommand(convertedSql, connection);
+            
+            // Set transaction if active. The `_currentTransaction` field is
+            // cleared on Dispose, NOT on Commit/Rollback — so after the caller
+            // commits but before they dispose, this would otherwise try to
+            // bind the command to an already-closed SQLite transaction object
+            // and throw "transaction is not associated with the same connection".
+            // Gate on IsActive so queries that fire between commit-and-dispose
+            // (e.g. visibility probes in transaction-integrity tests) bind to
+            // no transaction and run against the autocommit connection.
+            if (_currentTransaction != null && _currentTransaction.IsActive)
+            {
+                cmd.Transaction = _currentTransaction.SqliteTransaction;
+            }
+            else if (_ambientLease?.Entry.OwnTransaction is SqliteTransaction ambientTransaction)
+            {
+                // Inside a TransactionScope: bind to the transaction redb began on the transaction's connection.
+                cmd.Transaction = ambientTransaction;
+            }
+            
+            // Add parameters NAMED to match the converted $1,$2,... placeholders
+            // (Microsoft.Data.Sqlite binds by name, not by position).
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                var param = parameters[i];
+                var sqliteParam = new SqliteParameter { ParameterName = "$" + (i + 1) };
+
+                switch (param)
+                {
+                    case null:
+                        sqliteParam.Value = DBNull.Value;
+                        break;
+                    case DateTimeOffset dto:
+                        // Datetimes are stored as REAL Julian day (UTC) — the native SQLite
+                        // datetime format → numeric, correct, index-friendly comparisons and
+                        // datetime()/strftime()/julianday() work directly. Covers writes
+                        // (base _date_* + props _DateTimeOffset) AND parameterized query values.
+                        sqliteParam.Value = SqliteJulian.ToJulian(dto);
+                        break;
+                    case DateTime dt2:
+                        // e.g. a LINQ comparison value (DateTime) — same UTC Julian encoding.
+                        sqliteParam.Value = SqliteJulian.ToJulian(dt2);
+                        break;
+                    case decimal dec:
+                        // Microsoft.Data.Sqlite binds decimal as TEXT, but _Numeric/_value_numeric
+                        // are REAL — and in SQLite type-ordering a REAL is always < any TEXT, so
+                        // `Salary(REAL) > '80000'(TEXT)` is always false. Bind decimals as double.
+                        sqliteParam.Value = (double)dec;
+                        break;
+                    case long[]:
+                    case int[]:
+                    case string[]:
+                        // SQLite has no array parameters. Bind arrays as a JSON array
+                        // (TEXT); SQL that needs the elements uses
+                        // `IN (SELECT value FROM json_each($n))`.
+                        sqliteParam.Value = JsonSerializer.Serialize(param);
+                        break;
+                    default:
+                        sqliteParam.Value = param;
+                        break;
+                }
+
+                cmd.Parameters.Add(sqliteParam);
+            }
+            
+            return cmd;
+        }
+
+        // === QUERY METHODS ===
+        
+        /// <summary>
+        /// Execute SQL query and map results to list of objects.
+        /// Uses JsonPropertyName attribute for snake_case to PascalCase mapping.
+        /// </summary>
+        public Task<List<T>> QueryAsync<T>(string sql, params object[] parameters) where T : new()
+            => QueryAsync<T>(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<List<T>> QueryAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<List<T>> QueryCoreAsync<T>(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
+        {
+            await using var cmd = CreateCommand(conn, sql, parameters);
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            
+            var results = new List<T>();
+            var mapper = new RedbRowMapper<T>();
+            
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                results.Add(mapper.MapRow(reader));
+            }
+            
+            return results;
+        }
+        
+        /// <summary>
+        /// Execute SQL query and return first result.
+        /// </summary>
+        public Task<T?> QueryFirstOrDefaultAsync<T>(string sql, params object[] parameters) where T : class, new()
+            => QueryFirstOrDefaultAsync<T>(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<T?> QueryFirstOrDefaultAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : class, new()
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryFirstOrDefaultCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<T?> QueryFirstOrDefaultCoreAsync<T>(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken) where T : class, new()
+        {
+            await using var cmd = CreateCommand(conn, sql, parameters);
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                var mapper = new RedbRowMapper<T>();
+                return mapper.MapRow(reader);
+            }
+            
+            return null;
+        }
+        
+        /// <summary>
+        /// Execute SQL query and return scalar value.
+        /// </summary>
+        public Task<T?> ExecuteScalarAsync<T>(string sql, params object[] parameters)
+            => ExecuteScalarAsync<T>(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<T?> ExecuteScalarAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteScalarCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<T?> ExecuteScalarCoreAsync<T>(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            await using var cmd = CreateCommand(conn, sql, parameters);
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+            
+            if (result == null || result == DBNull.Value)
+                return default;
+
+            return ConvertScalar<T>(result);
+        }
+
+        // === ORPHAN TRANSACTION HYGIENE ===
+
+        private const string OrphanRollbackFailureKey = "redb.OrphanTransactionRollbackFailure";
+
+        /// <summary>
+        /// A command that failed can leave behind a transaction its own SQL text opened: a root
+        /// SAVEPOINT or BEGIN, some writes, then an error before RELEASE or COMMIT. This wrapper does
+        /// not own that transaction, and Microsoft.Data.Sqlite pools the handle as it is - the pool
+        /// clears it only when that very handle is handed out again, so its write lock stalls every
+        /// writer of the database meanwhile, and the scope itself cannot start a transaction. It is
+        /// rolled back here before the failure leaves, unless a transaction of this wrapper or an
+        /// ambient one owns the connection (its owner ends it). The original exception always
+        /// propagates; a rollback that fails as well is attached to it instead of replacing it.
+        /// </summary>
+        private void RollbackOrphanTransaction(SqliteConnection conn, Exception failure)
+        {
+            if (_currentTransaction is { IsActive: true } || Transaction.Current != null)
+                return;
+            if (conn.State != System.Data.ConnectionState.Open || SQLitePCL.raw.sqlite3_get_autocommit(conn.Handle) != 0)
+                return;
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "ROLLBACK";
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception rollbackFailure)
+            {
+                failure.Data[OrphanRollbackFailureKey] = rollbackFailure.Message;
+            }
+        }
+
+        /// <summary>
+        /// The last line for a handle about to return to the pool inside a transaction nobody owns -
+        /// a path that reached the physical connection without the per-command guard. Pooled as it is,
+        /// its write lock would stall every writer until the pool happened to hand it out again.
+        /// An ambient transaction still in flight owns the handle and ends it itself. A failing
+        /// rollback propagates, like any other dispose fault here.
+        /// </summary>
+        private static void ReleaseOrphanTransactionBeforePooling(SqliteConnection conn)
+        {
+            // The connection's own state first: Transaction.Current throws between Complete() and Dispose() of
+            // a TransactionScope, and disposing a scope's services in that window is legal.
+            if (conn.State != System.Data.ConnectionState.Open || SQLitePCL.raw.sqlite3_get_autocommit(conn.Handle) != 0)
+                return;
+            if (Transaction.Current != null)
+                return;
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ROLLBACK";
+            cmd.ExecuteNonQuery();
+        }
+
+        // === SYNCHRONOUS COUNTERPARTS (thread-pool-free lazy path) ===
+        // The sync getter of RedbListItem.Object runs the whole load on the calling thread; these
+        // are true sync ADO calls - no thread-pool continuation anywhere, so a saturated pool
+        // cannot slow or deadlock them. Same command shape and pragmas as the async twins above
+        // (SqliteDataSource.OpenConnection applies them synchronously).
+
+        private SqliteConnection GetOpenConnection()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(SqliteRedbConnection),
+                    "The scope that owned this connection has ended. Resolve a fresh scoped IRedbService " +
+                    "instead of reusing one from a finished scope or exchange.");
+
+            // Same ambient-transaction rule as the async twin.
+            if (_currentTransaction is not { IsActive: true } && Transaction.Current is { } ambient)
+            {
+                _ambientLease ??= AmbientConnectionRegistry.Acquire(ambient, DatabaseKey, SessionSignature, OpenAmbient, BeginAmbientTransaction);
+                return (SqliteConnection)_ambientLease.Entry.Connection;
+            }
+
+            if (_connection == null)
+            {
+                _connection = _dataSource.OpenConnection();
+            }
+            else if (_connection.State != System.Data.ConnectionState.Open)
+            {
+                _connection.Open();
+            }
+            return _connection;
+        }
+
+        /// <inheritdoc />
+        public T? QueryFirstOrDefault<T>(string sql, params object[] parameters) where T : class, new()
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            try
+            {
+                return QueryFirstOrDefaultCore<T>(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private T? QueryFirstOrDefaultCore<T>(SqliteConnection conn, string sql, object[] parameters) where T : class, new()
+        {
+            using var cmd = CreateCommand(conn, sql, parameters);
+            using var reader = cmd.ExecuteReader();
+            return reader.Read() ? new RedbRowMapper<T>().MapRow(reader) : null;
+        }
+
+        /// <inheritdoc />
+        public List<T> Query<T>(string sql, params object[] parameters) where T : new()
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            try
+            {
+                return QueryCore<T>(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private List<T> QueryCore<T>(SqliteConnection conn, string sql, object[] parameters) where T : new()
+        {
+            using var cmd = CreateCommand(conn, sql, parameters);
+            using var reader = cmd.ExecuteReader();
+
+            var results = new List<T>();
+            var mapper = new RedbRowMapper<T>();
+            while (reader.Read())
+                results.Add(mapper.MapRow(reader));
+            return results;
+        }
+
+        /// <inheritdoc />
+        public int Execute(string sql, params object[] parameters)
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            try
+            {
+                using var cmd = CreateCommand(conn, sql, parameters);
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        /// <inheritdoc />
+        public T? ExecuteScalar<T>(string sql, params object[] parameters)
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            try
+            {
+                return ExecuteScalarCore<T>(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private T? ExecuteScalarCore<T>(SqliteConnection conn, string sql, object[] parameters)
+        {
+            using var cmd = CreateCommand(conn, sql, parameters);
+            var result = cmd.ExecuteScalar();
+            if (result == null || result == DBNull.Value)
+                return default;
+            return ConvertScalar<T>(result);
+        }
+
+        /// <inheritdoc />
+        public string? ExecuteJson(string sql, params object[] parameters)
+        {
+            using var _guard = EnterCommand();
+            var conn = GetOpenConnection();
+            try
+            {
+                return ExecuteJsonCore(conn, sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private string? ExecuteJsonCore(SqliteConnection conn, string sql, object[] parameters)
+        {
+            using var cmd = CreateCommand(conn, sql, parameters);
+            var result = cmd.ExecuteScalar();
+            return result == null || result == DBNull.Value ? null : result.ToString();
+        }
+
+        /// <summary>
+        /// Convert a raw SQLite value to T, handling uuid->Guid (a hash BLOB or a TEXT guid),
+        /// TEXT/ DateTime -> DateTimeOffset, and BLOB -> byte[] (which
+        /// Convert.ChangeType cannot do), then falling back to ChangeType.
+        /// </summary>
+        private static T ConvertScalar<T>(object value)
+        {
+            var targetType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+
+            if (value.GetType() == targetType || targetType.IsAssignableFrom(value.GetType()))
+                return (T)value;
+
+            if (targetType == typeof(Guid))
+                return (T)(object)SqliteHash.FromDbValue(value);
+
+            // Datetimes are stored as REAL Julian day (UTC) → value is a double.
+            if (targetType == typeof(DateTimeOffset))
+                return (T)(object)(value is double jdo ? SqliteJulian.FromJulian(jdo)
+                    : value is DateTimeOffset d ? d
+                    : value is DateTime dt ? new DateTimeOffset(dt, TimeSpan.Zero)
+                    : DateTimeOffset.Parse(value.ToString()!, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind));
+
+            if (targetType == typeof(DateTime))
+                return (T)(object)(value is double jdt ? SqliteJulian.FromJulian(jdt).UtcDateTime
+                    : value is DateTime dt3 ? dt3
+                    : value is DateTimeOffset dto3 ? dto3.UtcDateTime
+                    : DateTime.Parse(value.ToString()!, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind));
+
+            if (targetType == typeof(DateOnly))
+                return (T)(object)(value is double jod ? DateOnly.FromDateTime(SqliteJulian.FromJulian(jod).UtcDateTime)
+                    : value is DateTime dt4 ? DateOnly.FromDateTime(dt4)
+                    : DateOnly.Parse(value.ToString()!, System.Globalization.CultureInfo.InvariantCulture));
+
+            if (targetType == typeof(byte[]))
+                return (T)(object)(byte[])value;
+
+            return (T)Convert.ChangeType(value, targetType);
+        }
+        
+        /// <summary>
+        /// Execute SQL command (INSERT, UPDATE, DELETE).
+        /// </summary>
+        public Task<int> ExecuteAsync(string sql, params object[] parameters)
+            => ExecuteAsync(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<int> ExecuteAsync(string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<int> ExecuteCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            await using var cmd = CreateCommand(conn, sql, parameters);
+            return await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        
+        /// <summary>
+        /// Execute SQL query and return list of scalar values (first column only).
+        /// Use for simple queries like SELECT _id FROM ... that return single column.
+        /// </summary>
+        public Task<List<T>> QueryScalarListAsync<T>(string sql, params object[] parameters)
+            => QueryScalarListAsync<T>(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<List<T>> QueryScalarListAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryScalarListCoreAsync<T>(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<List<T>> QueryScalarListCoreAsync<T>(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            await using var cmd = CreateCommand(conn, sql, parameters);
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            
+            var results = new List<T>();
+
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (reader.IsDBNull(0))
+                {
+                    results.Add(default!);
+                }
+                else
+                {
+                    results.Add(ConvertScalar<T>(reader.GetValue(0)));
+                }
+            }
+            
+            return results;
+        }
+
+        // === TRANSACTION METHODS ===
+        
+        /// <summary>
+        /// Begin new transaction.
+        /// </summary>
+        public async Task<IRedbTransaction> BeginTransactionAsync(System.Data.IsolationLevel? isolationLevel = null, CancellationToken cancellationToken = default)
+        {
+            // BR-1: the parameter is accepted for portability. SQLite is a single serial writer and
+            // BEGIN IMMEDIATE below already takes the write lock at start - every transaction is
+            // effectively serializable, whatever level the caller names.
+            _ = isolationLevel;
+            if (_currentTransaction != null && _currentTransaction.IsActive)
+                throw new InvalidOperationException("Transaction already active. Commit or rollback first.");
+
+            if (Transaction.Current != null)
+                throw new InvalidOperationException(
+                    "Ambient TransactionScope detected. Cannot create explicit transaction inside TransactionScope. " +
+                    "Use ExecuteAtomicAsync() which respects ambient transactions.");
+
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+
+            // [Diag-TXLOCK] — capture WHO is about to BEGIN IMMEDIATE and WHAT
+            // else is currently holding write tx; on BUSY we dump again so the
+            // operator can see who was racing.
+            var connHash = GetHashCode();
+            var ambient = Transaction.Current?.TransactionInformation.LocalIdentifier ?? "<none>";
+            var caller = DiagEnabled ? CaptureCallerStack(skipFrames: 1) : "<diag-off>";
+            if (DiagEnabled)
+            {
+                Console.WriteLine(
+                    $"[Diag-TXLOCK] BEGIN ENTRY conn=#{connHash} thread={Environment.CurrentManagedThreadId} " +
+                    $"ambientTx={ambient} activeCount={_activeBegins.Count}");
+                DumpActiveBegins("BEGIN ENTRY (pre-BeginImmediate)");
+                // Console.WriteLine($"[Diag-TXLOCK] BEGIN CALLER conn=#{connHash}\n{caller}");
+            }
+
+            SqliteTransaction sqliteTx;
+            try
+            {
+                // BEGIN IMMEDIATE (deferred:false) acquires SQLite's single write lock at
+                // transaction start — the SQLite equivalent of pessimistic locking / the PG
+                // `FOR UPDATE` intent. Atomicity here is critical and reused widely.
+                sqliteTx = conn.BeginTransaction(deferred: false);
+            }
+            catch (SqliteException ex)
+            {
+                if (DiagEnabled)
+                {
+                    Console.WriteLine(
+                        $"[Diag-TXLOCK] BEGIN FAILED conn=#{connHash} thread={Environment.CurrentManagedThreadId} " +
+                        $"errno={ex.SqliteErrorCode} msg='{ex.Message}'");
+                    DumpActiveBegins("BEGIN FAILED — current holders");
+                }
+                throw;
+            }
+
+            _currentTransaction = new SqliteRedbTransaction(sqliteTx, () =>
+            {
+                _currentTransaction = null;
+                if (DiagEnabled)
+                {
+                    _activeBegins.TryRemove(connHash, out _);
+                    Console.WriteLine(
+                        $"[Diag-TXLOCK] BEGIN RELEASED conn=#{connHash} thread={Environment.CurrentManagedThreadId} " +
+                        $"activeCount={_activeBegins.Count}");
+                }
+            });
+
+            if (DiagEnabled)
+            {
+                _activeBegins[connHash] = new BeginEntry(
+                    connHash, Environment.CurrentManagedThreadId, DateTime.UtcNow, ambient, caller);
+                Console.WriteLine(
+                    $"[Diag-TXLOCK] BEGIN OK    conn=#{connHash} thread={Environment.CurrentManagedThreadId} " +
+                    $"activeCount={_activeBegins.Count}");
+            }
+            return _currentTransaction;
+        }
+
+        // ── [Diag-TXLOCK] helpers ──────────────────────────────────────────
+
+        private static string CaptureCallerStack(int skipFrames)
+        {
+            try
+            {
+                var st = new StackTrace(skipFrames + 1, fNeedFileInfo: false);
+                var frames = st.GetFrames();
+                if (frames is null) return "<no frames>";
+                var top = frames.Take(8).Select(f =>
+                {
+                    var m = f.GetMethod();
+                    return m is null ? "<null>" : $"  at {m.DeclaringType?.FullName}.{m.Name}";
+                });
+                return string.Join("\n", top);
+            }
+            catch { return "<stack capture failed>"; }
+        }
+
+        private static void DumpActiveBegins(string label)
+        {
+            if (_activeBegins.IsEmpty)
+            {
+                // Console.WriteLine($"[Diag-TXLOCK] {label}: <none active>");
+                return;
+            }
+            // Console.WriteLine($"[Diag-TXLOCK] {label}: count={_activeBegins.Count}");
+            foreach (var (key, e) in _activeBegins)
+            {
+                var heldFor = DateTime.UtcNow - e.BeginUtc;
+                Console.WriteLine(
+                    $"  conn=#{key} thread={e.ThreadId} heldFor={heldFor.TotalMilliseconds:N0}ms " +
+                    $"ambientAtBegin={e.AmbientTxId}");
+                foreach (var line in e.CallerStack.Split('\n').Take(5))
+                    Console.WriteLine($"    {line}");
+            }
+        }
+
+        // === ATOMIC OPERATIONS ===
+        
+        /// <summary>
+        /// Atomic execution under an explicit isolation level (BR-1). An active or ambient transaction
+        /// wins: operations join it and its level is NOT changed.
+        /// </summary>
+        public async Task ExecuteAtomicAsync(System.Data.IsolationLevel isolationLevel, Func<Task> operations, CancellationToken cancellationToken = default)
+        {
+
+        
+            if (IsInTransaction)
+
+        
+            {
+
+        
+                await operations();
+
+        
+                return;
+
+        
+            }
+
+
+        
+            await using var tx = await BeginTransactionAsync(isolationLevel, cancellationToken);
+
+        
+            try
+
+        
+            {
+
+        
+                await operations();
+
+        
+                await tx.CommitAsync();
+
+        
+            }
+
+        
+            catch
+
+        
+            {
+
+        
+                await tx.RollbackAsync();
+
+        
+                throw;
+
+        
+            }
+
+        
+        }
+
+
+        
+        /// <summary>Result-returning form of the isolation-level overload (BR-1).</summary>
+        public async Task<T> ExecuteAtomicAsync<T>(System.Data.IsolationLevel isolationLevel, Func<Task<T>> operations, CancellationToken cancellationToken = default)
+
+        
+        {
+
+        
+            if (IsInTransaction)
+
+        
+                return await operations();
+
+
+        
+            await using var tx = await BeginTransactionAsync(isolationLevel, cancellationToken);
+
+        
+            try
+
+        
+            {
+
+        
+                var result = await operations();
+
+        
+                await tx.CommitAsync();
+
+        
+                return result;
+
+        
+            }
+
+        
+            catch
+
+        
+            {
+
+        
+                await tx.RollbackAsync();
+
+        
+                throw;
+
+        
+            }
+
+        
+        }
+
+
+        
+        /// <summary>
+        /// Execute operations atomically (SaveChanges replacement).
+        /// </summary>
+        public async Task ExecuteAtomicAsync(Func<Task> operations, CancellationToken cancellationToken = default)
+        {
+            // EF pattern: if any transaction active (explicit or ambient TransactionScope) — just execute
+            if (IsInTransaction)
+            {
+                await operations();
+                return;
+            }
+            
+            // Otherwise create auto-transaction
+            await using var tx = await BeginTransactionAsync(cancellationToken: cancellationToken);
+            try
+            {
+                await operations();
+                await tx.CommitAsync();
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        }
+        
+        /// <summary>
+        /// Execute operations atomically and return result.
+        /// </summary>
+        public async Task<T> ExecuteAtomicAsync<T>(Func<Task<T>> operations, CancellationToken cancellationToken = default)
+        {
+            // EF pattern: if any transaction active (explicit or ambient TransactionScope) — just execute
+            if (IsInTransaction)
+            {
+                return await operations();
+            }
+            
+            await using var tx = await BeginTransactionAsync(cancellationToken: cancellationToken);
+            try
+            {
+                var result = await operations();
+                await tx.CommitAsync();
+                return result;
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        }
+
+        // === JSON METHODS ===
+        
+        /// <summary>
+        /// Execute SQL returning JSON (for SQLite functions).
+        /// </summary>
+        public Task<string?> ExecuteJsonAsync(string sql, params object[] parameters)
+            => ExecuteJsonAsync(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<string?> ExecuteJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteJsonCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<string?> ExecuteJsonCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            await using var cmd = CreateCommand(conn, sql, parameters);
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+            
+            if (result == null || result == DBNull.Value)
+                return null;
+            
+            return result.ToString();
+        }
+        
+        /// <summary>
+        /// Execute SQL returning multiple JSON rows.
+        /// </summary>
+        public Task<List<string>> ExecuteJsonListAsync(string sql, params object[] parameters)
+            => ExecuteJsonListAsync(sql, parameters, CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<List<string>> ExecuteJsonListAsync(string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await ExecuteJsonListCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<List<string>> ExecuteJsonListCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            await using var cmd = CreateCommand(conn, sql, parameters);
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            
+            var results = new List<string>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                // Skip NULL values (e.g. get_object_json returns NULL for deleted objects)
+                if (reader.IsDBNull(0))
+                    continue;
+                    
+                var json = reader.GetString(0);
+                if (!string.IsNullOrEmpty(json))
+                    results.Add(json);
+            }
+            
+            return results;
+        }
+
+        /// <summary>
+        /// Execute SQL and serialize the result rows to a JSON array string in C#
+        /// (column names from the reader). SQLite has no row_to_json/json_agg, so the
+        /// Pro analytics providers package dynamic-shaped results here instead of in SQL.
+        /// Returns "[]" when there are no rows.
+        /// </summary>
+        public Task<string> QueryRowsAsJsonAsync(string sql, params object[] parameters)
+            => QueryRowsAsJsonAsync(sql, parameters, CancellationToken.None);
+
+        /// <summary>Cancellable form.</summary>
+        public async Task<string> QueryRowsAsJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryRowsAsJsonCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<string> QueryRowsAsJsonCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            await using var cmd = CreateCommand(conn, sql, parameters);
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
+            var rows = new List<Dictionary<string, object?>>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var row = new Dictionary<string, object?>(reader.FieldCount);
+                for (int i = 0; i < reader.FieldCount; i++)
+                    row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                rows.Add(row);
+            }
+            return JsonSerializer.Serialize(rows);
+        }
+
+        /// <summary>
+        /// Execute SQL and serialize the FIRST result row to a JSON object string in C#,
+        /// or null if there are no rows. SQLite analog of "SELECT row_to_json(t) FROM (...) t".
+        /// </summary>
+        public Task<string?> QueryFirstRowAsJsonAsync(string sql, params object[] parameters)
+            => QueryFirstRowAsJsonAsync(sql, parameters, CancellationToken.None);
+
+        /// <summary>Cancellable form.</summary>
+        public async Task<string?> QueryFirstRowAsJsonAsync(string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            using var _guard = EnterCommand();
+            var conn = await GetOpenConnectionAsync(cancellationToken);
+            try
+            {
+                return await QueryFirstRowAsJsonCoreAsync(conn, sql, parameters, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                RollbackOrphanTransaction(conn, ex);
+                throw;
+            }
+        }
+
+        private async Task<string?> QueryFirstRowAsJsonCoreAsync(SqliteConnection conn, string sql, object[] parameters, CancellationToken cancellationToken)
+        {
+            await using var cmd = CreateCommand(conn, sql, parameters);
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
+            if (!await reader.ReadAsync(cancellationToken))
+                return null;
+
+            var row = new Dictionary<string, object?>(reader.FieldCount);
+            for (int i = 0; i < reader.FieldCount; i++)
+                row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+            return JsonSerializer.Serialize(row);
+        }
+
+        // === DISPOSE ===
+        
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            // Teardown takes the SAME exclusion as commands: wait for the in-flight one (new
+            // entrants bounce with ObjectDisposedException the moment the gate flag is set).
+            // The budget follows the connection's own Default Timeout (SQLite's command
+            // timeout). The LIVE object is the source of truth (it can be changed
+            // programmatically); the string is the fallback for a never-opened connection.
+            int commandTimeout;
+            try
+            {
+                commandTimeout = _connection?.DefaultTimeout
+                    ?? new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(_dataSource.ConnectionString).DefaultTimeout;
+            }
+            catch { commandTimeout = 0; }
+            await _gate.DisposeAndWaitAsync(CommandGate.BudgetFrom(commandTimeout));
+            
+            // The physical connection MUST return to the pool even if disposing a broken transaction
+            // throws (e.g. after a mid-query failure): finally guarantees the return, and the exception
+            // is NOT swallowed — it propagates so the fault stays observable. The route's ReleaseScopes
+            // loop is throw-resilient, so a propagated dispose fault won't strand sibling scopes.
+            try
+            {
+                if (_currentTransaction != null)
+                    await _currentTransaction.DisposeAsync();
+            }
+            finally
+            {
+                _currentTransaction = null;
+                var conn = _connection;
+                _connection = null;
+                if (conn != null)
+                {
+                    try { ReleaseOrphanTransactionBeforePooling(conn); }
+                    finally { await conn.DisposeAsync(); }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Synchronous dispose for DI container compatibility.
+        /// </summary>
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+            
+            _disposed = true;
+            
+            try
+            {
+                _currentTransaction?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            finally
+            {
+                _currentTransaction = null;
+                var conn = _connection;
+                _connection = null;
+                if (conn != null)
+                {
+                    try { ReleaseOrphanTransactionBeforePooling(conn); }
+                    finally { conn.Dispose(); }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Convert @p0, @p1 parameter format to SQLite $1, $2 format.
+        /// Enables cross-platform SQL compatibility.
+        /// </summary>
+        private static string ConvertParameters(string sql, int paramCount)
+        {
+            var result = sql;
+            
+            // Replace @p0, @p1 with $1, $2 (in reverse order to avoid index shifting)
+            for (int i = paramCount - 1; i >= 0; i--)
+            {
+                result = result.Replace($"@p{i}", $"${i + 1}");
+            }
+            
+            return result;
+        }
+    }
+    
+    /// <summary>
+    /// Row mapper for converting SqliteDataReader to objects.
+    /// Supports multiple column name formats:
+    /// - SQLite table columns: _id, _name, _id_scheme
+    /// - JSON output: id, name, id_scheme  
+    /// - PascalCase: Id, Name, IdScheme
+    /// </summary>
+    /// <typeparam name="T">Target type.</typeparam>
+    internal class RedbRowMapper<T> where T : new()
+    {
+        private readonly Dictionary<string, PropertyInfo> _propertyMap;
+        
+        public RedbRowMapper()
+        {
+            _propertyMap = new Dictionary<string, PropertyInfo>(StringComparer.OrdinalIgnoreCase);
+            
+            foreach (var prop in typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!prop.CanWrite) continue;
+                
+                // Check for JsonPropertyName attribute
+                var jsonAttr = prop.GetCustomAttribute<JsonPropertyNameAttribute>();
+                var jsonName = jsonAttr?.Name ?? ToSnakeCase(prop.Name);
+                
+                // Map all possible column name formats:
+                // 1. JsonPropertyName value (e.g., "id", "id_scheme")
+                _propertyMap[jsonName] = prop;
+                
+                // 2. SQLite table column format (e.g., "_id", "_id_scheme")
+                _propertyMap["_" + jsonName] = prop;
+                
+                // 3. PascalCase property name (e.g., "Id", "IdScheme")
+                _propertyMap[prop.Name] = prop;
+                
+                // 4. Lowercase property name (SQLite returns lowercase aliases!)
+                _propertyMap[prop.Name.ToLowerInvariant()] = prop;
+
+                // 5. Underscore + lowercase property name without underscores (e.g., "_datetimeoffset")
+                _propertyMap["_" + prop.Name.ToLowerInvariant()] = prop;
+            }
+        }
+        
+        /// <summary>
+        /// Convert PascalCase to snake_case.
+        /// </summary>
+        private static string ToSnakeCase(string pascalCase)
+        {
+            if (string.IsNullOrEmpty(pascalCase)) return pascalCase;
+            
+            var result = new System.Text.StringBuilder();
+            for (int i = 0; i < pascalCase.Length; i++)
+            {
+                var c = pascalCase[i];
+                if (char.IsUpper(c) && i > 0)
+                {
+                    result.Append('_');
+                }
+                result.Append(char.ToLowerInvariant(c));
+            }
+            return result.ToString();
+        }
+        
+        /// <summary>
+        /// Map current row to object instance.
+        /// </summary>
+        public T MapRow(SqliteDataReader reader)
+        {
+            var obj = new T();
+            
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                var columnName = reader.GetName(i);
+                
+                if (!_propertyMap.TryGetValue(columnName, out var property))
+                    continue;
+                
+                var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                
+                if (value != null)
+                {
+                    try
+                    {
+                        var targetType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+                        
+                        // Datetimes are stored as REAL Julian day (UTC) — value is a double.
+                        if (targetType == typeof(DateTimeOffset))
+                        {
+                            if (value is double jd)
+                                property.SetValue(obj, SqliteJulian.FromJulian(jd));
+                            else if (value is DateTime dt)
+                                property.SetValue(obj, new DateTimeOffset(dt, TimeSpan.Zero));
+                            else if (value is DateTimeOffset dto)
+                                property.SetValue(obj, dto);
+                            else if (value is string sdt)
+                                property.SetValue(obj, DateTimeOffset.Parse(sdt, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind));
+                            continue;
+                        }
+
+                        if (targetType == typeof(DateTime))
+                        {
+                            if (value is double jd2) property.SetValue(obj, SqliteJulian.FromJulian(jd2).UtcDateTime);
+                            else if (value is DateTime dt2) property.SetValue(obj, dt2);
+                            else if (value is DateTimeOffset dto2) property.SetValue(obj, dto2.UtcDateTime);
+                            else if (value is string sdt2) property.SetValue(obj, DateTime.Parse(sdt2, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind));
+                            continue;
+                        }
+
+                        if (targetType == typeof(DateOnly))
+                        {
+                            if (value is double jd3) property.SetValue(obj, DateOnly.FromDateTime(SqliteJulian.FromJulian(jd3).UtcDateTime));
+                            else if (value is DateTime dt3) property.SetValue(obj, DateOnly.FromDateTime(dt3));
+                            else if (value is string sdt3) property.SetValue(obj, DateOnly.Parse(sdt3, System.Globalization.CultureInfo.InvariantCulture));
+                            continue;
+                        }
+
+                        // A hash comes back as BLOB(16), a data guid as TEXT — SqliteHash reads both.
+                        if (targetType == typeof(Guid))
+                        {
+                            property.SetValue(obj, SqliteHash.FromDbValue(value));
+                            continue;
+                        }
+
+                        // A value already of the property's type is assigned as is (BLOB -> byte[] among them).
+                        if (property.PropertyType.IsInstanceOfType(value))
+                        {
+                            property.SetValue(obj, value);
+                            continue;
+                        }
+
+                        var convertedValue = Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
+                        property.SetValue(obj, convertedValue);
+                    }
+                    catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
+                    {
+                        // SL-57: two silent catches left the property at its default - the row read as if the
+                        // column were NULL.
+                        throw new InvalidOperationException(
+                            $"Column '{columnName}': the value '{value}' ({value.GetType().Name}) cannot be read as " +
+                            $"{property.PropertyType.Name} ({typeof(T).Name}.{property.Name}).", ex);
+                    }
+                }
+            }
+            
+            return obj;
+        }
+    }
+}
+

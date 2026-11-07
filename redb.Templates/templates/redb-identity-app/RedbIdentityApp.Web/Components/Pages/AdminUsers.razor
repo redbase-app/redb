@@ -1,0 +1,56 @@
+@page "/admin/users"
+@attribute [Authorize(Policy = "admin")]
+@inject ModuleClient Module
+
+<PageTitle>Users</PageTitle>
+
+<h1>Users</h1>
+<p class="muted">Read by the module from Identity's management API, in process.</p>
+
+<ModuleError Error="error" />
+
+<p class="muted">@data.Total user(s)</p>
+<table>
+    <thead><tr><th>Id</th><th>Login</th><th>Name</th><th>E-mail</th><th>Enabled</th></tr></thead>
+    <tbody>
+    @foreach (var user in data.Items)
+    {
+        <tr>
+            <td class="num">@user.Id</td>
+            <td>@user.Login</td>
+            <td>@user.Name</td>
+            <td>@user.Email</td>
+            <td>@(user.Enabled ? "yes" : "no")</td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<nav class="pager">
+    <button disabled="@(current <= 1)" @onclick="() => LoadAsync(current - 1)">Previous</button>
+    <span>Page @current</span>
+    <button disabled="@(current * PageSize >= data.Total)" @onclick="() => LoadAsync(current + 1)">Next</button>
+</nav>
+
+@code {
+    private const int PageSize = 20;
+    private Page<UserSummaryDto> data = new();
+    private int current = 1;
+    private Exception? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync(1);
+
+    private async Task LoadAsync(int number)
+    {
+        error = null;
+        try
+        {
+            data = await Module.UsersAsync(number);
+            current = number;
+        }
+        catch (Exception ex) when (ex is SessionEndedException or IdentityUnavailableException or ModuleException)
+        {
+            error = ex;
+        }
+    }
+}

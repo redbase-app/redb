@@ -1,0 +1,791 @@
+-- ============================================================================
+-- REDB SQLite schema (DDL). Ported from redb.Postgres/sql/redbPostgre.sql.
+-- Target: SQLite 3.44.0+ (Microsoft.Data.Sqlite).
+-- Contains schema ONLY (tables + indexes + identity). The PL/pgSQL functions
+-- and views from the PG file are NOT here — for SQLite they live in the native
+-- C extension (Free) or in C# (Pro). See redb.SQLite/doc/C_EXTENSION.md.
+-- ----------------------------------------------------------------------------
+-- Type mapping: bigint->INTEGER, text/varchar->TEXT, boolean->INTEGER(0/1),
+--   uuid->TEXT, bytea->BLOB, float->REAL, timestamptz->TEXT(ISO-8601),
+--   NUMERIC(38,18)->TEXT (exact; configurable to REAL for speed).
+-- NOTE: PRAGMA foreign_keys=ON must be set per-connection (in C#); it is not
+--   persistent. WAL is persistent and set once below.
+-- ============================================================================
+
+PRAGMA journal_mode = WAL;
+
+-- ============================================================================
+-- ID generation. SQLite has no sequences; we use a native AUTOINCREMENT table.
+-- The high-water mark lives in sqlite_sequence._global_identity and is advanced
+-- monotonically by every id consumer, so ids are globally unique and never reused:
+--   * C# keygen (hi-lo block):  UPDATE sqlite_sequence SET seq = seq + :n
+--                               WHERE name='_global_identity' RETURNING seq;  -- ids=[seq-n+1 .. seq]
+--   * C ext nextId (single):    same with +1.
+--   * soft-delete (single, in a multi-statement dialect script): INSERT INTO
+--     _global_identity DEFAULT VALUES + last_insert_rowid() — last_insert_rowid()
+--     is per-connection, so it is stable across statements regardless of other
+--     writers (no counter re-read race).
+-- (RETURNING requires SQLite 3.35+, AUTOINCREMENT is native; we target 3.44+.)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS _global_identity(
+    _id INTEGER PRIMARY KEY AUTOINCREMENT
+);
+-- Reserve ids 1..1000 for system/seed rows; runtime ids start at 1001.
+-- Forcing one explicit insert materializes the sqlite_sequence row at seq=1000,
+-- then we clear the table (the sequence persists and only ever increases).
+INSERT INTO _global_identity(_id) VALUES (1000000);
+DELETE FROM _global_identity WHERE _id = 1000000;
+
+-- ============================================================================
+-- Core tables. `_id INTEGER PRIMARY KEY` aliases the SQLite rowid; the app
+-- supplies explicit ids from SqliteKeyGenerator (no AUTOINCREMENT).
+-- ============================================================================
+
+CREATE TABLE _types(
+    _id      INTEGER NOT NULL PRIMARY KEY,
+    _name    TEXT    NOT NULL UNIQUE,
+    _db_type TEXT    NULL,
+    _type    TEXT    NULL
+);
+
+CREATE TABLE _links(
+    _id   INTEGER NOT NULL PRIMARY KEY,
+    _id_1 INTEGER NOT NULL,
+    _id_2 INTEGER NOT NULL,
+    CONSTRAINT IX__links UNIQUE (_id_1, _id_2),
+    CONSTRAINT CK__links CHECK (_id_1 <> _id_2)
+);
+
+CREATE TABLE _lists(
+    _id    INTEGER NOT NULL PRIMARY KEY,
+    _name  TEXT    NOT NULL,
+    _alias TEXT    NULL,
+    CONSTRAINT IX__lists_name UNIQUE (_name)
+);
+
+CREATE TABLE _roles(
+    _id               INTEGER NOT NULL PRIMARY KEY,
+    _name             TEXT    NOT NULL,
+    -- forward FK to _objects (created later); SQLite resolves FKs at DML time
+    _id_configuration INTEGER NULL REFERENCES _objects(_id) ON DELETE SET NULL,
+    CONSTRAINT IX__roles UNIQUE (_name)
+);
+
+CREATE TABLE _users(
+    _id               INTEGER NOT NULL PRIMARY KEY,
+    _login            TEXT    NOT NULL UNIQUE,
+    _password         TEXT    NOT NULL,
+    _name             TEXT    NOT NULL,
+    _phone            TEXT    NULL,
+    _email            TEXT    NULL,
+    _date_register    REAL    NOT NULL DEFAULT (julianday('now')),  -- UTC Julian day (REAL); native datetime()/strftime()/julianday() consume directly
+    _date_dismiss     REAL    NULL,
+    _enabled          INTEGER NOT NULL DEFAULT 1,
+    _key              INTEGER NULL,
+    _code_int         INTEGER NULL,
+    _code_string      TEXT    NULL,
+    _code_guid        TEXT    NULL,
+    _note             TEXT    NULL,
+    _hash             BLOB    NULL,    -- 16 bytes, RFC 4122 order (SqliteHash); pre-V4 TEXT is converted on open
+    _id_configuration INTEGER NULL REFERENCES _objects(_id) ON DELETE SET NULL
+);
+
+CREATE TABLE _users_roles(
+    _id      INTEGER NOT NULL PRIMARY KEY,
+    _id_role INTEGER NOT NULL,
+    _id_user INTEGER NOT NULL,
+    CONSTRAINT IX__users_roles UNIQUE (_id_role, _id_user),
+    CONSTRAINT FK__users_roles__roles FOREIGN KEY (_id_role) REFERENCES _roles (_id) ON DELETE CASCADE,
+    CONSTRAINT FK__users_roles__users FOREIGN KEY (_id_user) REFERENCES _users (_id) ON DELETE CASCADE
+);
+
+CREATE TABLE _schemes(
+    _id             INTEGER NOT NULL PRIMARY KEY,
+    _id_parent      INTEGER NULL,
+    _name           TEXT    NOT NULL,
+    _alias          TEXT    NULL,
+    _name_space     TEXT    NULL,
+    _structure_hash BLOB    NULL,    -- 16 bytes, RFC 4122 order (SqliteHash); pre-V4 TEXT is converted on open
+    _tags           TEXT    NULL,    -- V4: free-form marker for future / custom extensions (450 chars, enforced in C#; sync never wipes it)
+    _type           INTEGER NOT NULL DEFAULT -9223372036854775675, -- Class (default), Array, Dictionary, JsonDocument, XDocument
+    CONSTRAINT IX__schemes UNIQUE (_name),
+    CONSTRAINT FK__schemes__schemes FOREIGN KEY (_id_parent) REFERENCES _schemes (_id),
+    CONSTRAINT FK__schemes__types   FOREIGN KEY (_type)      REFERENCES _types (_id)
+);
+
+-- Scheme name validation. Mirrors the PostgreSQL validate_scheme_name() trigger rule for rule so
+-- that a name accepted by one provider is accepted by all three.
+--
+-- This is a BACKSTOP against writes that bypass the library. The library validates explicit names
+-- in C# first (redb.Core/Attributes/SchemeNameValidator.cs), which is what reports the offending
+-- type instead of a bare constraint error, and which also covers databases created before this
+-- trigger existed -- EnsureDatabaseAsync skips initialisation entirely when _schemes is already
+-- present, so older databases never receive it.
+--
+-- Two triggers because SQLite has no combined INSERT OR UPDATE form. The UPDATE one fires only
+-- when _name is written, so touching the hash or alias costs nothing and cannot fail on a legacy
+-- name that predates these rules.
+CREATE TRIGGER tr_validate_scheme_name_insert
+BEFORE INSERT ON _schemes
+FOR EACH ROW
+WHEN NEW._name NOT GLOB '@@*'   -- system schemes (e.g. @@__deleted) bypass validation
+BEGIN
+    SELECT RAISE(ABORT, 'Scheme name cannot be empty')
+    WHERE length(trim(NEW._name)) = 0;
+
+    SELECT RAISE(ABORT, 'Scheme name cannot start with a digit')
+    WHERE NEW._name GLOB '[0-9]*';
+
+    SELECT RAISE(ABORT, 'Scheme name contains characters outside [a-zA-Z0-9_.+] or does not start with a letter/underscore')
+    WHERE NEW._name GLOB '*[^a-zA-Z0-9_.+]*' OR NEW._name NOT GLOB '[a-zA-Z_]*';
+
+    SELECT RAISE(ABORT, 'Scheme name cannot end with a dot')
+    WHERE NEW._name GLOB '*.';
+
+    SELECT RAISE(ABORT, 'Scheme name cannot contain two consecutive dots')
+    WHERE instr(NEW._name, '..') > 0;
+
+    SELECT RAISE(ABORT, 'Scheme name is longer than 128 characters')
+    WHERE length(NEW._name) > 128;
+
+    -- Rules 7 and 8: split on '.' and '+', then check every part. The seed row carries an empty
+    -- part and is filtered out; genuinely empty parts are already rejected by the '..' rule above.
+    SELECT RAISE(ABORT, 'Scheme name has a part that is not a valid identifier or is a C# reserved word')
+    WHERE EXISTS (
+        WITH RECURSIVE parts(part, rest) AS (
+            SELECT '', replace(NEW._name, '+', '.') || '.'
+            UNION ALL
+            SELECT substr(rest, 1, instr(rest, '.') - 1), substr(rest, instr(rest, '.') + 1)
+            FROM parts WHERE rest <> ''
+        )
+        SELECT 1 FROM parts
+        WHERE part <> ''
+          AND (part GLOB '*[^a-zA-Z0-9_]*'
+            OR part GLOB '[0-9]*'
+            OR lower(part) IN (
+                'abstract','as','bool','break','byte','case','catch','char','checked',
+                'class','const','continue','decimal','default','delegate','do','double','else',
+                'enum','event','explicit','extern','false','finally','fixed','float','for',
+                'foreach','goto','if','implicit','in','int','interface','internal','is','lock',
+                'long','namespace','new','null','object','operator','out','override','params',
+                'private','protected','public','readonly','ref','return','sbyte','sealed',
+                'short','sizeof','stackalloc','static','string','struct','switch','this',
+                'throw','true','try','typeof','uint','ulong','unchecked','unsafe','ushort',
+                'using','virtual','void','volatile','while'))
+    );
+END;
+
+CREATE TRIGGER tr_validate_scheme_name_update
+BEFORE UPDATE OF _name ON _schemes
+FOR EACH ROW
+WHEN NEW._name <> OLD._name AND NEW._name NOT GLOB '@@*'
+BEGIN
+    SELECT RAISE(ABORT, 'Scheme name cannot be empty')
+    WHERE length(trim(NEW._name)) = 0;
+
+    SELECT RAISE(ABORT, 'Scheme name cannot start with a digit')
+    WHERE NEW._name GLOB '[0-9]*';
+
+    SELECT RAISE(ABORT, 'Scheme name contains characters outside [a-zA-Z0-9_.+] or does not start with a letter/underscore')
+    WHERE NEW._name GLOB '*[^a-zA-Z0-9_.+]*' OR NEW._name NOT GLOB '[a-zA-Z_]*';
+
+    SELECT RAISE(ABORT, 'Scheme name cannot end with a dot')
+    WHERE NEW._name GLOB '*.';
+
+    SELECT RAISE(ABORT, 'Scheme name cannot contain two consecutive dots')
+    WHERE instr(NEW._name, '..') > 0;
+
+    SELECT RAISE(ABORT, 'Scheme name is longer than 128 characters')
+    WHERE length(NEW._name) > 128;
+
+    SELECT RAISE(ABORT, 'Scheme name has a part that is not a valid identifier or is a C# reserved word')
+    WHERE EXISTS (
+        WITH RECURSIVE parts(part, rest) AS (
+            SELECT '', replace(NEW._name, '+', '.') || '.'
+            UNION ALL
+            SELECT substr(rest, 1, instr(rest, '.') - 1), substr(rest, instr(rest, '.') + 1)
+            FROM parts WHERE rest <> ''
+        )
+        SELECT 1 FROM parts
+        WHERE part <> ''
+          AND (part GLOB '*[^a-zA-Z0-9_]*'
+            OR part GLOB '[0-9]*'
+            OR lower(part) IN (
+                'abstract','as','bool','break','byte','case','catch','char','checked',
+                'class','const','continue','decimal','default','delegate','do','double','else',
+                'enum','event','explicit','extern','false','finally','fixed','float','for',
+                'foreach','goto','if','implicit','in','int','interface','internal','is','lock',
+                'long','namespace','new','null','object','operator','out','override','params',
+                'private','protected','public','readonly','ref','return','sbyte','sealed',
+                'short','sizeof','stackalloc','static','string','struct','switch','this',
+                'throw','true','try','typeof','uint','ulong','unchecked','unsafe','ushort',
+                'using','virtual','void','volatile','while'))
+    );
+END;
+
+CREATE TABLE _structures(
+    _id              INTEGER NOT NULL PRIMARY KEY,
+    _id_parent       INTEGER NULL,
+    _id_scheme       INTEGER NOT NULL,
+    _id_override     INTEGER NULL,
+    _id_type         INTEGER NOT NULL,
+    _id_list         INTEGER NULL,
+    _name            TEXT    NOT NULL,
+    _alias           TEXT    NULL,
+    _order           INTEGER NULL,
+    _readonly        INTEGER NULL,
+    _allow_not_null  INTEGER NULL,
+    _collection_type INTEGER NULL,  -- Array/Dictionary type ID or NULL for non-collections
+    _key_type        INTEGER NULL,  -- Key type for Dictionary fields
+    _is_compress     INTEGER NULL,
+    _store_null      INTEGER NULL,
+    _unique          INTEGER NULL,  -- V4: field is a unique key within its scheme ([RedbUnique])
+    _unique_version  INTEGER NULL,  -- V4: UniqueKeyEncoder.Version the stored keys were computed with
+    _unique_scope    INTEGER NULL,  -- S3: element-key scope of a collection key (NULL = default; 1 = Scheme elements; 2 = Collection elements)
+    _lazy            INTEGER NULL,  -- V4 (LAZY Л2): lazy reference marker (virtual)
+    _tags            TEXT    NULL,  -- V4: free-form marker for future / custom extensions (sync never wipes it)
+    _default_value   BLOB    NULL,
+    _default_editor  TEXT    NULL,
+    CONSTRAINT IX__structures UNIQUE (_id_scheme, _name, _id_parent),
+    CONSTRAINT FK__structures__structures      FOREIGN KEY (_id_parent)       REFERENCES _structures (_id) ON DELETE CASCADE,
+    CONSTRAINT FK__structures__schemes         FOREIGN KEY (_id_scheme)       REFERENCES _schemes (_id),
+    CONSTRAINT FK__structures__types           FOREIGN KEY (_id_type)         REFERENCES _types (_id),
+    CONSTRAINT FK__structures__lists           FOREIGN KEY (_id_list)         REFERENCES _lists (_id),
+    CONSTRAINT FK__structures__collection_type FOREIGN KEY (_collection_type) REFERENCES _types (_id),
+    CONSTRAINT FK__structures__key_type        FOREIGN KEY (_key_type)        REFERENCES _types (_id)
+);
+
+CREATE TABLE _dependencies(
+    _id          INTEGER NOT NULL PRIMARY KEY,
+    _id_scheme_1 INTEGER NULL,
+    _id_scheme_2 INTEGER NOT NULL,
+    CONSTRAINT IX__dependencies UNIQUE (_id_scheme_1, _id_scheme_2),
+    CONSTRAINT FK__dependencies__schemes_1 FOREIGN KEY (_id_scheme_1) REFERENCES _schemes (_id),
+    CONSTRAINT FK__dependencies__schemes_2 FOREIGN KEY (_id_scheme_2) REFERENCES _schemes (_id) ON DELETE CASCADE
+);
+
+CREATE TABLE _objects(
+    _id             INTEGER NOT NULL PRIMARY KEY,
+    _id_parent      INTEGER NULL,
+    _id_scheme      INTEGER NOT NULL,
+    _id_owner       INTEGER NOT NULL,
+    _id_who_change  INTEGER NOT NULL,
+    _date_create    REAL    NOT NULL DEFAULT (julianday('now')),  -- UTC Julian day (REAL)
+    _date_modify    REAL    NOT NULL DEFAULT (julianday('now')),  -- UTC Julian day (REAL)
+    _date_begin     REAL    NULL,
+    _date_complete  REAL    NULL,
+    _key            INTEGER NULL,
+    _name           TEXT    NULL,
+    _note           TEXT    NULL,
+    _hash           BLOB    NULL,    -- 16 bytes, RFC 4122 order (SqliteHash); pre-V4 TEXT is converted on open
+    -- Value columns for RedbPrimitive<T> (Props = primitive value stored directly)
+    _value_long     INTEGER NULL,
+    _value_string   TEXT    NULL,   -- identifiers/external keys; contract limit 450 (C#-enforced), long text belongs in _note
+    _value_guid     TEXT    NULL,
+    _value_bool     INTEGER NULL,
+    _value_double   REAL    NULL,
+    _value_numeric  REAL    NULL,  -- NUMERIC(38,18): REAL default (numeric ops/JSON); TEXT = exact (config)
+    _value_datetime REAL    NULL,  -- UTC Julian day (REAL)
+    _value_bytes    BLOB    NULL,
+    _value_unique   TEXT    NULL,  -- V4: unique key within the scheme (440 chars, enforced in C#)
+    CONSTRAINT FK__objects__objects FOREIGN KEY (_id_parent)     REFERENCES _objects (_id) ON DELETE CASCADE,
+    CONSTRAINT FK__objects__schemes FOREIGN KEY (_id_scheme)     REFERENCES _schemes (_id) ON DELETE CASCADE,
+    CONSTRAINT FK__objects__users1  FOREIGN KEY (_id_owner)      REFERENCES _users (_id),
+    CONSTRAINT FK__objects__users2  FOREIGN KEY (_id_who_change) REFERENCES _users (_id)
+);
+
+CREATE TABLE _list_items(
+    _id        INTEGER NOT NULL PRIMARY KEY,
+    _id_list   INTEGER NOT NULL,
+    _value     TEXT    NULL,
+    _alias     TEXT    NULL,
+    _id_object INTEGER NULL,
+    CONSTRAINT FK__list_items__id_list FOREIGN KEY (_id_list)   REFERENCES _lists (_id)   ON DELETE CASCADE,
+    CONSTRAINT FK__list_items__objects FOREIGN KEY (_id_object) REFERENCES _objects (_id) ON DELETE SET NULL
+);
+
+-- PG used `NULLS NOT DISTINCT` (one NULL per list). SQLite treats NULLs as
+-- distinct in UNIQUE, so we emulate via an expression index with a sentinel.
+-- Sentinel char(1) (SOH) is not expected as a real dictionary value.
+CREATE UNIQUE INDEX IX__list_items_unique ON _list_items (_id_list, IFNULL(_value, char(1)));
+
+CREATE TABLE _values(
+    _id              INTEGER NOT NULL PRIMARY KEY,
+    _id_structure    INTEGER NOT NULL,
+    _id_object       INTEGER NOT NULL,
+    _String          TEXT    NULL,
+    _Long            INTEGER NULL,
+    _Guid            TEXT    NULL,
+    _Double          REAL    NULL,
+    _DateTimeOffset  REAL    NULL,  -- DateTime/DateTimeOffset/DateOnly as UTC Julian day (REAL)
+    _Boolean         INTEGER NULL,
+    _ByteArray       BLOB    NULL,
+    _Numeric         REAL    NULL,  -- NUMERIC(38,18): REAL default (numeric ops/JSON); TEXT = exact (config)
+    _ListItem        INTEGER NULL,
+    _Object          INTEGER NULL,
+    _unique          BLOB    NULL,  -- V4: unique-key hash (16 bytes, RFC 4122 order, SqliteHash) for [RedbUnique] root scalars
+    -- Relational storage of collections (arrays, dictionaries)
+    _array_parent_id INTEGER NULL, -- parent element (nested structures)
+    _array_index     TEXT    NULL, -- '0','1',... for arrays; string key for dictionaries
+    CONSTRAINT FK__values__objects      FOREIGN KEY (_id_object)       REFERENCES _objects (_id)    ON DELETE CASCADE,
+    CONSTRAINT FK__values__structures   FOREIGN KEY (_id_structure)    REFERENCES _structures (_id) ON DELETE CASCADE,
+    CONSTRAINT FK__values__array_parent FOREIGN KEY (_array_parent_id) REFERENCES _values (_id)      ON DELETE CASCADE,
+    CONSTRAINT FK__values__list_items   FOREIGN KEY (_ListItem)        REFERENCES _list_items (_id),
+    CONSTRAINT FK__values__objects_ref  FOREIGN KEY (_Object)          REFERENCES _objects (_id)
+);
+
+CREATE TABLE _permissions(
+    _id      INTEGER NOT NULL PRIMARY KEY,
+    _id_role INTEGER NULL,
+    _id_user INTEGER NULL,
+    _id_ref  INTEGER NOT NULL,
+    _select  INTEGER NULL,
+    _insert  INTEGER NULL,
+    _update  INTEGER NULL,
+    _delete  INTEGER NULL,
+    CONSTRAINT CK__permissions_users_roles CHECK (_id_role IS NOT NULL AND _id_user IS NULL OR _id_role IS NULL AND _id_user IS NOT NULL),
+    CONSTRAINT IX__permissions UNIQUE (_id_role, _id_user, _id_ref, _select, _insert, _update, _delete),
+    CONSTRAINT FK__permissions__roles FOREIGN KEY (_id_role) REFERENCES _roles (_id) ON DELETE CASCADE,
+    CONSTRAINT FK__permissions__users FOREIGN KEY (_id_user) REFERENCES _users (_id) ON DELETE CASCADE
+);
+
+CREATE TABLE _functions(
+    _id        INTEGER NOT NULL PRIMARY KEY,
+    _id_scheme INTEGER NOT NULL,
+    _language  TEXT    NOT NULL,
+    _name      TEXT    NOT NULL,
+    _body      TEXT    NOT NULL,
+    CONSTRAINT IX__functions_scheme_name UNIQUE (_id_scheme, _name),
+    CONSTRAINT FK__functions__schemes FOREIGN KEY (_id_scheme) REFERENCES _schemes (_id)
+);
+
+-- Pro data-migration history (ported 1:1 from redb_migrations.sql, PG types mapped:
+-- BIGSERIAL->INTEGER PK (the id is supplied explicitly by NextObjectIdAsync),
+-- TIMESTAMPTZ->REAL UTC Julian day like every other date column here,
+-- BOOLEAN->INTEGER 0/1).
+--
+-- Unlike PG/MSSql, SQLite has no redb_init.sql concatenation step, so the shared
+-- redb_migrations.sql never reached this provider and the table was missing entirely —
+-- MigrationExecutor's very first statement (the idempotency probe in
+-- ProSqliteDialect.Migration_SelectExisting) failed with "no such table: _migrations",
+-- making Pro data migrations unusable on SQLite. See docs/SQLITE_PARITY_PLAN.md §1.
+CREATE TABLE _migrations(
+    _id              INTEGER NOT NULL PRIMARY KEY,
+    _migration_id    TEXT    NOT NULL,   -- "OrderProps_TotalPrice_v1"
+    _scheme_id       INTEGER NOT NULL,
+    _structure_id    INTEGER NULL,       -- NULL = whole scheme
+    _property_name   TEXT    NULL,
+    _expression_hash TEXT    NULL,       -- MD5 of the Expression, to detect changes
+    _migration_type  TEXT    NOT NULL,   -- ComputedFrom, TypeChange, DefaultValue, Transform
+    _applied_at      REAL    NOT NULL DEFAULT (julianday('now')),  -- UTC Julian day (REAL)
+    _applied_by      TEXT    NULL,
+    _sql_executed    TEXT    NULL,       -- executed SQL, kept for audit
+    _affected_rows   INTEGER NULL,
+    _duration_ms     INTEGER NULL,
+    _dry_run         INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT uq_migration_scheme UNIQUE (_scheme_id, _migration_id),
+    CONSTRAINT FK__migrations__schemes    FOREIGN KEY (_scheme_id)    REFERENCES _schemes (_id)    ON DELETE CASCADE,
+    CONSTRAINT FK__migrations__structures FOREIGN KEY (_structure_id) REFERENCES _structures (_id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_migrations_scheme  ON _migrations(_scheme_id);
+CREATE INDEX idx_migrations_applied ON _migrations(_applied_at DESC);
+
+-- ============================================================================
+-- Metadata cache (ported 1:1 from redb_metadata_cache.sql). Denormalized
+-- _structures ⋈ _types (+ scheme/collection/key type names) per scheme, to avoid
+-- repeated JOINs. Maintained by SqliteDialect.Schemes_SyncMetadataCache (called
+-- by SchemeSyncProviderBase after each scheme sync) and Warmup_AllMetadataCaches
+-- (InitializeAsync). bytea->BLOB, boolean->INTEGER.
+-- ============================================================================
+CREATE TABLE _scheme_metadata_cache (
+    _scheme_id           INTEGER NOT NULL,
+    _structure_id        INTEGER NOT NULL,
+    _parent_structure_id INTEGER,
+    _id_override         INTEGER,
+    _name                TEXT    NOT NULL,
+    _alias               TEXT,
+    _type_id             INTEGER NOT NULL,
+    _list_id             INTEGER,
+    type_name            TEXT    NOT NULL,
+    db_type              TEXT    NOT NULL,
+    type_semantic        TEXT    NOT NULL,
+    _scheme_type         INTEGER,
+    scheme_type_name     TEXT,
+    _order               INTEGER,
+    _collection_type     INTEGER,
+    collection_type_name TEXT,
+    _key_type            INTEGER,
+    key_type_name        TEXT,
+    _readonly            INTEGER,
+    _allow_not_null      INTEGER,
+    _is_compress         INTEGER,
+    _store_null          INTEGER,
+    _lazy                INTEGER,
+    _unique              INTEGER,
+    _unique_version      INTEGER,
+    _unique_scope        INTEGER,   -- S3: element-key scope of a collection key
+    _tags                TEXT,      -- V4: free-form marker mirrored from _structures
+    _default_value       BLOB,
+    _default_editor      TEXT
+);
+
+CREATE INDEX idx_metadata_cache_lookup      ON _scheme_metadata_cache (_scheme_id, _parent_structure_id, _order);
+CREATE INDEX idx_metadata_cache_structure   ON _scheme_metadata_cache (_structure_id);
+CREATE INDEX idx_metadata_cache_scheme      ON _scheme_metadata_cache (_scheme_id);
+CREATE INDEX idx_metadata_cache_name        ON _scheme_metadata_cache (_scheme_id, _name);
+CREATE INDEX idx_metadata_cache_collection  ON _scheme_metadata_cache (_scheme_id, _collection_type) WHERE _collection_type IS NOT NULL;
+CREATE INDEX idx_metadata_cache_scheme_type ON _scheme_metadata_cache (_scheme_id, _scheme_type);
+CREATE INDEX idx_metadata_cache_key_type    ON _scheme_metadata_cache (_scheme_id, _key_type) WHERE _key_type IS NOT NULL;
+
+-- ============================================================================
+-- Indexes. PG `WITH (deduplicate_items=True)` dropped. PG covering `INCLUDE(...)`
+-- columns are appended to the index key (SQLite has no INCLUDE; trailing key
+-- columns give the same covering-scan benefit). Partial `WHERE` and `DESC`
+-- columns are supported as-is. The pg_trgm GIN index is dropped (no SQLite
+-- equivalent; text pattern search to be revisited via FTS5).
+-- ============================================================================
+
+-- REMOVED (2026-10-14): "IX__functions__schemes" (_id_scheme) is the leading column of the UNIQUE constraint
+-- IX__functions_scheme_name (_id_scheme, _name); the constraint's index serves the same lookups.
+-- REMOVED (2026-10-14): "IX__permissions__roles" (_id_role) is the leading column of the UNIQUE constraint
+-- IX__permissions (_id_role, _id_user, ...).
+CREATE INDEX IF NOT EXISTS "IX__permissions__users"  ON _permissions (_id_user);
+CREATE INDEX IF NOT EXISTS "IX__permissions__ref"    ON _permissions (_id_ref);
+CREATE INDEX IF NOT EXISTS "IX__values__objects"     ON _values (_id_object);
+CREATE INDEX IF NOT EXISTS "IX__values__structures"  ON _values (_id_structure);
+-- FK-column indexes: _Object/_ListItem carry foreign keys, and without a leading index every
+-- DELETE of a referenced object or list item scans the whole table for the FK check. Partial:
+-- reference fields are a small fraction of rows, so the indexes stay nearly empty.
+CREATE INDEX IF NOT EXISTS "IX__values__ListItem_not_null" ON _values (_ListItem) WHERE _ListItem IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__Object_not_null"   ON _values (_Object)   WHERE _Object IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__array_parent_id"    ON _values (_array_parent_id);
+CREATE INDEX IF NOT EXISTS "IX__values__array_parent_index" ON _values (_array_parent_id, _array_index);
+CREATE INDEX IF NOT EXISTS "IX__values__array_key"          ON _values (_id_structure, _array_index) WHERE _array_index IS NOT NULL;
+-- V4: uniqueness of [RedbUnique] fields. Covers keyed rows at ANY position (root and S2 nested
+-- scalars; element keys join in S3). No INCLUDE in SQLite: the _id_object lookup goes through
+-- the rowid, which is cheap.
+CREATE UNIQUE INDEX IF NOT EXISTS "UIX__values__structure_unique"
+    ON _values (_id_structure, _unique)
+    WHERE _unique IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__list_items__id_list" ON _list_items (_id_list);
+CREATE INDEX IF NOT EXISTS "IX__list_items__objects" ON _list_items (_id_object);
+
+CREATE INDEX IF NOT EXISTS "IX__objects__objects"     ON _objects (_id_parent);
+CREATE INDEX IF NOT EXISTS "IX__objects__schemes"     ON _objects (_id_scheme);
+CREATE INDEX IF NOT EXISTS "IX__objects__users1"      ON _objects (_id_owner);
+CREATE INDEX IF NOT EXISTS "IX__objects__users2"      ON _objects (_id_who_change);
+CREATE INDEX IF NOT EXISTS "IX__objects__date_create" ON _objects (_date_create);
+CREATE INDEX IF NOT EXISTS "IX__objects__date_modify" ON _objects (_date_modify);
+CREATE INDEX IF NOT EXISTS "IX__objects__name"        ON _objects (_name);
+CREATE INDEX IF NOT EXISTS "IX__users__name"          ON _users (_name);
+CREATE INDEX IF NOT EXISTS "IX__objects__hash"        ON _objects (_hash);
+
+CREATE INDEX IF NOT EXISTS "IX__objects__value_long"     ON _objects (_value_long)     WHERE _value_long     IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__objects__value_string"   ON _objects (_value_string)   WHERE _value_string   IS NOT NULL;
+-- V4: application-defined object key, unique per scheme (length 440 enforced in C# - SQLite does
+-- not check VARCHAR lengths).
+CREATE UNIQUE INDEX IF NOT EXISTS "UIX__objects__scheme_unique"
+    ON _objects (_id_scheme, _value_unique)
+    WHERE _value_unique IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__objects__value_guid"     ON _objects (_value_guid)     WHERE _value_guid     IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__objects__value_datetime" ON _objects (_value_datetime) WHERE _value_datetime IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__objects__value_numeric"  ON _objects (_value_numeric)  WHERE _value_numeric  IS NOT NULL;
+
+-- REMOVED (2026-10-14): "IX__dependencies__schemes_1" (_id_scheme_1) is the leading column of the UNIQUE
+-- constraint IX__dependencies (_id_scheme_1, _id_scheme_2). The index on _id_scheme_2 below stays.
+CREATE INDEX IF NOT EXISTS "IX__dependencies__schemes_2" ON _dependencies (_id_scheme_2);
+CREATE INDEX IF NOT EXISTS "IX__structures__structures"  ON _structures (_id_parent);
+-- One root field name once per scheme: IX__structures counts two NULL parents as distinct. Existing files get it from
+-- RootStructureKey (redb.Core) in the upgrade pass at start-up.
+CREATE UNIQUE INDEX IF NOT EXISTS "UX__structures__root" ON _structures (_id_scheme, _name) WHERE _id_parent IS NULL;
+CREATE INDEX IF NOT EXISTS "IX__structures__schemes"     ON _structures (_id_scheme);
+CREATE INDEX IF NOT EXISTS "IX__structures__types"       ON _structures (_id_type);
+CREATE INDEX IF NOT EXISTS "IX__structures__lists"       ON _structures (_id_list);
+CREATE INDEX IF NOT EXISTS "IX__schemes__schemes"        ON _schemes (_id_parent);
+CREATE INDEX IF NOT EXISTS "IX__schemes__structure_hash" ON _schemes (_structure_hash);
+CREATE INDEX IF NOT EXISTS "IX__schemes__type"           ON _schemes (_type);
+-- REMOVED (2026-10-14): "IX__users_roles__roles" (_id_role) is the leading column of the UNIQUE constraint
+-- IX__users_roles (_id_role, _id_user).
+CREATE INDEX IF NOT EXISTS "IX__users_roles__users"      ON _users_roles (_id_user);
+
+CREATE INDEX IF NOT EXISTS "IX__users__id_configuration" ON _users (_id_configuration) WHERE _id_configuration IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__roles__id_configuration" ON _roles (_id_configuration) WHERE _id_configuration IS NOT NULL;
+
+-- REMOVED (2026-10-17): "ix__values__array_null_structure" (_id_structure, _id_object, _Long) WHERE _array_index IS NULL.
+-- Its predicate matches the term every stream states, so SQLite drove pages from it, from a boolean field
+-- of 390 thousand rows instead of a value range of 410 (1.4 s against 26-38 ms). Reading a value by object
+-- is covered by IX__values__structure_object_lookup. Removed by schema step 11 of RedbService.
+
+-- Nested fields by structure_id (INCLUDE cols folded into key)
+CREATE INDEX IF NOT EXISTS "IX__values__structure_parent_batch"
+    ON _values (_id_structure, _array_parent_id, _Long, _Double, _Boolean, _Guid)
+    WHERE _array_parent_id IS NOT NULL;
+
+-- Structure lookups (INCLUDE folded into key)
+CREATE INDEX IF NOT EXISTS "IX__structures__name"
+    ON _structures (_name, _id, _id_type, _collection_type, _id_scheme);
+CREATE INDEX IF NOT EXISTS "IX__structures__id_lookup"
+    ON _structures (_id, _id_type, _name, _collection_type, _id_scheme);
+-- REMOVED (2026-10-14): "IX__structures__not_collection" (_id, _name, _id_scheme) WHERE _collection_type IS NULL
+-- is a prefix of IX__structures__not_collection_enhanced below, same predicate.
+CREATE INDEX IF NOT EXISTS "IX__structures__not_collection_enhanced"
+    ON _structures (_id, _name, _id_scheme, _id_type) WHERE _collection_type IS NULL;
+CREATE INDEX IF NOT EXISTS "IX__structures__collection"
+    ON _structures (_id, _id_scheme, _collection_type) WHERE _collection_type IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__structures__key_type"
+    ON _structures (_id, _id_scheme, _key_type) WHERE _key_type IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__structures__collection_type"
+    ON _structures (_collection_type) WHERE _collection_type IS NOT NULL;
+
+-- Covering value lookups (INCLUDE folded into key)
+CREATE INDEX IF NOT EXISTS "IX__values__object_structure_lookup"
+    ON _values (_id_object, _id_structure, _array_index, _Long, _Double, _DateTimeOffset, _Boolean, _Guid, _Numeric, _ListItem, _Object);
+CREATE INDEX IF NOT EXISTS "IX__values__object_array_null"
+    ON _values (_id_object, _id_structure, _Long, _Double, _DateTimeOffset, _Boolean, _Guid, _Numeric, _ListItem, _Object)
+    WHERE _array_index IS NULL;
+
+-- Faceted search core
+CREATE INDEX IF NOT EXISTS "IX__values__structure_object_lookup"
+    ON _values (_id_structure, _id_object, _Long, _DateTimeOffset, _Boolean, _Double, _Guid, _Numeric, _ListItem, _Object);
+CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent"
+    ON _objects (_id_scheme, _id_parent, _id);
+-- REMOVED (2026-10-14): "IX__values__object_structure_array_index" (_id_object, _id_structure, _array_index)
+-- WHERE _array_index IS NOT NULL is a prefix of IX__values__object_structure_lookup above, which has no predicate.
+
+-- Value-leading indexes (2026-10-17), the set PostgreSQL and SQL Server have: a filter on a field reads
+-- one range of its index, and the objects come out of it. SQLite has no INCLUDE, so _array_index is the
+-- last key column: a query that states _array_index IS NULL checks it inside the index.
+-- The predicate names the value only. SQLite does not prove implications between a query and a partial
+-- index predicate, it looks for a matching term: "_array_index IS NULL" there kept a prefilter that does
+-- not state it off the index, and PostgreSQL lost a prefilter the same way (7 ms -> 1.2 s). It derives
+-- "IS NOT NULL" from a comparison but never from LIKE, so the prefilter spells it out for LIKE branches.
+-- Unlike PostgreSQL there is NO length guard on the string: an SQLite index entry has no size limit, and
+-- "length(_String) < 2000" is a term no query states (a LIKE prefilter 294 ms without it, 1230 ms with it).
+-- They replace IX__values__{String,Long,DateTimeOffset,Numeric}_not_null, (_id_structure, _id_object,
+-- <value>), which only served reading the value of a known object. Schema step 11 of RedbService builds
+-- these and drops those on an existing file. To bring the old ones back:
+--   CREATE INDEX "IX__values__String_not_null" ON _values (_id_structure, _id_object, _String) WHERE _String IS NOT NULL;
+--   CREATE INDEX "IX__values__Long_not_null" ON _values (_id_structure, _id_object, _Long) WHERE _Long IS NOT NULL;
+--   CREATE INDEX "IX__values__DateTimeOffset_not_null" ON _values (_id_structure, _id_object, _DateTimeOffset) WHERE _DateTimeOffset IS NOT NULL;
+--   CREATE INDEX "IX__values__Numeric_not_null" ON _values (_id_structure, _id_object, _Numeric) WHERE _Numeric IS NOT NULL;
+--   CREATE INDEX "ix__values__array_null_structure" ON _values (_id_structure, _id_object, _Long) WHERE _array_index IS NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_string_object"
+    ON _values (_id_structure, _String, _id_object, _array_index) WHERE _String IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_long_object"
+    ON _values (_id_structure, _Long, _id_object, _array_index) WHERE _Long IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_numeric_object"
+    ON _values (_id_structure, _Numeric, _id_object, _array_index) WHERE _Numeric IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_double_object"
+    ON _values (_id_structure, _Double, _id_object, _array_index) WHERE _Double IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_datetimeoffset_object"
+    ON _values (_id_structure, _DateTimeOffset, _id_object, _array_index) WHERE _DateTimeOffset IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_boolean_object"
+    ON _values (_id_structure, _Boolean, _id_object, _array_index) WHERE _Boolean IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_guid_object"
+    ON _values (_id_structure, _Guid, _id_object, _array_index) WHERE _Guid IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_listitem_object"
+    ON _values (_id_structure, _ListItem, _id_object, _array_index) WHERE _ListItem IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__values__structure_object_object"
+    ON _values (_id_structure, _Object, _id_object, _array_index) WHERE _Object IS NOT NULL;
+-- Which objects hold a text value of a field, without the text: the text column is in no other index by object.
+-- A filter Field == null over a text field checks it with NOT EXISTS (SQLite Pro names it, INDEXED BY: the planner
+-- prefers IX__values__structure_object_lookup and reads the text from the table). Schema step 12 of RedbService.
+CREATE INDEX IF NOT EXISTS "IX__values__structure_object_string"
+    ON _values (_id_structure, _id_object) WHERE _String IS NOT NULL;
+
+-- Hierarchy / tree
+CREATE INDEX IF NOT EXISTS "IX__objects__parent_scheme_id"
+    ON _objects (_id_parent, _id_scheme, _id) WHERE _id_parent IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__objects__root_objects"
+    ON _objects (_id_scheme, _id) WHERE _id_parent IS NULL;
+CREATE INDEX IF NOT EXISTS "IX__objects__scheme_date_create"
+    ON _objects (_id_scheme, _date_create DESC, _id);
+CREATE INDEX IF NOT EXISTS "IX__objects__scheme_date_modify"
+    ON _objects (_id_scheme, _date_modify DESC, _id);
+CREATE INDEX IF NOT EXISTS "IX__objects__scheme_name"
+    ON _objects (_id_scheme, _name, _id);
+
+-- Ancestor/descendant (INCLUDE folded into key)
+-- _date_modify is deliberately NOT in these three covering _objects indexes (as in PostgreSQL, 2026-10-12). It
+-- changes on every save, so an index that carries it is rewritten for every saved object. Queries that go through
+-- them read the object row anyway. An existing file keeps the old definitions:
+-- sql/maintenance/rebuild_objects_indexes_without_date_modify.sql.
+CREATE INDEX IF NOT EXISTS "IX__objects__parent_id_descendant_lookup"
+    ON _objects (_id_parent, _id_scheme, _id, _id_owner, _date_create) WHERE _id_parent IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent_date_create"
+    ON _objects (_id_scheme, _id_parent, _date_create DESC, _id, _id_owner);
+CREATE INDEX IF NOT EXISTS "IX__objects__id_parent_scheme"
+    ON _objects (_id, _id_parent, _id_scheme) WHERE _id_parent IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX__objects__scheme_parent_owner"
+    ON _objects (_id_scheme, _id_parent, _id, _id_owner, _date_create, _name) WHERE _id_parent IS NOT NULL;
+
+-- Tree walk that needs the object hash (transparent cache). Analogue of
+-- IX__objects__id_parent in redbMSSQL.sql, whose INCLUDE (_id, _hash, _id_scheme) is
+-- folded into the key here — SQLite has no INCLUDE. IX__objects__parent_scheme_id above
+-- stops at (_id_parent, _id_scheme, _id) and does NOT carry _hash, so a walk that reads
+-- the hash falls back to the table on every row. Filtered on _id_parent IS NOT NULL: a lookup
+-- by parent never matches NULL, so root objects would sit in the index as dead weight.
+-- Verified on SQLite 3.46.1: SELECT _id, _hash, _id_scheme WHERE _id_parent = ? plans as
+-- SEARCH ... USING COVERING INDEX. (_id is the rowid alias and is therefore already in
+-- every index; it is listed to keep the column set identical to the MSSQL analogue.)
+CREATE INDEX IF NOT EXISTS "IX__objects__id_parent"
+    ON _objects (_id_parent, _id, _hash, _id_scheme) WHERE _id_parent IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "IX__values__parent_structure"
+    ON _values (_array_parent_id, _id_structure) WHERE _array_parent_id IS NOT NULL;
+
+-- ============================================================================
+-- SEED DATA (ported from redbPostgre.sql, lines 710-801, 1346-1364).
+-- Required by the C# layer: _types are referenced by _schemes._type /
+-- _structures._id_type; system _users (-1/0/1) are referenced by _objects'
+-- owner/who_change FKs; the soft-delete scheme (-10); and default permissions.
+-- Booleans -> 0/1, timestamptz -> ISO-8601 TEXT. (PG validation triggers on
+-- _structures/_schemes are intentionally NOT ported — they are PL/pgSQL.)
+-- ============================================================================
+
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775709, 'Boolean', 'Boolean', 'boolean');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775708, 'DateTime', 'DateTimeOffset', 'DateTime');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775707, 'Double', 'Double', 'double');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775706, 'ListItem', 'ListItem', '_RListItem');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775705, 'Guid', 'Guid', 'Guid');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775673, 'DateTimeOffset', 'DateTimeOffset', 'DateTimeOffset');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775674, 'Numeric', 'Numeric', 'decimal');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775704, 'Long', 'Long', 'long');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775703, 'Object', 'Object', '_RObject');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775701, 'ByteArray', 'ByteArray', 'byte[]');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775700, 'String', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775699, 'Int', 'Long', 'int');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775698, 'Short', 'Long', 'short');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775697, 'Byte', 'Long', 'byte');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775696, 'Float', 'Double', 'float');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775695, 'Decimal', 'Numeric', 'decimal');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775694, 'Char', 'String', 'char');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775693, 'Url', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775692, 'Email', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775691, 'Phone', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775690, 'Json', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775689, 'Xml', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775688, 'Base64', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775687, 'Color', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775686, 'DateOnly', 'DateTimeOffset', 'DateOnly');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775685, 'TimeOnly', 'String', 'TimeOnly');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775684, 'TimeSpan', 'String', 'TimeSpan');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775683, 'Enum', 'String', 'Enum');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775682, 'EnumInt', 'Long', 'Enum');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775681, 'Latitude', 'Double', 'double');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775680, 'Longitude', 'Double', 'double');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775679, 'GeoPoint', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775678, 'FilePath', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775677, 'FileName', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775676, 'MimeType', 'String', 'string');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775675, 'Class', 'Guid', 'Object');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775668, 'Array', 'Guid', 'Array');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775667, 'Dictionary', 'Guid', 'Dictionary');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775666, 'JsonDocument', 'Guid', 'JsonDocument');
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775665, 'XDocument', 'Guid', 'XDocument');
+
+INSERT INTO _users (_id, _login, _password, _name, _phone, _email, _date_register, _date_dismiss, _enabled) VALUES (-1, 'default', '', 'default', NULL, NULL, julianday('2023-12-26T01:14:34.410'), NULL, 1);
+INSERT INTO _users (_id, _login, _password, _name, _phone, _email, _date_register, _date_dismiss, _enabled) VALUES (0, 'sys', '', 'sys', NULL, NULL, julianday('2023-12-26T01:14:34.410'), NULL, 1);
+INSERT INTO _users (_id, _login, _password, _name, _phone, _email, _date_register, _date_dismiss, _enabled) VALUES (1, 'admin', '', 'admin', NULL, NULL, julianday('2023-12-26T01:14:34.410'), NULL, 1);
+
+-- Soft-delete reserved scheme (objects marked for deletion get _id_scheme = -10)
+INSERT INTO _schemes (_id, _name, _alias, _type)
+VALUES (-10, '@@__deleted', 'Deleted Objects', -9223372036854775703)
+ON CONFLICT (_id) DO NOTHING;
+
+-- Default permissions for sys (0) and admin (1): all rights on all objects (_id_ref=0).
+-- System rows use explicit ids in the reserved 1..1000 range, so they never collide
+-- with runtime ids handed out from sqlite_sequence (which start at 1001).
+INSERT INTO _permissions (_id, _id_user, _id_ref, _select, _insert, _update, _delete)
+VALUES (1, 0, 0, 1, 1, 1, 1);
+INSERT INTO _permissions (_id, _id_user, _id_ref, _select, _insert, _update, _delete)
+VALUES (2, 1, 0, 1, 1, 1, 1);
+
+-- ============================================================================
+-- v_user_permissions — effective permissions per (object, user), with tree
+-- inheritance + global (_id_ref=0) fallback. Port of the PG view (redbPostgre.sql).
+-- PG `DISTINCT ON (object_id) ... ORDER BY object_id, level` -> SQLite
+-- ROW_NUMBER() OVER (PARTITION BY object_id ORDER BY level) = 1. Booleans are 0/1.
+-- Columns match UserPermissionResult (permission_source_id, _id_user, ...).
+-- NOTE: per-object permission checks scan the full view (O(N)); the optimized
+-- per-object get_user_permissions_for_object() stays a Free C-function task (Python surface).
+-- System user (id=0) is short-circuited to full rights in C# before any query here.
+-- ============================================================================
+CREATE VIEW IF NOT EXISTS v_user_permissions AS
+WITH RECURSIVE permission_search AS (
+    -- Step 1: each object searches for its own permission
+    SELECT
+        o._id AS object_id,
+        o._id AS current_search_id,
+        o._id_parent,
+        0 AS level,
+        EXISTS(SELECT 1 FROM _permissions WHERE _id_ref = o._id) AS has_permission
+    FROM _objects o
+    UNION ALL
+    -- Step 2: if NO permission - walk up to the parent
+    SELECT
+        ps.object_id,
+        o._id AS current_search_id,
+        o._id_parent,
+        ps.level + 1,
+        EXISTS(SELECT 1 FROM _permissions WHERE _id_ref = o._id) AS has_permission
+    FROM _objects o
+    JOIN permission_search ps ON o._id = ps._id_parent
+    WHERE ps.level < 50
+      AND ps.has_permission = 0
+),
+-- closest permission per (object, grantee). NOTE: deviation from the literal PG view,
+-- which partitions by object_id ONLY (DISTINCT ON object_id) and is therefore lossy when
+-- one node carries permissions for several users/roles (e.g. the global _id_ref=0 row for
+-- both sys and admin) — it would keep just one, shadowing the others. We partition by
+-- (object_id, _id_user, _id_role) so every grantee keeps its own closest-level permission.
+object_permissions AS (
+    SELECT object_id, permission_id, _id_user, _id_role, _select, _insert, _update, _delete, level
+    FROM (
+        SELECT
+            ps.object_id,
+            p._id AS permission_id,
+            p._id_user, p._id_role, p._select, p._insert, p._update, p._delete, ps.level,
+            ROW_NUMBER() OVER (PARTITION BY ps.object_id, p._id_user, p._id_role ORDER BY ps.level) AS rn
+        FROM permission_search ps
+        JOIN _permissions p ON p._id_ref = ps.current_search_id
+        WHERE ps.has_permission = 1
+    ) WHERE rn = 1
+),
+-- global rights as virtual records with object_id = 0
+global_permissions AS (
+    SELECT
+        0 AS object_id, p._id AS permission_id, p._id_user, p._id_role,
+        p._select, p._insert, p._update, p._delete, 999 AS level
+    FROM _permissions p WHERE p._id_ref = 0
+),
+all_permissions AS (
+    SELECT * FROM object_permissions
+    UNION ALL
+    SELECT * FROM global_permissions
+),
+-- specific (object) beats global (object_id=0) per grantee: lower level wins.
+final_permissions AS (
+    SELECT object_id, permission_id, _id_user, _id_role, _select, _insert, _update, _delete, level
+    FROM (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY object_id, _id_user, _id_role ORDER BY level) AS rn
+        FROM all_permissions
+    ) WHERE rn = 1
+)
+SELECT
+    fp.object_id,
+    CASE WHEN fp._id_user IS NOT NULL THEN fp._id_user ELSE ur._id_user END AS user_id,
+    fp.permission_id AS permission_source_id,
+    CASE WHEN fp._id_user IS NOT NULL THEN 'user' ELSE 'role' END AS permission_type,
+    fp._id_role,
+    fp._id_user,
+    fp._select AS can_select,
+    fp._insert AS can_insert,
+    fp._update AS can_update,
+    fp._delete AS can_delete
+FROM final_permissions fp
+LEFT JOIN _users_roles ur ON ur._id_role = fp._id_role
+WHERE fp._id_user IS NOT NULL OR ur._id_user IS NOT NULL;

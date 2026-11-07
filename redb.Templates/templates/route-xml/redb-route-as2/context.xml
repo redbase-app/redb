@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its beans.
+
+     AS2 (RFC 4130) needs our key pair, the partner's certificate and the agreement with the partner. Paths and AS2
+     identifiers come from the context configuration; the password of our key has no default, so the module does not
+     start until the deployment supplies it. deploy/docker-compose.openas2.yml makes test keys and runs a local
+     exchange with OpenAS2. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- Our key pair (PKCS#12): it signs what we send and every MDN, and decrypts what the partner encrypts for us. -->
+  <bean name="as2-key" type="System.Security.Cryptography.X509Certificates.X509Certificate2, System.Security.Cryptography">
+    <constructorArg type="System.String" value="{{as2.keyFile}}"/>
+    <constructorArg type="System.String" value="{{as2.keyPassword}}"/>
+  </bean>
+
+  <!-- The partner's certificate: we encrypt for it and verify its signatures with it. It is pinned: a signature is
+       accepted only when made by this certificate. -->
+  <bean name="partner-cert" type="System.Security.Cryptography.X509Certificates.X509Certificate2, System.Security.Cryptography">
+    <constructorArg type="System.String" value="{{as2.partnerCertificateFile}}"/>
+  </bean>
+
+  <!-- The agreement with the partner: what every as2: endpoint of the module names with connectionFactory=partner.
+       As2From is us (AS2-From on send, the AS2-To we accept on receive), As2To the partner. We sign, encrypt and ask
+       for a signed MDN; a transfer the MDN does not confirm fails the exchange (RequireValidMdn). The same rules hold
+       for what we receive: an unsigned or unencrypted message is refused. -->
+  <bean name="partner" type="redb.Route.As2.As2ConnectionFactory, redb.Route.As2">
+    <property key="OurCertificate" ref="as2-key"/>
+    <property key="PartnerCertificate" ref="partner-cert"/>
+    <property key="As2From" value="{{as2.ourId:modulectx}}"/>
+    <property key="As2To" value="{{as2.partnerId:openas2}}"/>
+    <property key="PartnerUrl" value="{{as2.partnerUrl:http://openas2:10080}}"/>
+    <property key="Sign" value="true"/>
+    <property key="Encrypt" value="true"/>
+    <property key="SignAlg" value="sha-256"/>
+    <property key="EncryptAlg" value="aes-128-cbc"/>
+    <property key="MdnMode" value="Sync"/>
+    <property key="SignedMdn" value="true"/>
+    <property key="RequireValidMdn" value="true"/>
+  </bean>
+
+  <!-- A partner that did not see our MDN sends the document again with the same Message-ID: the resend gets the MDN
+       again and is not delivered twice. In memory the ids are forgotten when the worker restarts; a durable
+       repository keeps them. -->
+  <bean name="as2-received" type="redb.Route.Processors.InMemoryIdempotentRepository, redb.Route"/>
+
+
+  <!-- Routes written in C#: routes/InvoiceSendRoute.cs sends XML invoices under the same agreement. -->
+  <routeBuilder type="RouteModule.Routes.InvoiceSendRoute, RouteModule"/>
+
+</context>

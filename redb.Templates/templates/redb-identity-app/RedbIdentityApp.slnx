@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="RedbIdentityApp.Contracts/RedbIdentityApp.Contracts.csproj" />
+  <Project Path="RedbIdentityApp.Module/RedbIdentityApp.Module.csproj" />
+<!--#if (web) -->
+  <Project Path="RedbIdentityApp.Web/RedbIdentityApp.Web.csproj" />
+<!--#endif -->
+</Solution>

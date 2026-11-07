@@ -1,0 +1,1678 @@
+using System.Collections.Generic;
+
+namespace redb.Core.Query;
+
+/// <summary>
+/// SQL syntax abstraction for different DBMS support.
+/// 
+/// IMPORTANT: Implementations in different projects MAY DIFFER!
+/// - PostgreSqlDialect: CASE WHEN (tested - 15 ms on 15K objects)
+/// - MsSqlDialect: will be later, possibly different implementation
+/// 
+/// Current focus: PostgreSQL + performance.
+/// </summary>
+public interface ISqlDialect
+{
+    /// <summary>
+    /// Provider name (PostgreSQL, SqlServer, MySql)
+    /// </summary>
+    string ProviderName { get; }
+    
+    /// <summary>
+    /// Pagination format: LIMIT/OFFSET for PostgreSQL, TOP/OFFSET for MSSQL
+    /// </summary>
+    string FormatPagination(int? limit, int? offset);
+    
+    /// <summary>
+    /// Subquery wrapper: (subquery) AS alias
+    /// </summary>
+    string WrapSubquery(string subquery, string alias);
+    
+    /// <summary>
+    /// PVT column for CASE WHEN approach.
+    /// PostgreSQL: MAX(CASE WHEN _id_structure = X THEN _Long END) AS "Age"
+    /// </summary>
+    string FormatPvtColumn(long structureId, string dbColumn, string alias);
+    
+    /// <summary>
+    /// Array containment check: = ANY($1) for PostgreSQL, IN for MSSQL
+    /// </summary>
+    string FormatArrayContains(string column, string paramName);
+    
+    /// <summary>
+    /// Mapping of redb types to SQL types
+    /// </summary>
+    string GetDbTypeName(string redbType);
+    
+    /// <summary>
+    /// Parameter format: $1 for PostgreSQL, @p1 for MSSQL
+    /// </summary>
+    string FormatParameter(int index);
+    
+    /// <summary>
+    /// Identifier escaping: "name" for PostgreSQL, [name] for MSSQL
+    /// </summary>
+    string QuoteIdentifier(string name);
+    
+    /// <summary>
+    /// Case-insensitive LIKE: ILIKE for PostgreSQL, LIKE for MSSQL (CI collation)
+    /// </summary>
+    string FormatCaseInsensitiveLike(string column, string parameter);
+
+    /// <summary>
+    /// Wraps a text expression so the database folds its case for ALL scripts, not just ASCII.
+    ///
+    /// <para>
+    /// Every case-insensitive operation goes through here, so the three of them
+    /// (<c>ILIKE</c>/<c>LIKE</c>, <c>LOWER</c>, <c>UPPER</c>) can never drift apart: fixing one and
+    /// forgetting another is exactly how a search finds a row that an equality check then rejects.
+    /// </para>
+    ///
+    /// <para>
+    /// The mechanism differs per provider and that is deliberate, because the providers differ in
+    /// kind and not merely in syntax. PostgreSQL attaches a <c>COLLATE</c> clause to the operand.
+    /// MSSQL needs nothing: its default collation already folds every script. SQLite has no
+    /// collation that could help (its only case-insensitive one, <c>NOCASE</c>, is ASCII-only, and
+    /// <c>LIKE</c> is a function that ignores collations entirely), so its provider fixes the
+    /// problem one level down by overriding the built-in functions on the connection and returns
+    /// the expression untouched here.
+    /// </para>
+    ///
+    /// Returns <paramref name="expression"/> unchanged when the feature is off, so generated SQL is
+    /// byte-for-byte what it was.
+    /// </summary>
+    /// <param name="expression">A SQL text expression, already quoted or parenthesised as needed.</param>
+    string FoldCase(string expression);
+    
+    /// <summary>
+    /// Format DateTime as SQL literal. PostgreSQL: '...'::timestamptz, MSSQL: '...' (parsed natively)
+    /// </summary>
+    string FormatDateTimeLiteral(DateTime dt);
+    
+    /// <summary>
+    /// Format DateTimeOffset as SQL literal. PostgreSQL: '...'::timestamptz, MSSQL: '...' (parsed natively)
+    /// </summary>
+    string FormatDateTimeOffsetLiteral(DateTimeOffset dto);
+    
+    // ============================================================
+    // === ROLES SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// SELECT role by ID. Returns: Id, Name, IdConfiguration
+    /// </summary>
+    string Roles_SelectById();
+    
+    /// <summary>
+    /// SELECT role by name. Returns: Id, Name, IdConfiguration
+    /// </summary>
+    string Roles_SelectByName();
+    
+    /// <summary>
+    /// SELECT all roles ordered by name. Returns: Id, Name, IdConfiguration
+    /// </summary>
+    string Roles_SelectAll();
+    
+    /// <summary>
+    /// INSERT new role. Params: $1=id, $2=name
+    /// </summary>
+    string Roles_Insert();
+    
+    /// <summary>
+    /// UPDATE role name. Params: $1=newName, $2=roleId
+    /// </summary>
+    string Roles_UpdateName();
+    
+    /// <summary>
+    /// DELETE role by ID. Params: $1=roleId
+    /// </summary>
+    string Roles_Delete();
+    
+    /// <summary>
+    /// Check if role name exists (excluding role). Params: $1=name, $2=excludeId (optional)
+    /// </summary>
+    string Roles_ExistsByName();
+    
+    /// <summary>
+    /// Check if role name exists excluding specific role. Params: $1=name, $2=excludeId
+    /// </summary>
+    string Roles_ExistsByNameExcluding();
+    
+    /// <summary>
+    /// SELECT COUNT of all roles
+    /// </summary>
+    string Roles_Count();
+    
+    /// <summary>
+    /// UPDATE role configuration. Params: $1=configId, $2=roleId
+    /// </summary>
+    string Roles_UpdateConfiguration();
+    
+    /// <summary>
+    /// SELECT role configuration ID. Params: $1=roleId
+    /// </summary>
+    string Roles_SelectConfigurationId();
+    
+    // ============================================================
+    // === USERS_ROLES SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// INSERT user-role assignment. Params: $1=id, $2=userId, $3=roleId
+    /// </summary>
+    string UsersRoles_Insert();
+    
+    /// <summary>
+    /// DELETE user-role assignment. Params: $1=userId, $2=roleId
+    /// </summary>
+    string UsersRoles_Delete();
+    
+    /// <summary>
+    /// DELETE all user-role assignments for user. Params: $1=userId
+    /// </summary>
+    string UsersRoles_DeleteByUser();
+    
+    /// <summary>
+    /// DELETE all user-role assignments for role. Params: $1=roleId
+    /// </summary>
+    string UsersRoles_DeleteByRole();
+    
+    /// <summary>
+    /// Check if user-role assignment exists. Params: $1=userId, $2=roleId
+    /// </summary>
+    string UsersRoles_Exists();
+    
+    /// <summary>
+    /// SELECT roles for user. Params: $1=userId. Returns: Id, Name, IdConfiguration
+    /// </summary>
+    string UsersRoles_SelectRolesByUser();
+    
+    /// <summary>
+    /// SELECT users for role. Params: $1=roleId. Returns user fields
+    /// </summary>
+    string UsersRoles_SelectUsersByRole();
+    
+    /// <summary>
+    /// SELECT COUNT of users for role. Params: $1=roleId
+    /// </summary>
+    string UsersRoles_CountByRole();
+    
+    // ============================================================
+    // === USERS SQL (for role operations) ===
+    // ============================================================
+    
+    /// <summary>
+    /// Check if user exists by ID. Params: $1=userId
+    /// </summary>
+    string Users_ExistsById();
+    
+    /// <summary>
+    /// SELECT user by login. Params: $1=login. Returns: Id
+    /// </summary>
+    string Users_SelectIdByLogin();
+    
+    // ============================================================
+    // === PERMISSIONS SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// SELECT all permission columns FROM _permissions (no WHERE). Used for dynamic queries.
+    /// </summary>
+    string Permissions_SelectAllColumns();
+    
+    /// <summary>
+    /// SELECT COUNT(*) FROM _permissions (no WHERE). Used for dynamic count queries.
+    /// </summary>
+    string Permissions_CountFrom();
+    
+    /// <summary>
+    /// DELETE permissions by role. Params: $1=roleId
+    /// </summary>
+    string Permissions_DeleteByRole();
+    
+    /// <summary>
+    /// Get user permissions for object via SQL function or query.
+    /// CRITICAL: PostgreSQL uses get_user_permissions_for_object() function!
+    /// MSSQL: Must be expanded to CTE/JOIN query.
+    /// Params: $1=objectId, $2=userId
+    /// </summary>
+    string Permissions_GetEffectiveForObject();
+
+    /// <summary>
+    /// The rows of <see cref="Permissions_GetEffectiveForObject"/> for many objects in one statement, by the same rule
+    /// (the same function or view), with object_id the requested id. An object may have no row, as with the single
+    /// query. Params: $1=objectIds (array), $2=userId
+    /// </summary>
+    string Permissions_GetEffectiveForObjects();
+    
+    /// <summary>
+    /// SELECT readable object IDs for user. Params: $1=userId
+    /// </summary>
+    string Permissions_SelectReadableObjectIds();
+    
+    /// <summary>
+    /// INSERT new permission. Params: $1=id, $2=userId, $3=roleId, $4=refId, $5=select, $6=insert, $7=update, $8=delete
+    /// </summary>
+    string Permissions_Insert();
+    
+    /// <summary>
+    /// UPDATE permission flags. Params: $1=select, $2=insert, $3=update, $4=delete, $5=permissionId
+    /// </summary>
+    string Permissions_Update();
+    
+    /// <summary>
+    /// DELETE permission by ID. Params: $1=permissionId
+    /// </summary>
+    string Permissions_Delete();
+    
+    /// <summary>
+    /// SELECT permission by ID. Params: $1=permissionId
+    /// </summary>
+    string Permissions_SelectById();
+    
+    /// <summary>
+    /// SELECT permissions by user. Params: $1=userId
+    /// </summary>
+    string Permissions_SelectByUser();
+    
+    /// <summary>
+    /// SELECT permissions by role. Params: $1=roleId
+    /// </summary>
+    string Permissions_SelectByRole();
+    
+    /// <summary>
+    /// SELECT permissions by object. Params: $1=objectId
+    /// </summary>
+    string Permissions_SelectByObject();
+    
+    /// <summary>
+    /// SELECT permission by user/role/object. Params: $1=userId, $2=roleId, $3=objectId
+    /// </summary>
+    string Permissions_SelectByUserRoleObject();
+    
+    /// <summary>
+    /// DELETE permission by user/role/object. Params: $1=userId, $2=roleId, $3=objectId
+    /// </summary>
+    string Permissions_DeleteByUserRoleObject();
+    
+    /// <summary>
+    /// DELETE all permissions by user. Params: $1=userId
+    /// </summary>
+    string Permissions_DeleteByUser();
+    
+    /// <summary>
+    /// SELECT COUNT of all permissions
+    /// </summary>
+    string Permissions_Count();
+    
+    /// <summary>
+    /// SELECT COUNT of permissions by user. Params: $1=userId
+    /// </summary>
+    string Permissions_CountByUser();
+    
+    /// <summary>
+    /// SELECT COUNT of permissions by role. Params: $1=roleId
+    /// </summary>
+    string Permissions_CountByRole();
+    
+    /// <summary>
+    /// SELECT user's role IDs. Params: $1=userId
+    /// </summary>
+    string Permissions_SelectUserRoleIds();
+    
+    // ============================================================
+    // === USERS SQL (full) ===
+    // ============================================================
+    
+    /// <summary>
+    /// SELECT all user columns FROM _users (no WHERE). Used for dynamic search queries.
+    /// </summary>
+    string Users_SelectAllColumns();
+    
+    /// <summary>
+    /// SELECT COUNT(*) FROM _users (no WHERE). Used for dynamic count queries.
+    /// </summary>
+    string Users_CountFrom();
+    
+    /// <summary>
+    /// SELECT all user fields by ID. Params: $1=userId
+    /// </summary>
+    string Users_SelectById();
+    
+    /// <summary>
+    /// SELECT all user fields by IDs (batch). Params: $1=userIds (array/csv)
+    /// </summary>
+    string Users_SelectByIds();
+    
+    /// <summary>
+    /// SELECT all user fields by login. Params: $1=login
+    /// </summary>
+    string Users_SelectByLogin();
+
+    /// <summary>
+    /// SELECT all user fields by email (case-insensitive, first match, active only).
+    /// Params: $1=email. Used by <see cref="Providers.IUserProvider.GetUserByEmailAsync"/>.
+    /// </summary>
+    string Users_SelectByEmail();
+    
+    /// <summary>
+    /// INSERT new user with all fields.
+    /// Params: $1=id, $2=login, $3=password, $4=name, $5=phone, $6=email, $7=enabled,
+    ///         $8=dateRegister, $9=dateDismiss, $10=key, $11=codeInt, $12=codeString,
+    ///         $13=codeGuid, $14=note, $15=hash
+    /// </summary>
+    string Users_Insert();
+    
+    /// <summary>
+    /// UPDATE user fields.
+    /// Params: $1=login, $2=name, $3=phone, $4=email, $5=enabled, $6=dateDismiss,
+    ///         $7=key, $8=codeInt, $9=codeString, $10=codeGuid, $11=note, $12=hash, $13=userId
+    /// </summary>
+    string Users_Update();
+    
+    /// <summary>
+    /// UPDATE user for soft delete. Params: $1=newLogin, $2=newName, $3=enabled, $4=dateDismiss, $5=userId
+    /// </summary>
+    string Users_SoftDelete();
+    
+    /// <summary>
+    /// UPDATE user password. Params: $1=hashedPassword, $2=userId
+    /// </summary>
+    string Users_UpdatePassword();
+    
+    /// <summary>
+    /// UPDATE user enabled status. Params: $1=enabled, $2=dateDismiss, $3=userId
+    /// </summary>
+    string Users_UpdateStatus();
+    
+    /// <summary>
+    /// Check login exists. Params: $1=login
+    /// </summary>
+    string Users_ExistsByLogin();
+    
+    /// <summary>
+    /// Check login exists excluding user. Params: $1=login, $2=excludeUserId
+    /// </summary>
+    string Users_ExistsByLoginExcluding();
+    
+    /// <summary>
+    /// Check email exists. Params: $1=email
+    /// </summary>
+    string Users_ExistsByEmail();
+    
+    /// <summary>
+    /// SELECT COUNT of all users
+    /// </summary>
+    string Users_Count();
+    
+    /// <summary>
+    /// SELECT COUNT of enabled users
+    /// </summary>
+    string Users_CountEnabled();
+    
+    /// <summary>
+    /// SELECT user configuration ID. Params: $1=userId
+    /// </summary>
+    string Users_SelectConfigurationId();
+    
+    /// <summary>
+    /// UPDATE user configuration. Params: $1=configId, $2=userId
+    /// </summary>
+    string Users_UpdateConfiguration();
+    
+    /// <summary>
+    /// SELECT role by name. Params: $1=roleName
+    /// </summary>
+    string Roles_SelectIdByName();
+    
+    /// <summary>
+    /// Check role exists by ID. Params: $1=roleId
+    /// </summary>
+    string Roles_ExistsById();
+    
+    // ============================================================
+    // === SCHEMES SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// SELECT scheme by name. Params: $1=name
+    /// Returns: _id, _name, _alias, _name_space, _structure_hash, _type
+    /// </summary>
+    string Schemes_SelectByName();
+    
+    /// <summary>
+    /// SELECT scheme by ID. Params: $1=schemeId
+    /// Returns: _id, _name, _alias, _name_space, _structure_hash, _type
+    /// </summary>
+    string Schemes_SelectById();
+    
+    /// <summary>
+    /// SELECT all schemes.
+    /// Returns: _id, _name, _alias, _name_space, _structure_hash, _type
+    /// </summary>
+    string Schemes_SelectAll();
+    
+    /// <summary>
+    /// INSERT new scheme. Params: $1=id, $2=name, $3=alias, $4=type
+    /// </summary>
+    string Schemes_Insert();
+
+    /// <summary>
+    /// INSERT a new scheme, doing nothing when the name is already taken.
+    /// Params: $1=id, $2=name, $3=alias, $4=type, $5=nameSpace (nullable). Returns 0 affected rows on conflict.
+    /// <para>
+    /// Exists because several nodes starting simultaneously all miss the lookup and all try to create
+    /// the same scheme. The conflict must be suppressed by the statement itself rather than caught:
+    /// on PostgreSQL a failed INSERT inside a transaction poisons that transaction, so a catch-and-retry
+    /// cannot re-read the winner's row.
+    /// </para>
+    /// </summary>
+    string Schemes_InsertIfAbsent();
+
+    /// <summary>
+    /// UPDATE scheme alias by ID. Params: $1=alias (nullable), $2=schemeId
+    /// </summary>
+    string Schemes_UpdateAlias();
+
+    /// <summary>
+    /// UPDATE scheme namespace by ID (V4, К7 — the ownership mark that gates short-name adoption).
+    /// Params: $1=nameSpace (nullable), $2=schemeId
+    /// </summary>
+    string Schemes_UpdateNameSpace();
+
+    /// <summary>
+    /// UPDATE scheme structure hash. Params: $1=hash, $2=schemeId
+    /// </summary>
+    string Schemes_UpdateHash();
+    
+    /// <summary>
+    /// Update scheme name by ID.
+    /// Used for migration from short name to full name (with namespace).
+    /// Params: $1=newName, $2=schemeId
+    /// </summary>
+    string Schemes_UpdateName();
+    
+    /// <summary>
+    /// SELECT scheme hash by ID. Params: $1=schemeId
+    /// </summary>
+    string Schemes_SelectHashById();
+    
+    /// <summary>
+    /// Check scheme exists by name. Params: $1=name
+    /// </summary>
+    string Schemes_ExistsByName();
+    
+    /// <summary>
+    /// SELECT Object scheme by name and type. Params: $1=name, $2=type
+    /// </summary>
+    string Schemes_SelectObjectByName();
+    
+    /// <summary>
+    /// INSERT Object scheme. Params: $1=id, $2=name, $3=type
+    /// </summary>
+    string Schemes_InsertObject();
+
+    /// <summary>
+    /// INSERT an Object scheme, doing nothing when the name is already taken.
+    /// Params: $1=id, $2=name, $3=type. Returns 0 affected rows on conflict.
+    /// Same race as <see cref="Schemes_InsertIfAbsent"/>, on the untyped path.
+    /// </summary>
+    string Schemes_InsertObjectIfAbsent();
+
+    // ============================================================
+    // === STRUCTURES SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// SELECT full structures by scheme. Params: $1=schemeId
+    /// Returns all structure fields
+    /// </summary>
+    string Structures_SelectByScheme();
+    
+    /// <summary>
+    /// SELECT structures short fields by scheme. Params: $1=schemeId
+    /// Returns: _id, _id_parent, _id_scheme, _id_type, _name, _order
+    /// </summary>
+    string Structures_SelectBySchemeShort();
+    
+    /// <summary>
+    /// SELECT structures with cache fields by scheme. Params: $1=schemeId
+    /// Returns fields needed for caching
+    /// </summary>
+    string Structures_SelectBySchemeCacheable();
+    
+    /// <summary>
+    /// INSERT new structure. 
+    /// Params: $1=id, $2=schemeId, $3=parentId, $4=name, $5=alias, $6=typeId, $7=allowNotNull, $8=collectionType, $9=keyType, $10=order
+    /// </summary>
+    string Structures_Insert();
+    
+    /// <summary>
+    /// UPDATE structure type. Params: $1=typeId, $2=structureId
+    /// </summary>
+    string Structures_UpdateType();
+    
+    /// <summary>
+    /// UPDATE structure collection type. Params: $1=collectionType, $2=structureId
+    /// </summary>
+    string Structures_UpdateCollectionType();
+    
+    /// <summary>
+    /// UPDATE structure key type. Params: $1=keyType, $2=structureId
+    /// </summary>
+    string Structures_UpdateKeyType();
+    
+    /// <summary>
+    /// UPDATE structure alias. Params: $1=alias, $2=structureId
+    /// </summary>
+    string Structures_UpdateAlias();
+    
+    /// <summary>
+    /// UPDATE structure allow_not_null. Params: $1=allowNotNull, $2=structureId
+    /// </summary>
+    string Structures_UpdateAllowNotNull();
+
+    /// <summary>
+    /// UPDATE the lazy-reference marker (V4, LAZY Л2). Params: $1=lazy, $2=structureId
+    /// </summary>
+    string Structures_UpdateLazy();
+
+    /// <summary>
+    /// Set the session lazy-references flag the JSON builders read (V4, LAZY L2).
+    /// Params: $1 = 1|0
+    /// </summary>
+    string Session_SetLazyRefs();
+    
+    /// <summary>
+    /// DELETE structures by IDs. Params: dynamic IN clause
+    /// </summary>
+    string Structures_DeleteByIds(IEnumerable<long> ids);
+
+    // ============================================================
+    // === ROOT STRUCTURE KEY (Data.RootStructureKey) ===
+    // One root field name once per scheme: a partial unique index over the root rows on engines whose structure key
+    // counts two NULL parents as distinct (PostgreSQL 14+, SQLite). SQL Server counts NULLs as equal, so its structure
+    // key holds for root rows already: there Structures_RootKeyExists returns null and the other members of this
+    // group are not called (they throw NotSupportedException).
+    // ============================================================
+
+    /// <summary>
+    /// SELECT returning a row when the unique key of root structures exists. No params. <c>null</c>: the engine needs
+    /// no such key (SQL Server), and none of the members below applies.
+    /// </summary>
+    string? Structures_RootKeyExists();
+
+    /// <summary>CREATE the unique key of root structures. No params.</summary>
+    string Structures_CreateRootKey();
+
+    /// <summary>
+    /// SELECT the root structures whose (_id_scheme, _name) occurs more than once, as structure rows
+    /// (_id, _id_parent, _id_scheme, _name), ordered by scheme, name and id. No params.
+    /// </summary>
+    string Structures_SelectRootDuplicates();
+
+    /// <summary>
+    /// Locks a structure and every structure below it against writers until the transaction ends, so that a value
+    /// inserted into it meanwhile waits and then fails on the foreign key instead of being cascaded away by a delete.
+    /// Params: $1 = structure id. <c>null</c>: the engine has one writer at a time and the schema lock is that writer
+    /// (SQLite).
+    /// </summary>
+    string? Structures_LockSubtree();
+
+    /// <summary>
+    /// SELECT 1 when anything points to a structure or a structure below it (a value, an overriding structure and, with
+    /// <paramref name="withMigrations"/>, a record of <c>_migrations</c>), else 0. Params: $1 = structure id.
+    /// </summary>
+    string Structures_SubtreeIsReferenced(bool withMigrations);
+
+    /// <summary>DELETE the metadata cache rows of a structure and every structure below it. Params: $1 = structure id.</summary>
+    string Structures_DeleteSubtreeMetadataCache();
+
+    /// <summary>DELETE a structure; its children go by the cascade of _id_parent. Params: $1 = structure id.</summary>
+    string Structures_DeleteById();
+
+    /// <summary>SELECT the number of metadata cache rows of a scheme as BIGINT. Params: $1 = scheme id.</summary>
+    string Schemes_CountMetadataCache();
+
+    /// <summary>
+    /// UPDATE the unique-key flag, encoder version and element-key scope of a structure.
+    /// Params: $1=unique (bool), $2=unique_version (long, nullable),
+    /// $3=unique_scope (long, nullable; S3), $4=id
+    /// </summary>
+    string Structures_UpdateUnique();
+
+    /// <summary>UPDATE the free-form _tags marker of a structure. Params: $1=tags, $2=id</summary>
+    string Structures_UpdateTags();
+
+    /// <summary>UPDATE the free-form _tags marker of a scheme. Params: $1=tags, $2=id</summary>
+    string Schemes_UpdateTags();
+
+    /// <summary>
+    /// SELECT one structure by id (same columns as Structures_SelectByScheme). Params: $1=id
+    /// </summary>
+    string Structures_SelectById();
+
+    // ============================================================
+    // === UNIQUE KEYS (_values._unique) SQL ===
+    // ============================================================
+
+    /// <summary>
+    /// SELECT the root scalar rows of a structure — no array parent, no array index — with their
+    /// typed columns, for recomputing keys. Params: $1=structureId.
+    /// Returns RedbValue columns: Id, IdStructure, IdObject, String, Long, Guid, Double,
+    /// DateTimeOffset, Boolean, ByteArray, Numeric, Unique.
+    /// </summary>
+    string Values_SelectRootScalarsByStructure();
+
+    /// <summary>
+    /// SELECT the ELEMENT rows of a collection structure — array index present — with their
+    /// typed columns, reference targets and the owning collection id, for recomputing
+    /// element-scoped keys (S3). Params: $1=structureId.
+    /// Returns RedbValue columns: Id, IdStructure, IdObject, String, Long, Guid, Double,
+    /// DateTimeOffset, Boolean, ByteArray, Numeric, ListItem, Object, ArrayParentId, Unique.
+    /// </summary>
+    string Values_SelectElementRowsByStructure();
+
+    /// <summary>UPDATE one row's key. Params: $1=unique (Guid, nullable), $2=id</summary>
+    string Values_UpdateUnique();
+
+    /// <summary>UPDATE every row of a structure to _unique = NULL. Params: $1=structureId</summary>
+    string Values_ClearUniqueByStructure();
+
+    /// <summary>
+    /// SELECT _id_object of the root scalar row holding a key. Params: $1=structureId, $2=unique (Guid).
+    /// At most one row can match: the unique index guarantees it.
+    /// </summary>
+    string Values_SelectObjectIdByUnique();
+
+    /// <summary>
+    /// SELECT 1 if the structure has a root scalar row with a value in <paramref name="typedColumn"/>
+    /// but no key — the trace of a SQL-side writer. Params: $1=structureId. Column name is one of the
+    /// _values typed columns and is interpolated, never user input.
+    /// </summary>
+    string Values_ExistsUnhashedByStructure(string typedColumn);
+
+    /// <summary>
+    /// SELECT every row of a structure (base and array-element rows alike) with RedbValue aliases.
+    /// Params: $1=structureId. Used by the byte[]-storage conversion (V4, work Б1).
+    /// </summary>
+    string Values_SelectByStructure();
+
+    /// <summary>
+    /// UPDATE one row into the scalar byte[] shape: _ByteArray = payload, _Guid and _Long cleared.
+    /// Params: $1=bytes, $2=id.
+    /// </summary>
+    string Values_SetByteArrayScalar();
+
+    /// <summary>
+    /// DELETE the per-byte element rows of a legacy Array-of-Byte structure: rows of the structure
+    /// whose _array_parent_id points at another row OF THE SAME structure (the base row). A base row
+    /// nested in a class points at the class row, another structure, and is left alone. Set-based on
+    /// purpose: a megabyte payload is a million element rows. Params: $1=structureId (used twice).
+    /// </summary>
+    string Values_DeleteByteArrayElements();
+
+    /// <summary>
+    /// SELECT _id of the object holding a unique key in a scheme. Params: $1=schemeId, $2=valueUnique.
+    /// At most one row: the partial unique index over (_id_scheme, _value_unique) guarantees it.
+    /// </summary>
+    string ObjectStorage_SelectIdBySchemeValueUnique();
+
+    /// <summary>
+    /// UPDATE the listed objects to _value_unique = NULL (P7: release before take inside the batch
+    /// transaction, so an in-batch key exchange passes). Ids are inlined like Structures_DeleteByIds.
+    /// </summary>
+    string ObjectStorage_ClearValueUniqueByIds(IEnumerable<long> ids);
+
+    /// <summary>
+    /// P7-аналог для ПОЛЕВЫХ ключей (Э2): освободить _values._unique у обновляемых строк перед
+    /// bulk-UPDATE - иначе обмен [RedbUnique]-значений двух объектов в одном батче бьётся об
+    /// частичный уникальный индекс (проверка немедленная; на SQLite bulk идёт построчно и своп
+    /// падал всегда, на PG/MSSQL исход зависел от порядка строк). Та же транзакция - снаружи
+    /// разрыв не виден. CT-1/CT-выяснение 2026-09-04.
+    /// </summary>
+    string Values_ClearUniqueByValueIds(IEnumerable<long> ids);
+    
+    // ============================================================
+    // === TYPES SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// SELECT type by name. Params: $1=name
+    /// Returns: _id, _name
+    /// </summary>
+    string Types_SelectByName();
+    
+    /// <summary>
+    /// SELECT all types. Returns: _id, _name, _db_type, _type
+    /// </summary>
+    string Types_SelectAll();
+    
+    // ============================================================
+    // === SCHEME FUNCTIONS (PostgreSQL-specific, MSSQL: stored procs or queries) ===
+    // ============================================================
+    
+    /// <summary>
+    /// Sync metadata cache for scheme. Params: $1=schemeId
+    /// PostgreSQL: SELECT sync_metadata_cache_for_scheme($1)
+    /// MSSQL: EXEC sp_sync_metadata_cache @schemeId
+    /// </summary>
+    string Schemes_SyncMetadataCache();
+    
+    /// <summary>
+    /// Migrate structure type. Params: $1=structureId, $2=oldType, $3=newType, $4=dryRun
+    /// PostgreSQL: SELECT * FROM migrate_structure_type($1, $2, $3, $4)
+    /// </summary>
+    string Schemes_MigrateStructureType();
+    
+    /// <summary>
+    /// Get structure tree JSON. Params: $1=schemeId
+    /// PostgreSQL: SELECT get_scheme_structure_tree($1)
+    /// </summary>
+    string Schemes_GetStructureTree();
+    
+    // ============================================================
+    // === TREE SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// Get object as JSON. Params: $1=objectId, $2=depth
+    /// PostgreSQL: SELECT get_object_json($1, $2)
+    /// MSSQL: Must implement as stored procedure or CTE query
+    /// </summary>
+    string Tree_GetObjectJson();
+    
+    /// <summary>
+    /// SELECT children with JSON by parent and scheme. Params: $1=parentId, $2=schemeId
+    /// Returns: json_data column
+    /// </summary>
+    string Tree_SelectChildrenJson();
+    
+    /// <summary>
+    /// SELECT polymorphic children with scheme. Params: $1=parentId
+    /// Returns: ObjectId, SchemeId, JsonData columns
+    /// </summary>
+    string Tree_SelectPolymorphicChildren();
+
+    /// <summary>
+    /// SELECT direct child object ids only (no JSON materialization). Params: $1=parentId.
+    /// Returns a single _id column. Used for lightweight subtree id collection where the heavier
+    /// <see cref="Tree_SelectPolymorphicChildren"/> (which calls get_object_json) is unnecessary —
+    /// and unavailable on tiers without that function (e.g. SQLite Pro).
+    /// </summary>
+    string Tree_SelectChildrenIds();
+
+    /// <summary>
+    /// SELECT scheme and JSON for object. Params: $1=objectId
+    /// Returns: SchemeId, JsonData columns
+    /// </summary>
+    string Tree_SelectSchemeAndJson();
+    
+    /// <summary>
+    /// SELECT children base fields by parent and scheme (Pro PVT mode).
+    /// Params: $1=parentId, $2=schemeId
+    /// Returns: RedbObjectRow columns
+    /// </summary>
+    string Tree_SelectChildrenBySchemeBase();
+    
+    /// <summary>
+    /// SELECT all children base fields by parent (Pro PVT polymorphic mode).
+    /// Params: $1=parentId
+    /// Returns: RedbObjectRow columns
+    /// </summary>
+    string Tree_SelectChildrenBase();
+    
+    /// <summary>
+    /// Check if object exists. Params: $1=objectId
+    /// </summary>
+    string Tree_ObjectExists();
+    
+    /// <summary>
+    /// SELECT parent_id by object ID. Params: $1=objectId
+    /// </summary>
+    string Tree_SelectParentId();
+    
+    /// <summary>
+    /// UPDATE object parent (move). Params: $1=newParentId, $2=dateModify, $3=whoChangeId, $4=objectId
+    /// </summary>
+    string Tree_UpdateParent();
+    
+    /// <summary>
+    /// DELETE values by object IDs. Params: $1=objectIds (array)
+    /// </summary>
+    string Tree_DeleteValuesByObjectIds();
+    
+    /// <summary>
+    /// DELETE objects by IDs. Params: $1=objectIds (array)
+    /// </summary>
+    string Tree_DeleteObjectsByIds();
+
+    /// <summary>
+    /// The subtree under an object in one statement: every descendant down to a depth, as rows
+    /// (Id, IdParent, IdScheme, Depth; the children of the object have depth 1), ordered by _name, _id as the children
+    /// queries order them, so that the children of each parent come in that order. With a scheme, the walk keeps to
+    /// objects of that scheme (a child of another scheme and what hangs below it are not reached).
+    /// Params: $1=objectId, $2=schemeId or NULL for any scheme, $3=maxDepth. A cycle in _id_parent repeats rows up to
+    /// the depth; the caller detects it.
+    /// </summary>
+    string Tree_SelectSubtreeRows();
+
+    /// <summary>
+    /// An object and its ancestors in one statement, as rows (Id, IdParent, IdScheme, Depth; the object itself has
+    /// depth 0, its parent 1), ordered by depth. Params: $1=objectId, $2=maxDepth. A cycle repeats rows up to the
+    /// depth; the caller detects it.
+    /// </summary>
+    string Tree_SelectAncestorRows();
+
+    /// <summary>
+    /// The ids of the given objects and of all their ancestors, each once, in one statement (ToTreeListAsync,
+    /// ToRootListAsync, LoadWithParentsAsync). Params: $1=object ids (long[]), $2=maxDepth: how far up a chain is read.
+    /// </summary>
+    string Tree_SelectIdsWithAncestors();
+    
+    // ============================================================
+    // === OBJECT STORAGE SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// SELECT all base fields for object by ID. Params: $1=objectId
+    /// Returns: Id, IdScheme, Hash, Name, IdParent, IdOwner, IdWhoChange, DateCreate, DateModify, DateBegin, DateComplete, Key, ValueLong, ValueString, ValueGuid, ValueBool, ValueDouble, ValueNumeric, ValueDatetime, ValueBytes, Note
+    /// </summary>
+    string ObjectStorage_SelectObjectById();
+    
+    /// <summary>
+    /// SELECT only Id and Hash for object. Params: $1=objectId
+    /// </summary>
+    string ObjectStorage_SelectIdHash();
+    
+    /// <summary>
+    /// SELECT Id, Hash, IdScheme for cache check. Params: $1=objectId
+    /// </summary>
+    string ObjectStorage_SelectIdHashScheme();
+    
+    /// <summary>
+    /// SELECT all base fields for objects by IDs. Params: $1=objectIds (array)
+    /// </summary>
+    string ObjectStorage_SelectObjectsByIds();
+    
+    /// <summary>
+    /// DELETE object by ID. Params: $1=objectId
+    /// </summary>
+    string ObjectStorage_DeleteById();
+    
+    /// <summary>
+    /// DELETE objects by IDs (bulk). Params: $1=objectIds (array)
+    /// </summary>
+    string ObjectStorage_DeleteByIds();
+    
+    /// <summary>
+    /// INSERT new object with all fields.
+    /// Params: $1=id, $2=schemeId, $3=name, $4=note, $5=dateCreate, $6=dateModify,
+    ///         $7=ownerId, $8=whoChangeId, $9=parentId, $10=hash,
+    ///         $11=valueString, $12=valueLong, $13=valueGuid, $14=valueBool,
+    ///         $15=valueDouble, $16=valueNumeric, $17=valueDatetime, $18=valueBytes,
+    ///         $19=key, $20=dateBegin, $21=dateComplete
+    /// </summary>
+    string ObjectStorage_InsertObject();
+    
+    /// <summary>
+    /// UPDATE object with all fields.
+    /// Params: $1=name, $2=note, $3=dateModify, $4=whoChangeId, $5=hash,
+    ///         $6=valueString, $7=valueLong, $8=valueGuid, $9=valueBool,
+    ///         $10=valueDouble, $11=valueNumeric, $12=valueDatetime, $13=valueBytes,
+    ///         $14=key, $15=dateBegin, $16=dateComplete, $17=objectId
+    /// </summary>
+    string ObjectStorage_UpdateObject();
+    
+    /// <summary>
+    /// DELETE all values for object. Params: $1=objectId
+    /// </summary>
+    string ObjectStorage_DeleteValuesByObjectId();
+    
+    /// <summary>
+    /// SELECT object as JSON. Params: $1=objectId, $2=depth
+    /// PostgreSQL: SELECT get_object_json($1, $2)::text
+    /// MSSQL: Stored procedure or CTE
+    /// </summary>
+    string ObjectStorage_GetObjectJson();
+    
+    /// <summary>
+    /// SELECT objects as JSON (bulk). Params: $1=objectIds (array), $2=depth
+    /// PostgreSQL: SELECT get_object_json(id, $2)::text FROM unnest($1::bigint[]) AS id
+    /// MSSQL: Cursor or table-valued function
+    /// </summary>
+    string ObjectStorage_GetObjectsJsonBulk();
+    
+    /// <summary>
+    /// SELECT structure metadata by scheme ID. Params: $1=schemeId
+    /// Returns: Id, IdParent, Name, DbType, CollectionType, KeyType, StoreNull, Lazy, TypeSemantic
+    /// </summary>
+    string ObjectStorage_SelectStructuresWithMetadata();
+    
+    /// <summary>
+    /// SELECT type info by ID. Params: $1=typeId
+    /// Returns: Id, Name, DbType, Type1
+    /// </summary>
+    string ObjectStorage_SelectTypeById();
+    
+    /// <summary>
+    /// Check if object exists by ID. Params: $1=objectId
+    /// Returns: _id or NULL
+    /// </summary>
+    string ObjectStorage_CheckObjectExists();
+    
+    /// <summary>
+    /// SELECT scheme by ID. Params: $1=schemeId
+    /// Returns: Id, Name
+    /// </summary>
+    string ObjectStorage_SelectSchemeById();
+    
+    /// <summary>
+    /// SELECT all values for object IDs (ChangeTracking). Params: $1=objectIds (array)
+    /// Returns: Id, IdStructure, IdObject, String, Long, Guid, Double, DateTimeOffset, Boolean, ByteArray, Numeric, ListItem, Object, ArrayParentId, ArrayIndex
+    /// </summary>
+    string ObjectStorage_SelectValuesForObjects();
+    
+    /// <summary>
+    /// SELECT scheme IDs for objects. Params: $1=objectIds (array)
+    /// Returns: ObjectId, SchemeId
+    /// </summary>
+    string ObjectStorage_SelectSchemeIdsForObjects();
+    
+    /// <summary>
+    /// SELECT single value by ID. Params: $1=valueId
+    /// Returns: all value fields
+    /// </summary>
+    string ObjectStorage_SelectValueById();
+    
+    /// <summary>
+    /// SELECT all types (for cache preload). No params.
+    /// Returns: Id, Name, DbType, Type1
+    /// </summary>
+    string ObjectStorage_SelectAllTypes();
+    
+    /// <summary>
+    /// SELECT existing object IDs from array. Params: $1=objectIds (array)
+    /// Returns: Id only
+    /// </summary>
+    string ObjectStorage_SelectExistingIds();
+
+    /// <summary>
+    /// SELECT id + stored creation date of existing objects. Params: $1=objectIds (array).
+    /// Returns: Id, DateCreate. The save strategies take the existing ids from it and hand the
+    /// stored creation date back to the saved object: an update never rewrites _date_create.
+    /// </summary>
+    string ObjectStorage_SelectExistingCreateDates();
+
+    /// <summary>
+    /// SELECT id + persisted content hash of existing objects. Params: $1=objectIds (array).
+    /// Returns: Id, Hash. F1 (CT hash shortcut): an existing object whose recomputed hash
+    /// equals the persisted one skips the value pipeline under ChangeTracking.
+    /// </summary>
+    string ObjectStorage_SelectIdHashPairs();
+    
+    /// <summary>
+    /// SELECT schemes by IDs. Params: $1=schemeIds (array)
+    /// Returns: Id, Name, Alias, NameSpace, StructureHash, Type
+    /// </summary>
+    string ObjectStorage_SelectSchemesByIds();
+    
+    /// <summary>
+    /// Lock objects for update (row locking) and RETURN THE LOCKED IDS. Params: $1=objectIds (array)
+    /// Contract (BR-9, 2026-09-02): SELECT _id (not SELECT 1) - the returned rows are the ids that
+    /// exist and are now locked; the caller counts them, a missing id is simply not in the result.
+    /// Rows are taken in ascending _id order so concurrent lockers cannot deadlock on each other.
+    /// PostgreSQL: SELECT _id ... FOR UPDATE. MSSQL: WITH (UPDLOCK, ROWLOCK). SQLite: existence
+    /// check only - writers are serialized database-wide, there is no row lock to take.
+    /// </summary>
+    string ObjectStorage_LockObjectsForUpdate();
+    
+    /// <summary>
+    /// SELECT scheme ID for object. Params: $1=objectId
+    /// Returns: _id_scheme (long)
+    /// </summary>
+    string ObjectStorage_SelectSchemeIdByObjectId();
+    
+    // ============================================================
+    // === LIST SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// SELECT list by ID. Params: $1=listId
+    /// </summary>
+    string Lists_SelectById();
+    
+    /// <summary>
+    /// SELECT list by name. Params: $1=name
+    /// </summary>
+    string Lists_SelectByName();
+    
+    /// <summary>
+    /// SELECT all lists ordered by name.
+    /// </summary>
+    string Lists_SelectAll();
+    
+    /// <summary>
+    /// INSERT new list. Params: $1=id, $2=name, $3=alias
+    /// </summary>
+    string Lists_Insert();
+    
+    /// <summary>
+    /// UPDATE list. Params: $1=name, $2=alias, $3=id
+    /// </summary>
+    string Lists_Update();
+    
+    /// <summary>
+    /// DELETE list by ID. Params: $1=listId
+    /// </summary>
+    string Lists_Delete();
+    
+    /// <summary>
+    /// Check if list is used in structures. Params: $1=listId
+    /// </summary>
+    string Lists_IsUsedInStructures();
+    
+    // ============================================================
+    // === LIST ITEMS SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// SELECT list item by ID. Params: $1=itemId
+    /// </summary>
+    string ListItems_SelectById();
+    
+    /// <summary>
+    /// SELECT list items by their ids. Params: $1=itemIds (long[])
+    /// </summary>
+    string ListItems_SelectByIds();
+    
+    /// <summary>
+    /// SELECT list items by list ID. Params: $1=listId
+    /// </summary>
+    string ListItems_SelectByListId();
+    
+    /// <summary>
+    /// SELECT list item by list ID and value. Params: $1=listId, $2=value
+    /// </summary>
+    string ListItems_SelectByListIdAndValue();
+    
+    /// <summary>
+    /// INSERT list item. Params: $1=id, $2=idList, $3=value, $4=alias, $5=idObject
+    /// </summary>
+    string ListItems_Insert();
+    
+    /// <summary>
+    /// UPDATE list item alias and idObject. Params: $1=alias, $2=idObject, $3=id
+    /// </summary>
+    string ListItems_UpdateAliasAndObject();
+    
+    /// <summary>
+    /// UPDATE list item. Params: $1=value, $2=alias, $3=idObject, $4=id
+    /// </summary>
+    string ListItems_Update();
+    
+    /// <summary>
+    /// DELETE list item by ID. Params: $1=itemId
+    /// </summary>
+    string ListItems_Delete();
+    
+    /// <summary>
+    /// SELECT list items by object reference. Params: $1=objectId
+    /// </summary>
+    string ListItems_SelectByObjectId();
+    
+    // ============================================================
+    // === MAINTENANCE SQL ===
+    // ============================================================
+    // All provider variability of IMaintenanceProvider lives in these three texts; the base
+    // provider holds the only logic and the only mapping. Index-stats SQL must normalize the
+    // engine's catalogs to EXACTLY these column aliases: Table, Name, IsUnique, SizeBytes,
+    // EstimatedRows, Seeks, Scans, Updates, LastUsed - NULL where the engine cannot say.
+
+    /// <summary>
+    /// Refresh planner statistics. <paramref name="analysisLimit"/> bounds SQLite's ANALYZE
+    /// (PRAGMA analysis_limit; 0 = unbounded); PostgreSQL and MSSQL ignore it.
+    /// </summary>
+    string Maintenance_Analyze(int analysisLimit);
+
+    /// <summary>
+    /// Refresh planner statistics of ONE table. The identifier arrives already checked against
+    /// the catalogs by the base provider, and the dialect quotes it itself: an identifier cannot
+    /// be a query parameter, and this one comes from a dashboard.
+    /// </summary>
+    string Maintenance_AnalyzeTable(string? schema, string table, int analysisLimit);
+
+    /// <summary>Does the table exist? Params: table name, then schema (null = the engine's default).</summary>
+    string Maintenance_SelectTableExists();
+
+    /// <summary>Index statistics of user tables, normalized to the alias contract above.</summary>
+    string Maintenance_SelectIndexStats();
+
+    /// <summary>
+    /// Table statistics, normalized to the TableStatistics alias contract: Schema, Table,
+    /// EstimatedRows, DataSizeBytes, IndexesSizeBytes, DeadRows, LastAnalyze, LastAutoAnalyze,
+    /// LastVacuum, HasStatistics.
+    /// </summary>
+    string Maintenance_SelectTableStats();
+
+    /// <summary>
+    /// The table-stats forms in decreasing capability, tried in order until one runs. SQLite needs
+    /// three: the optional <c>dbstat</c> module may be missing, and <c>sqlite_stat1</c> does not
+    /// exist at all until the first ANALYZE - the state every fresh database starts in, where a
+    /// storage page must report "no statistics" rather than fail (redb.Tsak BR-13, 2026-09-21).
+    /// Engines that can always answer return a single text.
+    /// </summary>
+    System.Collections.Generic.IReadOnlyList<string> Maintenance_SelectTableStatsForms();
+
+    /// <summary>
+    /// The window the usage counters cover: aliases CountersSince and IsReplica, both null where
+    /// the engine keeps no counters.
+    /// </summary>
+    string Maintenance_SelectStatisticsWindow();
+
+    /// <summary>
+    /// Fallback form for engines where the full form may be unavailable: SQLite without the dbstat
+    /// virtual table (no sizes), SQL Server without VIEW SERVER STATE (no usage counters). Engines
+    /// with no such failure mode return the same text as <see cref="Maintenance_SelectIndexStats"/>,
+    /// and the base provider then never falls back.
+    /// </summary>
+    string Maintenance_SelectIndexStatsNoSize();
+
+    // ============================================================
+    // === VALIDATION SQL ===
+    // ============================================================
+
+    /// <summary>
+    /// SELECT all types for validation.
+    /// </summary>
+    string Validation_SelectAllTypes();
+    
+    /// <summary>
+    /// SELECT scheme by name. Params: $1=schemeName
+    /// </summary>
+    string Validation_SelectSchemeByName();
+    
+    /// <summary>
+    /// SELECT structures by scheme ID. Params: $1=schemeId
+    /// </summary>
+    string Validation_SelectStructuresBySchemeId();
+    
+    // ============================================================
+    // === LAZY LOADER SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// Get object base fields (without Props). Params: $1=objectId
+    /// </summary>
+    string LazyLoader_SelectObjectBase();
+    
+    /// <summary>
+    /// Get object as JSON via get_object_json. Params: $1=objectId, $2=maxDepth
+    /// </summary>
+    string LazyLoader_GetObjectJson();
+    
+    /// <summary>
+    /// Get multiple objects as JSON via get_object_json batch. Params: $1=objectIds array, $2=depth
+    /// (V4: a stub reload passes 1, query pages their PropsDepth, otherwise 10).
+    /// Returns: (Id, JsonData) tuples
+    /// </summary>
+    string LazyLoader_GetObjectJsonBatch();
+    
+    /// <summary>
+    /// Get object hash for cache validation. Params: $1=objectId
+    /// </summary>
+    string LazyLoader_SelectObjectHash();
+
+    /// <summary>
+    /// Savepoint trio for a save running inside the CALLER's transaction (bug report п.2,
+    /// 2026-09-02): a unique violation must not leave that transaction aborted (PostgreSQL 25P02),
+    /// so the batch runs under a savepoint and rolls back TO it before the typed exception leaves.
+    /// Release is null where the engine has nothing to release (MSSQL savepoints dissolve on their
+    /// own). MSSQL note: SAVE TRANSACTION does not work in a distributed transaction.
+    /// </summary>
+    string Transaction_SavepointBegin();
+
+    /// <summary>RELEASE of the savepoint above; null when the engine needs none.</summary>
+    string? Transaction_SavepointRelease();
+
+    /// <summary>ROLLBACK TO the savepoint above - the caller's transaction stays alive.</summary>
+    string Transaction_SavepointRollback();
+    
+    // ============================================================
+    // === QUERY PROVIDER SQL ===
+    // ============================================================
+    
+    /// <summary>
+    /// Name of the search function for objects with facets (eager loading).
+    /// PostgreSQL: "search_objects_with_facets"
+    /// </summary>
+    string Query_SearchObjectsFunction();
+    
+    /// <summary>
+    /// Name of the search function for objects base fields only (lazy loading).
+    /// PostgreSQL: "search_objects_with_facets_base"
+    /// </summary>
+    string Query_SearchObjectsBaseFunction();
+    
+    /// <summary>
+    /// Name of the search function with projection by paths.
+    /// PostgreSQL: "search_objects_with_projection_by_paths"
+    /// </summary>
+    string Query_SearchObjectsProjectionByPathsFunction();
+    
+    /// <summary>
+    /// Name of the search function with projection by IDs.
+    /// PostgreSQL: "search_objects_with_projection_by_ids"
+    /// </summary>
+    string Query_SearchObjectsProjectionByIdsFunction();
+    
+    /// <summary>
+    /// Name of the tree search function (eager loading).
+    /// PostgreSQL: "search_tree_objects_with_facets"
+    /// </summary>
+    string Query_SearchTreeObjectsFunction();
+    
+    /// <summary>
+    /// Name of the tree search function base fields only (lazy loading).
+    /// PostgreSQL: "search_tree_objects_with_facets_base"
+    /// </summary>
+    string Query_SearchTreeObjectsBaseFunction();
+    
+    /// <summary>
+    /// SQL template for COUNT query. Params: functionName
+    /// PostgreSQL: "SELECT ({0}($1, $2::jsonb, NULL, NULL, NULL, $3))->>'total_count'"
+    /// </summary>
+    string Query_CountTemplate();
+    
+    /// <summary>
+    /// SQL template for search query result. Params: functionName
+    /// PostgreSQL: "SELECT {0}($1, $2::jsonb, $3, $4, $5::jsonb, $6) as result"
+    /// </summary>
+    string Query_SearchTemplate();
+    
+    /// <summary>
+    /// SQL template for search query with distinct. Params: functionName
+    /// PostgreSQL: "SELECT {0}($1, $2::jsonb, $3, $4, $5::jsonb, $6, $7) as result"
+    /// </summary>
+    string Query_SearchWithDistinctTemplate();
+    
+    /// <summary>
+    /// SQL template for full search query with distinct and facets. Params: functionName
+    /// PostgreSQL: "SELECT {0}($1, $2::jsonb, $3, $4, $5::jsonb, $6, $7, $8) as result"
+    /// </summary>
+    string Query_SearchFullTemplate();
+    
+    /// <summary>
+    /// JSON cast expression for the database.
+    /// PostgreSQL: "::jsonb", MSSQL: ""
+    /// </summary>
+    string Query_JsonCast();
+    
+    /// <summary>
+    /// Text array cast. PostgreSQL: "::text[]"
+    /// </summary>
+    string Query_TextArrayCast();
+    
+    /// <summary>
+    /// Bigint array cast. PostgreSQL: "::bigint[]"
+    /// </summary>
+    string Query_BigintArrayCast();
+    
+    /// <summary>
+    /// SQL for projection by paths query.
+    /// </summary>
+    string Query_ProjectionByPathsTemplate();
+    
+    /// <summary>
+    /// SQL for projection by structure IDs query.
+    /// </summary>
+    string Query_ProjectionByIdsTemplate(string structureIdsArray);
+    
+    /// <summary>
+    /// SQL for checking user permission on object.
+    /// </summary>
+    string Query_CheckPermissionSql();
+    
+    /// <summary>
+    /// SQL for aggregate batch preview.
+    /// </summary>
+    string Query_AggregateBatchPreviewSql();
+    
+    /// <summary>
+    /// SQL for aggregate field.
+    /// </summary>
+    string Query_AggregateFieldSql();
+    
+    /// <summary>
+    /// SQL for SQL preview function.
+    /// </summary>
+    string Query_SqlPreviewTemplate();
+    
+    /// <summary>
+    /// SQL for aggregate batch function.
+    /// </summary>
+    string Query_AggregateBatchSql();
+    
+    /// <summary>
+    /// SQL for simple search objects (used in distinct).
+    /// </summary>
+    string Query_SearchObjectsSimpleSql();
+    
+    /// <summary>
+    /// SQL for grouped aggregation.
+    /// </summary>
+    string Query_AggregateGroupedSql();
+    
+    /// <summary>
+    /// SQL for window query.
+    /// </summary>
+    string Query_WindowSql();
+    
+    /// <summary>
+    /// SQL for tree count query (normal search).
+    /// </summary>
+    string Query_TreeCountNormalSql(string functionName);
+    
+    /// <summary>
+    /// SQL for tree search query (normal search).
+    /// </summary>
+    string Query_TreeSearchNormalSql(string functionName);
+    
+    /// <summary>
+    /// SQL for tree search with multiple parent IDs.
+    /// PostgreSQL: SELECT result->>'objects' FROM func($1,$2,...) as result
+    /// MSSQL: EXEC func @p0, @p1, ...
+    /// </summary>
+    string Query_TreeSearchWithParentIdsSql(string functionName);
+    
+    /// <summary>
+    /// SQL for HasAncestor tree search - extracts IDs from JSON result.
+    /// PostgreSQL: WITH ... SELECT jsonb_array_elements(...)
+    /// MSSQL: WITH ... CROSS APPLY OPENJSON(...)
+    /// </summary>
+    string Query_HasAncestorTreeSql(string functionName);
+    
+    /// <summary>
+    /// SQL for HasAncestor normal search - extracts IDs from JSON result.
+    /// </summary>
+    string Query_HasAncestorNormalSql(string functionName);
+    
+    /// <summary>
+    /// SQL for HasDescendant search - extracts IDs from JSON result.
+    /// </summary>
+    string Query_HasDescendantSql(string functionName);
+    
+    /// <summary>
+    /// SQL for getting parent IDs from descendant IDs using recursive CTE.
+    /// PostgreSQL: WITH RECURSIVE ancestors AS (...)
+    /// MSSQL: WITH ancestors AS (...)
+    /// </summary>
+    string Query_GetParentIdsFromDescendantsSql(string idsString, int depthLimit);
+    
+    /// <summary>
+    /// SQL for tree COUNT with parent_ids array.
+    /// PostgreSQL: SELECT (result->>'total_count')::int FROM func(...) as result
+    /// MSSQL: temp table + JSON_VALUE
+    /// </summary>
+    string Query_TreeCountWithParentIdsSql(string functionName);
+    
+    /// <summary>
+    /// SQL for loading objects by IDs as JSON.
+    /// PostgreSQL: SELECT get_object_json(id, 10)::text FROM unnest(ARRAY[...])
+    /// MSSQL: SELECT dbo.get_object_json(_id, 10) FROM _objects WHERE _id IN (...)
+    /// </summary>
+    string Query_LoadObjectsByIdsSql(string idsString, int maxDepth);
+    
+    /// <summary>
+    /// SQL for tree SQL preview.
+    /// </summary>
+    string Query_TreeSqlPreviewTemplate(string functionName);
+    
+    // ============================================================
+    // === SQL PREVIEW FUNCTION NAMES ===
+    // ============================================================
+    
+    /// <summary>
+    /// SQL preview function name for regular search.
+    /// PostgreSQL: "get_search_sql_preview"
+    /// MSSQL: "dbo.get_search_sql_preview"
+    /// </summary>
+    string Query_SqlPreviewFunction();
+    
+    /// <summary>
+    /// SQL preview function name for tree search.
+    /// PostgreSQL: "get_search_tree_sql_preview"
+    /// MSSQL: "dbo.get_search_tree_sql_preview"
+    /// </summary>
+    string Query_TreeSqlPreviewFunction();
+    
+    /// <summary>
+    /// SQL preview function name for tree base (lazy loading) search.
+    /// PostgreSQL: "get_search_tree_sql_preview_base"
+    /// MSSQL: "dbo.get_search_tree_sql_preview_base"
+    /// </summary>
+    string Query_TreeSqlPreviewBaseFunction();
+    
+    // ============================================================
+    // === v2-pvt MODULE (free Postgres only, phase 1) ===
+    // ------------------------------------------------------------
+    // Two-step search pipeline:
+    //   1. BUILD: ask the database to generate an _id-list SQL via
+    //      pvt_build_query_sql(...) — returned as plain text.
+    //   2. EXECUTE: the client (C#/Python/Go) wraps that text with
+    //      a materializer (get_object_json), COUNT(*), EXISTS(...) or
+    //      a projection JOIN and executes the wrapped SQL.
+    //
+    // Dialects that don't support v2-pvt MUST return null from all
+    // methods in this block. A null return is the explicit "no PVT"
+    // signal — there is no fallback flag, no try/catch on the hot
+    // path. The dispatch happens once per query call.
+    // ============================================================
+    
+    /// <summary>
+    /// Bare SQL function name returning the inner _id-list SQL string.
+    /// PostgreSQL: "pvt_build_query_sql". Return null when the dialect
+    /// has no v2-pvt module deployed (e.g. MSSql phase 1).
+    /// </summary>
+    string? Query_BuildPvtSqlFunction();
+    
+    /// <summary>
+    /// Builds the full SELECT statement that invokes pvt_build_query_sql.
+    /// Scalar arguments are inlined safely (no user-controlled strings);
+    /// only the three jsonb arguments are exposed as binding placeholders:
+    ///   $1 = filter      (jsonb)
+    ///   $2 = order       (jsonb)
+    ///   $3 = distinct_on (jsonb) — array of {field|$expr} entries; NULL when absent.
+    /// All may be NULL — the caller should pass DBNull when absent.
+    /// Returns null when v2-pvt is not supported.
+    /// </summary>
+    string? Query_BuildPvtSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false);
+    
+    /// <summary>
+    /// Wraps the inner _id-list SQL with the system materializer to
+    /// produce a result-set of object JSON. Returns null when v2-pvt
+    /// is not supported. PostgreSQL:
+    ///   SELECT get_object_json(t._id, {maxDepth})::text AS "Value"
+    ///   FROM ({innerSql}) t
+    /// </summary>
+    string? Query_WrapPvtWithObjectJson(string innerSql, int maxDepth);
+    
+    /// <summary>
+    /// Wraps the inner _id-list SQL with COUNT(*).
+    /// Returns null when v2-pvt is not supported.
+    /// </summary>
+    string? Query_WrapPvtWithCount(string innerSql);
+    
+    /// <summary>
+    /// Wraps the inner _id-list SQL with EXISTS(...).
+    /// Returns null when v2-pvt is not supported.
+    /// </summary>
+    string? Query_WrapPvtWithExists(string innerSql);
+    
+    /// <summary>
+    /// Bare SQL function name returning the deployed v2-pvt module
+    /// semver string (e.g. "0.1.0"). Used by RedbServiceBase.InitializeAsync
+    /// to enforce major-match + minor-compatibility. Returns null when
+    /// the dialect does not require a v2-pvt deployment check.
+    /// </summary>
+    string? Query_PvtModuleVersionFunction();
+
+    /// <summary>
+    /// Semver string the shipped v2-pvt bundle for this dialect declares.
+    /// Compared exactly against the value returned by
+    /// <see cref="Query_PvtModuleVersionFunction"/> at startup; any
+    /// mismatch triggers redeploy of <see cref="RedbServiceBase"/>'s
+    /// embedded bundle. Bump this string whenever any *.sql file under
+    /// the dialect's v2-pvt folder changes (together with the
+    /// `pvt_module_version()` literal inside `00_module_init.sql`).
+    /// Returns null for dialects that do not ship a v2-pvt module.
+    /// </summary>
+    string? Query_PvtRequiredVersion();
+
+    // ------------------------------------------------------------
+    // Native PVT projection orchestrator (pvt_build_projection_sql).
+    // Drives the .Select(...)/Distinct() shape directly in SQL: the
+    // outer SELECT yields the requested scalar columns (one per
+    // projection entry) instead of materializing full objects.
+    //
+    // Dialects that have no v2-pvt projection support MUST throw
+    // NotSupportedException from these methods. The caller dispatches
+    // via Query_BuildPvtProjectionSqlFunction() returning non-null.
+    // ------------------------------------------------------------
+
+    /// <summary>
+    /// Bare SQL function name returning the projection SELECT string.
+    /// PostgreSQL: "pvt_build_projection_sql". Return null when the
+    /// dialect has no native PVT projection (projection then falls
+    /// back to the standard PVT full-object path or to legacy SQL).
+    /// </summary>
+    string? Query_BuildPvtProjectionSqlFunction();
+
+    /// <summary>
+    /// Builds the full SELECT statement that invokes
+    /// pvt_build_projection_sql. Scalar arguments are inlined safely;
+    /// jsonb arguments are exposed as bound placeholders:
+    ///   $1 = projection  (jsonb)   — non-empty array, required
+    ///   $2 = filter      (jsonb)   — nullable
+    ///   $3 = order       (jsonb)   — nullable
+    ///   $4 = distinct_on (jsonb)   — nullable; required when hasDistinctOn
+    /// Returns null when native PVT projection is not supported.
+    /// </summary>
+    string? Query_BuildPvtProjectionSqlInvocation(
+        long schemeId,
+        int? limit,
+        int offset,
+        int maxDepth,
+        bool distinct,
+        string sourceMode,
+        long[]? treeIds,
+        bool hasDistinctOn = false);
+
+    /// <summary>
+    /// Wraps the projection inner SQL into a result-set of JSON rows
+    /// shaped as <c>{"id": &lt;_id&gt;, "properties": { ...projected columns... }}</c>.
+    /// The inner SQL MUST contain an <c>_id</c> column (the caller adds
+    /// it explicitly to the projection JSON unless DISTINCT collapses it).
+    /// When <paramref name="includeId"/> is false the wrapper synthesizes
+    /// id=0 and treats every inner column as a projected property.
+    /// Returns null when native PVT projection is not supported.
+    /// </summary>
+    string? Query_WrapPvtProjectionRowsAsJson(string innerSql, bool includeId);
+    
+    // =====================================================
+    // SOFT DELETE METHODS
+    // =====================================================
+    
+    /// <summary>
+    /// SQL to mark objects for soft-deletion.
+    /// Creates trash container and moves objects under it.
+    /// Params: $1=objectIds (array/comma-separated), $2=userId, $3=trashParentId (nullable)
+    /// Returns: trash_id, marked_count
+    /// PostgreSQL: SELECT * FROM mark_for_deletion($1, $2, $3)
+    /// MSSQL: EXEC sp_mark_for_deletion @p0, @p1, @p2 (with OUTPUT params)
+    /// </summary>
+    string SoftDelete_MarkForDeletion();
+    
+    /// <summary>
+    /// SQL to purge (physically delete) objects from trash container.
+    /// Deletes in batches, removes trash container when empty.
+    /// Params: $1=trashId, $2=batchSize
+    /// Returns: deleted_count, remaining_count
+    /// PostgreSQL: SELECT * FROM purge_trash($1, $2)
+    /// MSSQL: EXEC sp_purge_trash @p0, @p1 (with OUTPUT params)
+    /// </summary>
+    string SoftDelete_PurgeTrash();
+
+    /// <summary>
+    /// SQL that removes a trash container once it holds no objects, for a dialect whose
+    /// <see cref="SoftDelete_PurgeTrash"/> cannot do it itself - SQLite, where the result row must be
+    /// the last statement of the batch and there is no variable to keep it in. Null when the purge
+    /// statement removes the container (PostgreSQL, MSSQL). Runs after the last batch.
+    /// Params: $1=trashId
+    /// </summary>
+    string? SoftDelete_DeleteCompletedTrashContainer() => null;
+
+    /// <summary>
+    /// SQL query listing the objects of a trash container that live objects (scheme other than -10)
+    /// still reference through a <c>_values._Object</c> row, paired with the referencing objects.
+    /// Used to report a purge that ended 'failed'.
+    /// Params: $1=trashId
+    /// Returns: referenced_id, referencing_id (at most 100 pairs, ordered)
+    /// </summary>
+    string SoftDelete_SelectLiveReferrersOfTrash();
+
+    /// <summary>
+    /// SQL query to get deletion progress for a specific trash container.
+    /// Reads progress from trash object fields: _value_long=total, _key=deleted, _value_string=status.
+    /// Params: $1=trashId
+    /// Returns: trash_id, total, deleted, status, started_at, owner_id
+    /// </summary>
+    string SoftDelete_GetDeletionProgress();
+    
+    /// <summary>
+    /// SQL query to get all active deletions for a user.
+    /// Returns trash containers with status='pending' or 'running' owned by user.
+    /// Params: $1=userId
+    /// Returns: trash_id, total, deleted, status, started_at, owner_id
+    /// </summary>
+    string SoftDelete_GetUserActiveDeletions();
+    
+    /// <summary>
+    /// SQL query to get orphaned deletion tasks (for recovery at startup).
+    /// Returns 'pending' tasks OR 'running' tasks where _date_modify older than timeout.
+    /// CLUSTER-SAFE: Only returns tasks that are likely abandoned.
+    /// Params: $1=timeoutMinutes (int)
+    /// Returns: trash_id, total, deleted, status, owner_id
+    /// </summary>
+    string SoftDelete_GetOrphanedTasks();
+    
+    /// <summary>
+    /// SQL to atomically claim an orphaned task (prevent race condition in cluster).
+    /// Updates status to 'running' and _date_modify to NOW() only if conditions still match.
+    /// CLUSTER-SAFE: Uses atomic UPDATE with condition check.
+    /// Params: $1=trashId, $2=timeoutMinutes
+    /// Returns: claimed (1 = success, 0 = task already taken by another instance)
+    /// </summary>
+    string SoftDelete_ClaimOrphanedTask();
+    
+    // ============================================================
+    // === METADATA CACHE WARMUP ===
+    // ============================================================
+    
+    /// <summary>
+    /// SQL to warmup all metadata caches.
+    /// PostgreSQL: SELECT scheme_id, structures_count, scheme_name FROM warmup_all_metadata_caches()
+    /// MSSQL: EXEC warmup_all_metadata_caches (returns same columns)
+    /// Returns: scheme_id, structures_count, scheme_name
+    /// </summary>
+    string Warmup_AllMetadataCaches();
+}
+

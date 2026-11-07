@@ -1,0 +1,20 @@
+# A local RabbitMQ for the module: docker compose -f deploy/docker-compose.rabbitmq.yml up -d
+# Management UI: http://localhost:15672 (guest / guest). The guest user works from localhost only.
+name: modulectx-rabbitmq
+
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq-data:

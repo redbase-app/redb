@@ -1,0 +1,27 @@
+@inject NavigationManager Navigation
+
+@* What a failed module call means for the user. *@
+@switch (Error)
+{
+    case null:
+        break;
+    case SessionEndedException:
+        <p class="error">
+            Your session has ended.
+            <a href="@($"account/login?returnUrl={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}")" data-enhance-nav="false">Sign in again</a>
+        </p>
+        break;
+    case IdentityUnavailableException:
+        <p class="error">The sign-in service is not available right now. Try again in a few seconds.</p>
+        break;
+    case ModuleException { Forbidden: true } forbidden:
+        <p class="error">Not allowed: @forbidden.Message</p>
+        break;
+    default:
+        <p class="error">@Error.Message</p>
+        break;
+}
+
+@code {
+    [Parameter] public Exception? Error { get; set; }
+}

@@ -1,0 +1,65 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Single TFM: multi-targeting would triple the packaged native SQLite payload for no benefit.
+         The floor is net10.0. It used to be net8.0 to reach the widest set of hosts, but .NET 8 and
+         .NET 9 both reach end of support on 10 November 2026 (Microsoft aligned the STS 9 date with
+         LTS 8), while .NET 10 is supported until 14 November 2028. The floor moves up with the
+         ecosystem rather than trailing it. This DOES require .NET 10 on the machine installing it —
+         roll-forward only goes up, never down, so a net8/net9-only box can no longer install it.
+         RollForward=LatestMajor stays: without it the default (Minor) does not cross majors, and a
+         box carrying only a future net11 runtime would fail with "You must install .NET 10.0". -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>LatestMajor</RollForward>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>redb</AssemblyName>
+    <RootNamespace>redb.CLI</RootNamespace>
+
+    <!-- Install globally: dotnet tool install -g redb.CLI -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>redb</ToolCommandName>
+    <PackageId>redb.CLI</PackageId>
+    <Product>REDB - Entity Database for .NET</Product>
+    <Description>CLI tool for REDB database management: export, import, schema init.</Description>
+    <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>
+    <PackageTags>redb;cli;database;tool</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Build against the current monorepo, not stale 1.2.* NuGet packages: the SQLite provider
+         never existed at 1.2.*, so the package pins silently left `schema/init/export/import -p sqlite`
+         resolving against an assembly without redbSqlite.sql or redb.SQLite.RedbService. Mirrors the
+         ProjectReference switch already done in redb.Examples. -->
+    <ProjectReference Include="..\redb.Export\redb.Export.csproj" />
+    <ProjectReference Include="..\redb.Postgres\redb.Postgres.csproj" />
+    <ProjectReference Include="..\redb.MSSql\redb.MSSql.csproj" />
+    <ProjectReference Include="..\redb.SQLite\redb.SQLite.csproj" />
+  </ItemGroup>
+
+  <!-- Trim native runtime assets (SQLitePCLRaw e_sqlite3) down to platforms this CLI
+       actually runs on. Without this the bundle ships iOS/Android/browser/maccatalyst and
+       exotic-linux (mips/ppc64le/s390x/armel) natives, bloating the tool package ~30x. -->
+  <PropertyGroup>
+    <_CliKeepRids>;win-x64;win-arm64;linux-x64;linux-arm64;linux-musl-x64;linux-musl-arm64;osx-x64;osx-arm64;</_CliKeepRids>
+  </PropertyGroup>
+  <Target Name="TrimNativeRuntimeRids" AfterTargets="ResolvePackageAssets" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <RuntimeTargetsCopyLocalItems Remove="@(RuntimeTargetsCopyLocalItems)"
+        Condition="'%(RuntimeTargetsCopyLocalItems.AssetType)' == 'native' and !$(_CliKeepRids.Contains(';%(RuntimeTargetsCopyLocalItems.RuntimeIdentifier);'))" />
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+        Condition="'%(ReferenceCopyLocalPaths.AssetType)' == 'native' and '%(ReferenceCopyLocalPaths.RuntimeIdentifier)' != '' and !$(_CliKeepRids.Contains(';%(ReferenceCopyLocalPaths.RuntimeIdentifier);'))" />
+    </ItemGroup>
+  </Target>
+
+</Project>

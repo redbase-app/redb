@@ -1,0 +1,37 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject Session Session
+@inject NavigationManager Navigation
+
+<header>
+    <a class="brand" href="">RedbApp</a>
+    @if (Session.IsSignedIn)
+    {
+        <NavLink href="" Match="NavLinkMatch.All">Products</NavLink>
+        <NavLink href="categories">Categories</NavLink>
+        <span class="who">@Session.Login</span>
+        <button class="link" @onclick="SignOut">Sign out</button>
+    }
+</header>
+<main>
+    @Body
+</main>
+
+@code {
+    protected override void OnInitialized() => Session.Changed += StateHasChanged;
+
+    // Every page except the sign-in page needs a session.
+    protected override void OnParametersSet()
+    {
+        if (!Session.IsSignedIn && !Navigation.Uri.EndsWith("/login", StringComparison.OrdinalIgnoreCase))
+            Navigation.NavigateTo("login");
+    }
+
+    private void SignOut()
+    {
+        Session.SignOut();
+        Navigation.NavigateTo("login");
+    }
+
+    public void Dispose() => Session.Changed -= StateHasChanged;
+}

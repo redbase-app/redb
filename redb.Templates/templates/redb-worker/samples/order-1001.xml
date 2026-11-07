@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Order>
+  <OrderId>1001</OrderId>
+  <Customer>Contoso Ltd</Customer>
+  <Amount>249.90</Amount>
+  <Currency>EUR</Currency>
+</Order>

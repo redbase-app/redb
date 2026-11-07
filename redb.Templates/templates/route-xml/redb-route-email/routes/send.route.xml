@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- A send that failed (the server closed the connection, a timeout) is tried again twice, ten seconds apart. -->
+  <onException exceptions="System.Exception" handled="true" maximumRedeliveries="2" redeliveryDelay="00:00:10"
+               retryAttemptedLogLevel="Warning">
+    <log level="Error" showRouteId="true">
+      <message>could not send ${header.redbMail.Subject}: ${exception.message}</message>
+    </log>
+  </onException>
+
+  <!-- Sender: a message every {{mail.sendPeriod:60000}} ms to {{mail.to}}. The body is the text; the subject can also
+       come from the header redbMail.Subject, the recipients from redbMail.To, redbMail.Cc, redbMail.Bcc.
+       disconnect=true opens a connection per message: a server closes an idle connection after a while, and a
+       message sent once a minute would find it closed. -->
+  <route id="modulectx-mail-send" description="Sends a test message over SMTP">
+    <from uri="timer://modulectx-mail-send?period={{mail.sendPeriod:60000}}"/>
+    <setHeader name="redbMail.Subject" expr="Report ${header.CamelTimerCounter}"/>
+    <setBody expr="Report number ${header.CamelTimerCounter} from the module modulectx."/>
+    <to uri="smtp://{{mail.smtpHost:localhost}}?connectionFactory=smtp&amp;from={{mail.from}}&amp;to={{mail.to}}&amp;disconnect=true"/>
+    <log level="Information" showRouteId="true">
+      <message>sent ${header.redbMail.Subject}</message>
+    </log>
+  </route>
+
+</routes>

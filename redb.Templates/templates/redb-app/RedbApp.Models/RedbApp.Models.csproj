@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What the API and the browser exchange. No RedBase here: the WebAssembly client references this
+       project, and the redb Props classes stay on the server (RedbApp.Api/Props). -->
+
+</Project>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Reader: the unseen messages of INBOX, polled every {{mail.pollPeriod:30000}} ms, one exchange each; the text
+       body is the body, sender and subject are headers. A message the route finished is marked read; a failed one
+       stays unseen and is read again. -->
+  <route id="modulectx-mail-read" description="Reads the unseen messages of the inbox">
+    <from uri="imap://{{mail.imapHost:localhost}}?connectionFactory=imap&amp;folder=INBOX&amp;fetchFilter=Unseen&amp;postProcess=MarkRead&amp;delay={{mail.pollPeriod:30000}}"/>
+    <log level="Information" showRouteId="true">
+      <message>received from ${header.redbMail.From}: ${header.redbMail.Subject} / ${body}</message>
+    </log>
+  </route>
+
+</routes>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: components, context-wide beans and the one-time init pipeline.
+     It is loaded before the route files, so the routes can refer to its beans by #name. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- Routes written in C#: routes/OrdersRoute.cs runs the same check and transformation on a timer of its own. -->
+  <routeBuilder type="RouteModule.Routes.OrdersRoute, RouteModule"/>
+
+  <!-- A context-wide bean; values come from configuration:
+  <bean name="main-db" type="redb.Route.Sql.Connection.SqlConnectionFactory, redb.Route.Sql">
+    <constructorArg>
+      <bean type="redb.Route.Sql.Connection.SqlConnectionOptions, redb.Route.Sql">
+        <property key="ConnectionString" value="{{db.main.connection}}"/>
+      </bean>
+    </constructorArg>
+  </bean>
+  -->
+
+  <!-- One-time init before the routes start (DDL, seeding):
+  <onInit>
+    <to uri="sql:CREATE TABLE IF NOT EXISTS demo_log (id BIGINT)?dataSource=#main-db"/>
+  </onInit>
+  -->
+
+</context>

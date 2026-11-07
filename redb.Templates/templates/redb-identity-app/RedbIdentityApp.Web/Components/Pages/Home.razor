@@ -1,0 +1,19 @@
+@page "/"
+
+<PageTitle>RedbIdentityApp</PageTitle>
+
+<h1>RedbIdentityApp</h1>
+
+<p>
+    An application on redb.Identity. You sign in at Identity; this server keeps your session and calls the
+    application's module with your access token. The module checks every token with Identity.
+</p>
+
+<AuthorizeView>
+    <Authorized>
+        <p>Signed in as <strong>@context.User.Identity?.Name</strong>. Open your <a href="notes">notes</a>.</p>
+    </Authorized>
+    <NotAuthorized>
+        <p><a href="account/login" data-enhance-nav="false">Sign in</a> to see your notes.</p>
+    </NotAuthorized>
+</AuthorizeView>

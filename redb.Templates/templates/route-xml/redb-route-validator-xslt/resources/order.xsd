@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The order the module accepts. An order without a line, or a line without a positive quantity,
+     does not match and is rejected before the transformation. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:element name="order">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="customer" type="xs:string"/>
+        <xs:element name="line" minOccurs="1" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:attribute name="sku" type="xs:string" use="required"/>
+            <xs:attribute name="qty" type="xs:positiveInteger" use="required"/>
+            <xs:attribute name="price" type="xs:decimal" use="required"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

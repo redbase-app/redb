@@ -1,0 +1,273 @@
+@using redb.Core
+@using redb.Core.Models.Entities
+@using redb.PropsEditor.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@inject PropsMetadataService MetadataService
+@typeparam TProps where TProps : class, new()
+
+@* Full RedbObject editor with base fields + Props *@
+
+<div class="props-editor" style="max-width: 100%; overflow-x: hidden;">
+    <div class="props-editor-header">
+        <h3>@GetTypeName()</h3>
+        <div>
+            @if (ShowSaveButton)
+            {
+                <FluentButton Appearance="Appearance.Accent"
+                              OnClick="HandleSave"
+                              Disabled="@IsSaving">
+                    @(IsSaving ? "Saving..." : "Save")
+                </FluentButton>
+            }
+        </div>
+    </div>
+
+    <div class="props-editor-body">
+        @if (Value == null)
+        {
+            <div style="color: #666; padding: 1rem;">No data to edit.</div>
+        }
+        else
+        {
+            @* Base Fields Section *@
+            <div class="props-group">
+                <div style="display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer; user-select: none;" @onclick="() => baseFieldsCollapsed = !baseFieldsCollapsed">
+                    <span style="cursor: pointer; font-size: 10px;">@(baseFieldsCollapsed ? "▶" : "▼")</span>
+                    <span style="font-weight: 500;">Base Fields</span>
+                    <span style="margin-left: auto; font-size: 0.85rem; color: #888;">RedbObject</span>
+                </div>
+                @if (!baseFieldsCollapsed)
+                {
+                    <div class="props-group-content" style="background: #f8f9fa; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;">
+                        @* ID - read only *@
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #e5e5e5;">
+                            <div style="font-size: 12px; color: #444;">ID</div>
+                            <div>
+                                @if (IsNew)
+                                {
+                                    <span style="color: #28a745; font-style: italic; font-size: 12px;">(New - auto)</span>
+                                }
+                                else
+                                {
+                                    <FluentTextField Value="@Value.id.ToString()" Disabled="true" Style="max-width: 120px;" />
+                                }
+                            </div>
+                        </div>
+
+                        @* name *@
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #e5e5e5;">
+                            <div style="font-size: 12px; color: #444;">name</div>
+                            <div>
+                                <FluentTextField Value="@(Value.name ?? "")"
+                                                 ValueChanged="@(async (string v) => { Value.name = v; await NotifyChanged(); })"
+                                                 Placeholder="Object name"
+                                                 Style="width: 100%;" />
+                            </div>
+                        </div>
+
+                        @* value_string *@
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #e5e5e5;">
+                            <div style="font-size: 12px; color: #444;">value_string</div>
+                            <div>
+                                <FluentTextField Value="@(Value.value_string ?? "")"
+                                                 ValueChanged="@(async (string v) => { Value.value_string = string.IsNullOrEmpty(v) ? null : v; await NotifyChanged(); })"
+                                                 Placeholder="String value"
+                                                 Style="width: 100%;" />
+                            </div>
+                        </div>
+
+                        @* value_long *@
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #e5e5e5;">
+                            <div style="font-size: 12px; color: #444;">value_long</div>
+                            <div>
+                                <FluentNumberField TValue="long?"
+                                                   Value="@Value.value_long"
+                                                   ValueChanged="@(async (long? v) => { Value.value_long = v; await NotifyChanged(); })"
+                                                   Style="max-width: 120px;" />
+                            </div>
+                        </div>
+
+                        @* parent_id *@
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #e5e5e5;">
+                            <div style="font-size: 12px; color: #444;">parent_id</div>
+                            <div>
+                                <FluentNumberField TValue="long?"
+                                                   Value="@Value.parent_id"
+                                                   ValueChanged="@(async (long? v) => { Value.parent_id = v; await NotifyChanged(); })"
+                                                   Placeholder="Parent object ID"
+                                                   Style="max-width: 120px;" />
+                            </div>
+                        </div>
+
+                        @* key *@
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #e5e5e5;">
+                            <div style="font-size: 12px; color: #444;">key</div>
+                            <div>
+                                <FluentNumberField TValue="long?"
+                                                   Value="@Value.key"
+                                                   ValueChanged="@(async (long? v) => { Value.key = v; await NotifyChanged(); })"
+                                                   Placeholder="Sort order"
+                                                   Style="max-width: 120px;" />
+                            </div>
+                        </div>
+
+                        @* note *@
+                        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: start; padding: 4px 0; border-bottom: 1px solid #e5e5e5;">
+                            <div style="font-size: 12px; color: #444; padding-top: 6px;">note</div>
+                            <div>
+                                <FluentTextArea Value="@(Value.note ?? "")"
+                                                ValueChanged="@(async (string v) => { Value.note = string.IsNullOrEmpty(v) ? null : v; await NotifyChanged(); })"
+                                                Rows="2"
+                                                Placeholder="Notes"
+                                                Style="width: 100%;" />
+                            </div>
+                        </div>
+
+                        @* Dates - read only *@
+                        @if (!IsNew)
+                        {
+                            <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #e5e5e5;">
+                                <div style="font-size: 12px; color: #444;">date_create</div>
+                                <div style="font-size: 12px; color: #666;">@Value.date_create.ToString("yyyy-MM-dd HH:mm:ss")</div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; padding: 4px 0;">
+                                <div style="font-size: 12px; color: #444;">date_modify</div>
+                                <div style="font-size: 12px; color: #666;">@Value.date_modify.ToString("yyyy-MM-dd HH:mm:ss")</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* Props Section *@
+            <div class="props-group" style="margin-top: 1rem;">
+                <div style="display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer; user-select: none;" @onclick="() => propsCollapsed = !propsCollapsed">
+                    <span style="cursor: pointer; font-size: 10px;">@(propsCollapsed ? "▶" : "▼")</span>
+                    <span style="font-weight: 500;">Properties</span>
+                    <span style="margin-left: auto; font-size: 0.85rem; color: #888;">@GetTypeName()</span>
+                </div>
+                @if (!propsCollapsed)
+                {
+                    <div style="padding-left: 12px;">
+                        @foreach (var group in GetGroupedProperties())
+                        {
+                            @if (string.IsNullOrEmpty(group.Key))
+                            {
+                                @foreach (var prop in group)
+                                {
+                                    <PropertyField Metadata="@prop"
+                                                   Target="@Value.Props"
+                                                   OnValueChanged="NotifyChanged" />
+                                }
+                            }
+                            else
+                            {
+                                var groupName = group.Key;
+                                var isExpanded = !collapsedGroups.Contains(groupName);
+
+                                <div style="margin-top: 0.5rem; margin-left: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; user-select: none; background: #e9ecef; border-radius: 3px; padding: 4px 8px;" @onclick="() => ToggleGroup(groupName)">
+                                        <span style="cursor: pointer; font-size: 10px;">@(isExpanded ? "▼" : "▶")</span>
+                                        <span style="font-weight: 500; font-size: 0.9rem;">@groupName</span>
+                                    </div>
+                                    @if (isExpanded)
+                                    {
+                                        <div style="padding-left: 12px;">
+                                            @foreach (var prop in group)
+                                            {
+                                                <PropertyField Metadata="@prop"
+                                                               Target="@Value.Props"
+                                                               OnValueChanged="NotifyChanged" />
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// The RedbObject to edit.
+    /// </summary>
+    [Parameter]
+    public RedbObject<TProps>? Value { get; set; }
+
+    /// <summary>
+    /// Called when any value changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<RedbObject<TProps>> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Called when Save button is clicked.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    /// <summary>
+    /// Whether to show the Save button.
+    /// </summary>
+    [Parameter]
+    public bool ShowSaveButton { get; set; } = true;
+
+    /// <summary>
+    /// Whether save is in progress.
+    /// </summary>
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    private bool baseFieldsCollapsed = false;
+    private bool propsCollapsed = false;
+    private HashSet<string> collapsedGroups = [];
+    private IEnumerable<PropertyMetadata>? properties;
+
+    private bool IsNew => Value?.id == 0;
+
+    protected override void OnParametersSet()
+    {
+        properties = MetadataService.GetProperties<TProps>();
+
+        foreach (var prop in properties.Where(p => p.GroupCollapsed && !string.IsNullOrEmpty(p.GroupName)))
+        {
+            collapsedGroups.Add(prop.GroupName!);
+        }
+    }
+
+    private string GetTypeName() => typeof(TProps).Name;
+
+    private IEnumerable<IGrouping<string?, PropertyMetadata>> GetGroupedProperties()
+    {
+        return properties?
+            .GroupBy(p => p.GroupName)
+            .OrderBy(g => string.IsNullOrEmpty(g.Key) ? 0 : 1)
+            .ThenBy(g => g.Key)
+            ?? Enumerable.Empty<IGrouping<string?, PropertyMetadata>>();
+    }
+
+    private void ToggleGroup(string groupName)
+    {
+        if (collapsedGroups.Contains(groupName))
+            collapsedGroups.Remove(groupName);
+        else
+            collapsedGroups.Add(groupName);
+    }
+
+    private async Task NotifyChanged()
+    {
+        if (Value != null)
+        {
+            await ValueChanged.InvokeAsync(Value);
+        }
+    }
+
+    private async Task HandleSave()
+    {
+        await OnSave.InvokeAsync();
+    }
+}

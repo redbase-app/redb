@@ -1,0 +1,432 @@
+-- =====================================================================
+-- 20_pvt_build_query_sql.sql  (MSSql v2-pvt) — orchestrator
+-- ---------------------------------------------------------------------
+-- Pure SQL string generation. Output yields a single `_id` column.
+--
+-- Shapes:
+--   A) pure-base (no PROPS field referenced):
+--      SELECT [DISTINCT] _id FROM dbo._objects o
+--       WHERE o.[_id_scheme] = X AND <where>
+--       [ORDER BY ...] [OFFSET ... ROWS FETCH NEXT ... ROWS ONLY]
+--
+--   C) wide CTE (any PROPS field referenced):
+--      WITH _pvt_cte AS (...)
+--      SELECT [DISTINCT] [_id] FROM _pvt_cte
+--       WHERE <where>
+--       [ORDER BY ...] [OFFSET ... ROWS FETCH NEXT ... ROWS ONLY]
+--
+-- Slice limits: no narrow, no tree, no pushdown.
+-- DistinctBy: emulated via ROW_NUMBER() OVER (PARTITION BY key) = 1.
+-- MSSql paging: OFFSET/FETCH requires ORDER BY -> inject 'ORDER BY (SELECT 1)'
+-- when none specified and paging requested.
+-- =====================================================================
+
+SET QUOTED_IDENTIFIER ON;
+GO
+
+CREATE OR ALTER FUNCTION dbo.pvt_build_query_sql(
+    @scheme_id    BIGINT,
+    @filter       NVARCHAR(MAX),
+    @limit        INT,
+    @offset       INT,
+    @order        NVARCHAR(MAX),
+    @max_depth    INT,
+    @distinct     BIT,
+    @source_mode  NVARCHAR(50),
+    @tree_ids     NVARCHAR(MAX),
+    @include_seed BIT,
+    @polymorphic  BIT,
+    @distinct_on  NVARCHAR(MAX)
+)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    IF @scheme_id IS NULL
+        RETURN NULL;
+    IF @source_mode IS NULL SET @source_mode = N'flat';
+
+    -- WhereLevel of a tree query that starts from nodes counts from them (the start is 0, its children 1), as the
+    -- maxDepth of the same query and Pro count it: $level leaves the filter and becomes a condition on the walk depth
+    -- of pvt_tree_descendants (the first depth of a node reached from two starts). Without start nodes (the whole
+    -- scheme) the level stays absolute, counted from the root.
+    DECLARE @seed_level_sql NVARCHAR(MAX) = NULL;
+    IF @source_mode IN (N'tree', N'tree_descendants', N'tree_children', N'tree_roots', N'tree_leaves')
+       AND @tree_ids IS NOT NULL AND ISJSON(@tree_ids) = 1 AND ISJSON(@filter) = 1
+       AND EXISTS (SELECT 1 FROM OPENJSON(@filter) WHERE [key] = N'$level')
+    BEGIN
+        DECLARE @lvl_value NVARCHAR(MAX), @lvl_type INT, @lvl_cond NVARCHAR(MAX);
+        SELECT @lvl_value = [value], @lvl_type = [type] FROM OPENJSON(@filter) WHERE [key] = N'$level';
+        IF @lvl_type = 2
+            SET @lvl_cond = N'depth = ' + CAST(CAST(@lvl_value AS INT) AS NVARCHAR(20));
+        ELSE IF @lvl_type = 5
+            SELECT @lvl_cond = STRING_AGG(N'depth '
+                + CASE [key] WHEN N'$gt' THEN N'>' WHEN N'$gte' THEN N'>=' WHEN N'$lt' THEN N'<'
+                             WHEN N'$lte' THEN N'<=' WHEN N'$eq' THEN N'=' WHEN N'$ne' THEN N'<>'
+                             ELSE dbo.pvt_fail(N'unsupported $level operator ' + [key]) END
+                + N' ' + CAST(CAST([value] AS INT) AS NVARCHAR(20)), N' AND ')
+            FROM OPENJSON(@lvl_value);
+        ELSE
+            SET @lvl_cond = dbo.pvt_fail(N'$level expects a number or an operator object');
+        SET @seed_level_sql = N'o.[_id] IN (SELECT _id FROM dbo.pvt_tree_descendants('
+            + CAST(@scheme_id AS NVARCHAR(40)) + N', N''' + REPLACE(@tree_ids, N'''', N'''''') + N''', '
+            + CASE WHEN @max_depth IS NULL THEN N'NULL' ELSE CAST(@max_depth AS NVARCHAR(20)) END + N', '
+            + CAST(COALESCE(@polymorphic, 1) AS NVARCHAR(1)) + N', 1) WHERE '
+            + COALESCE(@lvl_cond, N'1 = 1') + N')';
+        SET @filter = JSON_MODIFY(@filter, N'$."$level"', NULL);
+    END;
+
+    -- Guard: @distinct=1 and @distinct_on not null are mutually exclusive.
+    -- Scalar UDFs cannot THROW; force a runtime cast error whose message
+    -- contains 'mutually exclusive' so callers can detect the guard.
+    IF @distinct = 1 AND @distinct_on IS NOT NULL AND ISJSON(@distinct_on) = 1
+    BEGIN
+        DECLARE @_guard INT = CAST(N'p_distinct and p_distinct_on are mutually exclusive' AS INT);
+    END;
+
+    -- Merge @distinct_on entries into @order for field collection so that
+    -- any PROPS field referenced in @distinct_on triggers Shape C correctly.
+    DECLARE @collect_order NVARCHAR(MAX) =
+        CASE
+            WHEN @distinct_on IS NULL OR ISJSON(@distinct_on) = 0 THEN @order
+            WHEN @order IS NULL OR ISJSON(@order) = 0             THEN @distinct_on
+            ELSE LEFT(@order, LEN(@order) - 1) + N',' + SUBSTRING(@distinct_on, 2, LEN(@distinct_on) - 1)
+        END;
+
+    DECLARE @fields NVARCHAR(MAX) = dbo.pvt_collect_fields(@scheme_id, @filter, @collect_order);
+
+    -- Pure-base shortcut: every collected field has kind='base'
+    DECLARE @has_props BIT = 0;
+    DECLARE @has_nested BIT = 0;     -- any nested-dict field (parent_sid + dict_key)
+    DECLARE @has_scalar BIT = 0;     -- any PROPS field that is NOT nested-dict
+    IF @fields IS NOT NULL AND ISJSON(@fields) = 1 AND @fields <> N'{}'
+    BEGIN
+        IF EXISTS (
+            SELECT 1
+              FROM OPENJSON(@fields)
+             WHERE JSON_VALUE([value], '$.kind') <> N'base'
+        )
+            SET @has_props = 1;
+        IF EXISTS (
+            SELECT 1
+              FROM OPENJSON(@fields)
+             WHERE JSON_VALUE([value], '$.parent_sid') IS NOT NULL
+               AND JSON_VALUE([value], '$.dict_key')   IS NOT NULL
+        )
+            SET @has_nested = 1;
+        IF EXISTS (
+            SELECT 1
+              FROM OPENJSON(@fields)
+             WHERE JSON_VALUE([value], '$.kind') <> N'base'
+               AND NOT (
+                       JSON_VALUE([value], '$.parent_sid') IS NOT NULL
+                   AND JSON_VALUE([value], '$.dict_key')   IS NOT NULL
+                   )
+        )
+            SET @has_scalar = 1;
+    END;
+
+    -- Narrow vs wide decision (PG parity, see redb.Postgres/sql/v2-pvt/20_pvt_build_query_sql.sql).
+    -- @force_outer = 1 means the wide LEFT JOIN shape is mandatory:
+    --   - any absence check ($null / $isNull) needs LEFT JOIN to surface NULL pivot rows,
+    --   - pure-base / empty-field queries do not need a pivot at all.
+    -- @narrow = 1 means we can use the Pro-shape narrow pivot
+    -- (FROM _values v / GROUP BY 1 / IN (SELECT FROM _objects)) and JOIN _objects in the outer SELECT.
+    -- Mixed (scalar + nested-dict in the same query) forces wide because the nested side CTE expects pi.* projection.
+    DECLARE @has_null   BIT = dbo.pvt_has_absence_check(@filter);
+    DECLARE @force_outer BIT = CASE
+        WHEN @has_null = 1 OR @has_props = 0 THEN 1
+        ELSE 0
+    END;
+    -- Narrow with nested: 12 emits a slim pivot (GROUP BY o.[_id]) and
+    -- the orchestrator JOINs _objects in the outer SELECT, so the heavy
+    -- 21-col GROUP BY is gone even when nested-dict fields are present.
+    DECLARE @narrow BIT = CASE
+        WHEN @force_outer = 0 THEN 1
+        ELSE 0
+    END;
+
+    DECLARE @paging NVARCHAR(MAX) = N'';
+    IF @limit IS NOT NULL AND @limit >= 0
+    BEGIN
+        IF COALESCE(@offset, 0) = 0
+            SET @paging = CHAR(10) + N'OFFSET 0 ROWS FETCH NEXT ' + CAST(@limit AS NVARCHAR(20)) + N' ROWS ONLY';
+        ELSE
+            SET @paging = CHAR(10) + N'OFFSET ' + CAST(@offset AS NVARCHAR(20))
+                        + N' ROWS FETCH NEXT ' + CAST(@limit AS NVARCHAR(20)) + N' ROWS ONLY';
+    END
+    ELSE IF COALESCE(@offset, 0) > 0
+        SET @paging = CHAR(10) + N'OFFSET ' + CAST(@offset AS NVARCHAR(20)) + N' ROWS';
+
+    -- Outer alias prefix for base columns: Shape A and narrow Shape B both expose
+    -- base columns on alias `o` (via JOIN _objects); legacy wide Shape C exposes
+    -- them on `_pvt_cte` (projected by the wide GROUP BY). Pivot/scalar columns
+    -- always render unprefixed (pvt_build_field_condition/_order skip the prefix
+    -- for kind <> 'base'), so unique pivot names resolve to _pvt_cte automatically.
+    DECLARE @base_prefix NVARCHAR(10) = CASE
+        WHEN @has_props = 0 OR @narrow = 1 THEN N'o.'
+        ELSE N'_pvt_cte.'
+    END;
+    DECLARE @order_sql NVARCHAR(MAX) = dbo.pvt_build_order_conditions(@order, @fields, @base_prefix);
+    -- The ordering columns alone (no "ORDER BY"), for the ROW_NUMBER of the DistinctBy branches: they rank
+    -- inside the row source, where pivot columns are visible, and are kept even without paging.
+    DECLARE @order_cols NVARCHAR(MAX) = CASE
+        WHEN @order_sql = N'' THEN N''
+        ELSE SUBSTRING(@order_sql, 11, LEN(@order_sql)) + N', '   -- skip CHAR(10) + N'ORDER BY ' (10 chars)
+    END;
+    -- T-SQL forbids ORDER BY inside subqueries unless paired with TOP/OFFSET-FETCH.
+    -- The orchestrator output is always wrapped as a derived table by the C# layer,
+    -- so drop ORDER BY when paging is absent and supply a stable default when
+    -- present. Using @base_prefix + [_id] gives deterministic paging (vs the old
+    -- (SELECT 1) placeholder which left row order to the planner).
+    IF @paging <> N'' AND @order_sql = N''
+        SET @order_sql = CHAR(10) + N'ORDER BY ' + @base_prefix + N'[_id]';
+    ELSE IF @paging = N''
+        SET @order_sql = N'';
+
+    -- DISTINCT (@distinct=1) wraps the row-source in a derived table `_dist` that
+    -- projects only [_id]; the OUTER ORDER BY must reference that projected column,
+    -- NOT the inner alias prefix (`o.`/`_pvt_cte.` don't exist outside the wrapper —
+    -- that caused "The multi-part identifier 'o._id' could not be bound" with .Take()).
+    -- T-SQL also forbids ORDER BY on columns absent from a DISTINCT SELECT, so only
+    -- the projected [_id] is orderable here; use it for deterministic paging.
+    DECLARE @order_sql_dist NVARCHAR(MAX) = CASE WHEN @paging <> N'' THEN CHAR(10) + N'ORDER BY [_id]' ELSE N'' END;
+
+    -- DistinctBy emulation: T-SQL has no SELECT DISTINCT ON. The row source gets
+    --   _rn  = ROW_NUMBER() OVER (PARTITION BY <keys> ORDER BY <order>, <id>)  -- first row of a key by the query order
+    --   _ord = ROW_NUMBER() OVER (ORDER BY <order>, <id>)                      -- the query order itself
+    -- and the wrapper keeps _rn = 1 ordered by _ord. The ordering is evaluated inside the row source, where
+    -- pivot columns resolve (an outer ORDER BY on a Props field failed: "Invalid column name"), and it is kept
+    -- without paging (OFFSET 0 ROWS). Every key of @distinct_on is partitioned by (DistinctRedb sends the
+    -- object's columns); up to 0.2.30 the first key only, ranked by (SELECT 1), with the order applied outside.
+    -- Keys are stored alias-qualified per current shape:
+    --   base col  -> @base_prefix + [DbCol]   (e.g. o.[_name] / _pvt_cte.[_name])
+    --   props col -> _pvt_cte.[FieldName]     (pivot cols always live in _pvt_cte)
+    DECLARE @rn_col NVARCHAR(MAX) = NULL;
+    IF @distinct_on IS NOT NULL AND ISJSON(@distinct_on) = 1
+    BEGIN
+        SELECT @rn_col = STRING_AGG(
+                   CASE WHEN JSON_VALUE(m.meta, '$.kind') = N'base'
+                        THEN @base_prefix + QUOTENAME(JSON_VALUE(m.meta, '$.column'))
+                        ELSE N'_pvt_cte.' + QUOTENAME(d.field) END,
+                   N', ') WITHIN GROUP (ORDER BY d.pos)
+          FROM (SELECT CAST([key] AS INT) AS pos, JSON_VALUE([value], '$.field') AS field
+                  FROM OPENJSON(@distinct_on)) d
+          CROSS APPLY (SELECT JSON_QUERY(@fields, N'$."' + STRING_ESCAPE(d.field, 'json') + N'"') AS meta) m
+         WHERE d.field IS NOT NULL AND d.field <> N'';
+    END;
+    DECLARE @rn_paging NVARCHAR(MAX) = CASE WHEN @paging = N'' THEN CHAR(10) + N'OFFSET 0 ROWS' ELSE @paging END;
+
+    -- ---------- Tree mode branch ----------
+    -- Handles tree_roots, tree_leaves, tree_children, tree_descendants, tree_ancestors.
+    -- When @has_props = 0: emit a flat subquery-safe SELECT against _objects using
+    -- the corresponding tree predicate; no WITH-CTE prefix so the result can be
+    -- wrapped in a derived table by the C# layer.
+    -- When @has_props = 1: delegate to pvt_build_cte_sql which natively supports
+    -- every tree mode (it injects o.[_id] IN (SELECT _id FROM dbo.pvt_tree_*(...)))
+    -- and then wrap with the Shape C outer SELECT / residual WHERE.
+    IF @source_mode IN (N'tree_roots', N'tree_leaves', N'tree_children',
+                        N'tree_descendants', N'tree_ancestors')
+    BEGIN
+        IF @has_props = 1
+        BEGIN
+            DECLARE @splitT NVARCHAR(MAX) = dbo.pvt_split_filter(@filter, @fields);
+            DECLARE @pushT  NVARCHAR(MAX) = JSON_VALUE(@splitT, N'$.push');
+            IF @seed_level_sql IS NOT NULL
+                SET @pushT = CASE WHEN @pushT IS NULL OR @pushT = N'' THEN @seed_level_sql
+                                  ELSE N'(' + @pushT + N') AND ' + @seed_level_sql END;
+            DECLARE @resT   NVARCHAR(MAX) = JSON_QUERY(@splitT, N'$.residual');
+            DECLARE @innerT NVARCHAR(MAX) = dbo.pvt_build_cte_sql(
+                @scheme_id, @fields, @source_mode, @tree_ids, @max_depth,
+                @force_outer, @pushT, @narrow, COALESCE(@include_seed, 1), COALESCE(@polymorphic, 1), DEFAULT);
+            IF @innerT IS NULL RETURN NULL;
+            DECLARE @whereTp NVARCHAR(MAX) = dbo.pvt_build_where_from_json(@resT, @fields, @base_prefix);
+            DECLARE @joinT   NVARCHAR(MAX) = CASE
+                WHEN @narrow = 1 THEN CHAR(10) + N'JOIN dbo._objects o ON o.[_id] = _pvt_cte.[_id_object]'
+                ELSE N''
+            END;
+            DECLARE @rowSelT NVARCHAR(MAX) = CASE WHEN @narrow = 1 THEN N'o.[_id]' ELSE N'_pvt_cte.[_id]' END;
+            IF @rn_col IS NOT NULL
+                RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                     + N'SELECT ' + @rowSelT + N' AS [_id], '
+                     + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + @rowSelT + N') AS [_rn], '
+                     + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + @rowSelT + N') AS [_ord]' + CHAR(10)
+                     + N'FROM (' + CHAR(10) + @innerT + CHAR(10) + N') _pvt_cte' + @joinT + CHAR(10)
+                     + N'WHERE ' + @whereTp + CHAR(10)
+                     + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
+                     + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
+            -- T-SQL forbids ORDER BY items not in SELECT when DISTINCT.
+            -- Wrap so paging-ORDER applies outside the DISTINCT.
+            IF @distinct = 1
+                RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                     + N'SELECT DISTINCT ' + @rowSelT + N' AS [_id] FROM ('
+                     + CHAR(10) + @innerT + CHAR(10) + N') _pvt_cte' + @joinT
+                     + CHAR(10) + N'WHERE ' + @whereTp + CHAR(10)
+                     + N') _dist'
+                     + @order_sql_dist + @paging;
+            RETURN N'SELECT '
+                 + @rowSelT + N' FROM (' + CHAR(10) + @innerT + CHAR(10) + N') _pvt_cte' + @joinT
+                 + CHAR(10) + N'WHERE ' + @whereTp
+                 + @order_sql + @paging;
+        END;
+
+        DECLARE @whereT  NVARCHAR(MAX) = dbo.pvt_build_where_from_json(@filter, @fields, N'o.');
+        DECLARE @filterT NVARCHAR(MAX) = CASE
+            WHEN @whereT IS NULL OR @whereT = N'' OR @whereT = N'1=1' THEN N''
+            ELSE N' AND ' + @whereT
+        END;
+
+        DECLARE @escapedIds NVARCHAR(MAX) = NULL;
+        IF @tree_ids IS NOT NULL AND ISJSON(@tree_ids) = 1
+            SET @escapedIds = REPLACE(@tree_ids, N'''', N'''''');
+
+        DECLARE @treeWhere NVARCHAR(MAX);
+
+        IF @source_mode = N'tree_roots'
+        BEGIN
+            -- Root-scoped: WhereRoots() on TreeQuery(rootObj) means the root of THIS tree — the seed
+            -- object itself — not every _id_parent IS NULL object in the scheme (the cross-tree leak).
+            IF @escapedIds IS NOT NULL
+                SET @treeWhere = N'o.[_id] IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))';
+            ELSE
+                SET @treeWhere = N'o.[_id_parent] IS NULL';
+        END;
+        ELSE IF @source_mode = N'tree_leaves'
+        BEGIN
+            -- Root-scoped: WhereLeaves() on TreeQuery(rootObj) must return leaves of THAT subtree —
+            -- childless descendants of the seed — not every leaf in the scheme (the cross-tree leak).
+            -- pvt_is_descendant_of() is inclusive, so exclude the seed root itself (empty tree => none).
+            SET @treeWhere = N'NOT EXISTS (SELECT 1 FROM dbo._objects _lc WHERE _lc.[_id_parent] = o.[_id])';
+            -- Down to a depth: the leaves of the whole tree that lie within it (a node at the cut that has children
+            -- is not a leaf). pvt_is_descendant_of below has no depth.
+            IF @escapedIds IS NOT NULL AND @max_depth IS NOT NULL
+                SET @treeWhere += N' AND o.[_id] IN (SELECT _id FROM dbo.pvt_tree_descendants('
+                    + CAST(@scheme_id AS NVARCHAR(40)) + N', N''' + @escapedIds + N''', '
+                    + CAST(@max_depth AS NVARCHAR(20)) + N', '
+                    + CAST(COALESCE(@polymorphic, 1) AS NVARCHAR(1)) + N', 0))';
+            ELSE IF @escapedIds IS NOT NULL
+                SET @treeWhere += N' AND o.[_id] NOT IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))'
+                    + N' AND EXISTS (SELECT 1 FROM OPENJSON(N''' + @escapedIds
+                    + N''') _s WHERE dbo.pvt_is_descendant_of(o.[_id], CAST(_s.[value] AS BIGINT)) = 1)';
+        END;
+        ELSE IF @source_mode = N'tree_children'
+        BEGIN
+            IF @escapedIds IS NULL RETURN NULL;
+            SET @treeWhere = N'o.[_id_parent] IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))';
+        END;
+        ELSE IF @source_mode = N'tree_ancestors'
+        BEGIN
+            IF @escapedIds IS NULL RETURN NULL;
+            SET @treeWhere = N'o.[_id] IN (SELECT _id FROM dbo.pvt_tree_ancestors('
+                + CAST(@scheme_id AS NVARCHAR(40)) + N', N''' + @escapedIds + N''', '
+                + CASE WHEN @max_depth IS NULL THEN N'NULL' ELSE CAST(@max_depth AS NVARCHAR(20)) END + N', '
+                + CAST(COALESCE(@polymorphic, 1) AS NVARCHAR(1)) + N'))';
+        END;
+        ELSE IF @max_depth IS NOT NULL  -- tree_descendants down to a depth: the walk that counts levels
+        BEGIN
+            -- pvt_is_descendant_of below has no depth: with it TreeQuery(root, maxDepth) returned the whole subtree.
+            IF @escapedIds IS NULL RETURN NULL;
+            SET @treeWhere = N'o.[_id] IN (SELECT _id FROM dbo.pvt_tree_descendants('
+                + CAST(@scheme_id AS NVARCHAR(40)) + N', N''' + @escapedIds + N''', '
+                + CAST(@max_depth AS NVARCHAR(20)) + N', '
+                + CAST(COALESCE(@polymorphic, 1) AS NVARCHAR(1)) + N', '
+                + CAST(COALESCE(@include_seed, 1) AS NVARCHAR(1)) + N'))';
+        END;
+        ELSE  -- tree_descendants: correlated pvt_is_descendant_of, no CTE
+        BEGIN
+            IF @escapedIds IS NULL RETURN NULL;
+            SET @treeWhere = N'EXISTS (SELECT 1 FROM OPENJSON(N''' + @escapedIds
+                + N''') _s WHERE dbo.pvt_is_descendant_of(o.[_id], CAST(_s.[value] AS BIGINT)) = 1)';
+            IF COALESCE(@include_seed, 1) = 0
+                SET @treeWhere += N' AND o.[_id] NOT IN (SELECT CAST([value] AS BIGINT) FROM OPENJSON(N''' + @escapedIds + N'''))';
+        END;
+
+        IF @seed_level_sql IS NOT NULL
+            SET @treeWhere = N'(' + @treeWhere + N') AND ' + @seed_level_sql;
+        DECLARE @baseFromT NVARCHAR(MAX) = N'FROM dbo._objects o'
+             + CHAR(10) + N'WHERE o.[_id_scheme] = ' + CAST(@scheme_id AS NVARCHAR(40))
+             + N' AND ' + @treeWhere
+             + @filterT;
+        -- Distinct as in the flat Shape A. This branch used to ignore both: DistinctByRedb on a base
+        -- field (no props in the query) returned every node of the tree.
+        IF @rn_col IS NOT NULL
+            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                 + N'SELECT o.[_id] AS [_id], '
+                 + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + N'o.[_id]) AS [_rn], '
+                 + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + N'o.[_id]) AS [_ord]' + CHAR(10)
+                 + @baseFromT + CHAR(10)
+                 + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
+                 + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
+        IF @distinct = 1
+            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                 + N'SELECT DISTINCT o.[_id] AS [_id] ' + @baseFromT + CHAR(10)
+                 + N') _dist'
+                 + @order_sql_dist + @paging;
+        RETURN N'SELECT o.[_id] ' + @baseFromT
+             + @order_sql + @paging;
+    END;
+
+    -- Unrecognized non-flat source mode: not yet implemented
+    IF @source_mode <> N'flat'
+        RETURN NULL;
+
+    -- ---------- Shape A (pure-base) ----------
+    IF @has_props = 0
+    BEGIN
+        DECLARE @whereA  NVARCHAR(MAX) = dbo.pvt_build_where_from_json(@filter, @fields, N'o.');
+        DECLARE @baseFrom NVARCHAR(MAX) = N'FROM dbo._objects o'
+            + CHAR(10) + N'WHERE o.[_id_scheme] = ' + CAST(@scheme_id AS NVARCHAR(40))
+            + CASE WHEN @whereA <> N'1=1' THEN N' AND ' + @whereA ELSE N'' END;
+        IF @rn_col IS NOT NULL
+            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                 + N'SELECT o.[_id] AS [_id], '
+                 + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + N'o.[_id]) AS [_rn], '
+                 + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + N'o.[_id]) AS [_ord]' + CHAR(10)
+                 + @baseFrom + CHAR(10)
+                 + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
+                 + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
+        IF @distinct = 1
+            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                 + N'SELECT DISTINCT o.[_id] AS [_id] ' + @baseFrom + CHAR(10)
+                 + N') _dist'
+                 + @order_sql_dist + @paging;
+        RETURN N'SELECT o.[_id] ' + @baseFrom
+             + @order_sql + @paging;
+    END;
+
+    -- ---------- Shape B (narrow Pro-parity) / Shape C (wide pivot) ----------
+    -- Pro-parity base pushdown: peel off base/hierarchical predicates so
+    -- they narrow _objects BEFORE the correlated pivot subqueries execute
+    -- per row. Residual stays on the outer WHERE.
+    DECLARE @splitC NVARCHAR(MAX) = dbo.pvt_split_filter(@filter, @fields);
+    DECLARE @pushC  NVARCHAR(MAX) = JSON_VALUE(@splitC, N'$.push');
+    DECLARE @resC   NVARCHAR(MAX) = JSON_QUERY(@splitC, N'$.residual');
+    DECLARE @inner  NVARCHAR(MAX) = dbo.pvt_build_cte_sql(
+        @scheme_id, @fields, N'flat', NULL, NULL, @force_outer, @pushC, @narrow, DEFAULT, DEFAULT, DEFAULT);
+    DECLARE @whereC NVARCHAR(MAX) = dbo.pvt_build_where_from_json(@resC, @fields, @base_prefix);
+    DECLARE @joinC  NVARCHAR(MAX) = CASE
+        WHEN @narrow = 1 THEN CHAR(10) + N'JOIN dbo._objects o ON o.[_id] = _pvt_cte.[_id_object]'
+        ELSE N''
+    END;
+    DECLARE @rowSelC NVARCHAR(MAX) = CASE WHEN @narrow = 1 THEN N'o.[_id]' ELSE N'_pvt_cte.[_id]' END;
+    IF @rn_col IS NOT NULL
+        RETURN N'SELECT [_id] FROM (' + CHAR(10)
+             + N'SELECT ' + @rowSelC + N' AS [_id], '
+             + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + @rowSelC + N') AS [_rn], '
+             + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + @rowSelC + N') AS [_ord]' + CHAR(10)
+             + N'FROM (' + CHAR(10) + @inner + CHAR(10) + N') _pvt_cte' + @joinC + CHAR(10)
+             + N'WHERE ' + @whereC + CHAR(10)
+             + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
+             + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
+    IF @distinct = 1
+        RETURN N'SELECT [_id] FROM (' + CHAR(10)
+             + N'SELECT DISTINCT ' + @rowSelC + N' AS [_id] FROM ('
+             + CHAR(10) + @inner + CHAR(10) + N') _pvt_cte' + @joinC
+             + CHAR(10) + N'WHERE ' + @whereC + CHAR(10)
+             + N') _dist'
+             + @order_sql_dist + @paging;
+    RETURN N'SELECT '
+         + @rowSelC + N' FROM (' + CHAR(10) + @inner + CHAR(10) + N') _pvt_cte' + @joinC
+         + CHAR(10) + N'WHERE ' + @whereC
+         + @order_sql + @paging;
+END;
+GO

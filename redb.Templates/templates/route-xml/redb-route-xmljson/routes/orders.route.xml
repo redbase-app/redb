@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Every {{orders.period:3000}} ms an XML order: the even ones have one Item, the odd ones two, every third is
+       an express order. In a real module this is file://, sftp:// or a queue. -->
+  <route id="modulectx-orders" description="Turns an XML order into JSON and posts it to the API">
+    <from uri="timer://modulectx-orders?period={{orders.period:3000}}"/>
+    <setHeader name="express" expr="${header.CamelTimerCounter % 3 == 0 ? 'true' : 'false'}"/>
+    <setHeader name="secondItem" expr="${header.CamelTimerCounter % 2 == 1 ? '&lt;Item&gt;&lt;Sku&gt;B-2&lt;/Sku&gt;&lt;Qty&gt;1&lt;/Qty&gt;&lt;Price&gt;20&lt;/Price&gt;&lt;/Item&gt;' : ''}"/>
+    <setBody expr='&lt;Order xmlns="urn:example:orders" id="order-${header.CamelTimerCounter}"&gt;&lt;Customer&gt;ACME&lt;/Customer&gt;&lt;Express&gt;${header.express}&lt;/Express&gt;&lt;Items&gt;&lt;Item&gt;&lt;Sku&gt;A-1&lt;/Sku&gt;&lt;Qty&gt;2&lt;/Qty&gt;&lt;Price&gt;9.50&lt;/Price&gt;&lt;/Item&gt;${header.secondItem}&lt;/Items&gt;&lt;/Order&gt;'/>
+    <validateXsd file="resources/order.xsd" targetNamespace="urn:example:orders" throwOnFailure="true"/>
+    <!-- XML to JSON by the format of context.xml: Item is an array even in an order of one, Qty and Price are
+         numbers, Express a boolean, the id attribute the key "@id". -->
+    <marshal format="orders-json"/>
+    <!-- The format writes UTF-8 bytes; the log wants the text. -->
+    <convertBody type="System.String"/>
+    <log level="Information" showRouteId="true">
+      <message>json: ${body}</message>
+    </log>
+    <!-- The JSON goes to the module's own API (routes/api.route.xml); the answer becomes the body. -->
+    <to uri="http://localhost:5181/api/orders?method=POST"/>
+    <convertBody type="System.String"/>
+    <log level="Information" showRouteId="true">
+      <message>api answered: ${body}</message>
+    </log>
+  </route>
+
+</routes>

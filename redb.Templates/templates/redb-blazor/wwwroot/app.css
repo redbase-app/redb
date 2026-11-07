@@ -1,0 +1,23 @@
+body { font-family: system-ui, sans-serif; margin: 0; color: #1f2328; background: #fff; }
+header { display: flex; gap: 1.5rem; align-items: center; padding: 0.75rem 1.5rem; border-bottom: 1px solid #d0d7de; }
+header .brand { font-weight: 600; color: #b3261e; text-decoration: none; }
+main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem; }
+a { color: #0969da; }
+.filters { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 0.5rem; }
+.muted { color: #656d76; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #d0d7de; }
+.num { text-align: right; }
+.pager { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.pager span { font-weight: 600; }
+.form { display: grid; gap: 0.35rem; max-width: 480px; }
+.form input:not([type=checkbox]), .form textarea { padding: 0.35rem; font: inherit; }
+.form .actions { display: flex; gap: 1rem; align-items: center; margin-top: 0.75rem; }
+.field-validation-error, .validation-summary-errors { color: #b3261e; }
+button.link { background: none; border: 0; padding: 0; color: #b3261e; cursor: pointer; font: inherit; }
+header a.active { font-weight: 600; }
+.pager button { font: inherit; }
+.tree { list-style: none; padding-left: 1.25rem; }
+.tree li { margin: 0.25rem 0; }
+.tree button.link { margin-left: 0.5rem; }
+.inline { display: inline-flex; gap: 0.4rem; margin-left: 0.5rem; }

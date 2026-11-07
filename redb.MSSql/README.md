@@ -1,0 +1,63 @@
+# redb.MSSql
+
+SQL Server provider for **RedBase (REDB)** — Entity Database for .NET.
+
+[![NuGet](https://img.shields.io/nuget/v/redb.MSSql?label=NuGet&color=blue)](https://www.nuget.org/packages/redb.MSSql)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](../LICENSE)
+
+## What's inside
+
+- T-SQL-optimized query generation
+- Tree queries with recursive CTEs
+- Schema initialization (`redbMSSQL.sql`)
+- Full LINQ-to-SQL translation
+- Depends on `redb.Core` and `Microsoft.Data.SqlClient` 7.0.3
+
+## Requirements
+
+- **SQL Server 2017 or newer.** The server-side machinery uses `OPENJSON`, `JSON_VALUE`,
+  `JSON_QUERY`, `ISJSON` and `STRING_SPLIT` (2016), plus `STRING_AGG` and `TRIM` (2017).
+- **SQL Server 2022 or newer for the `$min` / `$max` expression operators**, which compile to
+  `LEAST` / `GREATEST`. Nothing else needs 2022, and on an older server only those two operators
+  fail, at query time rather than at startup.
+- Azure SQL Database tracks the latest engine, so it satisfies both. It is not part of our test run.
+- Developed and tested against `mcr.microsoft.com/mssql/server:2025-latest`.
+- **Index usage counters need `VIEW SERVER STATE`** (`VIEW SERVER PERFORMANCE STATE` on 2022 and
+  newer). Without it, `Redb.Maintenance` still lists tables, indexes and their sizes, but
+  `IndexStatistics.Seeks`, `Scans`, `Updates`, `LastUsed` and `StatisticsWindow.CountersSince` are
+  null. Grant it to the application login with `GRANT VIEW SERVER STATE TO [login]`.
+
+## Installation
+
+```bash
+dotnet add package redb.MSSql
+```
+
+## Setup
+
+```csharp
+using redb.Core.Extensions;
+using redb.MSSql.Extensions;
+
+builder.Services.AddRedb(options => options
+    .UseMsSql("Server=localhost;Database=mydb;User Id=sa;Password=pass;TrustServerCertificate=true"));
+```
+
+## Server settings
+
+With the SQL Server defaults (`max degree of parallelism` 0, `cost threshold for parallelism` 5) the free
+provider's window, GroupBy and aggregate queries go parallel on every core and run 2 to 6 times slower: on
+100 000 employees an `NTILE` window took 11.5 s instead of 1.8 s. We test with `cost threshold for parallelism`
+50 and `max degree of parallelism` 4, set with `sp_configure` followed by `RECONFIGURE`. Simple filters and the
+Pro provider are not affected.
+
+## Links
+
+- Documentation (EN): [redbase.app](https://redbase.app)
+- Documentation (RU): [redb.ru](https://redb.ru)
+- API Reference: [redbase-app.github.io/redb](https://redbase-app.github.io/redb/)
+- GitHub: [github.com/redbase-app/redb](https://github.com/redbase-app/redb)
+
+## License
+
+Apache License 2.0 — see [LICENSE](https://github.com/redbase-app/redb/blob/main/LICENSE).

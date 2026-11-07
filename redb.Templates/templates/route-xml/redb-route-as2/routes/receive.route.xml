@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- The module's AS2 address for the partner: POST http(s)://<host>:{{as2.port:4080}}/as2/inbound. The receiver
+       checks AS2-From and AS2-To against the agreement, decrypts, verifies the signature against the pinned partner
+       certificate, and answers with the MDN the partner asked for (signed when asked). A refused message never
+       reaches the route. A Message-ID received before gets its MDN again and does not reach the route twice. -->
+  <route id="modulectx-as2-receive" description="Receives AS2 documents from the partner">
+    <from uri="as2:/as2/inbound?port={{as2.port:4080}}&amp;connectionFactory=partner&amp;idempotentRepository=as2-received"/>
+    <!-- The decrypted document is the body (bytes); the AS2 headers of the request are headers. -->
+    <convertBody type="System.String"/>
+    <log level="Information" showRouteId="true">
+      <message>received ${header.Message-ID} from ${header.AS2-From}, signature valid ${header.redbAs2.signatureValid}: ${body}</message>
+    </log>
+    <!-- Replace the log with the real work: parse the EDI, store the document, hand it to a queue. -->
+  </route>
+
+</routes>

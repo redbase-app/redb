@@ -1,0 +1,13 @@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using RedbBff.Models
+@using RedbBff.Web
+@using RedbBff.Web.Components
+@using RedbBff.Web.Services
+@* Every page needs a session; the sign-in and error pages opt out with [AllowAnonymous]. *@
+@attribute [Authorize]

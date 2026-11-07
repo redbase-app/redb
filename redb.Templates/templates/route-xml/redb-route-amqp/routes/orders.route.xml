@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- A failed message is tried again twice, one second apart. When it still fails, the original message goes to the
+       queue orders.failed and the delivery is accepted, so a bad message never blocks the queue. -->
+  <onException exceptions="System.Exception" handled="true" useOriginalBody="true"
+               maximumRedeliveries="2" redeliveryDelay="00:00:01" retryAttemptedLogLevel="Warning">
+    <log level="Warning" showRouteId="true">
+      <message>moved to orders.failed: ${exception.message}</message>
+    </log>
+    <to uri="amqp://orders.failed?connectionFactory=amqp"/>
+  </onException>
+
+  <!-- Producer: an order every {{orders.period:5000}} ms to the queue orders (ANYCAST: one consumer gets each
+       message); every fifth one has amount 0 and fails in the consumer. -->
+  <route id="modulectx-orders-out" description="Sends a test order to the queue orders">
+    <from uri="timer://modulectx-orders?period={{orders.period:5000}}"/>
+    <choice>
+      <when expr="header.CamelTimerCounter % 5 == 0">
+        <setBody expr='{"id":"order-${header.CamelTimerCounter}","amount":0}'/>
+      </when>
+      <otherwise>
+        <setBody expr='{"id":"order-${header.CamelTimerCounter}","amount":${header.CamelTimerCounter}}'/>
+      </otherwise>
+    </choice>
+    <to uri="amqp://orders?connectionFactory=amqp&amp;contentType=application/json"/>
+  </route>
+
+  <!-- Consumer: up to 10 unsettled messages at a time (credit); a message is accepted after the route finished with
+       it. Replace the log with the real work. -->
+  <route id="modulectx-orders-in" description="Processes the orders from the queue orders">
+    <from uri="amqp://orders?connectionFactory=amqp&amp;credit=10"/>
+    <convertBody type="System.String"/>
+    <choice>
+      <when expr="jpath('$.amount') == 0">
+        <throwException type="System.InvalidOperationException" message="an order needs an amount"/>
+      </when>
+    </choice>
+    <log level="Information" showRouteId="true">
+      <message>order processed: ${body}</message>
+    </log>
+  </route>
+
+  <!-- The failed messages, for a person to look at. -->
+  <route id="modulectx-orders-failed" description="Logs the orders that failed after the retries">
+    <from uri="amqp://orders.failed?connectionFactory=amqp"/>
+    <convertBody type="System.String"/>
+    <log level="Warning" showRouteId="true">
+      <message>failed order: ${body}</message>
+    </log>
+  </route>
+
+</routes>

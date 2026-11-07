@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- A failed record is tried again twice, one second apart. When it still fails, the original
+       record goes to the topic orders-failed and its offset is committed, so one bad record does
+       not stop the partition. -->
+  <onException exceptions="System.Exception" handled="true" useOriginalBody="true"
+               maximumRedeliveries="2" redeliveryDelay="00:00:01" retryAttemptedLogLevel="Warning">
+    <log level="Warning" showRouteId="true">
+      <message>moved to orders-failed: ${exception.message}</message>
+    </log>
+    <to uri="kafka://orders-failed?connectionFactory=kafka"/>
+  </onException>
+
+  <!-- Producer: an order every {{orders.period:5000}} ms. The record key is the order id
+       (header redbKafka.Key), so all records of one order land in one partition, in order.
+       Every fifth order has amount 0 and fails in the consumer. -->
+  <route id="modulectx-orders-out" description="Publishes a test order to the topic orders">
+    <from uri="timer://modulectx-orders?period={{orders.period:5000}}"/>
+    <setHeader name="redbKafka.Key" expr="order-${header.CamelTimerCounter}"/>
+    <choice>
+      <when expr="header.CamelTimerCounter % 5 == 0">
+        <setBody expr='{"id":"order-${header.CamelTimerCounter}","amount":0}'/>
+      </when>
+      <otherwise>
+        <setBody expr='{"id":"order-${header.CamelTimerCounter}","amount":${header.CamelTimerCounter}}'/>
+      </otherwise>
+    </choice>
+    <to uri="kafka://orders?connectionFactory=kafka"/>
+  </route>
+
+  <!-- Consumer in the group {{kafka.group:modulectx}}: the offset of a record is committed after
+       the route finished with it, so a record is not lost when the worker stops in the middle.
+       Run the module on several workers and the partitions are shared between them. -->
+  <route id="modulectx-orders-in" description="Processes the orders from the topic orders">
+    <from uri="kafka://orders?connectionFactory=kafka"/>
+    <!-- A record arrives as bytes; the JSON checks and the log want the text. -->
+    <convertBody type="System.String"/>
+    <choice>
+      <when expr="jpath('$.amount') == 0">
+        <throwException type="System.InvalidOperationException" message="an order needs an amount"/>
+      </when>
+    </choice>
+    <log level="Information" showRouteId="true">
+      <message>order processed: ${body} (partition ${header.redbKafka.Partition}, offset ${header.redbKafka.Offset})</message>
+    </log>
+  </route>
+
+  <!-- The failed records, for a person to look at. -->
+  <route id="modulectx-orders-failed" description="Logs the orders that failed after the retries">
+    <from uri="kafka://orders-failed?connectionFactory=kafka"/>
+    <convertBody type="System.String"/>
+    <log level="Warning" showRouteId="true">
+      <message>failed order: ${body}</message>
+    </log>
+  </route>
+
+</routes>

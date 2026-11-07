@@ -1,0 +1,237 @@
+-- =====================================================================
+-- v2-pvt module version (MSSql)
+-- =====================================================================
+-- Applied LAST on purpose, see the PostgreSQL twin. The bundle runs as GO
+-- batches with autocommit, so a failure in the middle leaves the earlier
+-- batches applied; with the version created first (as until 0.1.9) such a
+-- failure left the NEW version next to the OLD functions and nothing ever
+-- retried. Step 2 of 00_module_init.sql drops dbo.pvt_module_version with
+-- the rest; it is recreated here only after everything else succeeded.
+-- =====================================================================
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+-- ---------- 3. Module version function ---------------------------------
+-- semver: bump MAJOR on breaking changes to entry-point signatures or
+-- result shape; bump MINOR on additive features; bump PATCH on bug fixes.
+CREATE FUNCTION dbo.pvt_module_version()
+RETURNS nvarchar(50)
+WITH SCHEMABINDING
+AS
+BEGIN
+    -- 0.1.2 - 13_pvt_condition.sql: pvt_build_field_condition dict_key
+    --         branch now short-circuits to `_pvt_cte.[FieldName] OP val`
+    --         when called in a post-pivot context (@base_prefix = 'o.'
+    --         or '_pvt_cte.'). The nested-dict CTE already materializes
+    --         the pivot column; emitting an independent EXISTS over
+    --         dbo._values for the outer WHERE duplicated the lookup
+    --         work. Symmetric with PG's pvt_build_field_condition.
+    -- 0.1.1 - narrow-with-nested CTE shape + stable ORDER BY +
+    --         Pro-parity nested-dict pushdown:
+    --         * 12_pvt_cte_builder.sql: each LEFT JOIN nested derived
+    --           table now folds `_id_scheme = X` (+ extra_where +
+    --           tree_filter) into a dp._id_object IN (SELECT _id FROM
+    --           _objects ...) subquery — mirrors PG PRO.
+    --         * narrow-with-nested body skips INNER JOIN _values v
+    --           when @sids = N'' (nested-only): no scalar pivot
+    --           sids, no point in expanding+collapsing _values.
+    --         * 20_pvt_build_query_sql.sql: narrow eligibility now
+    --           allows nested groups; default ORDER BY @base_prefix
+    --           + [_id] when paging is present without ORDER BY.
+    -- 0.1.3 - fix: DISTINCT (@distinct=1) outer ORDER BY referenced the inner
+    --         alias prefix (o./_pvt_cte.) outside the `_dist` wrapper -> "multi-part
+    --         identifier 'o._id' could not be bound" with .Distinct().Take(). Outer
+    --         order now uses the projected [_id] (@order_sql_dist) in all 3 branches.
+    -- 0.1.4 - Soft-delete read-path fix + object-json materializer ownership:
+    --         * The whole object->JSON materializer (dbo.get_object_json plus
+    --           helpers build_properties / build_field_json / build_listitem_json
+    --           / escape_json_string) moved from core (redb_json_objects.sql,
+    --           now deleted) into the module (09_core_object_json.sql) so its
+    --           fixes auto-redeploy to existing databases via the version check
+    --           (full redb_init.sql is not re-run once _schemes exists).
+    --         * dbo.get_object_json now treats soft-deleted objects
+    --           (_id_scheme = -10, @@__deleted) as non-existent: a nested
+    --           _Object reference to a trashed object resolves to NULL instead
+    --           of materializing the tombstone. The _values pointer stays
+    --           intact, so soft-delete remains reversible.
+    -- 0.2.10 - base64 через FOR XML PATH вместо XML-инстанса (.value): 111 -> 21 мс на мегабайте.
+    --   В STRING_AGG подзапрос запрещён (Msg 130) - массив и словарь берут значение из OUTER APPLY.
+    -- 0.2.9 - root value_bytes emitted (base64 via XML trick) - was absent entirely, read gave null
+    --   (bug report BUG_BYTES �3.3 read side).
+    -- 0.2.8 - техбамп-2: OUTER APPLY попал в соседние блоки (0.2.7 битый в тестовых базах).
+    -- 0.2.7 - техбамп: T-SQL запрещает подзапрос в STRING_AGG, Р-1 переехал на OUTER APPLY
+    --   (0.2.6 успел задеплоиться битым в тестовые базы).
+    -- 0.2.6 - Р-1 (2026-09-03): legacy-толерантность «без _Guid И без детей» (оба места).
+    -- 0.2.5 - В-1 «null должен быть null» (2026-09-03): null-элемент коллекции классов
+    --   эмитится JSON-null (массив и словарь).
+    -- 0.2.4 - BR-7 (2026-09-02): dbo.pvt_like_escape() - the operand of every LIKE sugar
+    --   operator (field, dict, listitem, array, expression) is a LITERAL now, paired with
+    --   ESCAPE; the raw $like/$arrayMatches operators keep the caller's pattern.
+    -- 0.2.3 - the unread full-text index on _values._String is dropped (owner decision
+    --   2026-09-02): LIKE never used it, CONTAINS was never generated.
+    -- 0.2.2 - V4 LAZY L2 (lazy references):
+    --   * block 0: _structures._lazy and _scheme_metadata_cache._lazy (the virtual marker).
+    --   * 29: the metadata cache carries the marker.
+    --   * 09 build_field_json: @lazy parameter from the cache cursor; a lazy reference
+    --     emits the base-fields stub (depth 0) when SESSION_CONTEXT(N'redb.lazy_refs') = 1.
+    -- 0.1.12 - V4 byte[] scalar storage (B1):
+    --   * build_field_json fetched _ByteArray but had no emit branch at all, so a
+    --     ByteArray property always loaded as null. Base64 emit added to the three
+    --     CASE paths (scalar, array element, dictionary value) via xs:base64Binary.
+    -- 0.1.11 - V4 unique keys, stage 1 (UNIQUE_STRING_KEY_PLAN, Э1):
+    --   * block "0. Schema upgrades": _objects._value_unique NVARCHAR(440) and the filtered
+    --     unique index UIX__objects__scheme_unique (INCLUDE _id; 8+880 = 888 < 900).
+    --   * get_object_json and the PVT base-field surface emit and filter the column
+    --     (07/09/12/01), so the key behaves exactly like _value_string.
+    --   * sp_mark_for_deletion (30_soft_delete.sql) also releases the object key on the
+    --     way into the trash (decision 9).
+
+    -- 0.1.10 - V4 unique keys, stage 2 (UNIQUE_STRING_KEY_PLAN, Э2):
+    --   * block "0. Schema upgrades" opens 00_module_init.sql: _structures._unique,
+    --     _structures._unique_version, _values._unique UNIQUEIDENTIFIER, the filtered unique
+    --     index UIX__values__structure_unique, and the same two columns on
+    --     _scheme_metadata_cache (SCHEMA_DELIVERY plan, work S.1).
+    --   * 29_metadata_cache_sync.sql: sync_metadata_cache_for_scheme and
+    --     warmup_all_metadata_caches move in from sql/redb_metadata_cache.sql.
+    --   * 30_soft_delete.sql: sp_mark_for_deletion and sp_purge_trash move in from
+    --     sql/redb_soft_delete.sql; sp_mark_for_deletion now releases unique keys
+    --     (_values._unique = NULL) in the same transaction (decision 9).
+
+    -- 0.1.8 - the DateOnly seed correction joins the module:
+    --         * 28_migrate_dateonly_db_type.sql moved in from sql/. DateOnly was
+    --           seeded with _db_type = 'DateTime', which no JSON projection
+    --           branches on, so every DateOnly property materialised as
+    --           0001-01-01. The correction lived in sql/, which lands only in
+    --           redb_init.sql and is applied when the tables are absent, so it
+    --           reached new databases and no existing one.
+    --         * Idempotent by construction, as it must be: the bundle is
+    --           reapplied on every version change.
+    -- 0.1.7 - migrate_structure_type joins the module, and its String -> Boolean
+    --         conversion is guarded:
+    --         * 27_migrate_structure_type.sql moved in from sql/. It used to ship
+    --           only in redb_init.sql, applied to fresh databases only, so a fix
+    --           to it never reached an existing one. In the module, the version
+    --           check redeploys it like everything else here.
+    --         * String -> Boolean destroyed unrecognised values: the CASE fell
+    --           through to NULL while the same statement cleared _String, and the
+    --           row counted as a success. It is now predicated on the accepted
+    --           token list, like every other text conversion in that procedure,
+    --           which already used TRY_CAST(...) IS NOT NULL.
+    -- 0.1.6 - Scoped WhereLeaves()/WhereRoots() cross-tree leak fix:
+    --         * 20_pvt_build_query_sql.sql tree_leaves/tree_roots fast-path now
+    --           honours the seed: leaves = childless descendants of the seed root
+    --           (via pvt_is_descendant_of), roots = the seed object itself —
+    --           instead of a whole-scheme scan that ignored @tree_ids. So
+    --           TreeQuery(rootObj).WhereLeaves() returns the leaves of that
+    --           subtree, not every leaf in the scheme.
+    --         * pvt_tree_leaves / pvt_tree_roots (08_pvt_tree_functions.sql) —
+    --           the pvt_build_cte_sql (props-shape) path — seeded the same way.
+    -- 0.2.26 - found by the module smoke runner once it ran in the gate (SQ-4, 2026-09-26), each a PostgreSQL
+    --          parity gap that 1=0 had hidden: $arrayAt reads {"index":N,"value":V}; $arrayCountLte (was
+    --          $arraycountle); $ilike on a field; ContainsKey with a bare string key. One typed element
+    --          comparison (pvt_array_element_equals) instead of copies.
+    -- 0.2.25 - SQ-5 (2026-09-26): dbo.pvt_fail refuses what the filter and aggregate builders cannot read
+    --          (13, 14, 21). An unknown operator was 1=1 or 1=0, an unknown comparison '=', a value that
+    --          was not a number 0, an aggregate it could not compile a NULL column. PostgreSQL raises there.
+    -- 0.2.24 - pvt_build_query_sql, tree mode without props (2026-09-26): @distinct_on and @distinct were
+    --          ignored - DistinctByRedb on a tree returned every node. Wrapped as in the flat Shape A.
+    -- 0.2.23 - pvt_resolve_field_path (2026-09-26): T-SQL keeps a variable when SELECT @v = ... finds no
+    --          row, so an unknown nested child resolved to its parent (Contacts[].NoSuchField became the
+    --          Contacts array); the dictionary child and the 2b ListItem branch had the same trap.
+    -- 0.2.22 - array GroupBy (2026-09-26): a key or aggregate field the array item does not have, or an
+    --          unknown aggregate function, makes the result NULL. They were skipped - the grouping ran on
+    --          the other keys, the aggregate vanished, and with no key left the flat item list came back.
+    -- 0.2.21 - HAVING of the array GroupBy (2026-09-25): pvt_build_array_having_expr reads item fields
+    --          through the joined columns (@cols) and returns NULL for any shape it does not know; the
+    --          orchestrator joins a field only the HAVING aggregates and returns NULL on an unread
+    --          HAVING. It returned 1=1 for an unknown node (the condition was dropped) and wrote an item
+    --          field as [X], a column the query does not have.
+    -- 0.2.20 - tech bump: 0.2.19 reached the test databases before the file-26 fix below.
+    -- 0.2.19 - HAVING in GroupBy (2026-09-24): pvt_build_groupby_sql compiles @having through the
+    --          new pvt_build_groupby_having_expr, aggregates via pvt_build_agg_expr as in the SELECT
+    --          list; an unknown node makes the whole query NULL. @having was reserved and never
+    --          emitted, and the provider passed NULL: GroupBy(...).Having(...) returned every group.
+    --          26: an array-item field aggregated twice (Min(Value) + Max(Value)) reuses the joined
+    --          typed column; the second one named the field as an output alias and failed.
+    -- 0.2.18 - Regex.IsMatch / Regex.Replace in filters (2026-09-16): $regex / $iregex compile to
+    --          REGEXP_LIKE, $regexReplace to REGEXP_REPLACE (SQL Server 2025, compatibility level 170).
+    --          The unsupported-top branch turned $regex into 1=1: the filter was dropped and every row
+    --          came back.
+    -- 0.2.17 - arrays and dictionaries of references keep a trashed target as null (2026-09-15):
+    --          STRING_AGG skipped the NULL of the nested get_object_json and dropped the element /
+    --          the key. PostgreSQL, SQLite and Pro already kept null.
+    -- 0.2.16 - list item JSON in the model's shape (2026-09-15): dbo.build_listitem_json writes
+    --          {id, id_list, value, alias, id_object}. It wrote {id, idList, value, alias}: the model
+    --          reads id_list / id_object, so every load lost the list link and the object link.
+    -- 0.2.15 - trash review (2026-09-14): sp_mark_for_deletion and sp_purge_trash run with
+    --          SET XACT_ABORT ON and open their own transaction only when the caller has none -
+    --          a command timeout or cancel inside BEGIN TRANSACTION used to leave it open on the
+    --          session, and every later statement of the scope was rolled back with it.
+    --          sp_purge_trash: a reference held by a trashed object is removed with the purge; an
+    --          object referenced by a live object is skipped, and a container left with nothing
+    --          else is marked 'failed' instead of being retried forever.
+    -- 0.2.14 - soft delete resets _objects._hash (full-object hash, 2026-09-11): the trash
+    --          move changes parent and key outside the save path; a props-cache copy must not
+    --          outlive it.
+    -- 0.2.13 - block 0: S3 - _structures._unique_scope, _tags on schemes/structures/cache,
+    --          IX__structures__tags; cache sync carries the two new columns.
+    -- 0.2.12 - block 0: UIX__values__structure_unique recreated without the positional filter
+    --          (S2, subtree-unique plan): nested scalar keys carry _array_parent_id, the old
+    --          predicate kept them out of the index, so their uniqueness silently never fired.
+    -- 0.2.11 - block 0: FK-column indexes IX__values__ListItem_not_null /
+    --          IX__values__Object_not_null (filtered). Without them every DELETE of a
+    --          referenced object or list item scanned the whole _values for the FK check
+    --          (perf finding, 2026-09-10).
+    -- 0.1.0 - skeleton: module bootstrap, drop-all, version function.
+    --         Builder functions (pvt_build_query_sql etc.) not implemented yet.
+    -- 0.2.27 - fail-closed on unescaped splices (SQLI-PoC): pvt_b2_expr_sql (:60 and :361 of
+    --          14_pvt_where.sql) and pvt_build_window_expr (23_pvt_window.sql) call
+    --          dbo.pvt_fail instead of echoing a raw name inside a comment.
+    -- 0.2.28 - the $case branch of pvt_extract_field_pairs (10_pvt_field_collection.sql) is
+    --          reachable: the generic array descent swallowed $case first (its value is an
+    --          array), so "when"/"then"/"else" were harvested as field paths and the $field
+    --          references inside the arms were never collected. The expression builder then
+    --          could not resolve the field (silently NULL before 0.2.27, an error after).
+    -- 0.2.29 - block 0: the indexes another index of the same table fully replaces are dropped,
+    --          the set PostgreSQL dropped in 0.7.13 (2026-10-14). The statements that bring them
+    --          back are in the comment above the DROP block of 00_module_init.sql.
+    -- 0.2.30 - block 0: value-leading indexes (_id_structure, <value>, _id_object) INCLUDE (_array_index) for every
+    --          value column but the string replace the eleven object-leading *_not_null / *_filter ones (2026-10-16).
+    --          Restore statements: 00_module_init.sql.
+    -- 0.2.31 - DistinctBy/DistinctRedb in tree queries: the row source ranks by the query order and by every key
+    --          of @distinct_on, and the wrapper keeps _rn = 1 ordered by _ord. Until 0.2.30 the first key only was
+    --          partitioned, ranked by (SELECT 1), with the ordering applied outside, where a Props column does not
+    --          resolve: TreeQuery(...).DistinctBy(x => x.IsActive) failed with "Invalid column name 'IsActive'".
+    -- 0.2.40 - pvt_build_window_sql: AVG casts its operand to NUMERIC(38, 10), as pvt_agg_expr does; over a bigint
+    --          field the window average cut the fraction off (32 for 32.25) (2026-11-03).
+    -- 0.2.39 - pvt_build_cte_sql, narrow shape over a tree source: the objects read their values through OUTER APPLY,
+    --          so the walk (pvt_tree_descendants) runs once; joined to the pivot it ran on both sides, and a filter over
+    --          a 100 thousand node subtree took 3.3 s instead of 1.8 s (2026-11-02).
+    -- 0.2.38 - pvt_build_query_sql: WhereLevel of a tree query that starts from nodes counts from them (the walk depth
+    --          of pvt_tree_descendants), as maxDepth and Pro do; it counted from the root of the whole tree (2026-11-02).
+    -- 0.2.37 - tree_leaves with a depth (TreeQuery(root, maxDepth).WhereLeaves()): the leaves of the whole tree
+    --          within the depth, in pvt_build_query_sql and pvt_build_cte_sql; the leaves below the depth were
+    --          returned (2026-11-02).
+    -- 0.2.36 - pvt_build_query_sql, tree without props: tree_descendants with a depth walks pvt_tree_descendants;
+    --          the descendant check it used has no depth, and TreeQuery(root, maxDepth) returned the whole subtree
+    --          (2026-11-02).
+    --          0.2.35 was a structure condition in the nested-dictionary join, withdrawn before release; some
+    --          databases ran it, hence the next number.
+    -- 0.2.34 - the pivot starts from the objects in every shape (LEFT JOIN _values): an object that stores no value
+    --          for the fields a statement reads (a null field has no row) kept no pivot row, and lists, counts,
+    --          groups (the NULL group) and windows lost it (2026-11-02).
+    -- 0.2.32 - dbo.pvt_build_array_groupby_sql (GroupByArray): array paths through classes and arrays, '$element'
+    --          of an array of simple values, fields of classes inside the element, COUNT(*) with a filter, elements
+    --          reached from the ids of the filtered objects, element fields joined by _array_parent_id with
+    --          _array_parent_id IS NOT NULL (the filtered covering index: 950 -> 160 ms on 200 thousand elements);
+    --          what it cannot answer returns '--error: <text>' instead of NULL. The outer filter that fails to
+    --          compile is refused; it used to be dropped (2026-11-02).
+    RETURN N'0.2.39';
+END;
+GO
+
+-- ---------- 4. Smoke -----------------------------------------------------
+DECLARE @v nvarchar(50) = dbo.pvt_module_version();
+PRINT N'v2-pvt module init OK, version: ' + @v;
+GO

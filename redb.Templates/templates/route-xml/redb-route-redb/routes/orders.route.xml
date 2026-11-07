@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Writer: every {{orders.period:3000}} ms one of five orders is saved again with a new amount.
+       byUnique="true" finds the object by value_unique and updates it instead of adding a new one, so
+       the store holds five objects however long the module runs. With ChangeTracking (Pro, set in the
+       configuration) the save writes only the value that changed, the amount. -->
+  <route id="modulectx-orders-save" description="Saves an order object by its unique key">
+    <from uri="timer://modulectx-orders-save?period={{orders.period:3000}}"/>
+    <setHeader name="orderKey" expr="order-${header.CamelTimerCounter % 5}"/>
+    <setBody expr='{"name":"${header.orderKey}","value_unique":"modulectx:${header.orderKey}","properties":{"Customer":"ACME","Amount":${header.CamelTimerCounter * 10},"Status":"new"}}'/>
+    <redbSave type="RouteModule.Props.OrderProps, RouteModule" byUnique="true" storage="local"/>
+    <log level="Information" showRouteId="true">
+      <message>saved ${header.orderKey}, amount ${header.CamelTimerCounter * 10}</message>
+    </log>
+  </route>
+
+  <!-- Reader: every 10 seconds the orders over 100, largest first. The condition runs in the
+       database, not in memory; an unknown property refuses the route when it is built. -->
+  <route id="modulectx-orders-query" description="Queries the order objects">
+    <from uri="timer://modulectx-orders-query?period=10000&amp;delay=5000"/>
+    <redbQuery type="RouteModule.Props.OrderProps, RouteModule" storage="local"
+               where="Amount &gt; 100" orderBy="Amount" descending="true" take="10"/>
+    <log level="Information" showRouteId="true">
+      <message>orders over 100: ${body.Count}</message>
+    </log>
+  </route>
+
+</routes>

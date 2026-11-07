@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What the web server and the module exchange. No RedBase here: the redb Props classes stay in the
+       module (RedbIdentityApp.Module/Props). -->
+
+</Project>

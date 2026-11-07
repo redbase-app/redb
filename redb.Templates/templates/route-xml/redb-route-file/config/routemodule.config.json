@@ -1,0 +1,5 @@
+{
+  "//": "In-package identity only. Settings and secrets come from the merged context configuration, see config/context.sample.json.",
+  "ContextName": "modulectx",
+  "AutoStart": true
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its data format. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- XML to JSON and back without a class, as Apache Camel's xmljson. A named instance carries the options; the
+       routes refer to it with <marshal format="orders-json"/> and <unmarshal format="orders-json" .../>.
+       schema=      the XSD of resources/: arrays, value types and, on the way back, namespaces and element order
+       namespaces=  Drop writes local names ("Order") without the xmlns keys; the schema puts the namespace back
+       prefixes=    the prefix that namespace gets on the way back (without it: ns0)
+       For content the schema does not describe (xs:any), list the repeating elements: arrays="//Item,//Tag". -->
+  <dataFormat name="orders-json" type="redb.Route.DataFormats.XmlJson.XmlJsonDataFormat, redb.Route.DataFormats.XmlJson"
+              schema="resources/order.xsd" namespaces="Drop" prefixes="o=urn:example:orders"/>
+
+  <!-- Routes written in C#: routes/OrdersRoute.cs runs the same round trip on a timer of its own. -->
+  <routeBuilder type="RouteModule.Routes.OrdersRoute, RouteModule"/>
+
+</context>

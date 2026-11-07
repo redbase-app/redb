@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Context-level document: loaded before the route files, so the routes can use its beans. -->
+<context xmlns="urn:redb:route:1.0">
+
+  <!-- The C# class of Beans/PriceCalculator.cs, one instance for the whole context. The constructor
+       argument and the property come from configuration; the build checks that the type, the
+       constructor and the property exist. -->
+  <bean name="pricing" type="RouteModule.Beans.PriceCalculator, RouteModule">
+    <!-- type= picks the constructor parameter the value is converted to; a value is text otherwise. -->
+    <constructorArg type="System.Decimal" value="{{pricing.vat:0.20}}"/>
+    <property key="Currency" value="{{pricing.currency:EUR}}"/>
+  </bean>
+
+  <!-- Routes written in C#: routes/QuotesRoute.cs prices quotes with the same pricing bean. -->
+  <routeBuilder type="RouteModule.Routes.QuotesRoute, RouteModule"/>
+
+</context>

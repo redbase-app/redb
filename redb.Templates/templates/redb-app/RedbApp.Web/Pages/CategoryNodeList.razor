@@ -1,0 +1,48 @@
+@* Renders a level of the tree and calls itself for the children. *@
+
+<ul class="tree">
+    @foreach (var node in Nodes)
+    {
+        <li>
+            <span>@node.Name</span>
+            <button class="link" @onclick="() => adding = node.Id">Add child</button>
+            <button class="link" @onclick="() => OnDelete.InvokeAsync(node.Id)">Delete</button>
+
+            @if (adding == node.Id)
+            {
+                <span class="inline">
+                    <input placeholder="Child name" @bind="childName" />
+                    <button disabled="@string.IsNullOrWhiteSpace(childName)" @onclick="() => AddAsync(node.Id)">Add</button>
+                    <button class="link" @onclick="Cancel">Cancel</button>
+                </span>
+            }
+
+            @if (node.Children.Count > 0)
+            {
+                <CategoryNodeList Nodes="node.Children" OnAddChild="OnAddChild" OnDelete="OnDelete" />
+            }
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public List<CategoryNode> Nodes { get; set; } = [];
+    [Parameter] public EventCallback<(long ParentId, string Name)> OnAddChild { get; set; }
+    [Parameter] public EventCallback<long> OnDelete { get; set; }
+
+    private long? adding;
+    private string? childName;
+
+    private async Task AddAsync(long parentId)
+    {
+        var name = childName!.Trim();
+        Cancel();
+        await OnAddChild.InvokeAsync((parentId, name));
+    }
+
+    private void Cancel()
+    {
+        adding = null;
+        childName = null;
+    }
+}

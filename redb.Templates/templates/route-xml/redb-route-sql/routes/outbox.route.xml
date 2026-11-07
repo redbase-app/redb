@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<routes xmlns="urn:redb:route:1.0">
+
+  <!-- Writer: a row with status 0 every {{orders.period:5000}} ms. Every fifth order has amount 0
+       and fails in the reader. In a real module this is the place where another system writes. -->
+  <route id="modulectx-outbox-write" description="Writes a test order into orders_outbox">
+    <from uri="timer://modulectx-outbox?period={{orders.period:5000}}"/>
+    <choice>
+      <when expr="header.CamelTimerCounter % 5 == 0">
+        <setBody expr='{"id":"order-${header.CamelTimerCounter}","amount":0}'/>
+      </when>
+      <otherwise>
+        <setBody expr='{"id":"order-${header.CamelTimerCounter}","amount":${header.CamelTimerCounter}}'/>
+      </otherwise>
+    </choice>
+    <!-- :#payload is a parameter, bound from param.payload; the value never becomes SQL text. -->
+    <to uri="sql:INSERT INTO orders_outbox (payload, status) VALUES (:#payload, 0)?dataSource=#main-db&amp;param.payload=${body}"/>
+  </route>
+
+  <!-- Reader: every 2 seconds up to 50 rows with status 0, one exchange per row. Every column of
+       the row is a header, so onSuccess and onFailure bind :#id without more setup, and :#redbError
+       is the message of the failure. A row the route finishes gets status 1, a row it fails on gets
+       status 2 and the message in the column error: nothing is read twice and one bad row does not hold up the others. -->
+  <route id="modulectx-outbox-read" description="Processes the new rows of orders_outbox">
+    <from uri="sql:SELECT id, payload FROM orders_outbox WHERE status = 0 ORDER BY id?mode=Poll&amp;dataSource=#main-db&amp;delay=2000&amp;maxMessagesPerPoll=50&amp;onSuccess=UPDATE orders_outbox SET status = 1 WHERE id = :#id&amp;onFailure=UPDATE orders_outbox SET status = 2, error = :#redbError WHERE id = :#id"/>
+    <setBody expr="${header.payload}"/>
+    <choice>
+      <when expr="jpath('$.amount') == 0">
+        <log level="Warning" showRouteId="true">
+          <message>row ${header.id} rejected: no amount</message>
+        </log>
+        <throwException type="System.InvalidOperationException" message="an order needs an amount"/>
+      </when>
+    </choice>
+    <log level="Information" showRouteId="true">
+      <message>row ${header.id} processed: ${body}</message>
+    </log>
+  </route>
+
+</routes>

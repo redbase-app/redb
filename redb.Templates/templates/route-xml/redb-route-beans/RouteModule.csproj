@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Target framework, the RedBase version and the build-time packaging live in
+       Directory.Build.props and Directory.Build.targets next to this file. -->
+  <PropertyGroup>
+    <!-- The package name redb-route-xml pack uses: pkg/routemodule-<version>.tpkg,
+         with config/routemodule.config.json as the in-package identity. -->
+    <RoutePackageName>routemodule</RoutePackageName>
+    <!-- The C# beans of Beans/ live in this assembly: the package carries it, so the worker finds
+         <bean type="RouteModule.Beans.PriceCalculator, RouteModule">. -->
+    <RoutePackageIncludeAssembly>true</RoutePackageIncludeAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The markup runtime; it also brings redb.Route (IExchange, IMessage) for the beans. -->
+    <PackageReference Include="redb.Route.Xml" Version="$(RedbVersion)" />
+  </ItemGroup>
+
+</Project>

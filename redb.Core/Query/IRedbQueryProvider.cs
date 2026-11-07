@@ -1,0 +1,309 @@
+using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
+using redb.Core.Models.Contracts;
+using redb.Core.Query.Aggregation;
+using redb.Core.Query.QueryExpressions;
+
+namespace redb.Core.Query;
+
+/// <summary>
+/// Provider for executing LINQ queries.
+/// </summary>
+public interface IRedbQueryProvider
+{
+    /// <summary>
+    /// Create new query for specified scheme.
+    /// </summary>
+    IRedbQueryable<TProps> CreateQuery<TProps>(long schemeId, long? userId = null, bool checkPermissions = false) 
+        where TProps : class, new();
+    
+    /// <summary>
+    /// Execute query asynchronously.
+    /// </summary>
+    Task<object> ExecuteAsync(Expression expression, Type elementType,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Get scheme by ID (for projections).
+    /// </summary>
+    Task<IRedbScheme?> GetSchemeAsync(long schemeId,
+        CancellationToken cancellationToken = default);
+    
+    // ===== AGGREGATIONS (EAV) =====
+    
+    /// <summary>
+    /// Execute aggregation on EAV field (SQL strategy for simple fields).
+    /// </summary>
+    /// <param name="schemeId">Scheme ID</param>
+    /// <param name="fieldPath">Field path (e.g. "Price")</param>
+    /// <param name="function">Aggregation function</param>
+    /// <param name="filterJson">JSON filter (as for search_objects)</param>
+    /// <returns>Aggregation result</returns>
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+    Task<decimal?> ExecuteAggregateAsync(
+        long schemeId, 
+        string fieldPath, 
+        AggregateFunction function,
+        string? filterJson = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Execute batch aggregation (multiple fields in one query).
+    /// </summary>
+    Task<AggregateResult> ExecuteAggregateBatchAsync(
+        long schemeId,
+        IEnumerable<AggregateRequest> requests,
+        string? filterJson = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Execute single-field aggregation with FilterExpression (Pro version).
+    /// </summary>
+    Task<decimal?> ExecuteAggregateAsync(
+        long schemeId,
+        string fieldPath,
+        AggregateFunction function,
+        FilterExpression? filter,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Execute batch aggregation with FilterExpression (Pro version).
+    /// </summary>
+    Task<AggregateResult> ExecuteAggregateBatchAsync(
+        long schemeId,
+        IEnumerable<AggregateRequest> requests,
+        FilterExpression? filter,
+        CancellationToken cancellationToken = default);
+    
+    // ===== GROUPBY AGGREGATIONS =====
+    
+    /// <summary>
+    /// Execute GroupBy aggregation. Uses filterJson for Free version compatibility.
+    /// <paramref name="havingJson"/> is a PVT-shape HAVING predicate; pass null when none.
+    /// </summary>
+    Task<System.Text.Json.JsonDocument?> ExecuteGroupedAggregateAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<AggregateRequest> aggregations,
+        string? filterJson = null,
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Execute GroupBy aggregation with FilterExpression (Pro version).
+    /// Provides direct access to filter for proper SQL compilation.
+    /// <paramref name="havingJson"/> carries the PVT-shape HAVING predicate when present.
+    /// </summary>
+    Task<System.Text.Json.JsonDocument?> ExecuteGroupedAggregateAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<AggregateRequest> aggregations,
+        FilterExpression? filter,
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// The SQL <see cref="ExecuteGroupedAggregateAsync(long, IEnumerable{Grouping.GroupFieldRequest}, IEnumerable{AggregateRequest}, string?, string?, CancellationToken)"/>
+    /// runs, for <c>ToSqlStringAsync</c>.
+    /// </summary>
+    Task<string> GetGroupBySqlPreviewAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<AggregateRequest> aggregations,
+        string? filterJson,
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The SQL <see cref="ExecuteGroupedAggregateAsync(long, IEnumerable{Grouping.GroupFieldRequest}, IEnumerable{AggregateRequest}, FilterExpression?, string?, CancellationToken)"/>
+    /// runs, for <c>ToSqlStringAsync</c>.
+    /// </summary>
+    Task<string> GetGroupBySqlPreviewAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<AggregateRequest> aggregations,
+        FilterExpression? filter,
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs a grouping over the elements of an array (GroupByArray, with or without a window over the groups) and
+    /// returns its rows as a JSON array of objects, one property per key and aggregate alias, NULL values included.
+    /// </summary>
+    Task<System.Text.Json.JsonDocument> ExecuteArrayGroupQueryAsync(
+        Grouping.ArrayGroupQuery query,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The SQL <see cref="ExecuteArrayGroupQueryAsync"/> runs for the same request, for <c>ToSqlStringAsync</c>.
+    /// </summary>
+    Task<string> GetArrayGroupQuerySqlAsync(
+        Grouping.ArrayGroupQuery query,
+        CancellationToken cancellationToken = default);
+    
+    // ===== WINDOW FUNCTIONS =====
+    
+    /// <summary>
+    /// Execute query with window functions (SQL function query_with_window).
+    /// </summary>
+    Task<System.Text.Json.JsonDocument?> ExecuteWindowQueryAsync(
+        long schemeId,
+        IEnumerable<Window.WindowFieldRequest> selectFields,
+        IEnumerable<Window.WindowFuncRequest> windowFuncs,
+        IEnumerable<Window.WindowFieldRequest> partitionBy,
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        string? filterJson = null,
+        string? frameJson = null,
+        int? take = null,
+        int? skip = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Execute query with window functions with FilterExpression (Pro version).
+    /// </summary>
+    Task<System.Text.Json.JsonDocument?> ExecuteWindowQueryAsync(
+        long schemeId,
+        IEnumerable<Window.WindowFieldRequest> selectFields,
+        IEnumerable<Window.WindowFuncRequest> windowFuncs,
+        IEnumerable<Window.WindowFieldRequest> partitionBy,
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        FilterExpression? filter,
+        string? frameJson = null,
+        int? take = null,
+        int? skip = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Get SQL preview for window query (for debugging).
+    /// </summary>
+    Task<string> GetWindowSqlPreviewAsync(
+        long schemeId,
+        IEnumerable<Window.WindowFieldRequest> selectFields,
+        IEnumerable<Window.WindowFuncRequest> windowFuncs,
+        IEnumerable<Window.WindowFieldRequest> partitionBy,
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        string? filterJson = null,
+        string? frameJson = null,
+        int? take = null,
+        int? skip = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get SQL preview for window query with FilterExpression (Pro version): the SQL that
+    /// <see cref="ExecuteWindowQueryAsync(long, IEnumerable{Window.WindowFieldRequest}, IEnumerable{Window.WindowFuncRequest}, IEnumerable{Window.WindowFieldRequest}, IEnumerable{Window.WindowOrderRequest}, QueryExpressions.FilterExpression?, string?, int?, int?, CancellationToken)"/>
+    /// runs for the same arguments.
+    /// </summary>
+    Task<string> GetWindowSqlPreviewAsync(
+        long schemeId,
+        IEnumerable<Window.WindowFieldRequest> selectFields,
+        IEnumerable<Window.WindowFuncRequest> windowFuncs,
+        IEnumerable<Window.WindowFieldRequest> partitionBy,
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        QueryExpressions.FilterExpression? filter,
+        string? frameJson = null,
+        int? take = null,
+        int? skip = null,
+        CancellationToken cancellationToken = default)
+        // A default body keeps implementations outside redb compiling; QueryProviderBase overrides it.
+        => throw new NotSupportedException(
+            $"{GetType().Name} has no SQL preview of a window query with a FilterExpression; implement this overload " +
+            "of GetWindowSqlPreviewAsync.");
+
+    // ===== GROUPED WINDOW (GroupBy + Window Functions) =====
+    
+    /// <summary>
+    /// Execute GroupBy with Window Functions (ranking, running totals on aggregated data).
+    /// </summary>
+    Task<System.Text.Json.JsonDocument?> ExecuteGroupedWindowQueryAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        IEnumerable<Window.WindowFuncRequest> windowFuncs,
+        IEnumerable<Window.WindowFieldRequest> partitionBy,
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        string? filterJson = null,
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Execute GroupBy with Window Functions with FilterExpression (Pro version).
+    /// </summary>
+    Task<System.Text.Json.JsonDocument?> ExecuteGroupedWindowQueryAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        IEnumerable<Window.WindowFuncRequest> windowFuncs,
+        IEnumerable<Window.WindowFieldRequest> partitionBy,
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        FilterExpression? filter,
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Get SQL preview for GroupBy + Window query.
+    /// </summary>
+    Task<string> GetGroupedWindowSqlPreviewAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        IEnumerable<Window.WindowFuncRequest> windowFuncs,
+        IEnumerable<Window.WindowFieldRequest> partitionBy,
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        string? filterJson = null,
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Get SQL preview for GroupBy + Window query with FilterExpression (Pro version).
+    /// </summary>
+    Task<string> GetGroupedWindowSqlPreviewAsync(
+        long schemeId,
+        IEnumerable<Grouping.GroupFieldRequest> groupFields,
+        IEnumerable<Aggregation.AggregateRequest> aggregations,
+        IEnumerable<Window.WindowFuncRequest> windowFuncs,
+        IEnumerable<Window.WindowFieldRequest> partitionBy,
+        IEnumerable<Window.WindowOrderRequest> orderBy,
+        FilterExpression? filter,
+        string? havingJson = null,
+        CancellationToken cancellationToken = default);
+    
+    // ===== DELETE =====
+    
+    /// <summary>
+    /// Delete objects by filter (OpenSource version with JSON filter).
+    /// </summary>
+    /// <param name="schemeId">Scheme ID</param>
+    /// <param name="filterJson">JSON filter</param>
+    /// <returns>Number of deleted objects</returns>
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+    Task<int> ExecuteDeleteAsync(long schemeId, string? filterJson = null,
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Delete objects by filter (Pro version with FilterExpression for PVT-based deletion).
+    /// </summary>
+    /// <param name="schemeId">Scheme ID</param>
+    /// <param name="filter">Filter expression from LINQ</param>
+    /// <returns>Number of deleted objects</returns>
+    /// <param name="cancellationToken">Cancels the operation (OCE only; a rollback in flight always completes).</param>
+    Task<int> ExecuteDeleteAsync(long schemeId, FilterExpression? filter,
+        CancellationToken cancellationToken = default);
+    
+    // ===== SQL PREVIEW =====
+    
+    /// <summary>
+    /// Get SQL query for debugging (analogous to ToQueryString in EF Core).
+    /// Pro version returns PVT SQL, Open Source - redb_json_objects.
+    /// </summary>
+    Task<string> GetSqlPreviewAsync<TProps>(QueryContext<TProps> context,
+        CancellationToken cancellationToken = default) where TProps : class, new();
+    
+    /// <summary>
+    /// Returns the JSON filter that will be sent to SQL function (for diagnostics)
+    /// </summary>
+    Task<string> GetFilterJsonAsync<TProps>(QueryContext<TProps> context,
+        CancellationToken cancellationToken = default) where TProps : class, new();
+}
