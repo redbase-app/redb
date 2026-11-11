@@ -227,7 +227,7 @@ BEGIN
     --          _array_parent_id IS NOT NULL (the filtered covering index: 950 -> 160 ms on 200 thousand elements);
     --          what it cannot answer returns '--error: <text>' instead of NULL. The outer filter that fails to
     --          compile is refused; it used to be dropped (2026-11-02).
-    RETURN N'0.2.39';
+    RETURN N'0.2.40';
 END;
 GO
 

@@ -399,6 +399,12 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         // fields only: a provider compiles the fields of the object and Props in separate parts of a statement, and
         // NotTrue cannot be split across them.
         var predicateFilter = _filterParser.ParseFilter(predicate);
+
+        // All(x => true), or a predicate that folds to it: true for any set. It must not reach NotTrue: a provider
+        // drops a true operand from a logical node, so "not true" would compile to "every object is a counterexample".
+        if (predicateFilter is ComparisonExpression { Property.Name: "__constant", Operator: ComparisonOperator.Equal, Value: true })
+            return true;
+
         if (_provider is Base.QueryProviderBase { CompilesNotTrue: true } && ReadsPropsFieldsOnly(predicateFilter))
         {
             if (IsEmptyFilter(predicateFilter))

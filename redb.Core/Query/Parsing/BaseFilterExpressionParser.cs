@@ -86,6 +86,14 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     /// </summary>
     protected virtual FilterExpression VisitBooleanMemberExpression(MemberExpression member, bool negated)
     {
+        // A value of the caller (a captured variable, a field or property of another object, a static member), not a
+        // field of the object: it is the constant it holds now, as Where(x => true) is.
+        if (!ReadsParameter(member))
+        {
+            var value = (bool)EvaluateExpression(member)!;
+            return VisitConstantBooleanExpression(Expression.Constant(value != negated));
+        }
+
         // Nullable<T>.HasValue → IS [NOT] NULL
         if (member.Member.Name == "HasValue" && IsNullableAccessor(member))
         {
@@ -99,6 +107,55 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     }
 
     /// <summary>
+    /// AND / OR of two parsed operands with a constant operand folded away, so a constant is only ever the whole
+    /// condition: "a AND true" and "a OR false" are a, "a AND false" is false, "a OR true" is true. The rows a
+    /// database returns for the folded condition are the rows of the written one, an unset field included.
+    /// </summary>
+    private FilterExpression FoldLogical(LogicalOperator op, FilterExpression left, FilterExpression right)
+    {
+        // The constant that decides the result alone: false for AND, true for OR.
+        var deciding = op == LogicalOperator.Or;
+        if (TryGetConstant(left, out var l))
+            return l == deciding ? left : right;
+        if (TryGetConstant(right, out var r))
+            return r == deciding ? right : left;
+        return new LogicalExpression(op, new[] { left, right });
+    }
+
+    /// <summary>The value of a constant condition (the node of Where(x => true / false)).</summary>
+    private static bool TryGetConstant(FilterExpression filter, out bool value)
+    {
+        if (filter is ComparisonExpression { Property.Name: "__constant", Operator: ComparisonOperator.Equal, Value: bool b })
+        {
+            value = b;
+            return true;
+        }
+        value = false;
+        return false;
+    }
+
+    /// <summary>
+    /// The expression reads the object of the query (the lambda parameter) somewhere inside it.
+    /// </summary>
+    private static bool ReadsParameter(Expression expression)
+    {
+        var finder = new ParameterFinder();
+        finder.Visit(expression);
+        return finder.Found;
+    }
+
+    private sealed class ParameterFinder : ExpressionVisitor
+    {
+        public bool Found { get; private set; }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            Found = true;
+            return node;
+        }
+    }
+
+    /// <summary>
     /// Binary expression visitor (AND, OR, comparisons, arithmetic).
     /// </summary>
     protected virtual FilterExpression VisitBinaryExpression(BinaryExpression binary)
@@ -106,16 +163,10 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         switch (binary.NodeType)
         {
             case ExpressionType.AndAlso:
-                return new LogicalExpression(
-                    LogicalOperator.And,
-                    new[] { VisitExpression(binary.Left), VisitExpression(binary.Right) }
-                );
+                return FoldLogical(LogicalOperator.And, VisitExpression(binary.Left), VisitExpression(binary.Right));
 
             case ExpressionType.OrElse:
-                return new LogicalExpression(
-                    LogicalOperator.Or,
-                    new[] { VisitExpression(binary.Left), VisitExpression(binary.Right) }
-                );
+                return FoldLogical(LogicalOperator.Or, VisitExpression(binary.Left), VisitExpression(binary.Right));
 
             case ExpressionType.Equal:
                 return VisitComparisonExpression(binary, ComparisonOperator.Equal);
@@ -299,6 +350,8 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
                     return VisitBooleanMemberExpression(member, negated: true);
                 }
                 var operand = VisitExpression(unary.Operand);
+                if (TryGetConstant(operand, out var constantOperand))
+                    return VisitConstantBooleanExpression(Expression.Constant(!constantOperand));
                 return new LogicalExpression(LogicalOperator.Not, new[] { operand });
 
             default:
@@ -1350,6 +1403,29 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     }
 
     /// <summary>
+    /// A field path of a filter starts at the object of the query (a lambda parameter, also behind a cast). Anything
+    /// else at the start - an array or list element by index, a method call, a value of the caller - is refused: the
+    /// walk used to stop there and keep the tail, so Items[0].Name was read as the field Name of the object itself.
+    /// </summary>
+    private static void EnsurePathStartsAtQueryObject(Expression? start, Expression path)
+    {
+        var root = start;
+        while (root is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked or ExpressionType.TypeAs } conversion)
+            root = conversion.Operand;
+        if (root is ParameterExpression)
+            return;
+
+        throw new NotSupportedException(UnsupportedFieldPathMessage(path));
+    }
+
+    /// <summary>The one wording for a filter path that is not a chain of fields of the queried object.</summary>
+    internal static string UnsupportedFieldPathMessage(Expression path) =>
+        $"A filter cannot read '{path}': the path must be a chain of fields of the queried object. " +
+        "An array or list element by index and a method call inside the path (First(), ElementAt(...)) are not " +
+        "supported in a filter. Use Contains(...) for an array of simple values, Any(...) for an array of list items, " +
+        "or a dictionary with its key; a value of your own goes on the other side of the comparison.";
+
+    /// <summary>
     /// Build property path from member expression chain.
     /// Handles nested properties, Length, Count, Dictionary indexers.
     /// </summary>
@@ -1414,9 +1490,15 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
             }
             else
             {
+                // The start of the chain. It is the object of the query, or the part of the path before it would be lost.
+                EnsurePathStartsAtQueryObject(current.Expression, memberExpression);
                 break;
             }
         }
+
+        // The walk left the loop on a member that is not a property (a field: a captured variable of the caller).
+        if (current != null && current.Member is not System.Reflection.PropertyInfo)
+            EnsurePathStartsAtQueryObject(current, memberExpression);
 
         pathParts.Reverse();
         var fullPath = string.Join(".", pathParts);

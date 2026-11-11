@@ -45,7 +45,7 @@ public sealed class PostgresProCollationFixture : IAsyncLifetime
             Database = PostgresCollationFixture.DatabaseName
         }.ConnectionString;
 
-        await EnsureDatabaseAsync(baseCs);
+        await PostgresCollationFixture.EnsureCtypeCDatabaseAsync(baseCs);
 
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Warning));
@@ -73,26 +73,6 @@ public sealed class PostgresProCollationFixture : IAsyncLifetime
 
         await Redb.SyncSchemeAsync<CollationProps>();
         await Redb.InitializeTypeRegistryAsync();
-    }
-
-    private static async Task EnsureDatabaseAsync(string baseConnectionString)
-    {
-        var admin = new NpgsqlConnectionStringBuilder(baseConnectionString) { Database = "postgres" };
-        await using var conn = new NpgsqlConnection(admin.ConnectionString);
-        await conn.OpenAsync();
-
-        await using (var check = conn.CreateCommand())
-        {
-            check.CommandText = "SELECT 1 FROM pg_database WHERE datname = $1";
-            check.Parameters.Add(new NpgsqlParameter { Value = PostgresCollationFixture.DatabaseName });
-            if (await check.ExecuteScalarAsync() is not null) return;
-        }
-
-        await using var create = conn.CreateCommand();
-        create.CommandText =
-            $"CREATE DATABASE \"{PostgresCollationFixture.DatabaseName}\" TEMPLATE template0 " +
-            "LC_COLLATE 'C' LC_CTYPE 'C' ENCODING 'UTF8'";
-        await create.ExecuteNonQueryAsync();
     }
 
     public async Task DisposeAsync()

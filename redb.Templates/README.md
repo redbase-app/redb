@@ -10,7 +10,7 @@ dotnet run
 ```
 
 Every project runs as is: SQLite creates its database file next to the app, and Pro is on. Pro is free of
-charge for the whole 4.x line, no license key required.
+charge, no license key required.
 
 ## Templates
 

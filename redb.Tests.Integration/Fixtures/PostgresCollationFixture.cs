@@ -84,15 +84,26 @@ public sealed class PostgresCollationFixture : IAsyncLifetime
     /// <summary>
     /// Creates the database if it is absent. TEMPLATE template0 is required: template1 carries the
     /// cluster's own locale and CREATE DATABASE refuses a different one from it.
+    /// Every fixture on this database calls it: on a fresh server whichever collection starts first creates the
+    /// database, and a session lock keeps two of them from creating it at once.
     /// </summary>
-    private static async Task<string> EnsureCtypeCDatabaseAsync(string baseConnectionString)
+    internal static async Task<string> EnsureCtypeCDatabaseAsync(string baseConnectionString)
     {
         var builder = new NpgsqlConnectionStringBuilder(baseConnectionString);
         var target = new NpgsqlConnectionStringBuilder(baseConnectionString) { Database = DatabaseName };
 
         builder.Database = "postgres";
+        // Unpooled: the session lock below ends with this connection.
+        builder.Pooling = false;
         await using var admin = new NpgsqlConnection(builder.ConnectionString);
         await admin.OpenAsync();
+
+        await using (var gate = admin.CreateCommand())
+        {
+            gate.CommandText = "SELECT pg_advisory_lock(hashtext($1))";
+            gate.Parameters.Add(new NpgsqlParameter { Value = DatabaseName });
+            await gate.ExecuteNonQueryAsync();
+        }
 
         await using (var check = admin.CreateCommand())
         {
@@ -126,7 +137,7 @@ public sealed class PostgresCollationFixture : IAsyncLifetime
 /// <summary>
 /// The same C-ctype database, with the feature OFF. Proves the other half of the contract: without
 /// the setting the behaviour is exactly what it was, so nobody's existing deployment changes under
-/// them. Runs after <see cref="PostgresCollationFixture"/> has created the database and schema.
+/// them. Creates the database and the schema itself when it starts first.
 /// </summary>
 public sealed class PostgresNoCollationFixture : IAsyncLifetime
 {
@@ -137,10 +148,9 @@ public sealed class PostgresNoCollationFixture : IAsyncLifetime
     {
         var config = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build();
         var baseCs = config.GetConnectionString("Postgres")!;
-        var target = new NpgsqlConnectionStringBuilder(baseCs)
-        {
-            Database = PostgresCollationFixture.DatabaseName
-        };
+        // The database may not exist yet: on a fresh server this collection can start before the one that used to
+        // create it.
+        var target = new NpgsqlConnectionStringBuilder(await PostgresCollationFixture.EnsureCtypeCDatabaseAsync(baseCs));
 
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Warning));

@@ -57,7 +57,7 @@ class Program
             //.UseMsSql("Server=127.0.0.1,1433;Database=redb_app;User Id=sa;Password=YOUR_PASSWORD;TrustServerCertificate=true;Command Timeout=600;")  // 127.0.0.1, not localhost: localhost resolves to ::1 first and a container listening on [::]:1433 makes the connect hang ~63s
             .UseSqlite(@"Data Source=redb_app.db")  // Pro tier runs in Blazor WASM / mobile too
 #endif
-            // .WithLicense("YOUR_LICENSE_KEY")  // Not needed: the whole 4.x line is free and unrestricted
+            // .WithLicense("YOUR_LICENSE_KEY")  // Not needed: Pro is free and unrestricted
             .Configure(c =>
             {
                 // Narrows the object set before the pivot step, so a selective filter does not scan the

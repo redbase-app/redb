@@ -84,6 +84,13 @@ public class FacetFilterBuilder : IFacetFilterBuilder
 
     private object BuildComparisonFilter(ComparisonExpression comparison)
     {
+        // Where(x => true / false), alone or inside AND / OR / NOT: a comparison of two constants, which every module
+        // compiles as any other $expr. No field is read.
+        if (comparison.Property.Name == "__constant")
+        {
+            return new Dictionary<string, object?> { ["$expr"] = BuildConstantBoolNode(comparison) };
+        }
+
         // Computed-expression comparison: arithmetic/function on either side.
         // Emits PVT `$expr` boolean predicate node.
         if (comparison.LeftExpression != null || comparison.RightExpression != null
@@ -441,6 +448,22 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     /// Builds PVT <c>$expr</c> predicate for computed comparisons whose operands are
     /// arithmetic / function expressions (LeftExpression/RightExpression).
     /// </summary>
+    /// <summary>
+    /// The $expr node of a constant condition: 1 = 1 for true, 1 = 0 for false.
+    /// </summary>
+    private static Dictionary<string, object?> BuildConstantBoolNode(ComparisonExpression constant)
+    {
+        var holds = constant.Value is true == (constant.Operator == ComparisonOperator.Equal);
+        return new Dictionary<string, object?>
+        {
+            ["$eq"] = new object?[]
+            {
+                new Dictionary<string, object?> { ["$const"] = 1 },
+                new Dictionary<string, object?> { ["$const"] = holds ? 1 : 0 }
+            }
+        };
+    }
+
     private object BuildComputedExprFilter(ComparisonExpression comparison)
     {
         var opKey = MapComparisonOperatorToExprKey(comparison.Operator);
@@ -622,6 +645,8 @@ public class FacetFilterBuilder : IFacetFilterBuilder
         {
             case ComparisonExpression cmp:
             {
+                if (cmp.Property.Name == "__constant")
+                    return BuildConstantBoolNode(cmp);
                 var opKey = MapComparisonOperatorToExprKey(cmp.Operator);
                 var lhs = cmp.LeftExpression != null
                     ? BuildScalarExprNode(cmp.LeftExpression)

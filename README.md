@@ -281,7 +281,7 @@ if (problems.Count > 0)
 ### Client-side: Blazor WebAssembly & mobile
 
 Both run on `redb.SQLite.Pro` — it is pure C#, while the Free tier hosts its SQL functions in a native
-loadable extension, which a browser cannot load. Pro requires no license key on the 3.x and 4.x lines.
+loadable extension, which a browser cannot load. Pro requires no license key.
 
 **Mobile (.NET MAUI)** needs nothing special: point the connection string at the app data directory.
 
@@ -880,7 +880,7 @@ in C#, materializes Props in parallel, and adds:
 
 See [README-PRO.md](README-PRO.md).
 
-**Pro is free — no license key required.** Just add the `redb.*.Pro` packages and use them. Pro packages are proprietary (closed-source), but free of charge — starting from version 3.3.0 no license is needed. The whole 3.x and 4.x lines are covered, in production, with no request limits; licensing re-enables only at major 5.0, and versions you already run stay free forever.
+**Pro is free — no license key required.** Just add the `redb.*.Pro` packages and use them. Pro packages are proprietary (closed-source), but free of charge — starting from version 3.3.0 no license is needed, in production, with no request limits.
 
 **Need the Pro sources?** Larger companies that require them — for a security audit, source escrow, or to build in-house — can ask, and we hand them over. Write to [redbase.app](https://redbase.app).
 
@@ -914,4 +914,4 @@ Core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`, `redb.
 [Apache License 2.0](LICENSE) starting from version 2.0.0.
 Versions ≤ 1.3.0 published on nuget.org remain under MIT.
 
-Pro packages (`redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`) are proprietary (closed-source) but **free to use — no license key required** starting from version 3.3.0, for the entire 3.x and 4.x lines including commercial production use. Larger companies that need the Pro **sources** (audit, escrow, in-house builds) can request them — see [Pro](#pro).
+Pro packages (`redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`) are proprietary (closed-source) but **free to use — no license key required** starting from version 3.3.0, commercial production use included. Larger companies that need the Pro **sources** (audit, escrow, in-house builds) can request them — see [Pro](#pro).
