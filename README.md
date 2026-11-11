@@ -46,7 +46,7 @@ The examples project runs each task through redb and through an EF Core 10 twin 
 
 ![Seeding 100 000 objects](https://raw.githubusercontent.com/redbase-app/redb/main/redb.Examples/images/E203.png)
 
-*Seeding 100 000 Employee objects in batches of 1000, index rebuild inside the time: redb's Free providers on PostgreSQL, SQL Server and SQLite, and EF Core on PostgreSQL.*
+*Seeding 100 000 Employee objects in batches of 1000, index rebuild inside the time: redb on PostgreSQL, SQL Server and SQLite, and EF Core on PostgreSQL.*
 
 ---
 
