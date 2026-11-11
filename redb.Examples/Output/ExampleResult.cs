@@ -50,4 +50,10 @@ public record ExampleResult
     /// Not a failure: the reason is in <see cref="Output"/>, there is no time to compare.
     /// </summary>
     public bool NotSupported { get; init; }
+
+    /// <summary>
+    /// The example did no work in this run (a seeding example inside the whole-suite sweep). Such a result
+    /// is not stored, so the time of the last real run stays in the results database.
+    /// </summary>
+    public bool Skipped { get; init; }
 }

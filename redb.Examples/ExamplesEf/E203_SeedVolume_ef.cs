@@ -49,7 +49,7 @@ public class E203_SeedVolume_ef : EfExampleBase
                 "Skipped: the whole-suite sweep never seeds.",
                 "To seed: dotnet run --project redb.Examples -- E203_ef   (default 100000)",
                 "REDB_SEED_COUNT overrides the size, REDB_SEED_BATCH the batch (default 1000)."
-            ]);
+            ]) with { Skipped = true };
         }
 
         if (total < 0 || batchSize <= 0)

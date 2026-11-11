@@ -213,15 +213,68 @@ Every query example MUST include commented ToSqlStringAsync:
 # Run all examples
 dotnet run --project redb.Examples
 
-# Output shows table with results:
-# ┌────────┬──────────────────────────────────────────┬────────┬──────────┬────────┐
-# │ ID     │ TITLE                                    │ TIER   │ TIME     │ STATUS │
-# ├────────┼──────────────────────────────────────────┼────────┼──────────┼────────┤
-# │ E000   │ Bulk Insert - Complex Objects            │ PRO    │ 245ms    │ OK     │
-# │        │   Inserted: 100 complex objects          │        │          │        │
-# │        │   Rate: 408 obj/sec | 2 tables vs ~25    │        │          │        │
-# └────────┴──────────────────────────────────────────┴────────┴──────────┴────────┘
+# Run some of them by id
+dotnet run --project redb.Examples -- E002 E010 E070
+
+# Print the saved results again without running anything
+dotnet run --project redb.Examples -- --results
 ```
+
+The database is chosen in `Program.cs` (`ConfigureServices`): one of the `.UsePostgres(...)`, `.UseMsSql(...)`,
+`.UseSqlite(...)` lines is active, and `AddRedb` / `AddRedbPro` selects the edition. The project starts as Pro; for
+the Free edition replace `AddRedbPro` with `AddRedb` and set `PropsSaveStrategy` to `DeleteInsert`.
+
+Every run stores its results in `redb_examples_results.db`, a SQLite file next to the project, and prints the table
+from it: one row per example, one line per pass with the time and the number of SQL statements, then the average
+and the median time per pass as bars. The passes are named by a key: the database (`postgres`, `mssql`, `sqlite`),
+`.pro` for the Pro edition, `.ef` for EF Core, `.repeat` for the second pass and `.cache` for redb with its props
+cache. Results of other databases and earlier runs stay in the file, so they sit side by side.
+
+## Comparing with EF Core
+
+Each example has an EF Core twin in `ExamplesEf/` (`E010_WhereSimple_ef.cs` next to `E010_WhereSimple.cs`). A twin
+does the same task with the standard EF Core API over ordinary relational tables: the same classes unfolded by
+`redb flat`, 54 tables for all models, 41 of them for `EmployeeProps`. The twins run on PostgreSQL only, and only
+when redb itself runs as Pro on PostgreSQL, so that both sides work on the same server. Where EF Core has no
+built-in way (window functions, recursive tree queries with a depth), the twin reports `N/A`.
+
+To repeat the comparison:
+
+```bash
+# 1. Two empty databases on your PostgreSQL server: one for redb, one for the flat tables of EF Core
+createdb redb_examples
+createdb redb_examples_flat_ef
+
+# 2. In Program.cs: AddRedbPro with the .UsePostgres(...) line pointing at redb_examples,
+#    and FlatEfConnection pointing at redb_examples_flat_ef. Then build.
+dotnet build redb.Examples
+dotnet build redb.CLI
+
+# 3. The flat schema for EF Core: the CLI prints it from the compiled models, psql runs it
+dotnet run --project redb.CLI --no-build -- flat \
+  -a redb.Examples/bin/Debug/net10.0/redb.Examples.dll -tp postgres --ddl-only > flat.sql
+psql -d redb_examples_flat_ef -v ON_ERROR_STOP=1 -1 -f flat.sql
+
+# 4. Seed both sides with the same employees (100 000 by default, a reporting tree)
+dotnet run --project redb.Examples --no-build -- E203
+dotnet run --project redb.Examples --no-build -- E203_ef
+
+# 5. Run everything: redb, EF Core, the repeats, then the table and the bars
+dotnet run --project redb.Examples --no-build
+```
+
+Notes:
+
+- Step 3 comes before any run: as soon as a twin is selected, the program opens the flat database.
+- In Windows PowerShell 5 the `>` redirect writes UTF-16, which psql does not read: use
+  `| Out-File -Encoding ascii flat.sql` there. PowerShell 7 and bash need nothing.
+- A seed appends and never clears. `REDB_SEED_COUNT` sets the size (`REDB_SEED_COUNT=2000` for a quick trial) and
+  `REDB_SEED_BATCH` the batch, 1000 by default. With `REDB_SEED_COUNT` set, `E203` seeds its twin as well, and a
+  run of everything seeds again, so unset it after the seed.
+- The run of everything does not seed and keeps the stored seed times.
+- `Ef/developer_indexes.sql` holds the indexes a developer would add for the twins' queries; `E203_ef` drops them
+  before the load and creates them again after it, inside its time.
+- The time of an example is one measured run. Initialization on both sides is outside it.
 
 ## Import to Website
 

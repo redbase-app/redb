@@ -33,9 +33,6 @@ namespace redb.Examples;
 
 class Program
 {
-    // Test license for Pro features
-    //private const string TestLicense = "...";
-
     /// <summary>
     /// Results storage, a SQLite file of its own (created on first use), whatever provider the examples run
     /// on: one object per example, every platform and pass of every run under its key, so results of
@@ -246,7 +243,7 @@ class Program
             {
                 var result = await example.RunAsync(redb);
                 runs.Add((platform, result with { Queries = result.NotSupported ? null : (int)(commands() - before) }));
-                Console.WriteLine(result.NotSupported ? " N/A" : result.Success ? " OK" : " FAIL");
+                Console.WriteLine(result.Skipped ? " SKIPPED" : result.NotSupported ? " N/A" : result.Success ? " OK" : " FAIL");
             }
             catch (Exception ex)
             {
@@ -334,14 +331,13 @@ class Program
         SqliteDataSource.MmapSizeBytes = 4L * 1024 * 1024 * 1024;
         SqliteDataSource.CacheSizeBytes = 64L * 1024 * 1024;
 
-        // Pro is free from 3.3.0 — no license key required for the entire 3.x line.
-        // Empty string = no key; set a JWT here only against a 4.x+ build that re-enables licensing.
+        // Pro is free: no license key is required. An empty string means no key.
         var TestLicense=@"";
-        services.AddRedb(options => options
+        services.AddRedbPro(options => options
             .WithLicense(TestLicense)
             .Configure(c =>
             {
-                c.PropsSaveStrategy = PropsSaveStrategy.DeleteInsert; // FREE tier: DeleteInsert (ChangeTracking is a Pro feature). Flip to ChangeTracking for the Pro run.
+                c.PropsSaveStrategy = PropsSaveStrategy.ChangeTracking; // Pro run. FREE tier: DeleteInsert (ChangeTracking is a Pro feature).
                 //c.SkipHashValidationOnCacheCheck = false;
                 c.EnablePropsCache = enablePropsCache;
                 c.PropsCacheMaxSize = 100000;
@@ -432,7 +428,9 @@ class Program
         var saved = 0;
         var updated = 0;
 
-        foreach (var example in runs.GroupBy(r => BaseId(r.Result.Id)))
+        // A skipped result (a seeding example inside the whole-suite sweep) is not stored: the time of the
+        // last real seed stays.
+        foreach (var example in runs.Where(r => !r.Result.Skipped).GroupBy(r => BaseId(r.Result.Id)))
         {
             // Title and tier come from the redb example when it ran, from the twin otherwise.
             var lead = example.FirstOrDefault(r => !IsTwin(r.Result.Id)).Result ?? example.First().Result;
@@ -627,7 +625,18 @@ class Program
         static bool Timed(PlatformResult? pr) =>
             pr?.Time is > 0 && pr.Status?.StartsWith("OK", StringComparison.Ordinal) == true;
 
-        var platforms = results.SelectMany(r => r.Props?.Results?.Keys ?? Enumerable.Empty<string>()).Distinct().ToList();
+        // A platform takes part when it has a time for at least half of the examples the best covered
+        // platform has. One that ran a few examples only (a seed on another edition) would otherwise leave
+        // no example common to all; it is named below the charts instead.
+        var timedExamples = results.SelectMany(r => r.Props?.Results ?? Enumerable.Empty<KeyValuePair<string, PlatformResult>>())
+            .Where(p => Timed(p.Value))
+            .GroupBy(p => p.Key)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var widest = timedExamples.Count > 0 ? timedExamples.Values.Max() : 0;
+        var platforms = timedExamples.Where(p => p.Value * 2 >= widest).Select(p => p.Key).ToList();
+        var leftOut = results.SelectMany(r => r.Props?.Results?.Keys ?? Enumerable.Empty<string>()).Distinct()
+            .Except(platforms).Order().ToList();
+
         var common = results
             .Where(r => r.Props?.Results is { } byPlatform && platforms.All(p => Timed(byPlatform.GetValueOrDefault(p))))
             .ToList();
@@ -647,6 +656,12 @@ class Program
             times.Select(t => (t.Key, t.Value.Average())));
         PrintBars($"MEDIAN TIME, fastest first (same {common.Count} examples)",
             times.Select(t => (t.Key, Median(t.Value))));
+
+        if (leftOut.Count > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"  Not in the charts (too few examples with a time): {string.Join(", ", leftOut)}");
+        }
     }
 
     /// <summary>The middle value of an ordered list; the mean of the two middle values when the count is even.</summary>

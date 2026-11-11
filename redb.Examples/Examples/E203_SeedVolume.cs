@@ -63,7 +63,7 @@ public class E203_SeedVolume : ExampleBase
                 "REDB_SEED_COUNT overrides the size, REDB_SEED_BATCH the batch (default 1000).",
                 "100000 employees land around 6M rows in _values and take ~20 minutes.",
                 "It appends and never clears, so running it twice doubles the data."
-            ]);
+            ]) with { Skipped = true };
         }
 
         if (total < 0 || batchSize <= 0)

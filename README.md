@@ -36,6 +36,18 @@ Upgrading from an earlier version: see [UPGRADING.md](UPGRADING.md) and [CHANGEL
 
 > **Strong typing — real columns, not JSON blobs.** Each property of your `*Props` class is a row in the `_values` table, indexed, and its value goes into a column typed by the property type: `string` → `text` (`nvarchar` on SQL Server), `decimal` → `numeric(38,18)` (on SQLite the value sits in a `REAL` column by default, or in `TEXT` in the exact mode), `DateTime` → `timestamptz`. The table carries real foreign keys to the object, the structure and the referenced objects, and arrays and dictionaries are normalised rows as well. Your data is queryable, filterable, and aggregatable at the SQL level — no `JSON_VALUE` hacks, no full-table JSON scans, no cast errors at runtime.
 
+### Measured against EF Core
+
+The examples project runs each task through redb and through an EF Core 10 twin that reads the same data from ordinary relational tables: the Employee class unfolded into 41 tables by `redb flat`, standard EF Core API, split queries, whole objects returned on both sides. Over the 98 tasks EF Core can do without raw SQL, redb Pro on PostgreSQL took 189 ms on average (median 114 ms), 160 ms on a repeated call and 154 ms with its built-in cache; EF Core took 703 ms (median 910 ms) and 730 ms on a repeated call. Both ran from the same client against the same PostgreSQL 18 server (Ryzen 5 5500U, 38 GB RAM, NVMe) over Wi-Fi; SQLite is a local file on the client (Ryzen 7 260, 32 GB RAM). In the load-by-id example EF Core sends 62 statements where redb sends 9, and every statement is a round trip to the database server. The figures show the order of magnitude, not a guarantee. Every example with its time and statement count is on the [results page](https://redbase.app/results); the code and the steps to repeat the run are in [redb.Examples](redb.Examples/README.md).
+
+![Average and median time per example](https://raw.githubusercontent.com/redbase-app/redb/main/redb.Examples/images/results_e.png)
+
+*Mean and median time of one example, 98 examples, one timed run each. Suffixes: `.pro` redb Pro, `.ef` EF Core, `.repeat` second pass, `.cache` redb with its props cache. Compare the bars of one database: SQLite runs locally, PostgreSQL and SQL Server over the network.*
+
+![Seeding 100 000 objects](https://raw.githubusercontent.com/redbase-app/redb/main/redb.Examples/images/E203.png)
+
+*Seeding 100 000 Employee objects in batches of 1000, index rebuild inside the time: redb's Free providers on PostgreSQL, SQL Server and SQLite, and EF Core on PostgreSQL.*
+
 ---
 
 ## Quick Start
