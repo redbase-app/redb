@@ -1498,7 +1498,8 @@ public class SqliteDialect : ISqlDialect
     /// <summary>
     /// Soft-delete: move the given objects + all descendants under a fresh trash
     /// container (scheme -10). Native SQLite (no server function, Core untouched):
-    /// the trash id is allocated from the AUTOINCREMENT _global_identity and read via
+    /// the sequence is first raised above every stored id (as the key generator does, see
+    /// SqliteKeyGenerator.IdSpaceTopSql), then the trash id is allocated from the AUTOINCREMENT _global_identity and read via
     /// last_insert_rowid() — per-connection, so it stays stable across the statements
     /// regardless of concurrent writers. The batch opens no transaction of its own: the provider
     /// runs it inside one (ExecuteAtomicAsync, joining the caller's), whose owner rolls back a
@@ -1509,7 +1510,8 @@ public class SqliteDialect : ISqlDialect
     /// Returns: trash_id, marked_count.
     /// </summary>
     public string SoftDelete_MarkForDeletion() =>
-        """
+        $"""
+        UPDATE sqlite_sequence SET seq = max(seq, {(global::redb.SQLite.Data.SqliteKeyGenerator.IdSpaceTopSql)}) WHERE name = '_global_identity';
         INSERT INTO _global_identity DEFAULT VALUES;
         INSERT INTO _objects (_id, _id_scheme, _id_parent, _id_owner, _id_who_change, _name, _value_long, _key, _value_string)
         VALUES (last_insert_rowid(), -10, $3, $2, $2,

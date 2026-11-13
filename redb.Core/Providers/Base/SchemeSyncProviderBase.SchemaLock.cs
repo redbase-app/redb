@@ -57,6 +57,36 @@ public abstract partial class SchemeSyncProviderBase
     {
         if (IsCheckPass)
             throw new SchemeWriteNeededException();
+        ForgetCachedSchemesIfRolledBack();
+    }
+
+    // Transactions whose rollback already clears the scheme caches: one registration per transaction.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, object> RollbackResetRegistered = new();
+
+    /// <summary>
+    /// A sync that writes inside a transaction caches the schemes and structures it creates before the transaction
+    /// ends. If it rolls back, those entries point at rows that do not exist (and ids that are never handed out
+    /// again): the next save of the type would reference a missing scheme. The caches of this database are dropped
+    /// on that rollback and refill from the database.
+    /// </summary>
+    private void ForgetCachedSchemesIfRolledBack()
+    {
+        if (Data.TransactionHooks.TransactionOf(Context) is not { } transaction)
+            return;
+        if (!RollbackResetRegistered.TryAdd(transaction, transaction))
+            return;
+        Data.TransactionHooks.OnCompleted(Context, committed =>
+        {
+            if (committed)
+                return;
+            Cache.ClearDomainIncludingClrTypes();
+            foreach (var key in StructureTreeCache.Keys)
+                if (key.Domain == TreeCacheDomain)
+                    StructureTreeCache.TryRemove(key, out _);
+            foreach (var key in SubtreeCache.Keys)
+                if (key.Domain == TreeCacheDomain)
+                    SubtreeCache.TryRemove(key, out _);
+        });
     }
 
     private async Task<T> GuardSchemeSyncAsync<T>(Func<Task<T>> sync, CancellationToken cancellationToken)

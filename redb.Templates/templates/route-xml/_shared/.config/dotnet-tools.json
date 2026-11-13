@@ -3,7 +3,7 @@
   "isRoot": true,
   "tools": {
     "redb.route.xml.codegen": {
-      "version": "4.7.1",
+      "version": "4.7.2",
       "commands": [
         "redb-route-xml"
       ],

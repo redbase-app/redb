@@ -486,6 +486,7 @@ namespace redb.Core.Providers.Base
                         obj.Hash = RedbHash.ComputeFor(obj);
                     }
                 }
+                Data.AssignedIdRollback.ResetOnRollback(_context, objectsNeedingIds);
             }
             // Objects with existing IDs - no changes needed
         }

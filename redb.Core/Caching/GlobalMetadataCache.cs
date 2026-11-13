@@ -503,6 +503,18 @@ public class GlobalMetadataCache
     }
     
     /// <summary>
+    /// Clears this domain's schemes, types and scheme id to CLR type mappings: everything a scheme sync inside a
+    /// transaction that rolled back may have cached from rows that no longer exist. Resolution refills it lazily.
+    /// </summary>
+    public void ClearDomainIncludingClrTypes()
+    {
+        lock (_lock)
+        {
+            GetCache().ClearAll();
+        }
+    }
+
+    /// <summary>
     /// Get diagnostic information.
     /// </summary>
     public string GetDiagnosticInfo()

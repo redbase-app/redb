@@ -378,6 +378,7 @@ public abstract class TreeProviderBase : ITreeProvider
         if (obj.id == 0)
         {
             obj.id = await Context.NextObjectIdAsync();
+            AssignedIdRollback.ResetOnRollback(Context, new IRedbObject[] { obj });
         }
         
         obj.parent_id = parentId == 0 ? null : parentId;

@@ -14,6 +14,11 @@ namespace redb.Core.Data
         public readonly ConcurrentQueue<long> Keys = new();
         public readonly SemaphoreSlim Lock = new(1, 1);
         public volatile bool IsRefilling = false;
+
+        // The highest id this process has handed out for the domain, whatever the outcome of the transaction that
+        // took it. A provider whose sequence rolls back with the caller's transaction (SQLite) never hands out an id
+        // at or below it again.
+        public long IssuedHighWater;
     }
 
     /// <summary>
@@ -59,7 +64,8 @@ namespace redb.Core.Data
         ///   <item>SQLite single-writer trap: when the calling scope already holds a write transaction
         ///   (BEGIN IMMEDIATE), a refill on another connection waits for the file's only write lock while
         ///   the lock holder waits for the refill. Keys come from the scope's transaction instead; a
-        ///   rollback takes the sequence bump back, and those ids were never visible outside it.</item>
+        ///   rollback takes the sequence bump back, while the application may still hold the ids, so the
+        ///   provider takes every later range above <see cref="IssuedHighWater"/>.</item>
         ///   <item>MSSQL and PostgreSQL inside a TransactionScope: another connection would be a second
         ///   connection in the transaction (a distributed transaction). Keys come through the scope's
         ///   wrapper on the transaction's connection; sequences are not transactional, so a rollback leaves
@@ -69,6 +75,28 @@ namespace redb.Core.Data
         /// </summary>
         protected virtual Task<List<long>?> TryGenerateKeysInAmbientTransactionAsync(int count)
             => Task.FromResult<List<long>?>(null);
+
+        /// <summary>
+        /// The highest id this process has handed out for this domain (<see cref="RecordIssued"/>), 0 before the first.
+        /// A provider whose sequence bump can roll back with the caller's transaction takes every next range above it:
+        /// an id a rolled-back transaction handed out may still be held by the application, and a second owner of the
+        /// same id would overwrite the first one's row.
+        /// </summary>
+        protected long IssuedHighWater => Interlocked.Read(ref GetCache().IssuedHighWater);
+
+        /// <summary>Raises <see cref="IssuedHighWater"/> to <paramref name="top"/>, the highest id of a range just handed out.</summary>
+        protected void RecordIssued(long top)
+        {
+            var cache = GetCache();
+            var current = Interlocked.Read(ref cache.IssuedHighWater);
+            while (top > current)
+            {
+                var seen = Interlocked.CompareExchange(ref cache.IssuedHighWater, top, current);
+                if (seen == current)
+                    return;
+                current = seen;
+            }
+        }
 
         // === PUBLIC API ===
         

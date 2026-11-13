@@ -1,9 +1,9 @@
-# Assemblies the worker of redb-identity-full:4.7.1 already provides. A module dependency present here is
+# Assemblies the worker of redb-identity-full:4.7.2 already provides. A module dependency present here is
 # NOT packed into the .tpkg; every other dependency travels inside the package.
 #
 # Two sources:
 #   - the Tsak worker itself: /app/worker/*.dll and /app/worker/Libs/shared/*.dll of the image (the same set
-#     as redb-tsak-worker:4.7.1);
+#     as redb-tsak-worker:4.7.2);
 #   - the redb.Identity modules loaded in that worker: redb.Identity.Contracts.dll comes from the
 #     identity.contracts carrier, one copy per process. A second copy inside this package would be a second
 #     type identity, and every contract type the module exchanges with Identity would stop matching.

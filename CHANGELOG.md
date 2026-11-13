@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Pending changes live in `changelog/unreleased/` until the release; `pwsh scripts/changelog.ps1 -Preview` shows them.
 
+## [4.7.2] — 2026-11-13
+
+### Fixed
+
+- **SQLite: saving an object again after its transaction rolled back no longer overwrites another object.** Since 4.0.0,
+  ids a save took inside a transaction that rolled back went to the next save too: saving the first object again silently
+  replaced the second one's data, and later saves and deletes could fail with `UNIQUE constraint failed` on `_objects._id`
+  or `_values._id`. SQLite now never hands out an id twice. On every provider the ids a save assigned inside a rolled-back
+  transaction go back to 0 on the objects, and a scheme created there is created again. Packages: `redb.Core`, `redb.Core.Pro`, `redb.SQLite`, `redb.SQLite.Pro`.
+
 ## [4.7.1] — 2026-11-11
 
 ### Fixed

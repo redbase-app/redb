@@ -30,6 +30,20 @@ namespace redb.SQLite.Data
         private const string SEQUENCE_TABLE = "_global_identity";
 
         /// <summary>
+        /// The highest id stored in the tables that take their ids from the sequence. Every range starts above it, so
+        /// the sequence never hands out an id a stored row already has, whatever left it behind: a row committed with an
+        /// id the application kept from a rolled-back transaction (the sequence bump went back, the row did not), an id
+        /// another process wrote, a row written with an explicit id. Each term is the last key of a rowid table, read
+        /// from the end of its b-tree.
+        /// </summary>
+        internal const string IdSpaceTopSql =
+            "coalesce((SELECT max(_id) FROM _objects), 0), coalesce((SELECT max(_id) FROM _values), 0), " +
+            "coalesce((SELECT max(_id) FROM _schemes), 0), coalesce((SELECT max(_id) FROM _structures), 0), " +
+            "coalesce((SELECT max(_id) FROM _users), 0), coalesce((SELECT max(_id) FROM _roles), 0), " +
+            "coalesce((SELECT max(_id) FROM _users_roles), 0), coalesce((SELECT max(_id) FROM _permissions), 0), " +
+            "coalesce((SELECT max(_id) FROM _lists), 0), coalesce((SELECT max(_id) FROM _list_items), 0)";
+
+        /// <summary>
         /// Create SQLite key generator.
         /// </summary>
         public SqliteKeyGenerator(SqliteDataSource dataSource, string? domain = null,
@@ -64,10 +78,7 @@ namespace redb.SQLite.Data
             // Console.WriteLine($"[Diag-KeyGen] OpenConnectionAsync +{tConn}ms thread={tid}");
 
             await using var cmd = conn.CreateCommand();
-            cmd.CommandText =
-                "UPDATE sqlite_sequence SET seq = seq + @n WHERE name = @name RETURNING seq";
-            cmd.Parameters.AddWithValue("@n", count);
-            cmd.Parameters.AddWithValue("@name", SEQUENCE_TABLE);
+            PrepareReserve(cmd, count);
 
             object? scalar;
             try
@@ -90,6 +101,7 @@ namespace redb.SQLite.Data
             }
 
             long top = Convert.ToInt64(scalar);
+            RecordIssued(top);
             var keys = new List<long>(count);
             for (long id = top - count + 1; id <= top; id++)
             {
@@ -104,8 +116,9 @@ namespace redb.SQLite.Data
         /// The single-writer bypass: the same atomic sequence bump, but on the scope's own
         /// connection INSIDE its BEGIN IMMEDIATE - the write lock is already ours, so there is
         /// no waiting and no self-deadlock. The keys deliberately do NOT enter the shared
-        /// cache: a rollback takes the sequence bump back together with the transaction, and
-        /// nobody outside it ever saw these ids - no duplicates on either outcome.
+        /// cache. A rollback takes the sequence bump back together with the transaction, but
+        /// the ids stay with whoever got them (an object the application saves again), so
+        /// every later range starts above the highest id handed out (<see cref="PrepareReserve"/>).
         /// </summary>
         protected override async Task<List<long>?> TryGenerateKeysInAmbientTransactionAsync(int count)
         {
@@ -114,10 +127,7 @@ namespace redb.SQLite.Data
 
             await using var cmd = ambient.Connection.CreateCommand();
             cmd.Transaction = ambient.Transaction;
-            cmd.CommandText =
-                "UPDATE sqlite_sequence SET seq = seq + @n WHERE name = @name RETURNING seq";
-            cmd.Parameters.AddWithValue("@n", count);
-            cmd.Parameters.AddWithValue("@name", SEQUENCE_TABLE);
+            PrepareReserve(cmd, count);
             var scalar = await cmd.ExecuteScalarAsync();
             if (scalar is null || scalar == DBNull.Value)
             {
@@ -127,10 +137,26 @@ namespace redb.SQLite.Data
             }
 
             long top = Convert.ToInt64(scalar);
+            RecordIssued(top);
             var keys = new List<long>(count);
             for (long id = top - count + 1; id <= top; id++)
                 keys.Add(id);
             return keys;
+        }
+
+        /// <summary>
+        /// The reserving statement of both paths. The range starts above the sequence and above every id this process
+        /// handed out before: a range taken inside a transaction that rolled back is gone from sqlite_sequence, yet the
+        /// application may still hold its ids (since 4.0.0 the next range repeated them, and saving such an object again
+        /// overwrote the row of the object that got the id second). One statement, no extra write.
+        /// </summary>
+        private void PrepareReserve(SqliteCommand cmd, int count)
+        {
+            cmd.CommandText =
+                "UPDATE sqlite_sequence SET seq = max(seq, @floor, " + IdSpaceTopSql + ") + @n WHERE name = @name RETURNING seq";
+            cmd.Parameters.AddWithValue("@floor", IssuedHighWater);
+            cmd.Parameters.AddWithValue("@n", count);
+            cmd.Parameters.AddWithValue("@name", SEQUENCE_TABLE);
         }
     }
 }
