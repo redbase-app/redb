@@ -12,7 +12,7 @@
 If you discover a security vulnerability, please report it responsibly:
 
 1. **Do NOT** open a public issue
-2. Email: **security@redbase.app**
+2. Email: **support@redbase.app**
 3. Include a description of the vulnerability and steps to reproduce
 
 We will acknowledge receipt within 48 hours and provide a timeline for a fix.
