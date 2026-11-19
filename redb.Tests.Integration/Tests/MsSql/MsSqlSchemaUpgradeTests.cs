@@ -156,6 +156,67 @@ public class MsSqlSchemaUpgradeTests : SchemaUpgradeTestsBase
         }
     }
 
+    /// <summary>The foreign keys, the identity sequence, the triggers, the routines and the core rows, as one string.</summary>
+    private Task<string?> SchemaFingerprintAsync(string database) => ScalarAdminAsync<string>(database, """
+        SELECT CONCAT(
+            (SELECT COUNT(*) FROM sys.foreign_keys), '|',
+            (SELECT CONVERT(nvarchar(40), current_value) FROM sys.sequences WHERE name = N'global_identity'), '|',
+            (SELECT COUNT(*) FROM sys.triggers), '|',
+            (SELECT COUNT(*) FROM sys.objects WHERE type IN ('P', 'FN', 'IF', 'TF')), '|',
+            (SELECT COUNT(*) FROM dbo._objects), '|', (SELECT COUNT(*) FROM dbo._values), '|',
+            (SELECT COUNT(*) FROM dbo._schemes), '|', (SELECT COUNT(*) FROM dbo._users))
+        """);
+
+    /// <summary>
+    /// The creation script run again on a deployed database stops at its guard and changes nothing, run the way the
+    /// service and `redb init` run it and the way sqlcmd or SSMS run it (every batch on one session, an error does not
+    /// stop the next). It used to drop every foreign key and the identity sequence before its first CREATE TABLE failed.
+    /// A first run on an empty database is unchanged.
+    /// </summary>
+    [Fact]
+    public async Task CreationScript_RunAgainOnADeployedDatabase_StopsAtTheGuard_AndChangesNothing()
+    {
+        const string guard = "already holds the redb schema";
+        await using var sp = Build(OwnerConnectionString, autoApply: false, cacheDomain: $"recreate-{Guid.NewGuid():N}");
+        var script = sp.GetRequiredService<IRedbService>().GetSchemaScript();
+        var before = await SchemaFingerprintAsync(DatabaseName);
+
+        var act = async () => await ApplyScriptAsOwnerAsync(sp.GetRequiredService<IRedbContext>(), script);
+        (await act.Should().ThrowAsync<Exception>()).Which.Message.Should().Contain(guard);
+        SqlConnection.ClearAllPools();
+        (await SchemaFingerprintAsync(DatabaseName)).Should().Be(before, "the script used to drop the foreign keys and the sequence first");
+
+        var errors = new List<string>();
+        var cs = new SqlConnectionStringBuilder(AdminBase) { InitialCatalog = DatabaseName, Pooling = false }.ConnectionString;
+        await using (var conn = new SqlConnection(cs))
+        {
+            await conn.OpenAsync();
+            foreach (var batch in System.Text.RegularExpressions.Regex.Split(script, @"^\s*GO\s*$",
+                         System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                if (batch.Trim().Length == 0) continue;
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = batch.Trim();
+                cmd.CommandTimeout = 300;
+                try { await cmd.ExecuteNonQueryAsync(); }
+                catch (SqlException ex) { errors.Add(ex.Message); }
+            }
+        }
+        errors.Should().Contain(e => e.Contains(guard));
+        (await SchemaFingerprintAsync(DatabaseName)).Should().Be(before, "NOEXEC keeps the batches after the guard from running");
+
+        // A first run on an empty database still creates the whole schema.
+        await RecreateFreshDatabaseAsync();
+        await using (var fresh = Build(FreshDatabaseConnectionString, autoApply: true, cacheDomain: $"fresh-{Guid.NewGuid():N}"))
+            await fresh.GetRequiredService<IRedbService>().EnsureDatabaseAsync();
+        (await ScalarAdminAsync<int>(FreshDatabaseName, "SELECT COUNT(*) FROM sys.foreign_keys")).Should().Be(30);
+        (await ScalarAdminAsync<int>(FreshDatabaseName, "SELECT COUNT(*) FROM sys.sequences WHERE name = N'global_identity'")).Should().Be(1);
+        (await ScalarAdminAsync<int>(FreshDatabaseName, "SELECT COUNT(*) FROM sys.tables WHERE schema_id = SCHEMA_ID(N'dbo')"))
+            .Should().Be(16, "the tables of the schema");
+        (await ScalarAdminAsync<string>(FreshDatabaseName, "SELECT dbo.pvt_module_version()"))
+            .Should().Be(await ReadDeployedModuleVersionAsync(), "the module version is the one this build deploys, unchanged by the guard");
+    }
+
     protected virtual string ContainedDatabaseName => "redb_upgrade_contained";
     private const string ContainedUser = "redb_contained";
     private const string ContainedPassword = "Contained!12345";

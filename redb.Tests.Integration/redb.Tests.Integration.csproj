@@ -30,6 +30,8 @@
     <ProjectReference Include="..\redb.Core\redb.Core.csproj" />
     <PackageReference Include="redb.Core.Pro" />
     <ProjectReference Include="..\redb.Export\redb.Export.csproj" />
+    <!-- `redb init` is tested through the command itself (Program.InitSchemaAsync). -->
+    <ProjectReference Include="..\redb.CLI\redb.CLI.csproj" />
     <ProjectReference Include="..\redb.MSSql\redb.MSSql.csproj" />
     <PackageReference Include="redb.MSSql.Pro" />
     <ProjectReference Include="..\redb.Postgres\redb.Postgres.csproj" />

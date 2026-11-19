@@ -25,6 +25,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Pending changes live in `changelog/unreleased/` until the release; `pwsh scripts/changelog.ps1 -Preview` shows them.
 
+## [4.7.3] — 2026-11-19
+
+### Changed
+
+- **redb.CLI 4.7.3; the redb packages stay 4.7.2.** Only the redb.CLI tool and its standalone executables are released;
+  they carry the SQL Server creation script with the guard below. redb.Core, the providers and redb.Export on nuget.org
+  stay at 4.7.2 and are not republished.
+
+### Fixed
+
+- **`redb init` no longer damages a SQL Server database that already holds the redb schema.** Run a second time, it
+  dropped every foreign key and the id sequence before it failed, and a later import or application failed on the
+  missing sequence. On PostgreSQL and SQL Server `redb init` now refuses a database that holds the schema before it runs
+  anything, and the SQL Server script printed by `redb schema` stops on such a database before its first statement. A SQL
+  Server database where `redb init` ran twice may have been hit: the upgrade notes say how to check it and how to repair it. Packages: `redb.CLI`. Upgrade: [UPGRADING.md](UPGRADING.md#sql-server-a-database-hit-by-a-second-redb-init).
+
 ## [4.7.2] — 2026-11-13
 
 ### Fixed

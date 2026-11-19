@@ -56,6 +56,9 @@
       <InputFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
       <OutputFile ParameterType="System.String" Required="true" />
       <SortByFileName ParameterType="System.Boolean" Required="false" />
+      <!-- Text written after the last file: the creation script ends with SET NOEXEC OFF, which turns back the
+           NOEXEC its guard sets on a database that already holds the schema (redbMSSQL.sql). -->
+      <Trailer ParameterType="System.String" Required="false" />
     </ParameterGroup>
     <Task>
       <Code Type="Fragment" Language="cs"><![CDATA[
@@ -82,6 +85,8 @@
             sb.AppendLine(System.IO.File.ReadAllText(path));
             sb.AppendLine();
         }
+        if (!string.IsNullOrEmpty(Trailer))
+            sb.AppendLine(Trailer);
         System.IO.File.WriteAllText(OutputFile, sb.ToString());
       ]]></Code>
     </Task>
@@ -119,7 +124,8 @@
           BeforeTargets="DispatchToInnerBuilds;BeforeBuild"
           Inputs="@(SqlAllFiles)"
           Outputs="sql\redb_init.sql;sql\v2-pvt\pvt_bundle.sql">
-    <ConcatenateSqlFiles InputFiles="@(SqlAllFiles)" OutputFile="sql\redb_init.sql" />
+    <ConcatenateSqlFiles InputFiles="@(SqlAllFiles)" OutputFile="sql\redb_init.sql"
+                         Trailer="-- ===== end: turn back the NOEXEC of the guard in redbMSSQL.sql =====&#xD;&#xA;SET NOEXEC OFF;&#xD;&#xA;GO" />
     <!-- Also produce a v2-pvt-only bundle so the C# layer can deploy the module
          to existing databases that pre-date its introduction (EnsureDatabaseAsync
          skips redb_init.sql when _schemes already exists). Kept in sync with the

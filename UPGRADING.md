@@ -3,6 +3,49 @@
 What to check and change when moving to a new version. Each section lists the changes that need action;
 [CHANGELOG.md](CHANGELOG.md) has the full list of what changed.
 
+## 4.7.3
+
+### SQL Server: a database hit by a second redb init
+
+Up to this release, `redb init -p mssql` run on a database that already held the redb schema dropped every foreign key
+and the id sequence `global_identity`, then stopped with "There is already an object named '_types'". The data stayed;
+the next import failed at its end on `ALTER SEQUENCE`, and an application failed on its first new id. `redb init` now
+refuses such a database before it runs anything. The SQL Server script itself, as printed by `redb schema` and as run
+by `redb init`, now stops at its first statement on such a database too, also when a DBA runs it with sqlcmd or SSMS.
+The script reports that refusal as a message: sqlcmd without `-b` still exits with 0, so a script that runs it must read
+the output or call sqlcmd with `-b`.
+PostgreSQL and SQLite were not damaged by a second run.
+
+Check every SQL Server database on which `redb init` may have run twice:
+
+```sql
+SELECT name FROM sys.sequences;          -- must list global_identity
+SELECT COUNT(*) FROM sys.foreign_keys;   -- must be 30
+```
+
+If the sequence is missing or the count is lower, rebuild the database from an export. Stop the applications that use
+it first.
+
+1. `redb export -p mssql -c "<damaged database>" -o backup.redb`
+2. Create a new empty database and run `redb init -p mssql -c "<new database>"` once.
+3. `redb import -p mssql -c "<new database>" -i backup.redb --clean`
+4. Restart the id sequence past the imported ids. The export of a damaged database carries no sequence value, so the
+   import leaves the new sequence at its start, below the imported ids:
+
+   ```sql
+   DECLARE @sql nvarchar(max) = (
+       SELECT N'SELECT @max = MAX(id) FROM (' + STRING_AGG(CAST(N'SELECT MAX(_id) AS id FROM dbo.' + QUOTENAME(t.name) AS nvarchar(max)), N' UNION ALL ') + N') x'
+       FROM sys.tables t JOIN sys.columns c ON c.object_id = t.object_id AND c.name = N'_id'
+       WHERE t.schema_id = SCHEMA_ID(N'dbo'));
+   DECLARE @max bigint;
+   EXEC sp_executesql @sql, N'@max bigint OUTPUT', @max = @max OUTPUT;
+   DECLARE @restart nvarchar(200) = N'ALTER SEQUENCE dbo.global_identity RESTART WITH '
+       + CAST(CASE WHEN @max >= 1000000 THEN @max + 1 ELSE 1000000 END AS nvarchar(20));
+   EXEC (@restart);
+   ```
+
+5. Check the new database with the two queries above, then point the applications at it.
+
 ## 4.6.0
 
 ### Grouping: refusals instead of empty or default answers

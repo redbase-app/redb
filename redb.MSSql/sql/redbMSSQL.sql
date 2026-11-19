@@ -2,8 +2,20 @@
 -- REDB MS SQL Server Schema
 -- Version: 2.0 (with Array/Dictionary/JsonDocument support)
 -- Compatible with SQL Server 2016+
--- Can be run multiple times (idempotent)
+-- Creates the schema in an EMPTY database. A database that already holds it is left as it is: the guard below stops
+-- the script before any statement. An existing schema is upgraded by the service at start or with
+-- `redb schema --upgrade --provider mssql` (GetUpgradeScript), never by running this script again.
 -- =====================================================
+
+-- Guard: the schema is already here. RAISERROR reports it; SET NOEXEC ON makes sqlcmd and SSMS compile the remaining
+-- batches without running them (SET NOEXEC OFF at the end of the script turns it back). This script used to drop every
+-- foreign key and the identity sequence first, so a second run left a live database without both.
+IF OBJECT_ID(N'[dbo].[_types]', N'U') IS NOT NULL
+BEGIN
+    RAISERROR(N'redb: this database already holds the redb schema (dbo._types exists). The creation script runs on an empty database only and has changed nothing. Upgrade an existing schema with `redb schema --upgrade --provider mssql` or by starting the service; to start over, drop and create the database first.', 16, 1);
+    SET NOEXEC ON;
+END
+GO
 
 -- Enable row-versioning for READ COMMITTED to eliminate reader/writer deadlocks
 DECLARE @dbname NVARCHAR(256) = DB_NAME();
@@ -12,54 +24,6 @@ DECLARE @rcsi NVARCHAR(500) = N'ALTER DATABASE ' + QUOTENAME(@dbname) + N' SET R
 -- a database in use (an upgrade, a second node) would wait for every other connection.
 IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = @dbname AND is_read_committed_snapshot_on = 1)
     EXEC sp_executesql @rcsi;
-GO
-
--- =====================================================
--- DROP ALL FOREIGN KEY CONSTRAINTS FIRST
--- =====================================================
-
-DECLARE @sql NVARCHAR(MAX) = N'';
-
-SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id)) 
-    + '.' + QUOTENAME(OBJECT_NAME(parent_object_id)) 
-    + ' DROP CONSTRAINT ' + QUOTENAME(name) + ';' + CHAR(13)
-FROM sys.foreign_keys
-WHERE OBJECT_SCHEMA_NAME(parent_object_id) = 'dbo'
-  AND OBJECT_NAME(parent_object_id) LIKE '[_]%';
-
-IF LEN(@sql) > 0
-    EXEC sp_executesql @sql;
-GO
-
--- =====================================================
--- DROP EXISTING OBJECTS (clean install)
--- =====================================================
-
--- Drop stored procedures
-IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'sp_GetChildObjects')
-DROP PROCEDURE [dbo].[sp_GetChildObjects]
-GO
-
--- Drop sequence
-IF EXISTS (SELECT * FROM sys.sequences WHERE name = 'global_identity')
-    DROP SEQUENCE [dbo].[global_identity]
-GO
-
--- Drop tables (now safe - no FK constraints)
--- IF OBJECT_ID('[dbo].[_values]', 'U') IS NOT NULL DROP TABLE [dbo].[_values]
--- IF OBJECT_ID('[dbo].[_permissions]', 'U') IS NOT NULL DROP TABLE [dbo].[_permissions]
--- IF OBJECT_ID('[dbo].[_functions]', 'U') IS NOT NULL DROP TABLE [dbo].[_functions]
--- IF OBJECT_ID('[dbo].[_dependencies]', 'U') IS NOT NULL DROP TABLE [dbo].[_dependencies]
--- IF OBJECT_ID('[dbo].[_list_items]', 'U') IS NOT NULL DROP TABLE [dbo].[_list_items]
--- IF OBJECT_ID('[dbo].[_objects]', 'U') IS NOT NULL DROP TABLE [dbo].[_objects]
--- IF OBJECT_ID('[dbo].[_structures]', 'U') IS NOT NULL DROP TABLE [dbo].[_structures]
--- IF OBJECT_ID('[dbo].[_schemes]', 'U') IS NOT NULL DROP TABLE [dbo].[_schemes]
--- IF OBJECT_ID('[dbo].[_users_roles]', 'U') IS NOT NULL DROP TABLE [dbo].[_users_roles]
--- IF OBJECT_ID('[dbo].[_roles]', 'U') IS NOT NULL DROP TABLE [dbo].[_roles]
--- IF OBJECT_ID('[dbo].[_users]', 'U') IS NOT NULL DROP TABLE [dbo].[_users]
--- IF OBJECT_ID('[dbo].[_lists]', 'U') IS NOT NULL DROP TABLE [dbo].[_lists]
--- IF OBJECT_ID('[dbo].[_links]', 'U') IS NOT NULL DROP TABLE [dbo].[_links]
--- IF OBJECT_ID('[dbo].[_types]', 'U') IS NOT NULL DROP TABLE [dbo].[_types]
 GO
 
 -- =====================================================

@@ -577,8 +577,34 @@ public static class Program
     
     private static bool IsMssql(string providerName)
         => providerName.ToLowerInvariant() is "mssql" or "sqlserver";
-    
-    private static async Task<int> InitSchemaAsync(
+
+    /// <summary>
+    /// Whether the database holds the redb schema (its core table <c>_schemes</c>), asked through the dialect's
+    /// table-exists statement. PostgreSQL binds it positionally, SQL Server by @p0 / @p1.
+    /// </summary>
+    internal static async Task<bool> RedbSchemaExistsAsync(IDataProvider provider, CancellationToken ct)
+    {
+        var (sql, table, schema) = provider.Name switch
+        {
+            "postgres" => (new redb.Postgres.Sql.PostgreSqlDialect().Maintenance_SelectTableExists(), "", ""),
+            "mssql" => (new redb.MSSql.Sql.MsSqlDialect().Maintenance_SelectTableExists(), "@p0", "@p1"),
+            _ => throw new ArgumentException($"No schema check for provider: {provider.Name}", nameof(provider))
+        };
+
+        await using var command = provider.Connection.CreateCommand();
+        command.CommandText = sql;
+        foreach (var (name, value) in new[] { (table, (object)"_schemes"), (schema, DBNull.Value) })
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.DbType = System.Data.DbType.String;
+            parameter.Value = value;
+            command.Parameters.Add(parameter);
+        }
+        return Convert.ToInt64(await command.ExecuteScalarAsync(ct)) > 0;
+    }
+
+    internal static async Task<int> InitSchemaAsync(
         string connection, string provider, bool verbose, CancellationToken ct)
     {
         Console.WriteLine("REDB Schema Init");
@@ -593,10 +619,21 @@ public static class Program
                 Console.WriteLine($"Connecting to {provider}...");
             
             await dataProvider.OpenAsync(connection, ct);
-            
+
+            // The scripts create a schema in an empty database. Run over an existing one, the SQL Server script drops
+            // every foreign key and the id sequence in batches of their own before its first CREATE TABLE fails, and
+            // the database is left without them: refused before anything runs.
+            if (dataProvider.Name is "postgres" or "mssql" && await RedbSchemaExistsAsync(dataProvider, ct))
+            {
+                throw new InvalidOperationException(
+                    "The database already holds the redb schema; `redb init` creates it in an empty database only and has " +
+                    $"changed nothing. Upgrade an existing schema with `redb schema --upgrade --provider {dataProvider.Name}` " +
+                    "or by starting the service; to start over, drop and create the database first.");
+            }
+
             if (verbose)
                 Console.WriteLine("Connected. Reading schema script...");
-            
+
             var sql = GetEmbeddedSql(provider);
             
             if (verbose)
