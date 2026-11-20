@@ -237,7 +237,7 @@ BEGIN
     -- Split filter / narrow vs wide decision (only relevant when has_props=1;
     -- when has_props=0 we go to Shape A path below).
     DECLARE @splitC      NVARCHAR(MAX) = dbo.pvt_split_filter(@filter, @fields);
-    DECLARE @pushC       NVARCHAR(MAX) = JSON_VALUE(@splitC, N'$.push');
+    DECLARE @pushC       NVARCHAR(MAX) = dbo.pvt_json_text(@splitC, N'push');
     DECLARE @resC        NVARCHAR(MAX) = JSON_QUERY(@splitC, N'$.residual');
     DECLARE @has_null    BIT = dbo.pvt_has_absence_check(@resC);
     DECLARE @force_outer BIT = CASE WHEN @has_null = 1 OR @has_props = 0 THEN 1 ELSE 0 END;

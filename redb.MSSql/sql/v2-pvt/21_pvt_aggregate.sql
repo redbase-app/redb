@@ -414,7 +414,7 @@ BEGIN
     -- (T-SQL forbids aggregate-of-aggregate-subquery, unlike PG which
     -- can SUM((SELECT SUM(_x) FROM unnest(arr))) directly).
     DECLARE @splitC NVARCHAR(MAX) = dbo.pvt_split_filter(@filter, @fields);
-    DECLARE @pushC  NVARCHAR(MAX) = JSON_VALUE(@splitC, N'$.push');
+    DECLARE @pushC  NVARCHAR(MAX) = dbo.pvt_json_text(@splitC, N'push');
     DECLARE @resC   NVARCHAR(MAX) = JSON_QUERY(@splitC, N'$.residual');
 
     DECLARE @has_null    BIT = dbo.pvt_has_absence_check(@resC);

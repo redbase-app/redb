@@ -10,6 +10,8 @@
     
     <!-- NuGet Package Metadata -->
     <PackageId>redb.MSSql</PackageId>
+    <!-- Free-only patch of the 4.7 line: the provider carries its own number, the other redb packages stay on the root Version. -->
+    <Version>4.7.4</Version>
     <Product>REDB - Entity Database for .NET</Product>
     <Description>SQL Server provider for REDB. Includes optimized T-SQL generation, tree queries with CTEs, and full LINQ support. Requires SQL Server 2017 or newer (2022+ only for the $min / $max expression operators).</Description>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>

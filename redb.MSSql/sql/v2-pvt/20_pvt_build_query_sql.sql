@@ -230,7 +230,7 @@ BEGIN
         IF @has_props = 1
         BEGIN
             DECLARE @splitT NVARCHAR(MAX) = dbo.pvt_split_filter(@filter, @fields);
-            DECLARE @pushT  NVARCHAR(MAX) = JSON_VALUE(@splitT, N'$.push');
+            DECLARE @pushT  NVARCHAR(MAX) = dbo.pvt_json_text(@splitT, N'push');
             IF @seed_level_sql IS NOT NULL
                 SET @pushT = CASE WHEN @pushT IS NULL OR @pushT = N'' THEN @seed_level_sql
                                   ELSE N'(' + @pushT + N') AND ' + @seed_level_sql END;
@@ -398,7 +398,7 @@ BEGIN
     -- they narrow _objects BEFORE the correlated pivot subqueries execute
     -- per row. Residual stays on the outer WHERE.
     DECLARE @splitC NVARCHAR(MAX) = dbo.pvt_split_filter(@filter, @fields);
-    DECLARE @pushC  NVARCHAR(MAX) = JSON_VALUE(@splitC, N'$.push');
+    DECLARE @pushC  NVARCHAR(MAX) = dbo.pvt_json_text(@splitC, N'push');
     DECLARE @resC   NVARCHAR(MAX) = JSON_QUERY(@splitC, N'$.residual');
     DECLARE @inner  NVARCHAR(MAX) = dbo.pvt_build_cte_sql(
         @scheme_id, @fields, N'flat', NULL, NULL, @force_outer, @pushC, @narrow, DEFAULT, DEFAULT, DEFAULT);

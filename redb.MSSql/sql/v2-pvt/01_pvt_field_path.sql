@@ -56,6 +56,21 @@ BEGIN
 END;
 GO
 
+-- ---------- pvt_json_text ---------------------------------------------------
+-- The text of a scalar member at the top level of a JSON object, of any length, as JSON_VALUE gives it; NULL when
+-- the member is missing, null, an object or an array. JSON_VALUE returns NULL in lax mode for a value over 4,000
+-- characters, and a pushed condition (a SQL text built from a list of some hundreds of ids) or a long search constant
+-- read through it was dropped without an error: WhereRedb(ParentId in 400+ ids) with a props filter returned the
+-- whole scheme. OPENJSON gives the value as NVARCHAR(MAX).
+CREATE FUNCTION dbo.pvt_json_text(@json NVARCHAR(MAX), @key NVARCHAR(200))
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    IF @json IS NULL OR ISJSON(@json) = 0
+        RETURN NULL;
+    RETURN (SELECT TOP (1) [value] FROM OPENJSON(@json) WHERE [key] = @key AND [type] IN (1, 2, 3));
+END;
+GO
 -- ---------- pvt_normalize_base_field_name --------------------------------
 -- Maps C# base field names to _objects columns. Returns NULL if the field
 -- is not a base column. Bare names (without `0$:` prefix and without `_`

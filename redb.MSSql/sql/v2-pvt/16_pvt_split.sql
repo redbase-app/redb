@@ -111,7 +111,7 @@ BEGIN
             WHILE @@FETCH_STATUS = 0
             BEGIN
                 SET @child = dbo.pvt_split_filter(@elem_val, @fields);
-                SET @cpush = JSON_VALUE(@child, N'$.push');
+                SET @cpush = dbo.pvt_json_text(@child, N'push');
                 SET @cres  = JSON_QUERY(@child, N'$.residual');
 
                 IF @cpush IS NOT NULL
@@ -161,7 +161,7 @@ BEGIN
             WHILE @@FETCH_STATUS = 0 AND @all_pushable = 1
             BEGIN
                 SET @child = dbo.pvt_split_filter(@elem_val, @fields);
-                SET @cpush = JSON_VALUE(@child, N'$.push');
+                SET @cpush = dbo.pvt_json_text(@child, N'push');
                 SET @cres  = JSON_QUERY(@child, N'$.residual');
 
                 IF @cres IS NOT NULL OR @cpush IS NULL
@@ -199,7 +199,7 @@ BEGIN
                 GOTO ret;
             END;
             SET @child = dbo.pvt_split_filter(@op_val, @fields);
-            SET @cpush = JSON_VALUE(@child, N'$.push');
+            SET @cpush = dbo.pvt_json_text(@child, N'push');
             SET @cres  = JSON_QUERY(@child, N'$.residual');
             IF @cres IS NULL AND @cpush IS NOT NULL
             BEGIN
@@ -246,7 +246,7 @@ BEGIN
             SET @singleton = N'{"' + STRING_ESCAPE(@ek, 'json') + N'":' + @ev_json + N'}';
 
             SET @child = dbo.pvt_split_filter(@singleton, @fields);
-            SET @cpush = JSON_VALUE(@child, N'$.push');
+            SET @cpush = dbo.pvt_json_text(@child, N'push');
             SET @cres  = JSON_QUERY(@child, N'$.residual');
 
             IF @cpush IS NOT NULL

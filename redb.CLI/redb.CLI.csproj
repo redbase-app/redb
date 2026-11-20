@@ -22,7 +22,7 @@
     <ToolCommandName>redb</ToolCommandName>
     <PackageId>redb.CLI</PackageId>
     <!-- CLI-only release of the 4.7 line: the tool carries its own number, the redb packages stay on the root Version. -->
-    <Version>4.7.3</Version>
+    <Version>4.7.4</Version>
     <Product>REDB - Entity Database for .NET</Product>
     <Description>CLI tool for REDB database management: export, import, schema init.</Description>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>

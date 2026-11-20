@@ -25,6 +25,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Pending changes live in `changelog/unreleased/` until the release; `pwsh scripts/changelog.ps1 -Preview` shows them.
 
+## [4.7.4] — 2026-11-20
+
+### Changed
+
+- **redb.MSSql 4.7.4 and redb.CLI 4.7.4; the other redb packages stay 4.7.2.** redb.CLI carries the module of
+  redb.MSSql 4.7.4, so `redb init` and `redb schema` install the fixed module; update both. The Tsak and Identity images
+  and archives keep redb.MSSql 4.7.2 in `Libs/shared` until 4.8.0: on SQL Server Free put `redb.MSSql.dll` of the 4.7.4
+  package there, or every node of the database puts the old module back at start. Affected: SQL Server with the Free provider only; the Pro provider is not affected.
+
+### Fixed
+
+- **SQL Server (Free): a filter on a base field with a long condition was dropped when the query also filtered on a
+  props field or grouped, aggregated or used a window.** For example, `WhereRedb(o => ids.Contains(o.ParentId.Value))`
+  with about 400 ids or more (the condition over 4,000 characters) returned objects outside the id list: every object
+  the props filter let through. The module goes to `0.2.40.1` at the next start; run every node of a database on this
+  release, since an older 4.7 package puts its own module back when it starts. Packages: `redb.MSSql`.
+
 ## [4.7.3] — 2026-11-19
 
 ### Changed

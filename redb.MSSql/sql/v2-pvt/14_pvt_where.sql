@@ -602,7 +602,7 @@ BEGIN
                    @ct_s = MIN(CASE WHEN [key] = '1' THEN [value] END)
               FROM OPENJSON(@v);
             IF @ct_s IS NOT NULL AND ISJSON(@ct_s) = 1
-                SET @ct_s = COALESCE(JSON_VALUE(@ct_s, N'$."$const"'), @ct_s);
+                SET @ct_s = COALESCE(dbo.pvt_json_text(@ct_s, N'$const'), @ct_s);
             SET @piece = dbo.pvt_b2_expr_sql(@ct_e, @fields, @obj_alias)
                        + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@ct_s) + N'%') + N' ESCAPE ''\''';
         END
@@ -614,7 +614,7 @@ BEGIN
                    @sw_s = MIN(CASE WHEN [key] = '1' THEN [value] END)
               FROM OPENJSON(@v);
             IF @sw_s IS NOT NULL AND ISJSON(@sw_s) = 1
-                SET @sw_s = COALESCE(JSON_VALUE(@sw_s, N'$."$const"'), @sw_s);
+                SET @sw_s = COALESCE(dbo.pvt_json_text(@sw_s, N'$const'), @sw_s);
             SET @piece = dbo.pvt_b2_expr_sql(@sw_e, @fields, @obj_alias)
                        + N' LIKE ' + dbo.pvt_sql_string_literal(dbo.pvt_like_escape(@sw_s) + N'%') + N' ESCAPE ''\''';
         END
@@ -626,7 +626,7 @@ BEGIN
                    @es_s = MIN(CASE WHEN [key] = '1' THEN [value] END)
               FROM OPENJSON(@v);
             IF @es_s IS NOT NULL AND ISJSON(@es_s) = 1
-                SET @es_s = COALESCE(JSON_VALUE(@es_s, N'$."$const"'), @es_s);
+                SET @es_s = COALESCE(dbo.pvt_json_text(@es_s, N'$const'), @es_s);
             SET @piece = dbo.pvt_b2_expr_sql(@es_e, @fields, @obj_alias)
                        + N' LIKE ' + dbo.pvt_sql_string_literal(N'%' + dbo.pvt_like_escape(@es_s)) + N' ESCAPE ''\''';
         END
