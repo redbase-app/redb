@@ -58,6 +58,12 @@ public static class JsonValueConverter
             Type t when t == typeof(DateTime) => ParseDateTime(elem),
             Type t when t == typeof(DateTimeOffset) => ParseDateTimeOffset(elem),
             
+            // TimeSpan and TimeOnly are stored as their Ticks in _Long: a group key, a MIN/MAX or an average arrives as
+            // a number (an average with a fraction is truncated to whole ticks). They fell to the raw-text fallback
+            // and the result constructor refused the string.
+            Type t when t == typeof(TimeSpan) => TimeSpan.FromTicks((long)ReadIntegral(elem)),
+            Type t when t == typeof(TimeOnly) => new TimeOnly((long)ReadIntegral(elem)),
+
             // Guid
             Type t when t == typeof(Guid) => elem.TryGetGuid(out var g) ? g : Guid.Empty,
             
@@ -85,7 +91,7 @@ public static class JsonValueConverter
         {
             if (elem.TryGetInt64(out var l)) return l;
             if (elem.TryGetDecimal(out var d)) return decimal.Truncate(d);
-            if (elem.TryGetDouble(out var db)) return (decimal)Math.Truncate(db);
+            if (elem.TryGetDouble(out var db)) return redb.Core.Utils.RedbDecimal.FromDouble(Math.Truncate(db));
         }
         else if (elem.ValueKind == JsonValueKind.String &&
                  decimal.TryParse(elem.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var ds))

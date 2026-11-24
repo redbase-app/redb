@@ -40,6 +40,15 @@ public sealed class SqlRecorder
     /// <summary>The commands recorded so far; recording goes on.</summary>
     public IReadOnlyList<RecordedCommand> Peek() => _commands.ToArray();
 
+    /// <summary>
+    /// Runs before a QueryAsync command is forwarded, with its SQL text, armed or not: a test does something to the
+    /// database between two statements of one operation (a delete between the read of the objects and of their values).
+    /// </summary>
+    public Func<string, Task>? BeforeQuery { get; set; }
+
+    /// <summary>Runs after a QueryAsync command returned, with its SQL text, armed or not (see <see cref="BeforeQuery"/>).</summary>
+    public Func<string, Task>? AfterQuery { get; set; }
+
     internal void Note(IRedbContext context, string sql)
     {
         if (_armed) _commands.Enqueue(new RecordedCommand(sql, Environment.CurrentManagedThreadId, context));
@@ -99,11 +108,21 @@ public sealed class RecordingRedbContext : IRedbContext
     public IKeyGenerator Keys => _inner.Keys;
     public IBulkOperations Bulk => _inner.Bulk;
 
-    public Task<List<T>> QueryAsync<T>(string sql, params object[] parameters) where T : new()
-        => _inner.QueryAsync<T>(Note(sql), parameters);
+    public async Task<List<T>> QueryAsync<T>(string sql, params object[] parameters) where T : new()
+    {
+        if (_recorder.BeforeQuery is { } before) await before(sql);
+        var rows = await _inner.QueryAsync<T>(Note(sql), parameters);
+        if (_recorder.AfterQuery is { } after) await after(sql);
+        return rows;
+    }
 
-    public Task<List<T>> QueryAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
-        => _inner.QueryAsync<T>(Note(sql), parameters, cancellationToken);
+    public async Task<List<T>> QueryAsync<T>(string sql, object[] parameters, CancellationToken cancellationToken) where T : new()
+    {
+        if (_recorder.BeforeQuery is { } before) await before(sql);
+        var rows = await _inner.QueryAsync<T>(Note(sql), parameters, cancellationToken);
+        if (_recorder.AfterQuery is { } after) await after(sql);
+        return rows;
+    }
 
     public Task<T?> QueryFirstOrDefaultAsync<T>(string sql, params object[] parameters) where T : class, new()
         => _inner.QueryFirstOrDefaultAsync<T>(Note(sql), parameters);

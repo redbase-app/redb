@@ -415,6 +415,11 @@ namespace redb.Core.Providers.Base
                 }, cancellationToken);
             }
 
+            // The objects that existed before this save, taken before AssignMissingIds gives the new ones their ids:
+            // only these rows are locked in phase 4. Locking the ids of objects this save creates locked rows that do
+            // not exist yet, and on SQL Server the lock statement then read the rows of concurrent writers.
+            var existingObjectIds = allObjectsToSave.Where(o => o.Id > 0).Select(o => o.Id).ToArray();
+
             // === PHASE 3: BATCH PROCESSING (REUSING PROTECTED METHODS) ===
             await AssignMissingIds(allObjectsToSave, user, cancellationToken);
 
@@ -456,8 +461,7 @@ namespace redb.Core.Providers.Base
             if (diagIsIn)
             {
                 // Lock existing objects within the caller's transaction
-                var existingObjectIds = allObjectsToSave.Where(o => o.Id > 0).Select(o => o.Id).ToArray();
-                if (existingObjectIds.Any())
+                if (existingObjectIds.Length > 0)
                 {
                     await _context.ExecuteAsync(
                         Sql.ObjectStorage_LockObjectsForUpdate(), new object[] { existingObjectIds }, cancellationToken);
@@ -494,8 +498,7 @@ namespace redb.Core.Providers.Base
                     try
                     {
                         // FOR UPDATE: lock ALL existing objects to prevent race condition
-                        var existingObjectIds = allObjectsToSave.Where(o => o.Id > 0).Select(o => o.Id).ToArray();
-                        if (existingObjectIds.Any())
+                        if (existingObjectIds.Length > 0)
                         {
                             await _context.ExecuteAsync(
                                 Sql.ObjectStorage_LockObjectsForUpdate(), new object[] { existingObjectIds }, cancellationToken);

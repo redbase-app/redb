@@ -166,28 +166,93 @@ public class RedbService : RedbServiceBase
     ///     and the IX__values__scalar_*_object of SQLite Pro dropped (2026-10-17).
     /// 12 — IX__values__structure_object_string (partial, text values only): which objects hold a text value of a
     ///     field, without reading the text. A filter Field == null over a text field reads it (2026-10-21).
+    /// 13 — the table _schema_compat: which builds a file still serves (<see cref="SchemaCompatMinReader"/>). A build
+    ///     whose schema version is below the file's leaves the file as it is and opens it when that row allows,
+    ///     otherwise it stops with RedbSchemaNewerException (2026-11-14). In 4.7.5 the same step also stores
+    ///     TimeOnly and TimeSpan as Ticks in _Long: _types._db_type and _scheme_metadata_cache.db_type say Long for them.
     /// </remarks>
-    private const int SchemaVersion = 12;
+    public static int SchemaVersion { get; } = 13;
+
+    /// <summary>
+    /// The oldest schema version that may open a file of this build: written into <c>_schema_compat</c> with every
+    /// stamp. Raise it only when a step breaks the C# of older builds (a dropped or renamed column or table they read);
+    /// never lower it. <see cref="SchemaCompatPackage"/> is the redb package version that first shipped that schema
+    /// version, named to the operator of an older build that may not open the file.
+    /// </summary>
+    // 13: an older build would write TimeOnly/TimeSpan as text into a file whose readers take ticks (step 13).
+    private const int SchemaCompatMinReader = 13;
+
+    private const string SchemaCompatPackage = "4.7.5";
 
     /// <summary>
     /// The schema upgrades of <see cref="ApplySchemaUpgradeStepsAsync"/> under the schema lock, the version asked again
     /// under it: two processes opening one old file (a panel and a worker of one host) ran the same steps at once, and
     /// a step that checks and then acts (a column, an index rebuilt under its name) failed in the second.
     /// </summary>
-    private async Task ApplySchemaUpgradesAsync()
+    /// <returns>False when the file belongs to a newer build: then nothing was changed, and nothing else may be.</returns>
+    private async Task<bool> ApplySchemaUpgradesAsync()
     {
+        var fileVersion = await Context.ExecuteScalarAsync<long>("PRAGMA user_version");
+        if (fileVersion > SchemaVersion)
+        {
+            await AcceptNewerFileAsync(fileVersion);
+            return false;
+        }
+
         // The unique key of root structures is not a numbered step: a file with duplicates holding values goes on
         // without it, and every start tries again until they are resolved.
-        if (await Context.ExecuteScalarAsync<long>("PRAGMA user_version") >= SchemaVersion
-            && !await IsRootStructureKeyMissingAsync())
-            return;
+        if (fileVersion >= SchemaVersion && !await IsRootStructureKeyMissingAsync())
+            return true;
 
         await using (await AcquireSchemaLockAsync())
         {
-            if (await Context.ExecuteScalarAsync<long>("PRAGMA user_version") < SchemaVersion)
+            // A newer build may have opened the file while this one waited.
+            fileVersion = await Context.ExecuteScalarAsync<long>("PRAGMA user_version");
+            if (fileVersion > SchemaVersion)
+            {
+                await AcceptNewerFileAsync(fileVersion);
+                return false;
+            }
+            if (fileVersion < SchemaVersion)
                 await ApplySchemaUpgradeStepsAsync();
             await EnsureRootStructureKeyAsync();
         }
+        return true;
+    }
+
+    /// <summary>
+    /// The file was written by a newer build: never taken back. Opened, with one warning per process, when its
+    /// <c>_schema_compat</c> row allows this build; otherwise start-up stops with
+    /// <see cref="redb.Core.Exceptions.RedbSchemaNewerException"/>. A newer file without the row states nothing and is
+    /// treated as not allowing.
+    /// </summary>
+    private async Task AcceptNewerFileAsync(long fileVersion)
+    {
+        long? minReader = null;
+        string? package = null;
+        if (await TableExistsAsync("_schema_compat"))
+        {
+            var rows = await Context.QueryAsync<SchemaCompatRow>(
+                "SELECT _min_reader AS MinReader, _package AS Package FROM _schema_compat LIMIT 1");
+            if (rows.Count > 0)
+            {
+                minReader = rows[0].MinReader;
+                package = rows[0].Package;
+            }
+        }
+
+        var deployed = fileVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var own = SchemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (minReader is null || minReader > SchemaVersion)
+            throw new redb.Core.Exceptions.RedbSchemaNewerException(DatabaseTypeName, deployed, own, package);
+
+        WarnNewerOnce(DatabaseTypeName, deployed, own, Logger);
+    }
+
+    private sealed class SchemaCompatRow
+    {
+        public long MinReader { get; set; }
+        public string? Package { get; set; }
     }
 
     /// <inheritdoc />
@@ -427,6 +492,13 @@ public class RedbService : RedbServiceBase
             await Context.ExecuteAsync("ANALYZE \"IX__values__structure_object_string\"");
         }
 
+        // 13 - _schema_compat: which builds the file still serves. Written by the stamp below, with every stamp.
+        // Also 13 in 4.7.5 - TimeOnly and TimeSpan are stored as Ticks in _Long: the type rows and their copy in the metadata cache
+        // say Long. Values already stored as text are not converted (UPGRADING.md gives the statement).
+        await Context.ExecuteAsync(
+            "UPDATE _types SET _db_type = 'Long' WHERE _id IN (-9223372036854775685, -9223372036854775684) AND _db_type <> 'Long'");
+        await Context.ExecuteAsync(
+            "UPDATE _scheme_metadata_cache SET db_type = 'Long' WHERE _type_id IN (-9223372036854775685, -9223372036854775684) AND db_type <> 'Long'");
         await StampSchemaVersionAsync();
     }
 
@@ -439,7 +511,19 @@ public class RedbService : RedbServiceBase
         => System.Text.RegularExpressions.Regex.Replace(sql, @"\s+", " ").Trim()
             .Replace("CREATE INDEX IF NOT EXISTS ", "CREATE INDEX ", StringComparison.OrdinalIgnoreCase);
 
-    private Task StampSchemaVersionAsync() => Context.ExecuteAsync($"PRAGMA user_version = {SchemaVersion}");
+    /// <summary>
+    /// The version of this build into <c>PRAGMA user_version</c>, and into <c>_schema_compat</c> which builds the file
+    /// still serves (step 13; written with every stamp, so a file created from the schema script has it too).
+    /// </summary>
+    private async Task StampSchemaVersionAsync()
+    {
+        await Context.ExecuteAsync(
+            "CREATE TABLE IF NOT EXISTS _schema_compat(_min_reader INTEGER NOT NULL, _package TEXT NOT NULL)");
+        await Context.ExecuteAsync("DELETE FROM _schema_compat");
+        await Context.ExecuteAsync(
+            $"INSERT INTO _schema_compat(_min_reader, _package) VALUES ({SchemaCompatMinReader}, '{SchemaCompatPackage}')");
+        await Context.ExecuteAsync($"PRAGMA user_version = {SchemaVersion}");
+    }
 
     private async Task<bool> ColumnExistsAsync(string table, string column)
         => (await Context.ExecuteScalarAsync<long?>(
@@ -547,7 +631,8 @@ public class RedbService : RedbServiceBase
             return;
         }
 
-        await ApplySchemaUpgradesAsync();
-        await ApplySeedCorrectionsAsync();
+        // A file of a newer build is left as it is, seed corrections included.
+        if (await ApplySchemaUpgradesAsync())
+            await ApplySeedCorrectionsAsync();
     }
 }

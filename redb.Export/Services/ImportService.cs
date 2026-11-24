@@ -86,6 +86,11 @@ public sealed class ImportService
     {
         var startTime = DateTime.UtcNow;
 
+        // Before anything is cleaned or written: a target of another schema than this build's stops here with the
+        // exceptions of a service start. Without it a parallel import committed its cleaning, then failed on the
+        // first batch naming a column the target does not have, and left an emptied database behind.
+        await SchemaGate.CheckTargetAsync(_provider, ct);
+
         Log($"Importing from: {inputPath}");
 
         var isZip = await IsZipFileAsync(inputPath);
@@ -139,6 +144,10 @@ public sealed class ImportService
             // its constraints on. Before, rows went in batch by batch as read, the constraints came back only on
             // success, and an import with cleaning that failed left an emptied, half-filled database with its
             // integrity switched off (review 2026-09-24).
+            // The target's own _types rows stay, the cleaning keeps them: they are the built-in types of this build, and
+            // a file of an older version carries its own (TimeSpan and TimeOnly as text before they were ticks). Only the
+            // file's types the target lacks are added.
+            var targetTypeIds = await ImportFinishing.TargetTypeIdsAsync(_provider, ct);
             await _provider.BeginImportAsync(ct);
             var committed = false;
             var parallelFinished = false;
@@ -205,7 +214,9 @@ public sealed class ImportService
                     switch (type)
                     {
                         case "type":
-                            AddTypeRow(tables.Types, JsonSerializer.Deserialize<TypeRecord>(line, JsonOptions)!);
+                            var typeRecord = JsonSerializer.Deserialize<TypeRecord>(line, JsonOptions)!;
+                            if (!targetTypeIds.Contains(typeRecord.Id))
+                                AddTypeRow(tables.Types, typeRecord);
                             tables.TypesTotal++;
                             if (tables.Types.Rows.Count >= _batchSize)
                                 await FlushTableAsync("_types", tables.Types, ct);
@@ -302,47 +313,40 @@ public sealed class ImportService
                 if (_writer != null)
                     Console.WriteLine($"Data read in {(DateTime.UtcNow - _loadStarted):hh\\:mm\\:ss}; waiting for the writers, then the indexes are rebuilt.");
 
-                // The footer is the last line of every export: without it the file was cut short, and with it every
-                // table must have arrived in full. Checked before the commit, so a short file changes nothing.
                 if (_writer != null)
                 {
                     await _writer.CompleteAsync();
-                    try
+
+                    // Every row is written; what is left puts the database back in shape. Each step is attempted
+                    // whatever the one before it did, and the failures are reported together: one failing step (the
+                    // id sequence of a database that had lost it) used to leave every index disabled and every
+                    // constraint and trigger off.
+                    var failures = await FinishParallelLoadAsync(footer, tables, sequenceValue, droppedIndexes, ct);
+                    parallelFinished = true;
+                    if (failures.Count > 0)
                     {
-                        VerifyAgainstFooter(footer, tables);
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        // The serial import says "nothing was imported" here; a parallel one has already written.
                         throw new InvalidOperationException(
-                            ex.Message.Replace(" Nothing was imported; the database is unchanged.", "") +
-                            " The parallel import has already written its rows: run it again with --clean.", ex);
+                            $"The parallel import has written its rows, and {failures.Count} of its finishing steps " +
+                            "failed; every step was attempted:" +
+                            string.Concat(failures.Select(f => $"{Environment.NewLine}  - {f.Step}: {f.Error.Message}")) +
+                            $"{Environment.NewLine}Run the import again with --clean and --parallel: it reloads the data " +
+                            "and repeats every step.",
+                            new AggregateException(failures.Select(f => f.Error)));
                     }
                 }
                 else
                 {
+                    // The footer is the last line of every export: without it the file was cut short, and with it every
+                    // table must have arrived in full. Checked before the commit, so a short file changes nothing.
                     VerifyAgainstFooter(footer, tables);
                     await _provider.EnableConstraintsAsync(ct);
-                }
 
-                if (sequenceValue > 0)
-                {
-                    Log($"Setting sequence to: {sequenceValue}");
-                    await _provider.SetSequenceValueAsync(sequenceValue, ct);
-                }
+                    if (sequenceValue > 0)
+                    {
+                        Log($"Setting sequence to: {sequenceValue}");
+                        await _provider.SetSequenceValueAsync(sequenceValue, ct);
+                    }
 
-                if (_writer != null)
-                {
-                    await RebuildIndexesAsync(droppedIndexes, ct);
-
-                    // After the indexes: checking foreign keys over the loaded rows wants them in place.
-                    var constraintsStarted = DateTime.UtcNow;
-                    await ((IParallelImportProvider)_provider).RestoreConstraintsAfterLoadAsync(ct);
-                    Log($"Constraints restored in {(DateTime.UtcNow - constraintsStarted):hh\\:mm\\:ss}.");
-                    parallelFinished = true;
-                }
-                else
-                {
                     await _provider.CommitImportAsync(ct);
                     committed = true;
                 }
@@ -377,10 +381,23 @@ public sealed class ImportService
                 }
             }
 
+            // The rows are committed: the scheme metadata cache is built now, not by the first query of an application.
+            var cached = await ImportFinishing.SyncMetadataCacheAsync(_provider, ct);
+            Log($"Scheme metadata cache built for {cached} scheme(s).");
+
+            var timeAsText = await ImportFinishing.TimeValuesAsTextAsync(_provider, ct);
+
             var duration = DateTime.UtcNow - startTime;
 
             Console.WriteLine();
             Console.WriteLine("Import completed successfully!");
+            if (timeAsText > 0)
+            {
+                Console.WriteLine(
+                    $"  Note: {timeAsText:N0} imported TimeSpan or TimeOnly value(s) are stored as text by an older version. " +
+                    "Convert them with the statement of the redb upgrade notes (\"TimeSpan and TimeOnly are stored as ticks\") " +
+                    "before an application reads them.");
+            }
             Console.WriteLine($"  Duration: {duration:hh\\:mm\\:ss}");
             Console.WriteLine();
             Console.WriteLine("Statistics:");
@@ -589,6 +606,65 @@ public sealed class ImportService
     /// database lets index builds on one table run side by side, any free connection takes the next
     /// index; where it does not, each table gets one connection and its indexes go in turn.
     /// </summary>
+    /// <summary>
+    /// The finishing steps of a parallel load, each attempted whatever the others did: the file against its footer,
+    /// the id sequence, the index rebuild, then the constraints (after the indexes: checking foreign keys over the
+    /// loaded rows wants them in place). Returns the steps that failed.
+    /// </summary>
+    private async Task<List<(string Step, Exception Error)>> FinishParallelLoadAsync(
+        ExportFooter? footer, ImportTables tables, long sequenceValue, IReadOnlyList<DroppedIndex> droppedIndexes,
+        CancellationToken ct)
+    {
+        var failures = new List<(string Step, Exception Error)>();
+
+        async Task StepAsync(string step, Func<Task> run)
+        {
+            try
+            {
+                await run();
+            }
+            catch (Exception ex)
+            {
+                failures.Add((step, ex));
+            }
+        }
+
+        // The footer is the last line of every export: without it the file was cut short, and with it every table
+        // must have arrived in full. The serial import says "nothing was imported" there; a parallel one has written.
+        await StepAsync("file check", () =>
+        {
+            try
+            {
+                VerifyAgainstFooter(footer, tables);
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new InvalidOperationException(ex.Message.Replace(" Nothing was imported; the database is unchanged.", ""), ex);
+            }
+            return Task.CompletedTask;
+        });
+
+        if (sequenceValue > 0)
+        {
+            await StepAsync("id sequence", () =>
+            {
+                Log($"Setting sequence to: {sequenceValue}");
+                return _provider.SetSequenceValueAsync(sequenceValue, ct);
+            });
+        }
+
+        await StepAsync("index rebuild", () => RebuildIndexesAsync(droppedIndexes, ct));
+
+        await StepAsync("constraints", async () =>
+        {
+            var constraintsStarted = DateTime.UtcNow;
+            await ((IParallelImportProvider)_provider).RestoreConstraintsAfterLoadAsync(ct);
+            Log($"Constraints restored in {(DateTime.UtcNow - constraintsStarted):hh\\:mm\\:ss}.");
+        });
+
+        return failures;
+    }
+
     private async Task RebuildIndexesAsync(IReadOnlyList<DroppedIndex> indexes, CancellationToken ct)
     {
         var parallel = (IParallelImportProvider)_provider;

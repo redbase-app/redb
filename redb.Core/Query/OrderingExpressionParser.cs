@@ -332,25 +332,24 @@ public class OrderingExpressionParser : IOrderingExpressionParser
 
         while (current != null && current.Member is System.Reflection.PropertyInfo)
         {
-            // Skip .Value/.HasValue on Nullable<T>
-            if ((current.Member.Name == "Value" || current.Member.Name == "HasValue") && IsNullableAccessor(current))
-            {
-                if (current.Expression is MemberExpression nullableParent)
-                {
-                    current = nullableParent;
-                    continue;
-                }
-                break;
-            }
-            
-            pathParts.Add(current.Member.Name);
-            
+            // .Value/.HasValue on Nullable<T> add no part
+            if (!((current.Member.Name == "Value" || current.Member.Name == "HasValue") && IsNullableAccessor(current)))
+                pathParts.Add(current.Member.Name);
+
             if (current.Expression is MemberExpression parentMember)
             {
                 current = parentMember;
             }
             else
             {
+                // The start of the chain must be the object of the query. A dictionary entry, an element by index or a
+                // method call before it used to be dropped, so OrderBy(p => p.Items[0].Name) sorted by the field Name
+                // of the object itself and OrderBy(p => p.Scores["a"].Value) sent an empty path.
+                var root = current.Expression;
+                while (root is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked or ExpressionType.TypeAs } conversion)
+                    root = conversion.Operand;
+                if (root is not ParameterExpression)
+                    throw new NotSupportedException(Parsing.BaseFilterExpressionParser.UnsupportedFieldPathMessage(memberExpression));
                 break;
             }
         }

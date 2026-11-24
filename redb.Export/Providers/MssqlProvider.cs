@@ -80,8 +80,8 @@ public sealed class MssqlProvider : IDataProvider, IParallelImportProvider
             "_users",
             "_roles",
             "_lists",
-            "_links",
-            "_types"
+            "_links"
+            // _types is kept: the built-in types of this build; ImportService adds only the file's types the target lacks.
         };
 
         // Disable triggers and FK checks before truncation.

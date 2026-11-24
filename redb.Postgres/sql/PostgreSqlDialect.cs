@@ -1447,6 +1447,22 @@ public class PostgreSqlDialect : ISqlDialect
              + ") AS \"Value\"";
     }
 
+    // The inner query numbers its rows in its own order (_ord, module 0.7.26), restored after the join: a hash or merge
+    // join keeps no order, and row_number() OVER () above the subquery relied on the plan reading it in order.
+    public string? Query_WrapPvtWithObjectRows(string innerSql) =>
+        $"""
+        SELECT o._id as Id, o._id_scheme as IdScheme, o._id_parent as IdParent, o._id_owner as IdOwner,
+               o._id_who_change as IdWhoChange, o._name as Name, o._hash as Hash,
+               o._date_create as DateCreate, o._date_modify as DateModify, o._date_begin as DateBegin,
+               o._date_complete as DateComplete, o._key as Key, o._note as Note,
+               o._value_long as ValueLong, o._value_string as ValueString, o._value_guid as ValueGuid,
+               o._value_bool as ValueBool, o._value_double as ValueDouble, o._value_numeric as ValueNumeric,
+               o._value_datetime as ValueDatetime, o._value_bytes as ValueBytes, o._value_unique as ValueUnique
+        FROM ({innerSql}) sub
+        JOIN _objects o ON o._id = sub._id
+        ORDER BY sub._ord
+        """;
+
     public string? Query_WrapPvtWithObjectJson(string innerSql, int maxDepth) =>
         $"SELECT get_object_json(t._id, {maxDepth})::text AS \"Value\" FROM ({innerSql}) t";
 
@@ -1459,7 +1475,10 @@ public class PostgreSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
     // Bump together with the literal in redb.Postgres/sql/v2-pvt/99_module_version.sql.
-    public string? Query_PvtRequiredVersion() => "0.7.23";
+    public string? Query_PvtRequiredVersion() => "0.7.23.1";
+
+    // Created next to pvt_module_version() in 99_module_version.sql.
+    public string? Query_PvtModuleCompatFunction() => "pvt_module_compat";
 
     // ============================================================
     // Native PVT projection orchestrator (pvt_build_projection_sql).

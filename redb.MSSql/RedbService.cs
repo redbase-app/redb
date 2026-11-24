@@ -154,11 +154,23 @@ public class RedbService : RedbServiceBase
         var batches = System.Text.RegularExpressions.Regex.Split(sql, @"^\s*GO\s*$",
             System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-        foreach (var batch in batches)
+        try
         {
-            var trimmed = batch.Trim();
-            if (!string.IsNullOrEmpty(trimmed))
-                await Context.ExecuteAsync(trimmed);
+            foreach (var batch in batches)
+            {
+                var trimmed = batch.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                    await Context.ExecuteAsync(trimmed);
+            }
+        }
+        catch (Microsoft.Data.SqlClient.SqlException)
+        {
+            // The guard of the script (a database that already holds the schema) sets NOEXEC ON on the session it ran
+            // on, and the context keeps that session: every later command of this process would be compiled and not
+            // run, a query answering nothing. SET NOEXEC OFF runs even under NOEXEC and turns it back on the same
+            // session. Clearing the pool did not reach the connection the context holds.
+            await Context.ExecuteAsync("SET NOEXEC OFF");
+            throw;
         }
     }
 

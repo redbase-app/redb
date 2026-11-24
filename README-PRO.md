@@ -117,9 +117,9 @@ Both editions (core):
 
 The full list is in [CHANGELOG.md](CHANGELOG.md); what to check when upgrading is in [UPGRADING.md](UPGRADING.md).
 
-## Free — no license key
+## Free of charge
 
-All Pro features work out of the box — **no license key required** (starting from version 3.3.0). Install the Pro
+All Pro features work out of the box: **Pro is free of charge and needs no key.** Install the Pro
 packages and use them, in development and in production alike. Pro is proprietary (closed-source) software,
 distributed free of charge.
 
@@ -145,5 +145,5 @@ Target frameworks: .NET 8.0 (LTS), .NET 9.0, .NET 10.0.
 
 ## License
 
-RedBase Pro is proprietary software (closed-source), distributed **free of charge — no license key required** starting
-from version 3.3.0. The license terms (`LICENSE-PRO.txt`) ship in every Pro package.
+RedBase Pro is proprietary software (closed-source), distributed **free of charge and needs no key**.
+The license terms (`LICENSE-PRO.txt`) ship in every Pro package.

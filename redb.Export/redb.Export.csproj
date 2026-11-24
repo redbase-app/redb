@@ -22,6 +22,12 @@
     <!-- The flat export (Flat/) walks Props types the way scheme sync does and decodes dictionary
          keys with RedbKeySerializer, so it needs the core. -->
     <ProjectReference Include="..\redb.Core\redb.Core.csproj" />
+    <!-- The schema gate (Services/SchemaGate.cs) checks the database against the schema these provider builds require:
+         the module version and compatibility functions of the PostgreSQL and SQL Server dialects, the file schema
+         version of redb.SQLite. Free providers only; the numbers are the same for Pro. -->
+    <ProjectReference Include="..\redb.Postgres\redb.Postgres.csproj" />
+    <ProjectReference Include="..\redb.MSSql\redb.MSSql.csproj" />
+    <ProjectReference Include="..\redb.SQLite\redb.SQLite.csproj" />
   </ItemGroup>
 
   <ItemGroup>

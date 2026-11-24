@@ -17,6 +17,25 @@ public sealed class PostgresProvider : IDataProvider, IParallelImportProvider
     private string? _connectionString;
     private NpgsqlTransaction? _transaction;
 
+    /// <summary>The redb tables an import writes, dependents before parents (the order cleaning needs).</summary>
+    private static readonly string[] RedbTables =
+    [
+        "_values",
+        "_list_items",
+        "_objects",
+        "_permissions",
+        "_functions",
+        "_dependencies",
+        "_structures",
+        "_schemes",
+        "_users_roles",
+        "_users",
+        "_roles",
+        "_lists",
+        "_links",
+        "_types"
+    ];
+
     /// <inheritdoc />
     public async Task BeginImportAsync(CancellationToken ct = default)
     {
@@ -65,26 +84,9 @@ public sealed class PostgresProvider : IDataProvider, IParallelImportProvider
     {
         if (_connection is null) return;
 
-        // Order matters: dependents before parents.
-        var tables = new[]
-        {
-            "_values",
-            "_list_items",
-            "_objects",
-            "_permissions",
-            "_functions",
-            "_dependencies",
-            "_structures",
-            "_schemes",
-            "_users_roles",
-            "_users",
-            "_roles",
-            "_lists",
-            "_links",
-            "_types"
-        };
-
-        foreach (var table in tables)
+        // The target keeps its own _types rows: they are the built-in types of this build (the file may carry those of an
+        // older one), and ImportService adds only the file's types the target lacks.
+        foreach (var table in RedbTables.Where(t => t != "_types"))
         {
             await using var cmd = new NpgsqlCommand($"TRUNCATE TABLE {table} CASCADE", _connection, _transaction);
             await cmd.ExecuteNonQueryAsync(ct);
@@ -128,6 +130,11 @@ public sealed class PostgresProvider : IDataProvider, IParallelImportProvider
         await using var cmd = new NpgsqlCommand(
             "SET LOCAL session_replication_role = 'origin'", _connection, _transaction);
         await cmd.ExecuteNonQueryAsync(ct);
+
+        // The rows went in with the foreign key triggers off, and switching them back on checks nothing that is
+        // already there. SQL Server re-checks every key at this point; the same file must not load with broken
+        // references here and be refused there. Inside the import transaction, so a refusal rolls everything back.
+        await CheckForeignKeysAsync(_transaction, "Nothing was imported; the database is unchanged.", ct);
     }
 
     /// <inheritdoc />
@@ -263,7 +270,81 @@ public sealed class PostgresProvider : IDataProvider, IParallelImportProvider
     public Task RelaxConstraintsForLoadAsync(CancellationToken ct = default) => Task.CompletedTask;
 
     /// <inheritdoc />
-    public Task RestoreConstraintsAfterLoadAsync(CancellationToken ct = default) => Task.CompletedTask;
+    // The workers' sessions are closed, so nothing is to be switched back on; what remains is to check the loaded
+    // rows against the foreign keys, as the serial import does. The rows are committed by now and stay.
+    public Task RestoreConstraintsAfterLoadAsync(CancellationToken ct = default) =>
+        CheckForeignKeysAsync(null,
+            "The parallel import has already written its rows, these references included: fix the file and run it again with --clean.",
+            ct);
+
+    /// <summary>
+    /// Checks the rows of the redb tables against every foreign key they carry, one anti-join per key read from
+    /// <c>pg_constraint</c>, and refuses the import when a row points at a row that is not there. The message names
+    /// each broken key, how many rows break it and one of them.
+    /// </summary>
+    private async Task CheckForeignKeysAsync(NpgsqlTransaction? transaction, string outcome, CancellationToken ct)
+    {
+        if (_connection is null) return;
+
+        var keys = new List<ForeignKey>();
+        await using (var read = new NpgsqlCommand("""
+            SELECT c.conname::text, t.relname::text, p.relname::text,
+                   ARRAY(SELECT a.attname::text FROM unnest(c.conkey) WITH ORDINALITY k(n, i)
+                         JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.n ORDER BY k.i),
+                   ARRAY(SELECT a.attname::text FROM unnest(c.confkey) WITH ORDINALITY k(n, i)
+                         JOIN pg_attribute a ON a.attrelid = c.confrelid AND a.attnum = k.n ORDER BY k.i),
+                   EXISTS (SELECT 1 FROM pg_attribute a
+                           WHERE a.attrelid = c.conrelid AND a.attname = '_id' AND NOT a.attisdropped)
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            JOIN pg_class p ON p.oid = c.confrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            WHERE c.contype = 'f'
+              AND n.nspname = current_schema()
+              AND t.relname = ANY(@tables)
+            ORDER BY t.relname, c.conname
+            """, _connection, transaction))
+        {
+            read.Parameters.AddWithValue("tables", RedbTables);
+            await using var reader = await read.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+                keys.Add(new ForeignKey(reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                    reader.GetFieldValue<string[]>(3), reader.GetFieldValue<string[]>(4), reader.GetBoolean(5)));
+        }
+
+        var broken = new List<string>();
+        foreach (var key in keys)
+        {
+            // MATCH SIMPLE, as the key itself: a row with a null in any of its columns is not checked.
+            var notNull = string.Join(" AND ", key.Columns.Select(c => $"c.{QuoteIdentifier(c)} IS NOT NULL"));
+            var match = string.Join(" AND ", key.Columns.Zip(key.ReferencedColumns,
+                (c, r) => $"p.{QuoteIdentifier(r)} = c.{QuoteIdentifier(c)}"));
+            var sample = string.Join(" || ', ' || ",
+                key.Columns.Select(c => $"'{c} = ' || c.{QuoteIdentifier(c)}::text"));
+            if (key.ChildHasId)
+                sample = "'_id = ' || c._id::text || ', ' || " + sample;
+
+            // An anti-join over a large table outlives any ordinary command timeout, like an index build.
+            await using var check = new NpgsqlCommand($"""
+                SELECT count(*) OVER (), {sample}
+                FROM {QuoteIdentifier(key.Table)} c
+                WHERE {notNull}
+                  AND NOT EXISTS (SELECT 1 FROM {QuoteIdentifier(key.ReferencedTable)} p WHERE {match})
+                LIMIT 1
+                """, _connection, transaction) { CommandTimeout = 0 };
+            await using var reader = await check.ExecuteReaderAsync(ct);
+            if (await reader.ReadAsync(ct))
+                broken.Add(ForeignKeyRefusal.Describe(key.Name, key.Table, reader.GetInt64(0),
+                    key.ReferencedTable, key.ReferencedColumns, reader.GetString(1)));
+        }
+
+        if (broken.Count > 0)
+            throw ForeignKeyRefusal.Exception(broken, outcome);
+    }
+
+    /// <summary>A foreign key of a redb table, as <c>pg_constraint</c> describes it.</summary>
+    private sealed record ForeignKey(
+        string Name, string Table, string ReferencedTable, string[] Columns, string[] ReferencedColumns, bool ChildHasId);
 
     /// <inheritdoc />
     // CREATE INDEX takes a lock that lets other index builds on the same table run.

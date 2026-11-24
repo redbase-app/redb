@@ -145,6 +145,16 @@ public record InExpression(
     IReadOnlyList<object> Values
 ) : FilterExpression;
 
+/// <summary>
+/// Some element of an array or list of classes satisfies <paramref name="Element"/>: <c>p.Rows.Any(r => r.Kind == "a"
+/// &amp;&amp; r.Active == true)</c>. The paths inside Element name the fields of the element under the collection
+/// (<c>Rows[].Kind</c>, <c>Rows[].Place.City</c>), and every condition of Element is asked of the same element.
+/// </summary>
+public record ArrayElementAnyExpression(
+    PropertyInfo Collection,
+    FilterExpression Element
+) : FilterExpression;
+
 #endregion
 
 /// <summary>

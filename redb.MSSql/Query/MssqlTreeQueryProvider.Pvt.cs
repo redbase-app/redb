@@ -66,7 +66,7 @@ public partial class MssqlTreeQueryProvider
 
         try
         {
-            var objectsJson = await ExecutePvtTreeAsync(context, route, applyPaging: true);
+            var objectsJson = await ExecutePvtTreeAsync(context, route);
             var result = DeserializeTreeObjects<TProps>(objectsJson);
 
             if (result.Count > 0 && _lazyPropsLoader != null)
@@ -106,18 +106,11 @@ public partial class MssqlTreeQueryProvider
         if (!ShouldRoutePvtTree(context, out var route))
             return await base.ExecuteTreeCountAsync<TProps>(context, cancellationToken);
 
-        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: true);
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, forCount: true);
         var sql = "SELECT CAST(COUNT(*) AS BIGINT) AS [Value] FROM (" + inner + ") t";
         object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
-        var orderByJson = context.Orderings.Count > 0
-            ? _facetBuilder.BuildOrderBy(context.Orderings)
-            : null;
-        var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
-        long? count;
-        if (hasOrder)
-            count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam, orderByJson! }, cancellationToken);
-        else
-            count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam }, cancellationToken);
+        // A count reads no order: the inner SQL is built without one (forCount), so nothing is sorted.
+        long? count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam }, cancellationToken);
         return checked((int)(count ?? 0));
     }
 
@@ -267,7 +260,7 @@ public partial class MssqlTreeQueryProvider
         if (!ShouldRoutePvtTree(context, out var route))
             return await base.GetSqlPreviewAsync(context, cancellationToken);
 
-        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: false, cancellationToken);
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, forCount: false, cancellationToken);
         var orderByJson = context.Orderings.Count > 0 ? _facetBuilder.BuildOrderBy(context.Orderings) : null;
 
         var sb = new StringBuilder();
@@ -282,12 +275,12 @@ public partial class MssqlTreeQueryProvider
     private async Task<string> BuildPvtTreeInnerSqlAsync<TProps>(
         TreeQueryContext<TProps> context,
         PvtTreeRoute route,
-        bool ignoreLimitOffset, CancellationToken cancellationToken = default) where TProps : class, new()
+        bool forCount, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var orderByJson = context.Orderings.Count > 0
             ? _facetBuilder.BuildOrderBy(context.Orderings)
             : null;
-        var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
+        var hasOrder = !forCount && !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
 
         // The depth of the tree walk (TreeQuery(root, maxDepth)); none: the whole subtree. This passed MaxRecursionDepth, the
         // depth of nested props, so maxDepth was ignored and every subtree stopped at 10 levels.
@@ -295,10 +288,10 @@ public partial class MssqlTreeQueryProvider
         var walkDepth = context.TreeFilters?.FirstOrDefault(f => f.Operator == TreeFilterOperator.DescendantsOf)?.MaxDepth
             ?? context.MaxDepth;
         var maxDepth = walkDepth?.ToString(CultureInfo.InvariantCulture) ?? "NULL";
-        var limitArg = ignoreLimitOffset || !context.Limit.HasValue
+        var limitArg = forCount || !context.Limit.HasValue
             ? "NULL"
             : context.Limit.Value.ToString(CultureInfo.InvariantCulture);
-        var offsetArg = ignoreLimitOffset
+        var offsetArg = forCount
             ? "0"
             : (context.Offset ?? 0).ToString(CultureInfo.InvariantCulture);
 
@@ -349,10 +342,9 @@ public partial class MssqlTreeQueryProvider
     /// </summary>
     private async Task<string?> ExecutePvtTreeAsync<TProps>(
         TreeQueryContext<TProps> context,
-        PvtTreeRoute route,
-        bool applyPaging, CancellationToken cancellationToken = default) where TProps : class, new()
+        PvtTreeRoute route, CancellationToken cancellationToken = default) where TProps : class, new()
     {
-        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: !applyPaging);
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, forCount: false);
 
         // FOR JSON PATH column aliases drive the JSON keys; mirror PG's
         // jsonb_build_object key naming exactly so the deserializer reuses
@@ -381,7 +373,11 @@ public partial class MssqlTreeQueryProvider
             + "o.[_value_datetime] AS value_datetime,"
             + "o.[_value_bytes] AS value_bytes,"
             + "o.[_hash] AS hash"
-            + " FROM (" + inner + ") sub JOIN dbo._objects o ON o._id = sub._id"
+            // The inner query numbers its rows in its own order ([_ord], module 0.2.45), restored after the join: the
+            // join kept the order only while the plan happened to be a nested loop.
+            + " FROM (" + inner + ") sub"
+            + " JOIN dbo._objects o ON o._id = sub._id"
+            + " ORDER BY sub._ord"
             + " FOR JSON PATH, INCLUDE_NULL_VALUES) AS [Value]";
 
         object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;

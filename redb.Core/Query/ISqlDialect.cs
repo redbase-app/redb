@@ -843,9 +843,19 @@ public interface ISqlDialect
     string Tree_DeleteValuesByObjectIds();
     
     /// <summary>
-    /// DELETE objects by IDs. Params: $1=objectIds (array)
+    /// DELETE objects by IDs. Params: $1=objectIds (array). Its rows-affected is the number of the given objects this
+    /// statement deleted, unless <see cref="ObjectStorage_CountObjectsByIds"/> gives the count instead.
     /// </summary>
     string Tree_DeleteObjectsByIds();
+
+    /// <summary>
+    /// The count of a delete by ids (<see cref="Tree_DeleteObjectsByIds"/>, <see cref="ObjectStorage_DeleteByIds"/>)
+    /// where the rows-affected of the delete is not it. SQLite: the <c>_id_parent</c> cascade removes a child before the
+    /// statement reaches it, and the child is not counted. Run in the delete's transaction, which holds the write lock,
+    /// so no other writer changes the rows between the count and the delete. Params: $1=objectIds (array). Null: the
+    /// rows-affected of the delete is the count.
+    /// </summary>
+    string? ObjectStorage_CountObjectsByIds() => null;
 
     /// <summary>
     /// The subtree under an object in one statement: every descendant down to a depth, as rows
@@ -1497,11 +1507,17 @@ public interface ISqlDialect
         bool hasDistinctOn = false);
     
     /// <summary>
-    /// Wraps the inner _id-list SQL with the system materializer to
-    /// produce a result-set of object JSON. Returns null when v2-pvt
-    /// is not supported. PostgreSQL:
-    ///   SELECT get_object_json(t._id, {maxDepth})::text AS "Value"
-    ///   FROM ({innerSql}) t
+    /// Wraps the inner _id-list SQL so that it returns the <c>_objects</c> row of every id, in the order of the
+    /// inner list, with the columns of <see cref="ObjectStorage_SelectObjectsByIds"/>. Props are not read here: the
+    /// query provider loads them once, through the lazy loader and the Props cache. Returns null when v2-pvt is not
+    /// supported.
+    /// </summary>
+    string? Query_WrapPvtWithObjectRows(string innerSql);
+
+    /// <summary>
+    /// Wraps the inner _id-list SQL with the system materializer to produce a result-set of object JSON. Returns null
+    /// when v2-pvt is not supported. No longer called by redb: the list read goes through
+    /// <see cref="Query_WrapPvtWithObjectRows"/>. Kept in 4.7.x so code that calls it keeps working.
     /// </summary>
     string? Query_WrapPvtWithObjectJson(string innerSql, int maxDepth);
     
@@ -1527,15 +1543,24 @@ public interface ISqlDialect
 
     /// <summary>
     /// Semver string the shipped v2-pvt bundle for this dialect declares.
-    /// Compared exactly against the value returned by
-    /// <see cref="Query_PvtModuleVersionFunction"/> at startup; any
-    /// mismatch triggers redeploy of <see cref="RedbServiceBase"/>'s
-    /// embedded bundle. Bump this string whenever any *.sql file under
-    /// the dialect's v2-pvt folder changes (together with the
-    /// `pvt_module_version()` literal inside `00_module_init.sql`).
+    /// Compared against the value returned by
+    /// <see cref="Query_PvtModuleVersionFunction"/> at startup: an older or
+    /// missing module is replaced by <see cref="RedbServiceBase"/>'s embedded
+    /// bundle, a newer one is never replaced (see
+    /// <see cref="Query_PvtModuleCompatFunction"/>). Bump this string whenever
+    /// any *.sql file under the dialect's v2-pvt folder changes (together with
+    /// the `pvt_module_version()` literal inside `99_module_version.sql`).
     /// Returns null for dialects that do not ship a v2-pvt module.
     /// </summary>
     string? Query_PvtRequiredVersion();
+
+    /// <summary>
+    /// Bare SQL function name returning what a deployed module still serves: '&lt;oldest package module version&gt;|&lt;redb
+    /// package version that first shipped it&gt;', e.g. '0.7.23.1|4.7.5'. A package whose module is older than the deployed
+    /// one leaves the module in place and starts when its own version is not below the first part; otherwise it stops
+    /// with <see cref="Exceptions.RedbSchemaNewerException"/>. Returns null when the dialect has no such function.
+    /// </summary>
+    string? Query_PvtModuleCompatFunction() => null;
 
     // ------------------------------------------------------------
     // Native PVT projection orchestrator (pvt_build_projection_sql).

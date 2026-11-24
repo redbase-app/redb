@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using redb.Core.Models.Entities;
+using redb.Core.Query;
 using redb.Core.Query.Aggregation;
 using redb.Core.Query.QueryExpressions;
 
@@ -47,7 +50,7 @@ public partial class PostgresQueryProvider
         return raw switch
         {
             decimal d => d,
-            double dbl => (decimal)dbl,
+            double dbl => redb.Core.Utils.RedbDecimal.FromDouble(dbl),
             long l => l,
             int i => i,
             _ => Convert.ToDecimal(raw, CultureInfo.InvariantCulture)
@@ -93,7 +96,44 @@ public partial class PostgresQueryProvider
         if (list.Count == 0)
             return new AggregateResult();
 
-        var aggregationsJson = BuildPvtAggregationsJson(list);
+        var innerSql = await BuildAggregateSqlAsync(schemeId, list, filterJson, cancellationToken);
+
+        var wrapped = "SELECT row_to_json(t)::text AS \"Value\" FROM (" + innerSql + ") t";
+        var jsonRow = await _context.ExecuteScalarAsync<string>(wrapped, System.Array.Empty<object>(), cancellationToken);
+
+        var result = new AggregateResult();
+        if (!string.IsNullOrEmpty(jsonRow))
+        {
+            using var doc = JsonDocument.Parse(jsonRow);
+            foreach (var prop in doc.RootElement.EnumerateObject())
+            {
+                result.Values[prop.Name] = ConvertJsonValue(prop.Value);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// SQL preview of an AggregateAsync selector: the aggregate statement <c>pvt_build_aggregate_sql</c> compiles for the
+    /// same requests and filter as the execution, which reads its one row through <c>row_to_json</c>. The base
+    /// implementation asked for <c>aggregate_batch_preview</c>, a function of the removed legacy module.
+    /// </summary>
+    public override async Task<string> GetAggregateSqlPreviewAsync<TProps, TResult>(
+        QueryContext<TProps> context,
+        Expression<Func<RedbObject<TProps>, TResult>> selector, CancellationToken cancellationToken = default)
+    {
+        var requests = ParseAggregateRequests(selector);
+        if (requests.Count == 0)
+            return "-- No aggregations specified";
+        var facetFilters = context.Filter is null ? null : _facetBuilder.BuildFacetFilters(context.Filter);
+        return await BuildAggregateSqlAsync(context.SchemeId, requests, facetFilters, cancellationToken);
+    }
+
+    /// <summary>The aggregate statement <c>pvt_build_aggregate_sql</c> compiles for the requests; it binds no parameters.</summary>
+    private async Task<string> BuildAggregateSqlAsync(
+        long schemeId, IList<AggregateRequest> requests, string? filterJson, CancellationToken cancellationToken)
+    {
+        var aggregationsJson = BuildPvtAggregationsJson(requests);
 
         object filterParam = string.IsNullOrEmpty(filterJson) || filterJson == "{}" || filterJson == "null"
             ? DBNull.Value
@@ -110,20 +150,7 @@ public partial class PostgresQueryProvider
         if (string.IsNullOrWhiteSpace(innerSql))
             throw new InvalidOperationException(
                 "pvt_build_aggregate_sql returned an empty SQL string for scheme " + schemeId + ".");
-
-        var wrapped = "SELECT row_to_json(t)::text AS \"Value\" FROM (" + innerSql + ") t";
-        var jsonRow = await _context.ExecuteScalarAsync<string>(wrapped, System.Array.Empty<object>(), cancellationToken);
-
-        var result = new AggregateResult();
-        if (!string.IsNullOrEmpty(jsonRow))
-        {
-            using var doc = JsonDocument.Parse(jsonRow);
-            foreach (var prop in doc.RootElement.EnumerateObject())
-            {
-                result.Values[prop.Name] = ConvertJsonValue(prop.Value);
-            }
-        }
-        return result;
+        return innerSql;
     }
 
     /// <summary>
@@ -162,6 +189,7 @@ public partial class PostgresQueryProvider
             }
             else
             {
+                FieldPathRefusal.EnsureModuleAggregateCanRead(r.FieldPath);
                 entry[opKey] = new Dictionary<string, object>
                 {
                     ["$field"] = NormalizePvtFieldName(r.FieldPath, r.IsBaseField)

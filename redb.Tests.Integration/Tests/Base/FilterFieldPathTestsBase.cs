@@ -35,7 +35,8 @@ public abstract class FilterFieldPathTestsBase
                 Items = [new FieldPathItem { Name = "inner", Rank = 7 }],
                 Parts = [new FieldPathItem { Name = "inner", Rank = 7 }],
                 ByKey = new Dictionary<string, FieldPathItem> { ["k"] = new() { Name = "entry", Rank = 5 } },
-                Main = new FieldPathItem { Name = "main", Rank = 3, Score = 4 }
+                Main = new FieldPathItem { Name = "main", Rank = 3, Score = 4 },
+                Scores = new Dictionary<string, int?> { ["a"] = 1, ["n"] = null }
             }
         };
         var id = await Redb.SaveAsync(obj);
@@ -78,6 +79,36 @@ public abstract class FilterFieldPathTestsBase
         yield return ["list-count", (Expression<Func<FieldPathProps, bool>>)(p => p.Parts!.Count == 1), true];
         yield return ["dictionary-entry", (Expression<Func<FieldPathProps, bool>>)(p => p.ByKey!["k"].Name == "entry"), true];
         yield return ["dictionary-entry-miss", (Expression<Func<FieldPathProps, bool>>)(p => p.ByKey!["k"].Name == "top"), false];
+        // Nullable Value and HasValue over a dictionary entry: the path is the entry, not a member chain.
+        yield return ["dictionary-nullable-value", (Expression<Func<FieldPathProps, bool>>)(p => p.Scores!["a"].Value == 1), true];
+        yield return ["dictionary-nullable-value-miss", (Expression<Func<FieldPathProps, bool>>)(p => p.Scores!["a"].Value == 2), false];
+        yield return ["dictionary-nullable-has-value", (Expression<Func<FieldPathProps, bool>>)(p => p.Scores!["a"].HasValue), true];
+        yield return ["dictionary-nullable-has-value-null", (Expression<Func<FieldPathProps, bool>>)(p => p.Scores!["n"].HasValue), false];
+        yield return ["dictionary-nullable-not-null-null", (Expression<Func<FieldPathProps, bool>>)(p => p.Scores!["n"] != null), false];
+        yield return ["dictionary-nullable-is-null-null", (Expression<Func<FieldPathProps, bool>>)(p => p.Scores!["n"] == null), true];
+        yield return ["dictionary-nullable-not-has-value-null", (Expression<Func<FieldPathProps, bool>>)(p => !p.Scores!["n"].HasValue), true];
+    }
+
+    public static IEnumerable<object[]> RefusedOrderingPaths()
+    {
+        // Each of these sorted by the top-level field of the same name, or sent an empty path. The key keeps its own
+        // type, as in an application (a boxed key is a conversion, refused for another reason).
+        yield return ["array-index", (Func<IRedbQueryable<FieldPathProps>, Task>)(q => q.OrderBy(p => p.Items![0].Name).ToListAsync()), "Items"];
+        yield return ["dictionary-entry-field", (Func<IRedbQueryable<FieldPathProps>, Task>)(q => q.OrderBy(p => p.ByKey!["k"].Name).ToListAsync()), "ByKey"];
+        yield return ["dictionary-nullable-value", (Func<IRedbQueryable<FieldPathProps>, Task>)(q => q.OrderBy(p => p.Scores!["a"]!.Value).ToListAsync()), "Scores"];
+    }
+
+    [Theory]
+    [MemberData(nameof(RefusedOrderingPaths))]
+    public async Task OrderBy_ThroughAnEntryOrAnElement_IsRefused_NamingThePath(
+        string kind, Func<IRedbQueryable<FieldPathProps>, Task> sort, string named)
+    {
+        var q = await SeedAsync();
+
+        var act = () => sort(q);
+
+        var ex = (await act.Should().ThrowAsync<NotSupportedException>($"case {kind}")).Which;
+        ex.Message.Should().Contain(named);
     }
 
     [Theory]

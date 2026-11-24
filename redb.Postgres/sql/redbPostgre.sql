@@ -1,3 +1,20 @@
+-- =====================================================
+-- REDB PostgreSQL schema
+-- Creates the schema in an EMPTY database. A database that already holds it is left as it is: the guard below raises
+-- before any statement. An existing schema is upgraded by the service at start or with
+-- `redb schema --upgrade --provider postgres` (GetUpgradeScript), never by running this script again.
+-- Run by hand with psql, pass -v ON_ERROR_STOP=1: without it psql goes on past the guard's error, and the statements
+-- further down that are written to be repeated (the metadata cache table, triggers) run against the live database.
+-- The service and `redb init` send the whole script as one command, which stops at the first error and changes nothing.
+-- =====================================================
+
+DO $$
+BEGIN
+    IF to_regclass('_types') IS NOT NULL THEN
+        RAISE EXCEPTION 'redb: this database already holds the redb schema (table _types exists). The creation script runs on an empty database only and has changed nothing. Upgrade an existing schema with `redb schema --upgrade --provider postgres` or by starting the service; to start over, drop and create the database first.';
+    END IF;
+END $$;
+
 -- DROP SEQUENCE IF EXISTS global_identity;
 -- DROP VIEW IF EXISTS v_user_permissions;
 -- DROP VIEW IF EXISTS v_objects_json;
@@ -832,8 +849,8 @@ INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775687, '
 
 -- 4. Temporal types
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775686, 'DateOnly', 'DateTimeOffset', 'DateOnly'); -- .NET 6+ DateOnly, stored as a midnight reading in _DateTimeOffset
-INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775685, 'TimeOnly', 'String', 'TimeOnly');      -- .NET 6+ TimeOnly (as string)
-INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775684, 'TimeSpan', 'String', 'TimeSpan');      -- TimeSpan (format "HH:MM:SS" for JSON compatibility)
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775685, 'TimeOnly', 'Long', 'TimeOnly');        -- .NET 6+ TimeOnly (Ticks in _Long)
+INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775684, 'TimeSpan', 'Long', 'TimeSpan');        -- TimeSpan (Ticks in _Long)
 
 -- 5. Enum support
 INSERT INTO _types (_id, _name, _db_type, _type) VALUES (-9223372036854775683, 'Enum', 'String', 'Enum');        -- Enum (stored as string)

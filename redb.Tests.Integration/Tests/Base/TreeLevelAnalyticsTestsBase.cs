@@ -1,4 +1,5 @@
 using redb.Core;
+using redb.Core.Models.Contracts;
 using redb.Core.Models.Entities;
 using redb.Core.Query;
 using redb.Core.Query.Aggregation;
@@ -110,35 +111,147 @@ public abstract class TreeLevelAnalyticsTestsBase
     public async Task EveryAnalyticExit_CountsTheNodesTheListReturns(string kind)
     {
         var seeded = await SeedAsync();
-        var nodes = (await Source(seeded, kind).ToListAsync()).Select(o => o.Props).ToList();
-        nodes.Should().HaveCount(Expected[kind], "precondition: the list of the level");
+        await AssertEveryExitAsync(() => Source(seeded, kind), Expected[kind], kind);
+    }
+
+    // ===== A tree of several schemes =====
+
+    /// <summary>
+    /// An org root; under it an employee and two divisions; under each division a department; under the first department
+    /// an employee and a team with an employee under it, under the second an employee. The departments are reached only
+    /// through a division, the second employee of the first department only through a team.
+    /// </summary>
+    private async Task<MixedTree> SeedMixedAsync()
+    {
+        await Redb.SyncSchemeAsync<OrgRootProps>();
+        await Redb.SyncSchemeAsync<DivisionProps>();
+        await Redb.SyncSchemeAsync<DepartmentProps>();
+        await Redb.SyncSchemeAsync<TeamProps>();
+        await Redb.SyncSchemeAsync<EmployeeProps>();
+        var tag = "mx-" + Guid.NewGuid().ToString("N")[..8];
+        var n = 0;
+
+        async Task<TreeRedbObject<T>> Node<T>(T props, IRedbObject? parent) where T : class, new()
+        {
+            var node = new TreeRedbObject<T> { name = $"{tag}-{++n}", Props = props };
+            node.id = parent == null ? await Redb.SaveAsync(node) : await Redb.CreateChildAsync(node, parent);
+            return node;
+        }
+        Task<TreeRedbObject<EmployeeProps>> Employee(IRedbObject parent, string position)
+        {
+            var p = TestDataFactory.CreateEmployee(++n, firstName: $"{tag}-{n}", department: tag, salary: 1000m * n, position: position).Props;
+            return Node(p, parent);
+        }
+
+        var root = await Node(new OrgRootProps { OrgName = tag }, null);
+        await Employee(root, "Top");
+        var divA = await Node(new DivisionProps { DivisionName = tag + "-A" }, root);
+        var divB = await Node(new DivisionProps { DivisionName = tag + "-B" }, root);
+        var depA = await Node(new DepartmentProps { Name = tag, Code = tag + "-A" }, divA);
+        var depB = await Node(new DepartmentProps { Name = tag, Code = tag + "-B" }, divB);
+        await Employee(depA, "Odd");
+        var team = await Node(new TeamProps { TeamName = tag }, depA);
+        await Employee(team, "Even");
+        await Employee(depB, "Odd");
+        return new MixedTree(root.id, [divA.id, divB.id], tag);
+    }
+
+    private sealed record MixedTree(long Root, long[] Divisions, string Tag);
+
+    // 4.7.x leaves out the cases "mixed-ancestor-depth1" and "mixed-query-depth3": they hold the maxDepth of
+    // WhereHasAncestor counted up from the returned object, which changes in 4.8.0; in 4.7.x maxDepth keeps its meaning.
+    private static readonly Dictionary<string, int> MixedExpected = new()
+    {
+        ["mixed-ancestor"] = 2, ["mixed-ancestor-depth2"] = 2, ["mixed-ancestor-any"] = 3,
+        ["mixed-multi"] = 3,
+        ["mixed-descof"] = 2, ["mixed-descof-depth2"] = 1, ["mixed-leaves-descof"] = 2,
+        ["unrooted"] = 4, ["unrooted-level1"] = 1, ["unrooted-level3"] = 2, ["unrooted-level-gt2"] = 3,
+        ["unrooted-ancestor"] = 2, ["unrooted-ancestor-any"] = 3
+    };
+
+    public static IEnumerable<object[]> MixedCases() => MixedExpected.Keys.Select(c => new object[] { c });
+
+    /// <summary>The unrooted query, narrowed to the employees of this seed (the database holds other runs' trees).</summary>
+    private IRedbQueryable<EmployeeProps> Unrooted(MixedTree s)
+        => Redb.TreeQuery<EmployeeProps>().Where(e => e.Department == s.Tag);
+
+    private IRedbQueryable<EmployeeProps> MixedSource(MixedTree s, string kind) => kind switch
+    {
+        // Every employee below the first department, which lies under a division: two, one of them under a team.
+        "mixed-ancestor" => Redb.TreeQuery<EmployeeProps>(s.Root).WhereHasAncestor<DepartmentProps>(d => d.Code == s.Tag + "-A"),
+        // maxDepth counts up from the employee: the parent is the department for one of them, a team for the other.
+        "mixed-ancestor-depth2" => Redb.TreeQuery<EmployeeProps>(s.Root).WhereHasAncestor<DepartmentProps>(d => d.Code == s.Tag + "-A", maxDepth: 2),
+        // Any department: every employee except the one right under the root.
+        "mixed-ancestor-any" => Redb.TreeQuery<EmployeeProps>(s.Root).WhereHasAncestor<DepartmentProps>(d => d.Name == s.Tag),
+        // Started from the two divisions: the departments are their children.
+        "mixed-multi" => Redb.TreeQuery<EmployeeProps>(s.Divisions).WhereHasAncestor<DepartmentProps>(d => d.Name == s.Tag),
+        // The depth of the query counts from the root: division 1, department 2, the employees under the departments 3,
+        // the one under the team 4.
+        // The employees below the first division: under its department, one of them under a team.
+        "mixed-descof" => Redb.TreeQuery<EmployeeProps>(s.Root).WhereDescendantsOf(s.Divisions[0]),
+        // Two levels below the division: the department and the employee right under it.
+        "mixed-descof-depth2" => Redb.TreeQuery<EmployeeProps>(s.Root).WhereDescendantsOf(s.Divisions[0], maxDepth: 2),
+        // WhereDescendantsOf as the second tree filter (a condition on the first one's nodes): the leaves below the
+        // first division are its two employees.
+        "mixed-leaves-descof" => Redb.TreeQuery<EmployeeProps>(s.Root).WhereLeaves().WhereDescendantsOf(s.Divisions[0]),
+        // Unrooted: every employee of the scheme, whatever the scheme of its tree's root (here an org root), and the
+        // levels count from that real root: the employee under the root 1, those under the departments 3, the one
+        // under the team 4. Pro used to start at the roots of the employee scheme and found none of them.
+        "unrooted" => Unrooted(s),
+        "unrooted-level1" => Unrooted(s).WhereLevel(1),
+        "unrooted-level3" => Unrooted(s).WhereLevel(3),
+        "unrooted-level-gt2" => Unrooted(s).WhereLevel(level => level > 2),
+        "unrooted-ancestor" => Unrooted(s).WhereHasAncestor<DepartmentProps>(d => d.Code == s.Tag + "-A"),
+        "unrooted-ancestor-any" => Unrooted(s).WhereHasAncestor<DepartmentProps>(d => d.Name == s.Tag),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
+
+    /// <summary>
+    /// WhereHasAncestor finds an ancestor of another scheme, and WhereDescendantsOf reaches a descendant, however the
+    /// nodes between are typed. Pro used to walk down only through nodes of one scheme: WhereHasAncestor through the
+    /// ancestor's on PostgreSQL and SQLite, WhereDescendantsOf through the queried one on all three, so a department
+    /// under a division was never reached.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(MixedCases))]
+    public async Task MixedTree_TreeFilters_ReachNodesBelowNodesOfOtherSchemes(string kind)
+    {
+        var seeded = await SeedMixedAsync();
+        await AssertEveryExitAsync(() => MixedSource(seeded, kind), MixedExpected[kind], kind);
+    }
+
+    /// <summary>The list returns <paramref name="expected"/> nodes, and every analytic exit counts those nodes.</summary>
+    private static async Task AssertEveryExitAsync(Func<IRedbQueryable<EmployeeProps>> source, int expected, string kind)
+    {
+        var nodes = (await source().ToListAsync()).Select(o => o.Props).ToList();
+        nodes.Should().HaveCount(expected, "precondition: the list of the case");
 
         using var scope = new AwesomeAssertions.Execution.AssertionScope();
 
-        (await Source(seeded, kind).CountAsync()).Should().Be(nodes.Count, kind);
-        (await Source(seeded, kind).AnyAsync()).Should().Be(nodes.Count > 0, kind);
-        (await Source(seeded, kind).SumAsync(e => e.Salary)).Should().Be(nodes.Sum(e => e.Salary), kind);
+        (await source().CountAsync()).Should().Be(nodes.Count, kind);
+        (await source().AnyAsync()).Should().Be(nodes.Count > 0, kind);
+        (await source().SumAsync(e => e.Salary)).Should().Be(nodes.Sum(e => e.Salary), kind);
 
-        var batch = await Source(seeded, kind).AggregateAsync(x => new { Count = Agg.Count(), Sum = Agg.Sum(x.Props.Salary), Max = Agg.Max(x.Props.Salary) });
+        var batch = await source().AggregateAsync(x => new { Count = Agg.Count(), Sum = Agg.Sum(x.Props.Salary), Max = Agg.Max(x.Props.Salary) });
         batch.Count.Should().Be(nodes.Count, kind);
         batch.Sum.Should().Be(nodes.Sum(e => e.Salary), kind);
         batch.Max.Should().Be(nodes.Count > 0 ? nodes.Max(e => e.Salary) : 0m, kind);
 
-        var groups = await Source(seeded, kind).GroupBy(e => e.Position)
+        var groups = await source().GroupBy(e => e.Position)
             .SelectAsync(g => new { Key = g.Key, Count = Agg.Count(g), Sum = Agg.Sum(g, e => e.Salary) });
         groups.Select(g => (g.Key, g.Count, g.Sum)).Should().BeEquivalentTo(
             nodes.GroupBy(e => e.Position).Select(g => (g.Key, g.Count(), g.Sum(e => e.Salary))), kind);
 
-        var rows = await Source(seeded, kind).WithWindow(w => w.OrderBy(e => e.Salary))
+        var rows = await source().WithWindow(w => w.OrderBy(e => e.Salary))
             .SelectAsync(e => new { e.Props.Salary, Row = Win.RowNumber() });
         rows.Select(r => r.Salary).Should().BeEquivalentTo(nodes.Select(e => e.Salary), kind);
 
-        var ranked = await Source(seeded, kind).GroupBy(e => e.Position).WithWindow(w => w.OrderBy(g => g.Key))
+        var ranked = await source().GroupBy(e => e.Position).WithWindow(w => w.OrderBy(g => g.Key))
             .SelectAsync(g => new { Key = g.Key, Count = Agg.Count(g), Row = Win.RowNumber() });
         ranked.Select(g => (g.Key, g.Count)).Should().BeEquivalentTo(
             nodes.GroupBy(e => e.Position).Select(g => (g.Key, g.Count())), kind);
 
-        var elements = await Source(seeded, kind).GroupByArray(e => e.Contacts!, c => c.Type)
+        var elements = await source().GroupByArray(e => e.Contacts!, c => c.Type)
             .SelectAsync(g => new { Key = g.Key, Count = Agg.Count(g) });
         elements.Select(g => (g.Key, g.Count)).Should().BeEquivalentTo(
             nodes.SelectMany(e => e.Contacts ?? []).GroupBy(c => c.Type).Select(g => (g.Key, g.Count())), kind);

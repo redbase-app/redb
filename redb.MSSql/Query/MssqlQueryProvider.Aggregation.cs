@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using redb.Core.Models.Entities;
+using redb.Core.Query;
 using redb.Core.Query.Aggregation;
 using redb.Core.Query.QueryExpressions;
 
@@ -54,7 +57,7 @@ public partial class MssqlQueryProvider
         return raw switch
         {
             decimal d => d,
-            double dbl => (decimal)dbl,
+            double dbl => redb.Core.Utils.RedbDecimal.FromDouble(dbl),
             long l => l,
             int i => i,
             _ => Convert.ToDecimal(raw, CultureInfo.InvariantCulture)
@@ -86,7 +89,7 @@ public partial class MssqlQueryProvider
         return raw switch
         {
             decimal d => d,
-            double dbl => (decimal)dbl,
+            double dbl => redb.Core.Utils.RedbDecimal.FromDouble(dbl),
             long l => l,
             int i => i,
             _ => Convert.ToDecimal(raw, CultureInfo.InvariantCulture)
@@ -134,29 +137,8 @@ public partial class MssqlQueryProvider
         if (list.Count == 0)
             return new AggregateResult();
 
-        var aggregationsJson = BuildPvtAggregationsJson(list);
-
-        // pvt_build_aggregate_sql expects NULL for the empty / missing filter
-        // (a literal "{}" or "null" string would defeat the IS NULL branch in
-        // pvt_collect_fields and produce a missing-meta marker downstream).
-        object filterParam = string.IsNullOrEmpty(filterJson) || filterJson == "{}" || filterJson == "null"
-            ? DBNull.Value
-            : (object)filterJson!;
-
-        // Step 1: ask the server-side compiler for the inner aggregate SELECT.
-        // $1 → @p0 = filter, $2 → @p1 = aggregations (mirrors PG ordering).
-        var invocation =
-            "SELECT dbo.pvt_build_aggregate_sql(" +
-            schemeId.ToString(CultureInfo.InvariantCulture) +
-            ", $1, $2, N'flat')";
-
-        _logger?.LogDebug("PVT Aggregate Build (MSSql): SchemeId={SchemeId}, Aggs={Aggs}, Filter={Filter}",
-            schemeId, aggregationsJson, filterJson ?? "null");
-
-        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, aggregationsJson }, cancellationToken);
-        if (string.IsNullOrWhiteSpace(innerSql))
-            throw new InvalidOperationException(
-                "dbo.pvt_build_aggregate_sql returned an empty SQL string for scheme " + schemeId + ".");
+        // Step 1: the server-side compiler builds the inner aggregate SELECT.
+        var innerSql = await BuildAggregateSqlAsync(schemeId, list, filterJson, cancellationToken);
 
         // Step 2: wrap with FOR JSON to capture every alias in one row.
         // INCLUDE_NULL_VALUES preserves nulls so MIN/MAX over empty sets
@@ -176,6 +158,51 @@ public partial class MssqlQueryProvider
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// SQL preview of an AggregateAsync selector: the aggregate statement <c>dbo.pvt_build_aggregate_sql</c> compiles for
+    /// the same requests and filter as the execution, which reads its one row through <c>FOR JSON PATH</c>. The base
+    /// implementation asked for <c>aggregate_batch_preview</c>, a function of the removed legacy module.
+    /// </summary>
+    public override async Task<string> GetAggregateSqlPreviewAsync<TProps, TResult>(
+        QueryContext<TProps> context,
+        Expression<Func<RedbObject<TProps>, TResult>> selector, CancellationToken cancellationToken = default)
+    {
+        var requests = ParseAggregateRequests(selector);
+        if (requests.Count == 0)
+            return "-- No aggregations specified";
+        var facetFilters = context.Filter is null ? null : _facetBuilder.BuildFacetFilters(context.Filter);
+        return await BuildAggregateSqlAsync(context.SchemeId, requests, facetFilters, cancellationToken);
+    }
+
+    /// <summary>The aggregate statement <c>dbo.pvt_build_aggregate_sql</c> compiles for the requests; it binds no parameters.</summary>
+    private async Task<string> BuildAggregateSqlAsync(
+        long schemeId, IList<AggregateRequest> requests, string? filterJson, CancellationToken cancellationToken)
+    {
+        var aggregationsJson = BuildPvtAggregationsJson(requests);
+
+        // pvt_build_aggregate_sql expects NULL for the empty / missing filter
+        // (a literal "{}" or "null" string would defeat the IS NULL branch in
+        // pvt_collect_fields and produce a missing-meta marker downstream).
+        object filterParam = string.IsNullOrEmpty(filterJson) || filterJson == "{}" || filterJson == "null"
+            ? DBNull.Value
+            : (object)filterJson!;
+
+        // $1 → @p0 = filter, $2 → @p1 = aggregations (mirrors PG ordering).
+        var invocation =
+            "SELECT dbo.pvt_build_aggregate_sql(" +
+            schemeId.ToString(CultureInfo.InvariantCulture) +
+            ", $1, $2, N'flat')";
+
+        _logger?.LogDebug("PVT Aggregate Build (MSSql): SchemeId={SchemeId}, Aggs={Aggs}, Filter={Filter}",
+            schemeId, aggregationsJson, filterJson ?? "null");
+
+        var innerSql = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, aggregationsJson }, cancellationToken);
+        if (string.IsNullOrWhiteSpace(innerSql))
+            throw new InvalidOperationException(
+                "dbo.pvt_build_aggregate_sql returned an empty SQL string for scheme " + schemeId + ".");
+        return innerSql;
     }
 
     /// <summary>
@@ -213,6 +240,7 @@ public partial class MssqlQueryProvider
             }
             else
             {
+                FieldPathRefusal.EnsureModuleAggregateCanRead(r.FieldPath);
                 entry[opKey] = new Dictionary<string, object>
                 {
                     ["$field"] = NormalizePvtFieldName(r.FieldPath, r.IsBaseField)

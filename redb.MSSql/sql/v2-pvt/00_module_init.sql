@@ -16,6 +16,54 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
+-- ---------- Guard: a newer module is never taken back ----------
+-- An older package never puts its module over a newer one. Start-up does not apply this script then;
+-- the guard stops a hand run of an older script (GetUpgradeScript(), redb schema --upgrade) before it
+-- changes anything, with the sentence of RedbSchemaNewerException. A version that does not read as
+-- numbers is not newer. @own is the version 99_module_version.sql stamps (a test holds them equal).
+-- An error does not stop the later batches of SSMS or sqlcmd, so the guard also sets NOEXEC ON: the
+-- rest of the script is compiled, not run.
+DECLARE @own nvarchar(50) = N'0.2.40.2', @deployed nvarchar(50), @compat nvarchar(50), @package nvarchar(50),
+        @newer bit = 0, @msg nvarchar(1000);
+IF OBJECT_ID(N'dbo.pvt_module_version', N'FN') IS NOT NULL
+BEGIN
+    EXEC sp_executesql N'SELECT @v = dbo.pvt_module_version()', N'@v nvarchar(50) OUTPUT', @v = @deployed OUTPUT;
+    -- Each version as a sortable key: up to four numeric parts, each padded to 20 digits; a missing part
+    -- sorts below any present one, as System.Version compares them.
+    WITH v AS (
+        SELECT which, core, LEN(core) - LEN(REPLACE(core, N'.', N'')) + 1 AS n
+        FROM (VALUES (N'own', @own),
+                     (N'deployed', LEFT(ISNULL(@deployed, N''), CHARINDEX(N'-', ISNULL(@deployed, N'') + N'-') - 1))) x(which, core)
+    ), k AS (
+        SELECT which,
+            CASE WHEN core = N'' OR core LIKE N'%[^0-9.]%' OR core LIKE N'.%' OR core LIKE N'%.' OR core LIKE N'%..%'
+                      OR n NOT BETWEEN 2 AND 4 THEN NULL
+                 ELSE RIGHT(REPLICATE(N'0', 20) + PARSENAME(core, n), 20)
+                    + RIGHT(REPLICATE(N'0', 20) + PARSENAME(core, n - 1), 20)
+                    + CASE WHEN n >= 3 THEN RIGHT(REPLICATE(N'0', 20) + PARSENAME(core, n - 2), 20) ELSE N'' END
+                    + CASE WHEN n = 4 THEN RIGHT(REPLICATE(N'0', 20) + PARSENAME(core, 1), 20) ELSE N'' END
+            END AS k
+        FROM v
+    )
+    SELECT @newer = CASE WHEN d.k COLLATE Latin1_General_BIN2 > o.k COLLATE Latin1_General_BIN2 THEN 1 ELSE 0 END
+    FROM k d JOIN k o ON d.which = N'deployed' AND o.which = N'own';
+END
+IF @newer = 1
+BEGIN
+    IF OBJECT_ID(N'dbo.pvt_module_compat', N'FN') IS NOT NULL
+        EXEC sp_executesql N'SELECT @c = dbo.pvt_module_compat()', N'@c nvarchar(50) OUTPUT', @c = @compat OUTPUT;
+    IF CHARINDEX(N'|', ISNULL(@compat, N'')) > 0
+        SET @package = NULLIF(SUBSTRING(@compat, CHARINDEX(N'|', @compat) + 1, 50), N'');
+    SET @msg = N'The MSSql database carries the redb module ' + @deployed + N', newer than ' + @own
+        + N' of this package, and '
+        + CASE WHEN @package IS NULL THEN N'it does not state which packages it serves'
+               ELSE N'it needs redb packages from ' + @package + N' on' END
+        + N'. Upgrade the redb packages of this application; the database was left unchanged.';
+    RAISERROR(N'%s', 16, 1, @msg);
+    SET NOEXEC ON;
+END
+GO
+
 -- ---------- 0. Schema upgrades (idempotent, run on every redeploy) ----------
 -- DDL for columns added after a database was created. The base DDL in
 -- redbMSSQL.sql stays the source of truth for fresh databases; this block is
@@ -310,3 +358,13 @@ IF EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = 'redb_fulltext_catal
     DROP FULLTEXT CATALOG [redb_fulltext_catalog]
 GO
 
+
+-- 0.2.40.2 (4.7.5): TimeOnly and TimeSpan are stored as Ticks in _Long (they were text, which compared wrong past a day and
+-- below zero). The type rows and their copy in the metadata cache say Long from now on; values already stored as
+-- text are not converted (UPGRADING.md gives the statement for a database that wants them). After the drops above,
+-- so a role without schema rights stops at them, as before, and not at these rows.
+UPDATE [dbo].[_types] SET [_db_type] = N'Long'
+    WHERE [_id] IN (-9223372036854775685, -9223372036854775684) AND [_db_type] <> N'Long';
+UPDATE [dbo].[_scheme_metadata_cache] SET [db_type] = N'Long'
+    WHERE [_type_id] IN (-9223372036854775685, -9223372036854775684) AND [db_type] <> N'Long';
+GO

@@ -143,10 +143,10 @@ public static class RedbTypeIds
     /// <summary>DateOnly type (.NET 6+)</summary>
     public const long DateOnly = -9223372036854775686;
     
-    /// <summary>TimeOnly type (.NET 6+) - stored as string</summary>
+    /// <summary>TimeOnly type (.NET 6+) - stored as Ticks in _Long</summary>
     public const long TimeOnly = -9223372036854775685;
     
-    /// <summary>TimeSpan type - stored as string (HH:MM:SS format)</summary>
+    /// <summary>TimeSpan type - stored as Ticks in _Long</summary>
     public const long TimeSpan = -9223372036854775684;
     
     // ═══════════════════════════════════════════════════════════════

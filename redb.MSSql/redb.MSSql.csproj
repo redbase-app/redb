@@ -10,8 +10,6 @@
     
     <!-- NuGet Package Metadata -->
     <PackageId>redb.MSSql</PackageId>
-    <!-- Free-only patch of the 4.7 line: the provider carries its own number, the other redb packages stay on the root Version. -->
-    <Version>4.7.4</Version>
     <Product>REDB - Entity Database for .NET</Product>
     <Description>SQL Server provider for REDB. Includes optimized T-SQL generation, tree queries with CTEs, and full LINQ support. Requires SQL Server 2017 or newer (2022+ only for the $min / $max expression operators).</Description>
     <RepositoryUrl>https://github.com/redbase-app/redb</RepositoryUrl>
@@ -117,13 +115,18 @@
     <SqlAllFiles Include="@(SqlMainFile);@(SqlEarlyFiles);@(SqlOtherFiles);@(SqlPvtBundle)" />
   </ItemGroup>
 
-  <!-- Always regenerate the bundles before any inner build starts. We hook
-       both DispatchToInnerBuilds (outer multi-TFM evaluation) and BeforeBuild
-       (single-TFM build, e.g. when consumed via ProjectReference for one TFM).
-       Inputs/Outputs make the target incremental: it skips when no .sql file
-       under sql/ changed. -->
+  <!-- Regenerate the bundles before any inner build starts. The outer build of the frameworks runs the target
+       itself (DispatchToInnerBuilds). An inner build (one framework, e.g. through a ProjectReference) asks for it
+       through ConcatenateSqlOnce, which builds the project without TargetFramework: MSBuild runs one target of one
+       project configuration once per build, so inner builds of two frameworks running side by side no longer both
+       write sql/redb_init.sql (IOException, file in use). Inputs/Outputs keep it incremental: it skips when no .sql
+       file under sql/ changed. -->
+  <Target Name="ConcatenateSqlOnce" BeforeTargets="BeforeBuild" Condition="'$(TargetFramework)' != ''">
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="ConcatenateSql" RemoveProperties="TargetFramework" />
+  </Target>
+
   <Target Name="ConcatenateSql"
-          BeforeTargets="DispatchToInnerBuilds;BeforeBuild"
+          BeforeTargets="DispatchToInnerBuilds"
           Inputs="@(SqlAllFiles)"
           Outputs="sql\redb_init.sql;sql\v2-pvt\pvt_bundle.sql">
     <ConcatenateSqlFiles InputFiles="@(SqlAllFiles)" OutputFile="sql\redb_init.sql"

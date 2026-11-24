@@ -747,8 +747,10 @@ public class MsSqlDialect : ISqlDialect
     public string Tree_DeleteValuesByObjectIds() =>
         "DELETE FROM _values WHERE _id_object IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
     
+    // The cascade procedure locks the rows it deletes and counts only those: the INSTEAD OF trigger of a plain DELETE
+    // reports the rows the statement qualified, one another session deleted meanwhile included.
     public string Tree_DeleteObjectsByIds() =>
-        "DELETE FROM _objects WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))";
+        "EXEC dbo.delete_objects_cascade @p0";
 
     // MAXRECURSION 0: the depth parameter bounds the walk, which may go past the default of 100 levels.
     public string Tree_SelectSubtreeRows() =>
@@ -955,8 +957,11 @@ public class MsSqlDialect : ISqlDialect
         FROM _schemes WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ','))
         """;
     
+    // FORCESEEK: STRING_SPLIT has a fixed row estimate, and with it the optimizer could read PK__objects as a range,
+    // taking U locks on (and waiting for) rows of concurrent writers the save never names - a deadlock between
+    // writers of disjoint objects. A seek per id locks exactly the named rows.
     public string ObjectStorage_LockObjectsForUpdate() =>
-        "SELECT _id FROM _objects WITH (UPDLOCK, ROWLOCK) WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ',')) ORDER BY _id";
+        "SELECT _id FROM _objects WITH (UPDLOCK, ROWLOCK, FORCESEEK) WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@p0, ',')) ORDER BY _id";
     
     public string ObjectStorage_SelectSchemeIdByObjectId() =>
         "SELECT _id_scheme FROM _objects WHERE _id = @p0";
@@ -1428,6 +1433,22 @@ public class MsSqlDialect : ISqlDialect
              + ") AS [Value]";
     }
 
+    // The inner query numbers its rows in its own order ([_ord], module 0.2.45), restored after the join: a hash or merge
+    // join keeps no order, and a number given outside, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)), may run before the sort.
+    public string? Query_WrapPvtWithObjectRows(string innerSql) =>
+        $"""
+        SELECT o._id as Id, o._id_scheme as IdScheme, o._id_parent as IdParent, o._id_owner as IdOwner,
+               o._id_who_change as IdWhoChange, o._name as Name, o._hash as Hash,
+               o._date_create as DateCreate, o._date_modify as DateModify, o._date_begin as DateBegin,
+               o._date_complete as DateComplete, o._key as [Key], o._note as Note,
+               o._value_long as ValueLong, o._value_string as ValueString, o._value_guid as ValueGuid,
+               o._value_bool as ValueBool, o._value_double as ValueDouble, o._value_numeric as ValueNumeric,
+               o._value_datetime as ValueDatetime, o._value_bytes as ValueBytes, o._value_unique as ValueUnique
+        FROM ({innerSql}) sub
+        JOIN dbo._objects o ON o._id = sub._id
+        ORDER BY sub._ord
+        """;
+
     public string? Query_WrapPvtWithObjectJson(string innerSql, int maxDepth) =>
         $"SELECT dbo.get_object_json(t.[_id], {maxDepth.ToString(System.Globalization.CultureInfo.InvariantCulture)}) AS [Value] FROM ({innerSql}) t";
 
@@ -1440,7 +1461,10 @@ public class MsSqlDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "dbo.pvt_module_version";
 
     // Bump together with the literal RETURNed by dbo.pvt_module_version() in redb.MSSql/sql/v2-pvt/99_module_version.sql.
-    public string? Query_PvtRequiredVersion() => "0.2.40.1";
+    public string? Query_PvtRequiredVersion() => "0.2.40.2";
+
+    // Created next to dbo.pvt_module_version() in 99_module_version.sql.
+    public string? Query_PvtModuleCompatFunction() => "dbo.pvt_module_compat";
 
     // Native PVT projection orchestrator — not supported on MSSql (yet).
     // Callers gate on Query_BuildPvtProjectionSqlFunction()==null, so these

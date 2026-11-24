@@ -38,7 +38,8 @@ BEGIN
         WHEN N'ByteArray'      THEN N'_ByteArray'
         WHEN N'ListItem'       THEN N'_ListItem'
         WHEN N'Object'         THEN N'_Object'
-        WHEN N'TimeSpan'       THEN N'_String'
+        WHEN N'TimeSpan'       THEN N'_Long'      -- Ticks
+        WHEN N'TimeOnly'       THEN N'_Long'      -- Ticks
         WHEN N'DateTime'       THEN N'_DateTimeOffset'
         ELSE NULL
     END;

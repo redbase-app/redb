@@ -64,8 +64,34 @@ public static class TemporalDecoder
     /// destined for a temporal type be decoded by the registered backend decoder. Non-temporal
     /// or non-numeric inputs fall straight through to <see cref="System.Convert.ChangeType(object, Type)"/>.
     /// </summary>
-    public static object ChangeType(object value, Type targetType) =>
-        TryDecode(value, targetType, out var decoded) && decoded != null
+    public static object ChangeType(object value, Type targetType)
+    {
+        if (TryTicks(value, targetType, out var fromTicks))
+            return fromTicks!;
+        return TryDecode(value, targetType, out var decoded) && decoded != null
             ? decoded
-            : System.Convert.ChangeType(value, targetType);
+            : redb.Core.Utils.RedbDecimal.ChangeType(value, targetType);
+    }
+
+    /// <summary>
+    /// TimeSpan and TimeOnly are stored as their Ticks in _Long on every provider, so a number read back for one of them
+    /// (a Min/Max, a group key, an average with a fraction, truncated) is its Ticks.
+    /// </summary>
+    private static bool TryTicks(object value, Type targetType, out object? result)
+    {
+        result = null;
+        var t = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        if (t != typeof(TimeSpan) && t != typeof(TimeOnly)) return false;
+        long ticks;
+        switch (value)
+        {
+            case long l: ticks = l; break;
+            case int i: ticks = i; break;
+            case decimal m: ticks = (long)decimal.Truncate(m); break;
+            case double d: ticks = (long)Math.Truncate(d); break;
+            default: return false;
+        }
+        result = t == typeof(TimeSpan) ? TimeSpan.FromTicks(ticks) : new TimeOnly(ticks);
+        return true;
+    }
 }

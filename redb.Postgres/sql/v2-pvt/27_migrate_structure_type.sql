@@ -28,7 +28,7 @@ BEGIN
         WHEN 'datetime' THEN '_datetimeoffset'
         WHEN 'datetimeoffset' THEN '_datetimeoffset'
         WHEN 'dateonly' THEN '_datetimeoffset'
-        WHEN 'timeonly' THEN '_datetimeoffset'
+        WHEN 'timeonly' THEN '_long'           -- Ticks, as TimeSpan
         WHEN 'timespan' THEN '_long'
         WHEN 'guid' THEN '_guid'
         WHEN 'bytearray' THEN '_bytearray'

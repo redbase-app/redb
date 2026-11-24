@@ -33,7 +33,8 @@ BEGIN
         WHEN 'ListItem'       THEN '_ListItem'
         WHEN 'Object'         THEN '_Object'
         -- Legacy / type_semantic aliases.
-        WHEN 'TimeSpan'       THEN '_String'    -- TimeSpan stored as text
+        WHEN 'TimeSpan'       THEN '_Long'      -- Ticks
+        WHEN 'TimeOnly'       THEN '_Long'      -- Ticks
         WHEN 'DateTime'       THEN '_DateTimeOffset'
         ELSE NULL
     END;

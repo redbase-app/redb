@@ -78,6 +78,10 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             LogicalExpression logical => BuildLogicalFilter(logical),
             NullCheckExpression nullCheck => BuildNullCheckFilter(nullCheck),
             InExpression inExpr => BuildInFilter(inExpr),
+            ArrayElementAnyExpression elementAny => throw new NotSupportedException(
+                $"Any() with a condition over the array of classes '{elementAny.Collection.Name}' is not supported by the free " +
+                "providers (redb Pro supports it). Any() over a list-item array, Contains over an array of values and Any() " +
+                "without a condition are."),
             _ => throw new NotSupportedException($"Filter expression type {filter.GetType().Name} is not supported")
         };
     }
@@ -270,6 +274,7 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             {
                 ["$or"] = logical.Operands.Select(BuildFilterObject).ToArray()
             },
+            LogicalOperator.Not when HasEmptyIn(logical.Operands[0]) => BuildFilterObject(Negate(logical.Operands[0])),
             LogicalOperator.Not => new Dictionary<string, object>
             {
                 ["$not"] = BuildFilterObject(logical.Operands.First())
@@ -277,6 +282,28 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             _ => throw new NotSupportedException($"Logical operator {logical.Operator} is not supported")
         };
     }
+
+    // Contains over an empty list is false where the field has a value and unknown where it has none, as SQL reads
+    // (col <> col) on Pro. The modules spell $in [] as an IN over an empty set, false on every object, so NOT around it
+    // returned the objects without a value too. A negation over such a membership is pushed down instead (De Morgan
+    // holds in three-valued logic), and the negated empty membership becomes "the field has a value".
+    private static bool HasEmptyIn(FilterExpression expression) => expression switch
+    {
+        InExpression inExpr => inExpr.Values.Count == 0,
+        LogicalExpression logical => logical.Operands.Any(HasEmptyIn),
+        _ => false
+    };
+
+    private static FilterExpression Negate(FilterExpression expression) => expression switch
+    {
+        InExpression { Values.Count: 0 } inExpr => new NullCheckExpression(inExpr.Property, IsNull: false),
+        LogicalExpression { Operator: LogicalOperator.Not } negated => negated.Operands[0],
+        LogicalExpression { Operator: LogicalOperator.And } all when HasEmptyIn(all) =>
+            new LogicalExpression(LogicalOperator.Or, all.Operands.Select(Negate).ToList()),
+        LogicalExpression { Operator: LogicalOperator.Or } any when HasEmptyIn(any) =>
+            new LogicalExpression(LogicalOperator.And, any.Operands.Select(Negate).ToList()),
+        _ => new LogicalExpression(LogicalOperator.Not, [expression])
+    };
 
     private object BuildAndFilter(IReadOnlyList<FilterExpression> operands)
     {
@@ -843,9 +870,12 @@ public class FacetFilterBuilder : IFacetFilterBuilder
     {
         var fieldName = BuildFieldPath(inExpr.Property);
 
+        // Each value spelled as a single comparison value of the field is ($eq goes through the same conversion): a list
+        // of dates, times or texts reached the module in another spelling than the field stores.
+        var values = inExpr.Values.Select(v => ConvertValueToFieldType(v, inExpr.Property.Type)).ToArray();
         return new Dictionary<string, object>
         {
-            [fieldName] = new Dictionary<string, object> { ["$in"] = inExpr.Values.ToArray() }
+            [fieldName] = new Dictionary<string, object> { ["$in"] = values }
         };
     }
 
@@ -1149,16 +1179,13 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             return Core.Utils.DateTimeConverter.NormalizeForStorage(dt);
         }
 
-        // Zone-less text temporals, BEFORE the "types already match" shortcut below — that
-        // shortcut would hand a TimeOnly/TimeSpan straight to the JSON writer, whose default form
-        // ("12:30:00") differs from the invariant round-trip form the writer stored
-        // ("12:30:00.0000000"), and the row became unfindable by its own value. Both ends must
-        // spell it the same way, so both go through RedbTemporalFormat.
+        // TimeOnly and TimeSpan are stored as their Ticks in _Long, BEFORE the "types already match" shortcut below,
+        // which would hand them to the JSON writer as text.
         if (value is TimeOnly timeOnlyValue && targetType == typeof(TimeOnly))
-            return Core.Utils.RedbTemporalFormat.ToText(timeOnlyValue);
+            return timeOnlyValue.Ticks;
 
         if (value is TimeSpan timeSpanValue && targetType == typeof(TimeSpan))
-            return Core.Utils.RedbTemporalFormat.ToText(timeSpanValue);
+            return timeSpanValue.Ticks;
 
         // DateOnly is stored in _DateTimeOffset at midnight (db_type "DateTime"), so the filter has
         // to compare against the same zone-less reading the writer produced.
@@ -1183,7 +1210,7 @@ public class FacetFilterBuilder : IFacetFilterBuilder
             }
             else if (targetType == typeof(decimal))
             {
-                return Convert.ToDecimal(value);
+                return redb.Core.Utils.RedbDecimal.From(value);
             }
             else if (targetType == typeof(long))
             {

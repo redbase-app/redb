@@ -15,6 +15,7 @@ public class FieldPathProps
     public List<FieldPathItem>? Parts { get; set; }
     public Dictionary<string, FieldPathItem>? ByKey { get; set; }
     public FieldPathItem? Main { get; set; }
+    public Dictionary<string, int?>? Scores { get; set; }
 }
 
 public class FieldPathItem

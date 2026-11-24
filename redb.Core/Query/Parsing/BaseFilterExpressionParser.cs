@@ -156,6 +156,53 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     }
 
     /// <summary>
+    /// A value the caller holds: it reads no field of the object and calls no database function, so it can be evaluated
+    /// in .NET before the query is built.
+    /// </summary>
+    private bool IsCallerValue(Expression expression)
+    {
+        if (ReadsParameter(expression))
+            return false;
+        var finder = new DatabaseFunctionFinder(m => IsCustomFunctionCall(m) || IsProFunctionCall(m));
+        finder.Visit(expression);
+        return !finder.Found;
+    }
+
+    private sealed class DatabaseFunctionFinder(Func<MethodCallExpression, bool> isDatabaseFunction) : ExpressionVisitor
+    {
+        public bool Found { get; private set; }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (isDatabaseFunction(node))
+            {
+                Found = true;
+                return node;
+            }
+            return base.VisitMethodCall(node);
+        }
+    }
+
+    /// <summary>One side of a computed comparison: a field of the object, or a value of the caller.</summary>
+    private ValueExpression Operand(Expression side) =>
+        ReadsParameter(side)
+            ? FieldOperand(side)
+            : new ConstantValueExpression(EvaluateExpression(side), side.Type);
+
+    /// <summary>A side that reads the object and is not itself computed must be a field of it (behind a cast).</summary>
+    private ValueExpression FieldOperand(Expression side)
+    {
+        var field = side;
+        while (field is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } conversion)
+            field = conversion.Operand;
+        if (TryExtractValueExpression(field) is { } computed)
+            return computed;
+        if (!IsPropertyAccess(field))
+            throw new NotSupportedException(UnsupportedFieldPathMessage(side));
+        return new PropertyValueExpression(ExtractProperty(field));
+    }
+
+    /// <summary>
     /// Binary expression visitor (AND, OR, comparisons, arithmetic).
     /// </summary>
     protected virtual FilterExpression VisitBinaryExpression(BinaryExpression binary)
@@ -213,14 +260,22 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     /// </summary>
     protected virtual FilterExpression VisitComparisonExpression(BinaryExpression binary, ComparisonOperator op)
     {
-        var leftValueExpr = TryExtractValueExpression(binary.Left);
-        var rightValueExpr = TryExtractValueExpression(binary.Right);
-        
+        // A side that does not read the queried object is a value of the caller (tag + "-none", a + 1, x ?? "d"): it is
+        // evaluated here, once, whatever its shape. A database function stays an expression even without a field.
+        var leftValueExpr = IsCallerValue(binary.Left) ? null : TryExtractValueExpression(binary.Left);
+        var rightValueExpr = IsCallerValue(binary.Right) ? null : TryExtractValueExpression(binary.Right);
+
         if (leftValueExpr != null || rightValueExpr != null)
         {
             return CreateExtendedComparison(binary, op, leftValueExpr, rightValueExpr);
         }
-        
+
+        // A field against a field (p.A == p.B): both sides are operands of a computed comparison.
+        if (ReadsParameter(binary.Left) && ReadsParameter(binary.Right))
+        {
+            return CreateExtendedComparison(binary, op, FieldOperand(binary.Left), FieldOperand(binary.Right));
+        }
+
         var (property, value) = ExtractPropertyAndValue(binary);
 
         if (value is IRedbListItem listItem)
@@ -258,17 +313,12 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         ValueExpression? leftValueExpr,
         ValueExpression? rightValueExpr)
     {
+        // The other side is a field of the object (p.A == p.B + 1) or a value of the caller (p.A + 1 == limit).
         if (leftValueExpr != null && rightValueExpr == null)
-        {
-            var value = EvaluateExpression(binary.Right);
-            rightValueExpr = new ConstantValueExpression(value, binary.Right.Type);
-        }
+            rightValueExpr = Operand(binary.Right);
         else if (rightValueExpr != null && leftValueExpr == null)
-        {
-            var value = EvaluateExpression(binary.Left);
-            leftValueExpr = new ConstantValueExpression(value, binary.Left.Type);
-        }
-        
+            leftValueExpr = Operand(binary.Left);
+
         var dummyProperty = new QueryExpressions.PropertyInfo(
             "__computed", typeof(object), _isBaseFieldContext);
         
@@ -602,18 +652,9 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
             var values = EvaluateExpression(sourceExpression);
 
             if (values is System.Collections.IEnumerable enumerable)
-            {
-                var valuesList = enumerable.Cast<object>()
-                    .Select(v => v is IRedbListItem li ? (object)li.Id : v)
-                    .ToList();
-                if (valuesList.Count > 0
-                    && enumerable.Cast<object>().Any(v => v is IRedbListItem)
-                    && !property.Name.Contains('.'))
-                {
-                    property = property with { Name = property.Name + ".Id", Type = typeof(long) };
-                }
-                return new InExpression(property, valuesList);
-            }
+                return InListExpression(property, enumerable);
+            if (values == null)
+                throw NullContainsList(sourceExpression);
         }
         else if (IsPropertyAccess(sourceExpression))
         {
@@ -624,6 +665,33 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         }
 
         throw new NotSupportedException("Unsupported Contains expression structure");
+    }
+
+    /// <summary>
+    /// The membership test of <c>list.Contains(p.F)</c>. Each value is spelled as a single comparison value of the
+    /// same kind is (a list item by its id, an enum by its name). A null in the list is dropped: <c>[a, null]</c> filters
+    /// as <c>[a]</c>, and a list of nulls only as an empty list. This is the one place the rule for a null in the list is
+    /// decided (the owner's choice, 2026-11-19). Objects without a value for the field match neither Contains nor
+    /// !Contains, as they match neither == nor != (write <c>|| p.F == null</c> to include them).
+    /// </summary>
+    /// <summary>The list of a Contains filter is itself null: said as such, not as an unsupported expression.</summary>
+    private static ArgumentNullException NullContainsList(Expression list) =>
+        new("list", $"The list of a Contains filter is null ('{list}'). Pass an empty list to match no object.");
+
+    private static InExpression InListExpression(QueryExpressions.PropertyInfo property, System.Collections.IEnumerable list)
+    {
+        var raw = list.Cast<object?>().ToList();
+        var values = raw.Where(v => v != null).Select(v => v switch
+        {
+            IRedbListItem item => item.Id,
+            Enum e => e.ToString(),
+            _ => v
+        }).ToList();
+
+        if (values.Count > 0 && raw.Any(v => v is IRedbListItem) && !property.Name.Contains('.'))
+            property = property with { Name = property.Name + ".Id", Type = typeof(long) };
+
+        return new InExpression(property, values!.Cast<object>().ToList());
     }
 
     /// <summary>
@@ -647,9 +715,11 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     /// </summary>
     protected virtual FilterExpression VisitEnumerableAny(MethodCallExpression method)
     {
-        // Enumerable.Any(source) — 1-arg form. Translate to: cardinality(source) > 0
-        // i.e. ComparisonExpression with PropertyFunction.Length > 0, which the
-        // facet builder serializes as {"$expr":{"$gt":[{"$length":{"$field":"X"}},{"$const":0}]}}.
+        // Enumerable.Any(source) — 1-arg form. Translate to: element count of source > 0, parsed as list.Count is
+        // (the count an int, the collection its source), so the Pro builders emit array_length / json_array_length
+        // and the facet builder the array-aware .$count modifier of the modules. It used to be PropertyFunction.Length
+        // with no source type, the length of a text: PostgreSQL refused length(text[]), SQLite measured the JSON text
+        // of the array (an empty or missing array counted as non-empty), and SQL Server answered !Any() with nothing.
         if (method.Arguments.Count == 1)
         {
             var only = method.Arguments[0];
@@ -657,8 +727,8 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
                 throw new NotSupportedException("Any() must be called on a property collection");
 
             var prop = ExtractProperty(only);
-            var lengthProp = prop with { Function = PropertyFunction.Length };
-            return new ComparisonExpression(lengthProp, ComparisonOperator.GreaterThan, 0);
+            var countProp = prop with { Type = typeof(int), Function = PropertyFunction.Count, FunctionSourceType = prop.Type };
+            return new ComparisonExpression(countProp, ComparisonOperator.GreaterThan, 0);
         }
 
         if (method.Arguments.Count != 2)
@@ -672,10 +742,21 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
 
         var collectionProperty = ExtractProperty(sourceExpression);
 
+        // An array or list of classes: the predicate is a filter over the fields of one element.
+        if (predicateExpression is LambdaExpression classLambda && IsCollectionOfClasses(collectionProperty.Type))
+            return VisitAnyOverClasses(collectionProperty, classLambda);
+
         if (predicateExpression is LambdaExpression lambda)
         {
             if (lambda.Body is BinaryExpression binaryBody)
             {
+                // The form asks whether some item has that value: its comparison is built as "the array contains", so
+                // another operator would get the answer for == (r.Value != x read as r.Value == x).
+                if (binaryBody.NodeType != ExpressionType.Equal)
+                    throw new NotSupportedException(
+                        $"Any() over '{collectionProperty.Name}' compares an item property only with ==, not with "
+                        + $"'{binaryBody.NodeType}'. For \"no item has that value\" write !{collectionProperty.Name}.Any(r => r.X == value).");
+
                 var left = binaryBody.Left;
                 var right = binaryBody.Right;
 
@@ -722,6 +803,67 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     }
 
     /// <summary>
+    /// True for an array or list whose element is a class stored field by field: not a text, a simple value, a list
+    /// item or an object reference (those have their own Any forms).
+    /// </summary>
+    private static bool IsCollectionOfClasses(Type collectionType)
+    {
+        var element = collectionType.IsArray
+            ? collectionType.GetElementType()
+            : collectionType.IsGenericType && collectionType.GetGenericArguments().Length == 1
+                ? collectionType.GetGenericArguments()[0]
+                : null;
+        if (element == null || !element.IsClass || element == typeof(string) || element == typeof(byte[]))
+            return false;
+        if (typeof(IRedbListItem).IsAssignableFrom(element) || typeof(IRedbObject).IsAssignableFrom(element))
+            return false;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>p.Rows.Any(r =&gt; ...)</c> over an array of classes: the predicate is parsed as a filter over the fields of
+    /// the element, and its paths are placed under the collection (<c>r.Kind</c> becomes <c>Rows[].Kind</c>). The
+    /// conditions are comparisons, null checks, Contains of a list of values, and &amp;&amp;, || and ! of those; every
+    /// one is asked of the same element. A predicate that reads the outer object is refused.
+    /// </summary>
+    private FilterExpression VisitAnyOverClasses(QueryExpressions.PropertyInfo collection, LambdaExpression lambda)
+    {
+        var element = lambda.Parameters[0];
+        var outer = new OtherParameterFinder(element);
+        outer.Visit(lambda.Body);
+        if (outer.Found)
+            throw new NotSupportedException(
+                $"Any() over '{collection.Name}': the condition reads only the fields of the element; it reads another value of the query here.");
+
+        var inner = VisitExpression(lambda.Body);
+        var prefix = collection.Name + "[].";
+        return new ArrayElementAnyExpression(collection, UnderCollection(inner, prefix, collection.Name));
+    }
+
+    private static FilterExpression UnderCollection(FilterExpression filter, string prefix, string collection) => filter switch
+    {
+        ComparisonExpression { LeftExpression: null, RightExpression: null } c when c.Property.Name is not ("__constant" or "__computed")
+            => c with { Property = c.Property with { Name = prefix + c.Property.Name } },
+        NullCheckExpression n => n with { Property = n.Property with { Name = prefix + n.Property.Name } },
+        InExpression i => i with { Property = i.Property with { Name = prefix + i.Property.Name } },
+        LogicalExpression l => l with { Operands = l.Operands.Select(o => UnderCollection(o, prefix, collection)).ToList() },
+        _ => throw new NotSupportedException(
+            $"Any() over '{collection}': a condition on a field of the element compares it with a value, checks it for null or " +
+            "takes Contains of a list, joined with &&, || or !; this one does something else.")
+    };
+
+    private sealed class OtherParameterFinder(ParameterExpression element) : ExpressionVisitor
+    {
+        public bool Found { get; private set; }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            if (node != element) Found = true;
+            return node;
+        }
+    }
+
+    /// <summary>
     /// Collection.Contains visitor.
     /// </summary>
     protected virtual FilterExpression VisitCollectionContains(MethodCallExpression method)
@@ -738,18 +880,9 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
             var values = EvaluateExpression(collectionExpression);
 
             if (values is System.Collections.IEnumerable enumerable)
-            {
-                var valuesList = enumerable.Cast<object>()
-                    .Select(v => v is IRedbListItem li ? (object)li.Id : v)
-                    .ToList();
-                if (valuesList.Count > 0
-                    && enumerable.Cast<object>().Any(v => v is IRedbListItem)
-                    && !property.Name.Contains('.'))
-                {
-                    property = property with { Name = property.Name + ".Id", Type = typeof(long) };
-                }
-                return new InExpression(property, valuesList);
-            }
+                return InListExpression(property, enumerable);
+            else if (values == null)
+                throw NullContainsList(collectionExpression);
             else
             {
                 throw new ArgumentException("Collection expression must evaluate to IEnumerable");
@@ -1418,12 +1551,8 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         throw new NotSupportedException(UnsupportedFieldPathMessage(path));
     }
 
-    /// <summary>The one wording for a filter path that is not a chain of fields of the queried object.</summary>
-    internal static string UnsupportedFieldPathMessage(Expression path) =>
-        $"A filter cannot read '{path}': the path must be a chain of fields of the queried object. " +
-        "An array or list element by index and a method call inside the path (First(), ElementAt(...)) are not " +
-        "supported in a filter. Use Contains(...) for an array of simple values, Any(...) for an array of list items, " +
-        "or a dictionary with its key; a value of your own goes on the other side of the comparison.";
+    /// <summary>The one wording for a path that is not a chain of fields of the queried object, see <see cref="FieldPathRefusal"/>.</summary>
+    internal static string UnsupportedFieldPathMessage(Expression path) => FieldPathRefusal.Message(path.ToString());
 
     /// <summary>
     /// Build property path from member expression chain.
@@ -1438,23 +1567,21 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
         while (current != null && current.Member is System.Reflection.PropertyInfo)
         {
             var memberName = current.Member.Name;
-            
-            // Skip .Value/.HasValue on Nullable<T> — these are C# accessors, not real properties
+
+            // .Value/.HasValue on Nullable<T> are C# accessors, not fields: the path is the one of the nullable they are
+            // read from (a field, or a dictionary entry: Scores["a"].Value, whose path used to come out empty).
             if ((memberName == "Value" || memberName == "HasValue") && IsNullableAccessor(current))
             {
-                if (current.Expression is MemberExpression parentMember2)
-                {
-                    current = parentMember2;
-                    continue;
-                }
-                break;
+                // the accessor adds no part
             }
-            
-            if (memberName == "Length")
+            // Length and Count of a string, an array or a collection are functions; a field of the object of that name is
+            // a field. Every member called Count or Length used to be taken for the function, and a filter on such a
+            // field failed.
+            else if (memberName == "Length" && IsSizeOf(current, collection: false))
             {
                 function = PropertyFunction.Length;
             }
-            else if (memberName == "Count")
+            else if (memberName == "Count" && IsSizeOf(current, collection: true))
             {
                 function = PropertyFunction.Count;
             }
@@ -1512,6 +1639,20 @@ public abstract class BaseFilterExpressionParser : IFilterExpressionParser
     /// <summary>
     /// Checks if member expression is a Nullable&lt;T&gt; accessor (.Value or .HasValue).
     /// </summary>
+    /// <summary>
+    /// Whether a Length (<paramref name="collection"/> false) or Count member is the size of what it is read on: Length
+    /// of a string or an array, Count of a collection. Not when the member is a field of a class of the model.
+    /// </summary>
+    private static bool IsSizeOf(MemberExpression member, bool collection)
+    {
+        var owner = member.Expression?.Type;
+        if (owner == null)
+            return false;
+        if (!collection)
+            return owner == typeof(string) || owner.IsArray;
+        return owner != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(owner);
+    }
+
     private static bool IsNullableAccessor(MemberExpression member)
     {
         var declaringType = member.Member.DeclaringType;

@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Transactions;
 using Npgsql;
 using redb.Core.Data;
@@ -77,5 +78,86 @@ public class DeadlockRetryHelperAmbientTests
         }, maxRetries: 3, baseDelayMs: 1);
 
         calls.Should().Be(2, "a suppressed scope has no ambient transaction: the operation owns its own");
+    }
+
+    /// <summary>A context that answers <see cref="IRedbContext.IsInTransaction"/> only; the helper reads nothing else.</summary>
+    public class TransactionStateContext : DispatchProxy
+    {
+        public bool InTransaction { get; set; }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+            => targetMethod?.Name == "get_IsInTransaction"
+                ? InTransaction
+                : throw new NotSupportedException(targetMethod?.Name);
+
+        public static IRedbContext Create(bool inTransaction)
+        {
+            var context = DispatchProxy.Create<IRedbContext, TransactionStateContext>();
+            ((TransactionStateContext)(object)context).InTransaction = inTransaction;
+            return context;
+        }
+    }
+
+    [Fact]
+    public async Task ContextInATransaction_DeadlockIsNotRetried_TheOriginalLeaves()
+    {
+        var calls = 0;
+        var deadlock = Deadlock();
+
+        var act = () => DeadlockRetryHelper.ExecuteWithRetryAsync(TransactionStateContext.Create(inTransaction: true), () =>
+        {
+            calls++;
+            return Task.FromException(deadlock);
+        }, maxRetries: 3, baseDelayMs: 1);
+
+        (await act.Should().ThrowAsync<PostgresException>()).Which.Should().BeSameAs(deadlock);
+        calls.Should().Be(1, "the transaction belongs to the caller; only the caller can run its unit again");
+    }
+
+    [Fact]
+    public async Task ContextInATransaction_TypedOverload_DeadlockIsNotRetried()
+    {
+        var calls = 0;
+        var deadlock = Deadlock();
+
+        var act = () => DeadlockRetryHelper.ExecuteWithRetryAsync<int>(TransactionStateContext.Create(inTransaction: true), () =>
+        {
+            calls++;
+            return Task.FromException<int>(deadlock);
+        }, maxRetries: 3, baseDelayMs: 1);
+
+        (await act.Should().ThrowAsync<PostgresException>()).Which.Should().BeSameAs(deadlock);
+        calls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ContextWithoutATransaction_DeadlockIsRetried()
+    {
+        var calls = 0;
+
+        var result = await DeadlockRetryHelper.ExecuteWithRetryAsync(TransactionStateContext.Create(inTransaction: false), () =>
+        {
+            calls++;
+            return calls == 1 ? Task.FromException<int>(Deadlock()) : Task.FromResult(7);
+        }, maxRetries: 3, baseDelayMs: 1);
+
+        result.Should().Be(7);
+        calls.Should().Be(2, "the operation opens and owns its transaction, so it may run again");
+    }
+
+    [Fact]
+    public async Task ContextWithoutATransaction_AfterTheLastAttempt_TheDeadlockLeaves()
+    {
+        var calls = 0;
+        var deadlock = Deadlock();
+
+        var act = () => DeadlockRetryHelper.ExecuteWithRetryAsync(TransactionStateContext.Create(inTransaction: false), () =>
+        {
+            calls++;
+            return Task.FromException(deadlock);
+        }, maxRetries: 2, baseDelayMs: 1);
+
+        (await act.Should().ThrowAsync<PostgresException>()).Which.Should().BeSameAs(deadlock);
+        calls.Should().Be(3, "the first attempt and two retries");
     }
 }

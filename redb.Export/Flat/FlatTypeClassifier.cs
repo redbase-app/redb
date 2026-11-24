@@ -107,8 +107,10 @@ internal static class FlatTypeClassifier
     {
         var underlying = Nullable.GetUnderlyingType(type) ?? type;
 
+        // TimeSpan and TimeOnly are stored as their Ticks.
         if (underlying == typeof(long) || underlying == typeof(int) ||
-            underlying == typeof(short) || underlying == typeof(byte))
+            underlying == typeof(short) || underlying == typeof(byte) ||
+            underlying == typeof(TimeSpan) || underlying == typeof(TimeOnly))
             return FlatValueSource.Long;
         if (underlying == typeof(double) || underlying == typeof(float))
             return FlatValueSource.Double;

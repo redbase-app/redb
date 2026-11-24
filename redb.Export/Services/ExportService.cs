@@ -74,6 +74,10 @@ public sealed class ExportService
     {
         var startTime = DateTime.UtcNow;
 
+        // Before anything is read: a source of another schema than this build's stops here with the exceptions of a
+        // service start, a newer one always (the file would leave out what this build does not know).
+        await SchemaGate.CheckSourceAsync(_provider, ct);
+
         if (dryRun)
         {
             await PrintDryRunInfoAsync(schemeIds, ct);

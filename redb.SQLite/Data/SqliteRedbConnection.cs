@@ -288,6 +288,13 @@ namespace redb.SQLite.Data
                         // `IN (SELECT value FROM json_each($n))`.
                         sqliteParam.Value = JsonSerializer.Serialize(param);
                         break;
+                    case Array values when values is not byte[]:
+                        // The same JSON array for the other element types a list of values carries (Contains over a
+                        // list of dates, decimals, flags, Guids): each element spelled as the single value is bound,
+                        // a date as its Julian day, a decimal as a double, so json_each yields what the column holds.
+                        // A DateTime[] reached the driver as it was and failed: "No mapping exists from object type".
+                        sqliteParam.Value = JsonArrayOfStoredValues(values);
+                        break;
                     default:
                         sqliteParam.Value = param;
                         break;
@@ -295,8 +302,36 @@ namespace redb.SQLite.Data
 
                 cmd.Parameters.Add(sqliteParam);
             }
-            
+
             return cmd;
+        }
+
+        /// <summary>
+        /// A list of values as the JSON array <c>json_each</c> reads, every element spelled as the column stores it: a
+        /// date as its Julian day, a decimal as a double, a flag as 1/0, a Guid as the driver writes one (upper-case
+        /// text). Nulls stay JSON null: <c>IN</c> never matches them. An element of any other type is refused here,
+        /// before the statement runs, instead of reaching the driver.
+        /// </summary>
+        private static string JsonArrayOfStoredValues(Array values)
+        {
+            var items = new List<object?>(values.Length);
+            foreach (var v in values)
+            {
+                items.Add(v switch
+                {
+                    null => null,
+                    DateTimeOffset dto => SqliteJulian.ToJulian(dto),
+                    DateTime dt => SqliteJulian.ToJulian(dt),
+                    decimal dec => (double)dec,
+                    double or float or long or int or short or byte or sbyte or ushort or uint or string => v,
+                    bool flag => flag ? 1 : 0,
+                    Guid g => g.ToString().ToUpperInvariant(),
+                    char c => c.ToString(),
+                    _ => throw new NotSupportedException(
+                        $"SQLite cannot take a list of {v.GetType().Name} values as a parameter.")
+                });
+            }
+            return JsonSerializer.Serialize(items);
         }
 
         // === QUERY METHODS ===
@@ -644,7 +679,7 @@ namespace redb.SQLite.Data
             if (targetType == typeof(byte[]))
                 return (T)(object)(byte[])value;
 
-            return (T)Convert.ChangeType(value, targetType);
+            return (T)redb.Core.Utils.RedbDecimal.ChangeType(value, targetType);
         }
         
         /// <summary>
@@ -1380,7 +1415,7 @@ namespace redb.SQLite.Data
                             continue;
                         }
 
-                        var convertedValue = Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
+                        var convertedValue = redb.Core.Utils.RedbDecimal.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
                         property.SetValue(obj, convertedValue);
                     }
                     catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)

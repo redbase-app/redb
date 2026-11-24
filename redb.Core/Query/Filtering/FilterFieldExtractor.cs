@@ -89,6 +89,11 @@ public class FilterFieldExtractor
             case InExpression inExpr:
                 infos.TryAdd(inExpr.Property.Name, inExpr.Property.IsBaseField);
                 break;
+
+            case ArrayElementAnyExpression elementAny:
+                // The fields of the element (Rows[].Kind) are resolved with the others; they are not pivot columns.
+                ExtractRecursive(elementAny.Element, infos, nullCheckFields);
+                break;
         }
     }
     

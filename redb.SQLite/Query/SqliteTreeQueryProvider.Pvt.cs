@@ -66,8 +66,8 @@ public partial class SqliteTreeQueryProvider
 
         try
         {
-            var objectsJson = await ExecutePvtTreeAsync(context, route, applyPaging: true);
-            var result = DeserializeTreeObjects<TProps>(objectsJson);
+            var rows = await ExecutePvtTreeAsync(context, route, cancellationToken);
+            var result = rows.Select(MapRowToTreeObject<TProps>).ToList();
 
             if (result.Count > 0 && _lazyPropsLoader != null)
             {
@@ -109,18 +109,11 @@ public partial class SqliteTreeQueryProvider
         if (!ShouldRoutePvtTree(context, out var route))
             return await base.ExecuteTreeCountAsync<TProps>(context, cancellationToken);
 
-        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: true);
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, forCount: true);
         var sql = "SELECT COUNT(*) AS \"Value\" FROM (" + inner + ") t";
         object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
-        var orderByJson = context.Orderings.Count > 0
-            ? _facetBuilder.BuildOrderBy(context.Orderings)
-            : null;
-        var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
-        long? count;
-        if (hasOrder)
-            count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam, orderByJson! }, cancellationToken);
-        else
-            count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam }, cancellationToken);
+        // A count reads no order: the inner SQL is built without one (forCount), so nothing is sorted.
+        long? count = await _context.ExecuteScalarAsync<long?>(sql, new object[] { filterParam }, cancellationToken);
         return checked((int)(count ?? 0));
     }
 
@@ -273,12 +266,12 @@ public partial class SqliteTreeQueryProvider
     private async Task<string> BuildPvtTreeInnerSqlAsync<TProps>(
         TreeQueryContext<TProps> context,
         PvtTreeRoute route,
-        bool ignoreLimitOffset, CancellationToken cancellationToken = default) where TProps : class, new()
+        bool forCount, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var orderByJson = context.Orderings.Count > 0
             ? _facetBuilder.BuildOrderBy(context.Orderings)
             : null;
-        var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
+        var hasOrder = !forCount && !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
 
         // The depth of the tree walk (TreeQuery(root, maxDepth)); none: the whole subtree. This passed MaxRecursionDepth, the
         // depth of nested props, so maxDepth was ignored and every subtree stopped at 10 levels.
@@ -286,10 +279,10 @@ public partial class SqliteTreeQueryProvider
         var walkDepth = context.TreeFilters?.FirstOrDefault(f => f.Operator == TreeFilterOperator.DescendantsOf)?.MaxDepth
             ?? context.MaxDepth;
         var maxDepth = walkDepth?.ToString(CultureInfo.InvariantCulture) ?? "NULL";
-        var limitArg  = ignoreLimitOffset || !context.Limit.HasValue
+        var limitArg  = forCount || !context.Limit.HasValue
             ? "NULL"
             : context.Limit.Value.ToString(CultureInfo.InvariantCulture);
-        var offsetArg = ignoreLimitOffset
+        var offsetArg = forCount
             ? "0"
             : (context.Offset ?? 0).ToString(CultureInfo.InvariantCulture);
 
@@ -352,7 +345,7 @@ public partial class SqliteTreeQueryProvider
         if (!ShouldRoutePvtTree(context, out var route))
             return await base.GetSqlPreviewAsync(context, cancellationToken);
 
-        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: false, cancellationToken);
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, forCount: false, cancellationToken);
         var orderByJson = context.Orderings.Count > 0 ? _facetBuilder.BuildOrderBy(context.Orderings) : null;
 
         var sb = new StringBuilder();
@@ -365,26 +358,17 @@ public partial class SqliteTreeQueryProvider
     }
 
     /// <summary>
-    /// Wraps the inner <c>_id</c> list with the same <c>jsonb_agg(jsonb_build_object(...))</c>
-    /// shape produced by the legacy <c>search_tree_objects_with_facets_base</c>
-    /// function and executes it. Returns the raw JSON array string.
+    /// Reads the <c>_objects</c> rows of the inner <c>_id</c> list, in its order. Props are not read here: the
+    /// caller loads them once through the lazy loader (this wrapper used to build each object's JSON with
+    /// get_object_json, and the loader built it again).
     /// </summary>
-    private async Task<string?> ExecutePvtTreeAsync<TProps>(
+    private async Task<List<RedbObjectRow>> ExecutePvtTreeAsync<TProps>(
         TreeQueryContext<TProps> context,
-        PvtTreeRoute route,
-        bool applyPaging, CancellationToken cancellationToken = default) where TProps : class, new()
+        PvtTreeRoute route, CancellationToken cancellationToken = default) where TProps : class, new()
     {
-        var inner = await BuildPvtTreeInnerSqlAsync(context, route, ignoreLimitOffset: !applyPaging);
-
-        // SQLite has no jsonb_agg/jsonb_build_object: materialize each matched id through the
-        // canonical get_object_json (base + props, ISO dates, base64 bytes) and pack the rows
-        // into a JSON array. json() embeds each object as JSON (not a quoted string); the inner
-        // subquery's ORDER BY is preserved through the single-pass aggregate.
-        var maxDepth = context.MaxRecursionDepth ?? 10;
-        var sql =
-            "SELECT json_group_array(json(get_object_json(sub._id, "
-            + maxDepth.ToString(CultureInfo.InvariantCulture)
-            + "))) AS \"Value\" FROM (" + inner + ") sub";
+        var inner = await BuildPvtTreeInnerSqlAsync(context, route, forCount: false);
+        var sql = _sql.Query_WrapPvtWithObjectRows(inner)
+            ?? throw new InvalidOperationException("Query_WrapPvtWithObjectRows returned null for the SQLite dialect.");
 
         object filterParam = string.IsNullOrEmpty(route.FilterJson) ? "{}" : route.FilterJson;
         var orderByJson = context.Orderings.Count > 0
@@ -393,7 +377,7 @@ public partial class SqliteTreeQueryProvider
         var hasOrder = !string.IsNullOrEmpty(orderByJson) && orderByJson != "null" && orderByJson != "[]";
 
         if (hasOrder)
-            return await _context.ExecuteScalarAsync<string>(sql, new object[] { filterParam, orderByJson! }, cancellationToken);
-        return await _context.ExecuteScalarAsync<string>(sql, new object[] { filterParam }, cancellationToken);
+            return await _context.QueryAsync<RedbObjectRow>(sql, new object[] { filterParam, orderByJson! }, cancellationToken);
+        return await _context.QueryAsync<RedbObjectRow>(sql, new object[] { filterParam }, cancellationToken);
     }
 }

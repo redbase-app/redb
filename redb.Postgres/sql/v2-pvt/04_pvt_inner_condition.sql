@@ -30,11 +30,8 @@ BEGIN
         END CASE;
         
         -- 🚀 OPTIMIZATION: removed fs.db_type checks - use db_type from type_info directly
-        IF type_info->>'type_semantic' = 'TimeSpan' THEN
-            -- TimeSpan: convert to INTERVAL for correct comparison
-            RETURN format('fv._String::interval %s %L::interval', op_symbol, operator_value);
-        
-        ELSIF operator_value ~ '^\d{4}-\d{2}-\d{2}' OR db_type = 'DateTimeOffset' THEN
+        -- TimeSpan and TimeOnly are Ticks in _Long (db_type Long): the Long branch compares them.
+        IF operator_value ~ '^\d{4}-\d{2}-\d{2}' OR db_type = 'DateTimeOffset' THEN
             RETURN format('fv._DateTimeOffset %s %L::timestamptz', op_symbol, operator_value);
         ELSIF db_type = 'Long' THEN
             -- Known Long type (int, long)
@@ -77,11 +74,7 @@ BEGIN
     -- 🚀 OPTIMIZATION: removed fs.db_type checks - use db_type from type_info directly
     ELSIF operator_name = '$in' THEN
         in_values_list := _format_json_array_for_in(operator_value::jsonb);
-        IF type_info->>'type_semantic' = 'TimeSpan' THEN
-            -- TimeSpan: convert to INTERVAL for correct comparison
-            RETURN format('fv._String::interval IN (%s)', 
-                regexp_replace(in_values_list, '([^,]+)', '\1::interval', 'g'));
-        ELSIF type_info->>'type_semantic' = '_RListItem' THEN
+        IF type_info->>'type_semantic' = '_RListItem' THEN
             -- ListItem: values stored in _listitem column as list element IDs
             RETURN format('fv._listitem IN (%s)', in_values_list);
         ELSIF db_type = 'String' THEN
@@ -143,9 +136,7 @@ BEGIN
     -- Explicit equality operator
     -- 🚀 OPTIMIZATION: removed fs.db_type checks - use db_type from type_info directly
     ELSIF operator_name = '$eq' THEN
-        IF type_info->>'type_semantic' = 'TimeSpan' THEN
-            RETURN format('fv._String::interval = %L::interval', operator_value);
-        ELSIF type_info->>'type_semantic' = '_RListItem' THEN
+        IF type_info->>'type_semantic' = '_RListItem' THEN
             RETURN format('fv._listitem = %L::bigint', operator_value);
         ELSIF db_type = 'DateTimeOffset' OR operator_value ~ '^\d{4}-\d{2}-\d{2}' THEN
             RETURN format('fv._DateTimeOffset = %L::timestamptz', operator_value);
@@ -380,15 +371,10 @@ BEGIN
     
     ELSE
         -- 🚀 OPTIMIZATION: Simple equality - use db_type from type_info if known
-        IF type_info->>'type_semantic' = 'TimeSpan' THEN
-            RETURN format('fv._String::interval = %L::interval', operator_value);
-        ELSIF db_type = 'DateTimeOffset' OR operator_value ~ '^\d{4}-\d{2}-\d{2}' THEN
+        IF db_type = 'DateTimeOffset' OR operator_value ~ '^\d{4}-\d{2}-\d{2}' THEN
             RETURN format('fv._DateTimeOffset = %L::timestamptz', operator_value);
         ELSIF db_type = 'Guid' OR operator_value ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
             RETURN format('fv._Guid = %L::uuid', operator_value);
-        ELSIF operator_value ~ '^\d+(\.\d+)?:\d{2}:\d{2}' THEN
-            -- TimeSpan format (HH:MM:SS)
-            RETURN format('fv._String::interval = %L::interval', operator_value);
         ELSIF db_type = 'Long' THEN
             RETURN format('fv._Long = %L::bigint', operator_value);
         ELSIF db_type = 'Double' THEN
@@ -419,11 +405,11 @@ $BODY$;
 COMMENT ON FUNCTION pvt_build_inner_condition(text, text, jsonb) IS '🚀 EXTENDED core system of LINQ operators. Supports 25+ operators: 
 📊 Numeric: $gt, $gte, $lt, $lte, $ne, $in (Long, Double, Numeric)
 📝 String: $contains, $startsWith, $endsWith  
-⏱️ TimeSpan: $gt, $lt, $eq (conversion to INTERVAL for correct comparison)
+⏱️ TimeSpan, TimeOnly: as Long (their Ticks in _Long)
 📅 DateTimeOffset: $gt, $lt, $eq (timestamptz with timezone)
 🔢 Arrays (basic): $arrayContains, $arrayAny, $arrayEmpty, $arrayCount*
 🎯 Arrays (position): $arrayAt, $arrayFirst, $arrayLast
 🔍 Arrays (search): $arrayStartsWith, $arrayEndsWith, $arrayMatches
 📈 Arrays (aggregation): $arraySum, $arrayAvg, $arrayMin, $arrayMax
-All operators adapted for relational arrays via _array_index. Supports distinguishing _RObject vs Object types. Auto type detection by value format. Special handling for TimeSpan via INTERVAL.';
+All operators adapted for relational arrays via _array_index. Supports distinguishing _RObject vs Object types. Auto type detection by value format.';
 

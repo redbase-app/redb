@@ -537,19 +537,20 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider, Grouping.I
 
     /// <summary>
     /// Phase 1: ask the database to build the inner _id-list SQL string.
-    /// When <paramref name="ignoreLimitOffset"/> is true the call passes
-    /// p_limit=NULL,p_offset=0 (used for COUNT/EXISTS wrappers).
+    /// When <paramref name="forCount"/> is true the call passes p_limit=NULL, p_offset=0 and no order (used for the
+    /// COUNT/EXISTS wrappers): a count needs no order, and the SQL Server module keeps an order without paging with
+    /// OFFSET 0 ROWS, which would sort the rows only to count them.
     /// </summary>
     protected async Task<string> BuildPvtInnerSqlAsync<TProps>(
         QueryContext<TProps> context,
-        bool ignoreLimitOffset, CancellationToken cancellationToken = default) where TProps : class, new()
+        bool forCount, CancellationToken cancellationToken = default) where TProps : class, new()
     {
         var facetFilters = _facetBuilder.BuildFacetFilters(context.Filter);
         var orderByJson  = BuildOrderByJson(context);
         var parameters   = _facetBuilder.BuildQueryParameters(context.Limit, context.Offset);
 
-        var limit  = ignoreLimitOffset ? (int?)null : parameters.Limit;
-        var offset = ignoreLimitOffset ? 0          : (parameters.Offset ?? 0);
+        var limit  = forCount ? (int?)null : parameters.Limit;
+        var offset = forCount ? 0          : (parameters.Offset ?? 0);
 
         // DistinctBy → p_distinct_on jsonb array (PVT engine handles SELECT DISTINCT ON parity)
         var distinctOnJson = BuildPvtDistinctOnJson(context);
@@ -571,7 +572,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider, Grouping.I
         object filterParam = string.IsNullOrEmpty(facetFilters) || facetFilters == "{}"
             ? (object)DBNull.Value
             : facetFilters;
-        object orderParam = string.IsNullOrEmpty(orderByJson) || orderByJson == "null" || orderByJson == "[]"
+        object orderParam = forCount || string.IsNullOrEmpty(orderByJson) || orderByJson == "null" || orderByJson == "[]"
             ? (object)DBNull.Value
             : orderByJson;
 
@@ -612,7 +613,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider, Grouping.I
     /// <summary>v2-pvt Count path: COUNT(*) wrapper over the inner _id-list SQL.</summary>
     protected virtual async Task<int> ExecuteCountAsyncPvt<TProps>(QueryContext<TProps> context, CancellationToken cancellationToken = default) where TProps : class, new()
     {
-        var inner   = await BuildPvtInnerSqlAsync(context, ignoreLimitOffset: true);
+        var inner   = await BuildPvtInnerSqlAsync(context, forCount: true);
         var wrapped = _sql.Query_WrapPvtWithCount(inner)
             ?? throw new InvalidOperationException("Query_WrapPvtWithCount returned null for a PVT-enabled dialect.");
         var count = await _context.ExecuteScalarAsync<long>(wrapped, System.Array.Empty<object>(), cancellationToken);
@@ -621,39 +622,44 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider, Grouping.I
 
     /// <summary>v2-pvt SQL preview path: returns the inner _id-list SQL as-is.</summary>
     protected virtual Task<string> GetSqlPreviewAsyncPvt<TProps>(QueryContext<TProps> context, CancellationToken cancellationToken = default) where TProps : class, new()
-        => BuildPvtInnerSqlAsync(context, ignoreLimitOffset: false);
+        => BuildPvtInnerSqlAsync(context, forCount: false);
 
     /// <summary>
-    /// v2-pvt ToList path: wraps the inner SQL with get_object_json, executes,
-    /// and reuses the existing JSON materializer.
+    /// v2-pvt ToList path: the inner SQL picks the ids, the wrapper reads their <c>_objects</c> rows in that
+    /// order, and the lazy loader reads the Props once, from the Props cache where it holds them. The JSON of an
+    /// object is built once per read, by the loader; the wrapper used to build it too, and the loader built it again.
     /// </summary>
     protected virtual async Task<object> ExecuteToListAsyncPvt<TProps>(QueryContext<TProps> context, Type propsType, CancellationToken cancellationToken = default) where TProps : class, new()
     {
-        var inner = await BuildPvtInnerSqlAsync(context, ignoreLimitOffset: false);
-        var maxDepth = context.MaxRecursionDepth ?? 10;
-        var wrapped = _sql.Query_WrapPvtWithObjectJson(inner, maxDepth)
-            ?? throw new InvalidOperationException("Query_WrapPvtWithObjectJson returned null for a PVT-enabled dialect.");
+        var loader = _lazyPropsLoader
+            ?? throw new InvalidOperationException("The v2-pvt list read needs the lazy Props loader of the provider.");
+        var inner = await BuildPvtInnerSqlAsync(context, forCount: false);
+        var wrapped = _sql.Query_WrapPvtWithObjectRows(inner)
+            ?? throw new InvalidOperationException("Query_WrapPvtWithObjectRows returned null for a PVT-enabled dialect.");
 
         var sqlTimer = System.Diagnostics.Stopwatch.StartNew();
-        var rows = await _context.QueryAsync<StringValue>(wrapped, System.Array.Empty<object>(), cancellationToken);
+        var rows = await _context.QueryAsync<RedbObjectRow>(wrapped, System.Array.Empty<object>(), cancellationToken);
         sqlTimer.Stop();
-        _logger?.LogDebug("PVT SQL (get_object_json wrapper) executed in {ElapsedMs} ms", sqlTimer.ElapsedMilliseconds);
+        _logger?.LogDebug("PVT SQL (object rows) executed in {ElapsedMs} ms", sqlTimer.ElapsedMilliseconds);
 
-        if (rows is null || rows.Count == 0)
+        var objects = new List<RedbObject<TProps>>(rows.Count);
+        foreach (var row in rows)
         {
-            _logger?.LogDebug("PVT ToList Result: empty");
-            return new List<RedbObject<TProps>>();
+            if (context.CheckPermissions && context.UserId.HasValue
+                && !await CheckUserPermission(row.Id, context.UserId.Value, cancellationToken))
+                continue;
+            objects.Add(row.ToRedbObject<TProps>());
         }
+        if (objects.Count == 0)
+            return objects;
 
-        var objects = new System.Text.Json.JsonElement[rows.Count];
-        for (var i = 0; i < rows.Count; i++)
-        {
-            var json = rows[i].Value;
-            if (string.IsNullOrWhiteSpace(json)) continue;
-            objects[i] = System.Text.Json.JsonDocument.Parse(json).RootElement.Clone();
-        }
-
-        return await MaterializeResultsFromJson<TProps>(objects, context, cancellationToken);
+        // The rows carry no Props, so they are loaded whatever SkipPropsLoading says: that flag keeps the partial
+        // Props of a projection statement, and this statement reads none.
+        var propsLoadTimer = System.Diagnostics.Stopwatch.StartNew();
+        await loader.LoadPropsForManyAsync(objects, context.ProjectedStructureIds, context.PropsDepth, cancellationToken);
+        propsLoadTimer.Stop();
+        _logger?.LogDebug("Props loaded via batch (with cache check) in {ElapsedMs} ms", propsLoadTimer.ElapsedMilliseconds);
+        return objects;
     }
 
     /// <summary>
@@ -1176,6 +1182,13 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider, Grouping.I
     }
 
     /// <summary>
+    /// The aggregate requests of an AggregateAsync selector, read as the execution reads them
+    /// (<see cref="RedbQueryable{TProps}.AggregateAsync{TResult}"/>): a preview built from them shows the statement that runs.
+    /// </summary>
+    protected static List<AggregateRequest> ParseAggregateRequests(System.Linq.Expressions.LambdaExpression selector)
+        => AggregateSelectorParser.Parse(selector);
+
+    /// <summary>
     /// Parses aggregate expression for preview (simplified version from RedbQueryable)
     /// </summary>
     protected List<(string Alias, string FieldPath, string Function)> ParseAggregateExpressionForPreview<TProps, TResult>(
@@ -1458,8 +1471,7 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider, Grouping.I
             return 0;
 
         // 3. Delete via dialect-specific SQL (MSSQL uses delete_objects_cascade, Postgres uses ANY)
-        var deletedCount = await _context.ExecuteAsync(
-            _sql.ObjectStorage_DeleteByIds(), new object[] { objectIds.ToArray() }, cancellationToken);
+        var deletedCount = await redb.Core.Providers.Base.ObjectDeleteByIds.RunAsync(_context, _sql, objectIds.ToArray(), cancellationToken);
 
         _logger?.LogDebug("DELETE: Deleted {Count} objects by filter", deletedCount);
 
@@ -1467,12 +1479,34 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider, Grouping.I
     }
 
     /// <summary>
-    /// Delete objects by FilterExpression (Pro version uses PVT, OpenSource falls back to facet JSON).
+    /// Delete objects by FilterExpression. Pro builds its own DELETE; Free reads the ids through the v2-pvt module, as
+    /// a list read does, and deletes them by ids, counting every one it deleted. Free used to ask the removed
+    /// search_objects_simple function for the ids, and a query delete threw NotSupportedException.
     /// </summary>
     public virtual async Task<int> ExecuteDeleteAsync(long schemeId, QueryExpressions.FilterExpression? filter, CancellationToken cancellationToken = default)
     {
-        // OpenSource: convert FilterExpression to facet JSON and use existing method
-        var filterJson = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
-        return await ExecuteDeleteAsync(schemeId, filterJson);
+        if (_sql.Query_BuildPvtSqlFunction() is null)
+            throw new NotSupportedException(
+                $"A query delete reads the ids through the v2-pvt module, and the dialect {_sql.GetType().Name} has none " +
+                "(Query_BuildPvtSqlFunction returns null).");
+        var facetFilters = filter != null ? _facetBuilder.BuildFacetFilters(filter) : null;
+
+        // The objects of the scheme the filter selects: no page, no order, as a count reads them.
+        var invocation = _sql.Query_BuildPvtSqlInvocation(
+            schemeId: schemeId, limit: null, offset: 0, maxDepth: 10, distinct: false,
+            sourceMode: "flat", treeIds: null, hasDistinctOn: false)
+            ?? throw new InvalidOperationException("v2-pvt is enabled by dialect but Query_BuildPvtSqlInvocation returned null.");
+        object filterParam = string.IsNullOrEmpty(facetFilters) || facetFilters == "{}" ? DBNull.Value : facetFilters;
+        var inner = await _context.ExecuteScalarAsync<string>(invocation, new object[] { filterParam, DBNull.Value }, cancellationToken);
+        if (string.IsNullOrWhiteSpace(inner))
+            throw new InvalidOperationException("pvt_build_query_sql returned an empty SQL string for scheme " + schemeId + ".");
+
+        var ids = await _context.QueryScalarListAsync<long>("SELECT t._id FROM (\n" + inner + "\n) t", System.Array.Empty<object>(), cancellationToken);
+        if (ids.Count == 0)
+            return 0;
+
+        var deletedCount = await redb.Core.Providers.Base.ObjectDeleteByIds.RunAsync(_context, _sql, ids.ToArray(), cancellationToken);
+        _logger?.LogDebug("DELETE: Deleted {Count} objects by filter", deletedCount);
+        return deletedCount;
     }
 }

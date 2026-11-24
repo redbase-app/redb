@@ -985,17 +985,8 @@ where TField : struct
     {
         var schemeId = _context.SchemeId;
 
-        // Parse expression and find all Agg.* calls
-        var aggregations = ParseAggregateExpression(selector);
-
-        // ONE SQL query for all aggregations!
-        var requests = aggregations.Select(agg => new Aggregation.AggregateRequest
-        {
-            FieldPath = agg.FieldPath,
-            Function = agg.Function,
-            Alias = agg.PropertyName,
-            IsBaseField = agg.IsBaseField
-        });
+        // Every Agg.* call of the selector; the SQL preview of the aggregate reads the same requests.
+        var requests = Aggregation.AggregateSelectorParser.Parse(selector);
 
         // BUG FIX: pass the FilterExpression directly so providers that only
         // honour the typed overload (e.g. Pro) don't silently drop the outer Where.
@@ -1003,51 +994,6 @@ where TField : struct
 
         // Build result
         return BuildAggregateResult<TResult>(selector, batchResult.Values);
-    }
-
-    /// <summary>
-    /// Parses AggregateAsync expression and extracts aggregations
-    /// </summary>
-    private List<(string PropertyName, string FieldPath, Aggregation.AggregateFunction Function, bool IsBaseField)> ParseAggregateExpression<TResult>(
-        Expression<Func<RedbObject<TProps>, TResult>> selector)
-    {
-        var result = new List<(string PropertyName, string FieldPath, Aggregation.AggregateFunction Function, bool IsBaseField)>();
-
-        if (selector.Body is NewExpression newExpr)
-        {
-            for (int i = 0; i < newExpr.Arguments.Count; i++)
-            {
-                var propName = newExpr.Members?[i].Name ?? $"Item{i}";
-                var arg = newExpr.Arguments[i];
-
-                if (arg is MethodCallExpression methodCall && methodCall.Method.DeclaringType == typeof(Aggregation.Agg))
-                {
-                    var funcName = methodCall.Method.Name;
-                    var function = funcName switch
-                    {
-                        "Sum" => Aggregation.AggregateFunction.Sum,
-                        "Average" => Aggregation.AggregateFunction.Average,
-                        "Min" => Aggregation.AggregateFunction.Min,
-                        "Max" => Aggregation.AggregateFunction.Max,
-                        "Count" => Aggregation.AggregateFunction.Count,
-                        _ => throw new NotSupportedException($"Unknown aggregation: {funcName}")
-                    };
-
-                    // Extract field path
-                    string fieldPath = "*"; // for Count()
-                    var isBaseField = false;
-                    if (methodCall.Arguments.Count > 0)
-                    {
-                        fieldPath = ExtractFieldPathFromExpression(methodCall.Arguments[0]);
-                        isBaseField = Aggregation.AggregateRequest.ReadsObjectField(methodCall.Arguments[0]);
-                    }
-
-                    result.Add((propName, fieldPath, function, isBaseField));
-                }
-            }
-        }
-
-        return result;
     }
 
     /// <summary>
@@ -1167,170 +1113,6 @@ where TField : struct
     }
 
     /// <summary>
-    /// Extracts field path from expression
-    /// Supports:
-    ///   x.Props.Price              → "Price"
-    ///   x.Props.Customer.Name      → "Customer.Name"
-    ///   x.Props.Items[2].Price     → "Items[2].Price"   (specific index)
-    ///   x.Props.Items[].Price      → "Items[].Price"    (all elements, via Select)
-    ///   x.Props.PhoneBook["home"]  → "PhoneBook[home]"  (Dictionary key)
-    ///   x.Props.PhoneBook.Values   → "PhoneBook[]"      (all Dictionary values)
-    /// </summary>
-    private string ExtractFieldPathFromExpression(Expression expr)
-    {
-        var parts = new List<string>();
-        ExtractFieldPathRecursive(expr, parts);
-        return string.Join(".", parts);
-    }
-
-    private void ExtractFieldPathRecursive(Expression? expr, List<string> parts)
-    {
-        if (expr == null) return;
-
-        switch (expr)
-        {
-            // x.Props.Price or x.Props.Items.Price
-            case MemberExpression member:
-                // Dictionary.Values → add [] to get all values (like Array[])
-                if (member.Member.Name == "Values" && member.Expression != null &&
-                    IsDictionaryType(member.Expression.Type))
-                {
-                    ExtractFieldPathRecursive(member.Expression, parts);
-                    if (parts.Count > 0)
-                    {
-                        parts[^1] = $"{parts[^1]}[]";
-                    }
-                    // DON'T continue recursion - already processed!
-                }
-                else
-                {
-                    if (member.Member.Name != "Props")
-                    {
-                        parts.Insert(0, member.Member.Name);
-                    }
-                    ExtractFieldPathRecursive(member.Expression, parts);
-                }
-                break;
-
-            // x.Props.Items[2] - array indexer (int[], string[], etc.)
-            case BinaryExpression { NodeType: ExpressionType.ArrayIndex } arrayIndex:
-                // IMPORTANT: recursion first, then modification!
-                ExtractFieldPathRecursive(arrayIndex.Left, parts);
-                if (arrayIndex.Right is ConstantExpression indexConst && parts.Count > 0)
-                {
-                    var index = Convert.ToInt32(indexConst.Value);
-                    // Add index to last element: "Scores1" → "Scores1[2]"
-                    parts[^1] = $"{parts[^1]}[{index}]";
-                }
-                break;
-
-            // x.Props.Items.get_Item(2) - indexer for List&lt;T&gt; or Dictionary&lt;K,V&gt;
-            case MethodCallExpression { Method.Name: "get_Item" } indexerCall:
-                if (indexerCall.Arguments.Count > 0 &&
-                    indexerCall.Arguments[0] is ConstantExpression idxConst)
-                {
-                    // FIX: For nested paths like AddressBook["home"].City
-                    // Recursion uses Insert(0, ...), so new element will be at the beginning
-                    var countBefore = parts.Count;
-                    ExtractFieldPathRecursive(indexerCall.Object, parts);
-
-                    // If element was added, it's at the beginning (Insert(0, ...))
-                    if (parts.Count > countBefore)
-                    {
-                        // Dictionary&lt;K,V&gt;: key can be string or other type
-                        // List&lt;T&gt;: key is always int
-                        var keyValue = idxConst.Value;
-                        if (keyValue is int intKey)
-                        {
-                            parts[0] = $"{parts[0]}[{intKey}]";
-                        }
-                        else
-                        {
-                            // Dictionary key (string, etc.)
-                            parts[0] = $"{parts[0]}[{keyValue}]";
-                        }
-                    }
-                }
-                break;
-
-            // x.Props.Items.ElementAt(2)
-            case MethodCallExpression { Method.Name: "ElementAt" } elementAtCall:
-                if (elementAtCall.Arguments.Count > 1 &&
-                    elementAtCall.Arguments[1] is ConstantExpression elemConst)
-                {
-                    var index = Convert.ToInt32(elemConst.Value);
-                    ExtractFieldPathRecursive(elementAtCall.Arguments[0], parts);
-                    if (parts.Count > 0)
-                    {
-                        parts[^1] = $"{parts[^1]}[{index}]";
-                    }
-                }
-                else if (elementAtCall.Arguments.Count == 1 &&
-                         elementAtCall.Arguments[0] is ConstantExpression singleConst)
-                {
-                    // For instance method
-                    var index = Convert.ToInt32(singleConst.Value);
-                    ExtractFieldPathRecursive(elementAtCall.Object, parts);
-                    if (parts.Count > 0)
-                    {
-                        parts[^1] = $"{parts[^1]}[{index}]";
-                    }
-                }
-                break;
-
-            // x.Props.Items.Select(i => i.Price) → Items[].Price (all elements)
-            case MethodCallExpression { Method.Name: "Select" } selectCall:
-                // Add [] to array
-                ExtractFieldPathRecursive(selectCall.Arguments[0], parts);
-                if (parts.Count > 0)
-                {
-                    parts[^1] = $"{parts[^1]}[]";
-                }
-                // Parse lambda inside Select
-                if (selectCall.Arguments.Count > 1 &&
-                    selectCall.Arguments[1] is LambdaExpression lambda)
-                {
-                    var innerParts = new List<string>();
-                    ExtractFieldPathRecursive(lambda.Body, innerParts);
-                    parts.AddRange(innerParts);
-                }
-                break;
-
-            // x.Props.Items.Sum(i => i.Price) → Items[].Price
-            case MethodCallExpression { Method.Name: "Sum" or "Average" or "Min" or "Max" } linqAggCall:
-                ExtractFieldPathRecursive(linqAggCall.Arguments[0], parts);
-                if (parts.Count > 0)
-                {
-                    parts[^1] = $"{parts[^1]}[]";
-                }
-                if (linqAggCall.Arguments.Count > 1 &&
-                    linqAggCall.Arguments[1] is LambdaExpression aggLambda)
-                {
-                    var innerParts = new List<string>();
-                    ExtractFieldPathRecursive(aggLambda.Body, innerParts);
-                    parts.AddRange(innerParts);
-                }
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Checks if a type is Dictionary&lt;K,V&gt; or IDictionary&lt;K,V&gt;
-    /// </summary>
-    private static bool IsDictionaryType(Type? type)
-    {
-        if (type == null) return false;
-        if (type.IsGenericType)
-        {
-            var genericDef = type.GetGenericTypeDefinition();
-            if (genericDef == typeof(Dictionary<,>) || genericDef == typeof(IDictionary<,>))
-                return true;
-        }
-        return type.GetInterfaces().Any(i =>
-            i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDictionary<,>));
-    }
-
-    /// <summary>
     /// Creates aggregation result from dictionary of values
     /// </summary>
     private TResult BuildAggregateResult<TResult>(
@@ -1369,7 +1151,7 @@ where TField : struct
         {
             Type t when t == typeof(int) => Convert.ToInt32(value),
             Type t when t == typeof(long) => Convert.ToInt64(value),
-            Type t when t == typeof(decimal) => Convert.ToDecimal(value),
+            Type t when t == typeof(decimal) => redb.Core.Utils.RedbDecimal.From(value),
             Type t when t == typeof(double) => Convert.ToDouble(value),
             Type t when t == typeof(float) => Convert.ToSingle(value),
             _ => Utils.TemporalDecoder.ChangeType(value, underlying)
@@ -1377,32 +1159,11 @@ where TField : struct
     }
 
     /// <summary>
-    /// Extracts field path from lambda expression
+    /// The field path of a single aggregate's selector, read by the walker of AggregateAsync: an element, a dictionary
+    /// entry and the Value of a nullable are read as such, and a path that is not a chain of fields is refused.
     /// </summary>
     protected string ExtractFieldPath<TField>(Expression<Func<TProps, TField>> selector)
-    {
-        var body = selector.Body;
-
-        // Handle Convert (for nullable types)
-        if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
-        {
-            body = unary.Operand;
-        }
-
-        var segments = new List<string>();
-        var current = body;
-
-        while (current is MemberExpression member)
-        {
-            segments.Insert(0, member.Member.Name);
-            current = member.Expression;
-        }
-
-        if (segments.Count == 0)
-            throw new ArgumentException("Cannot extract field path from selector", nameof(selector));
-
-        return string.Join(".", segments);
-    }
+        => Aggregation.AggregateSelectorParser.ExtractFieldPath(selector.Body);
 
     /// <summary>
     /// Extracts base field path from IRedbObject expression

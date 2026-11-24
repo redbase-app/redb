@@ -70,12 +70,12 @@ namespace redb.Core.Serialization
                 new PostgresInfinityDateTimeConverter(), // FIX: PostgreSQL "-infinity" support
                 new PostgresInfinityNullableDateTimeConverter(), // FIX: PostgreSQL "-infinity" support for nullable DateTime
                 new JsonStringEnumConverter(), // Enum as strings support
-                new FlexibleTimeSpanConverter(), // TimeSpan from strings support
+                new FlexibleTimeSpanConverter(), // TimeSpan from its Ticks
                 new FlexibleNullableTimeSpanConverter(), // nullable TimeSpan support
 #if NET6_0_OR_GREATER
                 new FlexibleDateOnlyConverter(), // DateOnly from DateTime strings support
                 new FlexibleNullableDateOnlyConverter(), // nullable DateOnly support
-                new FlexibleTimeOnlyConverter(), // TimeOnly from TimeSpan strings support
+                new FlexibleTimeOnlyConverter(), // TimeOnly from its Ticks
                 new FlexibleNullableTimeOnlyConverter() // nullable TimeOnly support
 #endif
             }
@@ -249,31 +249,23 @@ namespace redb.Core.Serialization
     }
 
     /// <summary>
-    /// Flexible converter for TimeOnly - supports TimeSpan strings
+    /// TimeOnly from the object JSON of the modules: its Ticks, as _values._Long stores it.
     /// </summary>
     public class FlexibleTimeOnlyConverter : JsonConverter<TimeOnly>
     {
         public override TimeOnly Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType == JsonTokenType.String)
-            {
-                var timeString = reader.GetString();
-                if (Utils.RedbTemporalFormat.TryParseTimeOnly(timeString, out var timeOnly))
-                {
-                    return timeOnly;
-                }
-            }
-            throw new JsonException($"Unable to convert '{reader.GetString()}' to TimeOnly.");
+            if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt64(out var ticks))
+                return new TimeOnly(ticks);
+            throw new JsonException($"Unable to convert a {reader.TokenType} token to TimeOnly: it is stored as Ticks.");
         }
 
         public override void Write(Utf8JsonWriter writer, TimeOnly value, JsonSerializerOptions options)
-        {
-            writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value));
-        }
+            => writer.WriteNumberValue(value.Ticks);
     }
 
     /// <summary>
-    /// Flexible converter for nullable TimeOnly
+    /// Nullable TimeOnly from the object JSON of the modules: its Ticks, or null.
     /// </summary>
     public class FlexibleNullableTimeOnlyConverter : JsonConverter<TimeOnly?>
     {
@@ -281,25 +273,15 @@ namespace redb.Core.Serialization
         {
             if (reader.TokenType == JsonTokenType.Null)
                 return null;
-
-            if (reader.TokenType == JsonTokenType.String)
-            {
-                var timeString = reader.GetString();
-                if (string.IsNullOrEmpty(timeString))
-                    return null;
-
-                if (Utils.RedbTemporalFormat.TryParseTimeOnly(timeString, out var timeOnly))
-                {
-                    return timeOnly;
-                }
-            }
-            throw new JsonException($"Unable to convert '{reader.GetString()}' to TimeOnly?.");
+            if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt64(out var ticks))
+                return new TimeOnly(ticks);
+            throw new JsonException($"Unable to convert a {reader.TokenType} token to TimeOnly?: it is stored as Ticks.");
         }
 
         public override void Write(Utf8JsonWriter writer, TimeOnly? value, JsonSerializerOptions options)
         {
             if (value.HasValue)
-                writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value.Value));
+                writer.WriteNumberValue(value.Value.Ticks);
             else
                 writer.WriteNullValue();
         }
@@ -307,31 +289,23 @@ namespace redb.Core.Serialization
 #endif
 
     /// <summary>
-    /// Flexible converter for TimeSpan - supports strings
+    /// TimeSpan from the object JSON of the modules: its Ticks, as _values._Long stores it.
     /// </summary>
     public class FlexibleTimeSpanConverter : JsonConverter<TimeSpan>
     {
         public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType == JsonTokenType.String)
-            {
-                var timeString = reader.GetString();
-                if (Utils.RedbTemporalFormat.TryParseTimeSpan(timeString, out var timeSpan))
-                {
-                    return timeSpan;
-                }
-            }
-            throw new JsonException($"Unable to convert '{reader.GetString()}' to TimeSpan.");
+            if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt64(out var ticks))
+                return TimeSpan.FromTicks(ticks);
+            throw new JsonException($"Unable to convert a {reader.TokenType} token to TimeSpan: it is stored as Ticks.");
         }
 
         public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options)
-        {
-            writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value));
-        }
+            => writer.WriteNumberValue(value.Ticks);
     }
 
     /// <summary>
-    /// Flexible converter for nullable TimeSpan
+    /// Nullable TimeSpan from the object JSON of the modules: its Ticks, or null.
     /// </summary>
     public class FlexibleNullableTimeSpanConverter : JsonConverter<TimeSpan?>
     {
@@ -339,25 +313,15 @@ namespace redb.Core.Serialization
         {
             if (reader.TokenType == JsonTokenType.Null)
                 return null;
-
-            if (reader.TokenType == JsonTokenType.String)
-            {
-                var timeString = reader.GetString();
-                if (string.IsNullOrEmpty(timeString))
-                    return null;
-
-                if (Utils.RedbTemporalFormat.TryParseTimeSpan(timeString, out var timeSpan))
-                {
-                    return timeSpan;
-                }
-            }
-            throw new JsonException($"Unable to convert '{reader.GetString()}' to TimeSpan?.");
+            if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt64(out var ticks))
+                return TimeSpan.FromTicks(ticks);
+            throw new JsonException($"Unable to convert a {reader.TokenType} token to TimeSpan?: it is stored as Ticks.");
         }
 
         public override void Write(Utf8JsonWriter writer, TimeSpan? value, JsonSerializerOptions options)
         {
             if (value.HasValue)
-                writer.WriteStringValue(Utils.RedbTemporalFormat.ToText(value.Value));
+                writer.WriteNumberValue(value.Value.Ticks);
             else
                 writer.WriteNullValue();
         }

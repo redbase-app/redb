@@ -3,7 +3,11 @@ using System.Data.Common;
 using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
+using redb.Core;
 using redb.Core.Attributes;
+using redb.Core.Extensions;
+using redb.SQLite.Extensions;
 using redb.Export.Flat;
 using redb.Export.Providers;
 using redb.Export.Services;
@@ -629,6 +633,22 @@ public static class Program
                     "The database already holds the redb schema; `redb init` creates it in an empty database only and has " +
                     $"changed nothing. Upgrade an existing schema with `redb schema --upgrade --provider {dataProvider.Name}` " +
                     "or by starting the service; to start over, drop and create the database first.");
+            }
+
+            // SQLite goes through the service: the schema script, then the file stamp (PRAGMA user_version and the
+            // _schema_compat row) that the service and the export schema check read. The script alone left the file
+            // unstamped, and an import into it was refused as into an older file. An existing file is upgraded.
+            if (dataProvider.Name == "sqlite")
+            {
+                var services = new ServiceCollection();
+                services.AddRedb(options => options.UseSqlite(connection));
+                await using (var serviceProvider = services.BuildServiceProvider())
+                    await serviceProvider.GetRequiredService<IRedbService>().EnsureDatabaseAsync();
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("REDB schema created successfully.");
+                Console.ResetColor();
+                return 0;
             }
 
             if (verbose)

@@ -48,6 +48,28 @@ public class RedbSchemaOutdatedException : Exception
         Cause = cause;
     }
 
+    /// <summary>
+    /// For a caller outside the service start, such as a tool, that reads the version and judges it itself and does
+    /// not upgrade the database. <see cref="Cause"/> is null.
+    /// </summary>
+    /// <param name="provider">Provider name as the dialect reports it.</param>
+    /// <param name="deployedVersion">Module version the database reports (SQLite: file schema version), null when absent.</param>
+    /// <param name="requiredVersion">Module version (SQLite: file schema version) this build requires.</param>
+    /// <param name="reason">Why the caller did not upgrade the database, completing "and ..." in the first sentence.</param>
+    /// <param name="remedy">What the operator does about it: the closing sentence of the message.</param>
+    public RedbSchemaOutdatedException(
+        string provider,
+        string? deployedVersion,
+        string requiredVersion,
+        string reason,
+        string remedy)
+        : base($"{Outdated(provider, deployedVersion, requiredVersion, reason)} Nothing was changed. {remedy}")
+    {
+        Provider = provider;
+        DeployedVersion = deployedVersion;
+        RequiredVersion = requiredVersion;
+    }
+
     private static string BuildMessage(string provider, string? deployed, string required, Exception? cause)
     {
         var reason = cause is null
@@ -55,10 +77,14 @@ public class RedbSchemaOutdatedException : Exception
             : $"the connected role is not allowed to apply it ({cause.GetType().Name}: {cause.Message})";
 
         return
-            $"The {provider} database schema is outdated: deployed module version is " +
-            $"'{deployed ?? "<none>"}', this build requires '{required}', and {reason}. " +
+            $"{Outdated(provider, deployed, required, reason)} " +
             "Nothing was changed. Have the schema owner apply the upgrade script: export it with " +
             "IRedbService.GetUpgradeScript() or `redb schema --upgrade --provider <name>`, then " +
             "run it with psql / sqlcmd. The script is idempotent and safe to re-run.";
     }
+
+    /// <summary>The first sentence of every message: what is deployed, what is required, and why it stays so.</summary>
+    private static string Outdated(string provider, string? deployed, string required, string reason) =>
+        $"The {provider} database schema is outdated: deployed module version is " +
+        $"'{deployed ?? "<none>"}', this build requires '{required}', and {reason}.";
 }

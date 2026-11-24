@@ -176,10 +176,11 @@ BEGIN
                 END);
             ELSIF v_is_array AND NOT v_length_mod AND v_op_norm IN ('$eq', '$ne') THEN
                 -- Array LHS: scalar = ANY / NOT (= ANY) semantics, e.g.
-                -- Roles[].Any(r => r.Value == "X") -> 'X' = ANY(<text[]>)
+                -- Roles[].Any(r => r.Value == "X") -> 'X' = ANY(<text[]>). No such item is FALSE, not NULL (0.7.30):
+                -- a missing list or NULL items without a match, so $not of it holds there (!Roles.Any(...)).
                 v_parts := v_parts || (CASE v_op_norm
                     WHEN '$eq'
-                        THEN format('(%L%s = ANY(%s))',
+                        THEN format('COALESCE(%L%s = ANY(%s), FALSE)',
                                 pvt_jsonb_to_sql_literal(v_op_val), v_cast, v_col)
                     WHEN '$ne'
                         THEN format('(%s IS NULL OR NOT (%L%s = ANY(%s)))',

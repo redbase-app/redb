@@ -784,6 +784,11 @@ public class SqliteDialect : ISqlDialect
     public string Tree_DeleteObjectsByIds() =>
         "DELETE FROM _objects WHERE _id IN (SELECT value FROM json_each($1))";
 
+    // changes() of the delete misses the children the _id_parent cascade removed first; the transaction holds the
+    // write lock when this runs, so the rows it counts are the rows the delete removes.
+    public string? ObjectStorage_CountObjectsByIds() =>
+        "SELECT COUNT(*) FROM _objects WHERE _id IN (SELECT value FROM json_each($1))";
+
     public string Tree_SelectSubtreeRows() =>
         """
         WITH RECURSIVE sub AS (
@@ -1466,6 +1471,23 @@ public class SqliteDialect : ISqlDialect
         return "SELECT " + call;
     }
 
+    // The inner order is numbered before the join and restored after it.
+    public string? Query_WrapPvtWithObjectRows(string innerSql) =>
+        $"""
+        SELECT o._id as Id, o._id_scheme as IdScheme, o._id_parent as IdParent, o._id_owner as IdOwner,
+               o._id_who_change as IdWhoChange, o._name as Name, o._hash as Hash,
+               o._date_create as DateCreate, o._date_modify as DateModify, o._date_begin as DateBegin,
+               o._date_complete as DateComplete, o._key as Key, o._note as Note,
+               o._value_long as ValueLong, o._value_string as ValueString, o._value_guid as ValueGuid,
+               o._value_bool as ValueBool, o._value_double as ValueDouble, o._value_numeric as ValueNumeric,
+               o._value_datetime as ValueDatetime, o._value_bytes as ValueBytes, o._value_unique as ValueUnique
+        FROM (SELECT ordered._id, row_number() OVER () AS _rn FROM (
+        {innerSql}
+        ) ordered) sub
+        JOIN _objects o ON o._id = sub._id
+        ORDER BY sub._rn
+        """;
+
     public string? Query_WrapPvtWithObjectJson(string innerSql, int maxDepth) =>
         $"SELECT get_object_json(t._id, {maxDepth}) AS \"Value\" FROM (\n{innerSql}\n) t";
 
@@ -1482,6 +1504,10 @@ public class SqliteDialect : ISqlDialect
     public string? Query_PvtModuleVersionFunction() => "pvt_module_version";
 
     public string? Query_PvtRequiredVersion() => "0.6.13";
+
+    // The native extension ships with the package and is matched exactly; a newer database file is judged by its
+    // _schema_compat row (RedbService), not by a function.
+    public string? Query_PvtModuleCompatFunction() => null;
 
     public string? Query_BuildPvtProjectionSqlFunction() => null;
 

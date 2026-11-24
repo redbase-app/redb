@@ -3,6 +3,124 @@
 What to check and change when moving to a new version. Each section lists the changes that need action;
 [CHANGELOG.md](CHANGELOG.md) has the full list of what changed.
 
+## 4.7.5
+
+### TimeSpan and TimeOnly are stored as ticks
+
+`TimeSpan` and `TimeOnly` values are stored as their `Ticks` in the number column of `_values` (`_Long`), no longer as
+text. They now compare, sort, group and take `Min`/`Max` correctly on every provider; as text, a value over a day and a
+negative value compared and sorted wrong (`23:00:00` above `1.00:00:00`, `10.00:00:00` below `2.00:00:00`).
+
+Read this before you upgrade a database that holds `TimeSpan` or `TimeOnly` values:
+
+- **Every node and every image of the database runs 4.7.5**: the applications, and the Tsak and Identity images and
+  archives, which carry the redb packages in `Libs/shared`. A node of 4.7.4 or older writes the values as text again,
+  and at its start puts its own database module back over the new one. Packages published before 4.7.5 do not know the
+  rule of the next section.
+- **There is no way back except a backup.** Once the values are converted, a package before 4.7.5 does not read them.
+- **Convert the stored values before the first start of 4.7.5**: stop every node, back up the database, run the
+  statement for your database below, then start the nodes on 4.7.5. The statements work on a database of an older
+  version, as they find the fields by their type name.
+
+The schema follows by itself at the first start: the type rows of the two types say `Long` (on PostgreSQL and SQL Server
+the SQL module does it, or `redb schema --upgrade`; on SQLite the file upgrade). **Values still stored as text are not
+converted by the start.** Such a field reads as `00:00:00` (Pro) or fails to load (Free), a nullable one as `null`, and
+an array of them as empty; saving the object again writes those empty values.
+
+PostgreSQL:
+
+```sql
+UPDATE _values v
+SET _Long = x.ticks, _String = NULL
+FROM (SELECT o._id,
+             CASE WHEN m[1] = '-' THEN -1 ELSE 1 END * (
+                 (COALESCE(m[2], '0')::bigint * 86400 + m[3]::bigint * 3600 + m[4]::bigint * 60 + m[5]::bigint) * 10000000
+                 + rpad(COALESCE(m[6], ''), 7, '0')::bigint) AS ticks
+      FROM _values o
+      JOIN _structures s ON s._id = o._id_structure
+      JOIN _types t ON t._id = s._id_type AND t._name IN ('TimeSpan', 'TimeOnly')
+      CROSS JOIN LATERAL regexp_match(o._String, '^(-)?(?:(\d+)\.)?(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,7}))?$') m
+      WHERE o._String IS NOT NULL AND m IS NOT NULL) x
+WHERE v._id = x._id;
+```
+
+SQL Server:
+
+```sql
+UPDATE v SET _Long = x.ticks, _String = NULL
+FROM _values v
+JOIN _structures s ON s._id = v._id_structure
+JOIN _types t ON t._id = s._id_type AND t._name IN (N'TimeSpan', N'TimeOnly')
+CROSS APPLY (SELECT IIF(LEFT(v._String, 1) = N'-', 1, 0) AS neg,
+                    IIF(LEFT(v._String, 1) = N'-', STUFF(v._String, 1, 1, N''), v._String) AS body) b
+CROSS APPLY (SELECT IIF(CHARINDEX(N'.', b.body) BETWEEN 1 AND CHARINDEX(N':', b.body),
+                        CAST(LEFT(b.body, CHARINDEX(N'.', b.body) - 1) AS bigint), 0) AS days,
+                    IIF(CHARINDEX(N'.', b.body) BETWEEN 1 AND CHARINDEX(N':', b.body),
+                        STUFF(b.body, 1, CHARINDEX(N'.', b.body), N''), b.body) AS rest) d
+CROSS APPLY (SELECT (d.days * 864000000000
+                     + DATEDIFF_BIG(NANOSECOND, CAST('00:00' AS time(7)), TRY_CAST(d.rest AS time(7))) / 100)
+                    * IIF(b.neg = 1, -1, 1) AS ticks) x
+WHERE v._String IS NOT NULL AND TRY_CAST(d.rest AS time(7)) IS NOT NULL;
+```
+
+SQLite:
+
+```sql
+UPDATE _values SET
+    _Long = (SELECT sign * (days * 864000000000
+                 + (CAST(substr(rest, 1, 2) AS INTEGER) * 3600 + CAST(substr(rest, 4, 2) AS INTEGER) * 60
+                    + CAST(substr(rest, 7, 2) AS INTEGER)) * 10000000
+                 + CAST(substr(substr(rest, 10) || '0000000', 1, 7) AS INTEGER))
+             FROM (SELECT sign,
+                          CASE WHEN instr(b, '.') BETWEEN 1 AND instr(b, ':') THEN CAST(substr(b, 1, instr(b, '.') - 1) AS INTEGER) ELSE 0 END AS days,
+                          CASE WHEN instr(b, '.') BETWEEN 1 AND instr(b, ':') THEN substr(b, instr(b, '.') + 1) ELSE b END AS rest
+                   FROM (SELECT CASE WHEN substr(_values._String, 1, 1) = '-' THEN -1 ELSE 1 END AS sign,
+                                CASE WHEN substr(_values._String, 1, 1) = '-' THEN substr(_values._String, 2) ELSE _values._String END AS b))),
+    _String = NULL
+WHERE _String IS NOT NULL
+  AND _String GLOB '*[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*'
+  AND _id_structure IN (SELECT s._id FROM _structures s JOIN _types t ON t._id = s._id_type
+                        WHERE t._name IN ('TimeSpan', 'TimeOnly'));
+```
+
+The statements read the forms redb has written: `[-][d.]hh:mm:ss[.fffffff]` for `TimeSpan` and `hh:mm:ss[.fffffff]`
+for `TimeOnly`. A value they cannot read stays as it was; this lists them:
+
+```sql
+SELECT v._id, v._String FROM _values v
+JOIN _structures s ON s._id = v._id_structure JOIN _types t ON t._id = s._id_type
+WHERE t._name IN ('TimeSpan', 'TimeOnly') AND v._String IS NOT NULL;
+```
+
+### A newer database module is left in place
+
+From 4.7.5 on a start applies the module of its own package when the database holds an older one, as before, and no
+longer over a newer one. The newer module states which packages it still serves (`pvt_module_compat()` on PostgreSQL
+and SQL Server, the `_schema_compat` table of a SQLite file): a package among them starts and logs one warning, one that
+is not stops with `RedbSchemaNewerException`, which names the package version to upgrade to, and changes nothing. The
+upgrade script run by hand (`GetUpgradeScript()`, `redb schema --upgrade`) refuses a newer module the same way before
+its first change. The module goes to `0.7.23.1` on PostgreSQL and `0.2.40.2` on SQL Server, a SQLite file to schema
+version 13. The 4.7.5 module serves 4.7.5 and later packages only, because of the ticks above.
+
+Action: none for an application. A host that tells start-up failures apart can catch `RedbSchemaNewerException`: the
+application, not the database, needs upgrading. Packages published before 4.7.5 do not know the rule and still put
+their own module back, which is why every node runs 4.7.5.
+
+### Custom dialects: Query_WrapPvtWithObjectRows
+
+Only for code that implements `ISqlDialect` itself; the dialects redb ships implement it. A Free list read now reads
+the `_objects` rows of the objects it finds and loads their Props once, so `ISqlDialect` has one more member,
+`Query_WrapPvtWithObjectRows(string innerSql)`: wrap the inner id list so that it returns the `_objects` row of every
+id, in the order of the inner list, with the columns of `ObjectStorage_SelectObjectsByIds`. A dialect without the
+v2-pvt module returns `null`. `Query_PvtModuleCompatFunction()` is new too and has a default (`null`, no compatibility
+function).
+
+### SQL Server: a delete counts the requested objects only
+
+`DeleteAsync` over ids or objects returns the number of the requested objects it deleted, as on PostgreSQL and SQLite;
+on SQL Server it used to add every descendant removed with them. Code that compared that number with the size of a
+subtree reads the count of `DeleteSubtreeAsync` instead.
+
 ## 4.7.3
 
 ### SQL Server: a database hit by a second redb init

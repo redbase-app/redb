@@ -73,6 +73,25 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider, Grouping.IList
     }
 
     /// <summary>
+    /// The scheme id of a CLR type, found as Query&lt;T&gt;() finds it: the metadata cache, then the database through the
+    /// scheme provider (a process that does not sync a scheme another one owns, a Tsak worker, meets it there on first
+    /// use). Null when neither has it. The tree filters (WhereHasAncestor / WhereHasDescendant) read their target here;
+    /// they read the cache alone, and failed for a scheme that existed in the database.
+    /// </summary>
+    internal long? ResolveSchemeIdByType(Type type)
+    {
+        var cached = Cache.GetSchemeIdByClrType(type);
+        if (cached is > 0)
+            return cached;
+        if (_schemeSync == null)
+            return null;
+
+        // Task.Run as QueryableProviderBase.GetSchemeSync: no SynchronizationContext deadlock in Blazor or ASP.NET.
+        var scheme = Task.Run(() => _schemeSync.GetSchemeByTypeAsync(type)).GetAwaiter().GetResult();
+        return scheme?.Id;
+    }
+
+    /// <summary>
     /// Creates filter expression parser. Override for Pro features.
     /// </summary>
     protected virtual IFilterExpressionParser CreateFilterParser() => new FilterExpressionParser();
@@ -1434,7 +1453,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider, Grouping.IList
     /// <summary>
     /// Maps a base _objects row to a TreeRedbObject shell (Props loaded separately).
     /// </summary>
-    private static TreeRedbObject<TProps> MapRowToTreeObject<TProps>(RedbObjectRow row) where TProps : class, new()
+    protected static TreeRedbObject<TProps> MapRowToTreeObject<TProps>(RedbObjectRow row) where TProps : class, new()
     {
         return new TreeRedbObject<TProps>
         {
@@ -1569,8 +1588,7 @@ public abstract class TreeQueryProviderBase : ITreeQueryProvider, Grouping.IList
 
         // Use dialect's cascade delete (handles children automatically)
         // MSSQL context auto-converts long[] to comma-separated string
-        var deletedCount = await _context.ExecuteAsync(
-            _sql.ObjectStorage_DeleteByIds(), new object[] { objectIds }, cancellationToken);
+        var deletedCount = await redb.Core.Providers.Base.ObjectDeleteByIds.RunAsync(_context, _sql, objectIds, cancellationToken);
 
         _logger?.LogDebug("TreeDelete: Deleted {Count} objects (cascade)", deletedCount);
 

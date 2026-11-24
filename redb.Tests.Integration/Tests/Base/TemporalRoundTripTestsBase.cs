@@ -16,9 +16,9 @@ namespace redb.Tests.Integration.Tests.Base;
 /// </para>
 ///
 /// <para>
-/// <b>Text form is invariant.</b> <see cref="DateOnly"/>, <see cref="TimeOnly"/> and
-/// <see cref="TimeSpan"/> land in <c>_values._String</c>; their form must not follow the ambient
-/// <see cref="CultureInfo"/>, or a row written on one host stops loading on another.
+/// <b>No form follows the culture.</b> <see cref="TimeOnly"/> and <see cref="TimeSpan"/> are stored as their Ticks in
+/// <c>_values._Long</c>, independent of the ambient <see cref="CultureInfo"/>; a row written on one host loads on
+/// another.
 /// </para>
 ///
 /// <para>
@@ -453,35 +453,33 @@ public abstract class TemporalRoundTripTestsBase
     }
 
     /// <summary>
-    /// KNOWN BOUNDARY, characterised on purpose rather than hidden.
-    ///
-    /// <para>
-    /// <see cref="TimeSpan"/> and <see cref="TimeOnly"/> are stored in <c>_values._String</c>
-    /// (db_type "String" in the <c>_types</c> seed), so SQL orders them lexicographically, not
-    /// chronologically: <c>"10.02:00:00"</c> sorts before <c>"2.02:00:00"</c>. Equality is exact and
-    /// is the supported operation; ordered comparison is not. The real fix is to move both to
-    /// <c>_Long</c> (ticks), which changes db_type and needs a data migration — deferred, see
-    /// DATETIME.md.
-    /// </para>
-    ///
-    /// <para>
-    /// This test pins today's behaviour. When the storage moves to ticks it will go red, which is
-    /// the intended signal to delete it.
-    /// </para>
+    /// <see cref="TimeSpan"/> and <see cref="TimeOnly"/> are stored as their Ticks in <c>_values._Long</c>, so ordered
+    /// comparison and sorting are chronological. As text they were lexicographic: <c>"10.02:00:00"</c> sorted before
+    /// <c>"2.02:00:00"</c>, and a filter Span &gt; 9 days 2 hours left the row of 10 days out.
     /// </summary>
     [Fact]
-    public async Task Where_TimeSpan_OrderedComparison_IsLexicographic_KnownBoundary()
+    public async Task Where_TimeSpan_OrderedComparison_IsChronological()
     {
         await EnsureSeededAsync();
 
-        // Chronologically 10 days > 2 days. Lexicographically "10." < "2.".
         var results = await Redb.Query<TemporalProps>()
-            .Where(t => t.Span > TimeSpan.FromDays(9).Add(TimeSpan.FromHours(2)))
+            .Where(t => t.Span > TimeSpan.FromDays(8).Add(TimeSpan.FromHours(2)))
             .Take(50).ToListAsync();
 
-        var labels = results.Select(r => r.Props.Label).OrderBy(x => x).ToList();
-        labels.Should().NotContain("row-10",
-            "string ordering puts \"10.02:00:00\" below \"9.02:00:00\" — the documented boundary of " +
-            "storing TimeSpan as text");
+        results.Select(r => r.Props.Label).Should().BeEquivalentTo(["row-09", "row-10"],
+            "9 and 10 days are longer than 8 days");
+    }
+
+    [Fact]
+    public async Task OrderBy_TimeSpan_And_TimeOnly_AreChronological()
+    {
+        await EnsureSeededAsync();
+
+        var bySpan = await Redb.Query<TemporalProps>().OrderBy(t => t.Span).Take(50).ToListAsync();
+        bySpan.Select(r => r.Props.Span).Should().BeInAscendingOrder();
+        bySpan.Select(r => r.Props.Label).Should().Equal(Enumerable.Range(1, 10).Select(i => $"row-{i:00}"));
+
+        var byClock = await Redb.Query<TemporalProps>().OrderByDescending(t => t.Clock).Take(50).ToListAsync();
+        byClock.Select(r => r.Props.Clock).Should().BeInDescendingOrder();
     }
 }

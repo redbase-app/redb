@@ -117,6 +117,12 @@ redb export -p postgres -c "..." -o test.redb --dry-run
 | `--dry-run` | | No | Show what would be done without execution |
 | `--verbose` | `-v` | No | Enable verbose output |
 
+Before it reads anything, the export checks that the source database has the schema of this CLI's redb version. An
+older one stops with `RedbSchemaOutdatedException`: upgrade it with `redb schema --upgrade` (SQLite: `redb init -p
+sqlite` upgrades an existing file) and export again. A newer one stops with `RedbSchemaNewerException`: export with the
+CLI of the version the database runs, since this one would leave out what it does not know. A database without the
+redb schema has nothing to export and says so.
+
 ### `import` — Import Data
 
 Imports data from a `.redb` file into the database.
@@ -139,6 +145,24 @@ redb import -p mssql -c "..." -i backup.redb --dry-run
 | `--batch-size` | | No | Batch size for bulk insert (default: 1000) |
 | `--dry-run` | | No | Show what would be done without execution |
 | `--verbose` | `-v` | No | Enable verbose output |
+
+Rows are loaded with the foreign key checks off, since a file may hold a child before its parent. On every provider
+each key is checked once the rows are in, and a file with a reference to a row it does not hold is refused; the error
+names each broken key, the number of rows and an example. A file exported with `--schemes` whose objects
+point into a scheme left out is such a file: export the referenced schemes too.
+
+Stop every application that uses the target database before the import and start it again afterwards. A running redb
+service keeps handing out the ids it reserved before the import, and those ids collide with the imported rows.
+
+Before it cleans or writes anything, the import checks the target's schema the way a redb application does at start:
+an older one stops with `RedbSchemaOutdatedException` (upgrade it as above, then import again), a newer one goes on
+when it states that it serves this version and stops with `RedbSchemaNewerException` otherwise. A database without the
+redb schema is told to get one with `redb init` first.
+
+With `--parallel` the rows are committed as they are loaded. The steps after the load (the id sequence, the index
+rebuild, the constraints) are each attempted; if any of them fails, the import exits with a non-zero code and its
+message lists every failed step. A script that runs the CLI must check the exit code, then run the import again with
+`--clean`.
 
 ### `flat` — Unfold Objects into Relational Tables
 

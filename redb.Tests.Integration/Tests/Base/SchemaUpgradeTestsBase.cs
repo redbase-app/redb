@@ -1,3 +1,4 @@
+using redb.Tests.Integration.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using redb.Core;
@@ -56,6 +57,12 @@ public abstract class SchemaUpgradeTestsBase : IAsyncLifetime
 
     /// <summary>Reads the module version the database currently reports.</summary>
     protected abstract Task<string> ReadDeployedModuleVersionAsync();
+
+    /// <summary>
+    /// Rewrites the module compatibility function to return the given value; null drops the function, as a module of
+    /// a version before it has none.
+    /// </summary>
+    protected abstract Task SetDeployedModuleCompatAsync(string? compat);
 
     /// <summary>Drops and re-creates a SEPARATE, completely empty database for the fresh-install test.</summary>
     protected abstract Task RecreateFreshDatabaseAsync();
@@ -251,6 +258,34 @@ public abstract class SchemaUpgradeTestsBase : IAsyncLifetime
             "an owner start-up must bring the module to the version the build requires");
     }
 
+    /// <summary>
+    /// A database whose _types say String for TimeOnly and TimeSpan (created before they moved to Ticks in _Long) says
+    /// Long after the module upgrade, in _types and in the metadata cache, so it writes their Ticks. Stored values are
+    /// not converted; the module only changes the type rows.
+    /// </summary>
+    [Fact]
+    public async Task Owner_OutdatedModule_SetsLongForTimeOnlyAndTimeSpan()
+    {
+        const string ids = "(-9223372036854775685, -9223372036854775684)";
+        await using (var sp = Build(OwnerConnectionString, autoApply: true))
+        {
+            var ctx = sp.GetRequiredService<IRedbContext>();
+            await ctx.ExecuteAsync($"UPDATE _types SET _db_type = 'String' WHERE _id IN {ids}");
+            await ctx.ExecuteAsync($"UPDATE _scheme_metadata_cache SET db_type = 'String' WHERE _type_id IN {ids}");
+        }
+        await SetDeployedModuleVersionAsync("0.0.0-test");
+
+        await using (var sp = Build(OwnerConnectionString, autoApply: true))
+        {
+            await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+            var ctx = sp.GetRequiredService<IRedbContext>();
+            (await ctx.ExecuteScalarAsync<long>($"SELECT COUNT(*) FROM _types WHERE _id IN {ids} AND _db_type = 'Long'"))
+                .Should().Be(2, "the module upgrade sets Long for TimeOnly and TimeSpan");
+            (await ctx.ExecuteScalarAsync<long>($"SELECT COUNT(*) FROM _scheme_metadata_cache WHERE _type_id IN {ids} AND db_type <> 'Long'"))
+                .Should().Be(0, "and the copy in the metadata cache");
+        }
+    }
+
     [Fact]
     public async Task RestrictedRole_OutdatedModule_StopsWithSchemaOutdated_NotDriverError()
     {
@@ -349,5 +384,168 @@ public abstract class SchemaUpgradeTestsBase : IAsyncLifetime
     {
         await using var sp = Build(OwnerConnectionString, autoApply: true);
         await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+    }
+
+    // ===== A module newer than the package: never put back =====
+
+    /// <summary>A version above any real one, new per test: the warning is written once per process and version.</summary>
+    private static string NewerVersion() => $"99.0.{Random.Shared.Next(1, 1_000_000)}";
+
+    /// <summary>After a newer-module test: the module marked old again, so a start puts the package's module back.</summary>
+    private async Task RepairFromNewerAsync()
+    {
+        await SetDeployedModuleVersionAsync("0.0.0-test");
+        await RepairAsync();
+    }
+
+    [Fact]
+    public async Task NewerModule_ThatServesThisPackage_IsLeftInPlace_AndTheStartGoesOn()
+    {
+        var newer = NewerVersion();
+        await SetDeployedModuleCompatAsync($"{_requiredVersion}|9.9.0");
+        await SetDeployedModuleVersionAsync(newer);
+        try
+        {
+            var logs = new CapturingLoggerProvider();
+            await using (var sp = Build(OwnerConnectionString, autoApply: true, cacheDomain: $"newer-{Guid.NewGuid():N}", logs: logs))
+                await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+
+            (await ReadDeployedModuleVersionAsync()).Should().Be(newer, "a package never puts its older module over a newer one");
+            logs.Warnings.Should().ContainSingle(w => w.Contains(newer) && w.Contains("left as it is"));
+
+            // The same with automatic upgrades off: a newer module that serves the package is no reason to stop.
+            await using (var sp = Build(OwnerConnectionString, autoApply: false, cacheDomain: $"newer-{Guid.NewGuid():N}"))
+                await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+            (await ReadDeployedModuleVersionAsync()).Should().Be(newer);
+        }
+        finally
+        {
+            await RepairFromNewerAsync();
+        }
+    }
+
+    [Fact]
+    public async Task NewerModule_ThatNoLongerServesThisPackage_StopsTheStart_AndChangesNothing()
+    {
+        var newer = NewerVersion();
+        await SetDeployedModuleCompatAsync($"{newer}|9.9.0");
+        await SetDeployedModuleVersionAsync(newer);
+        try
+        {
+            await using var sp = Build(OwnerConnectionString, autoApply: true, cacheDomain: $"newer-{Guid.NewGuid():N}");
+            var act = async () => await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+
+            var ex = (await act.Should().ThrowAsync<RedbSchemaNewerException>()).Which;
+            ex.DeployedVersion.Should().Be(newer);
+            ex.PackageVersion.Should().Be(_requiredVersion);
+            ex.RequiredPackageVersion.Should().Be("9.9.0");
+            ex.Message.Should().Contain("from 9.9.0 on").And.Contain("Upgrade the redb packages")
+                .And.Contain("the database was left unchanged");
+
+            (await ReadDeployedModuleVersionAsync()).Should().Be(newer);
+        }
+        finally
+        {
+            await RepairFromNewerAsync();
+        }
+    }
+
+    [Fact]
+    public async Task NewerModule_WithoutTheCompatibilityFunction_StopsTheStart_AndChangesNothing()
+    {
+        var newer = NewerVersion();
+        await SetDeployedModuleCompatAsync(null);
+        await SetDeployedModuleVersionAsync(newer);
+        try
+        {
+            await using var sp = Build(OwnerConnectionString, autoApply: true, cacheDomain: $"newer-{Guid.NewGuid():N}");
+            var act = async () => await sp.GetRequiredService<IRedbService>().InitializeAsync(ensureCreated: true);
+
+            var ex = (await act.Should().ThrowAsync<RedbSchemaNewerException>()).Which;
+            ex.RequiredPackageVersion.Should().BeNull("the module states nothing, and no version is guessed");
+            ex.Message.Should().Contain("does not state which packages it serves");
+
+            (await ReadDeployedModuleVersionAsync()).Should().Be(newer);
+        }
+        finally
+        {
+            await RepairFromNewerAsync();
+        }
+    }
+
+    /// <summary>After a script the guard refused: drops what the refusal may have left on pooled connections.</summary>
+    protected virtual Task AfterRefusedScriptAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// What a second run must not change: the foreign keys, the identity sequence, the triggers, the routines and the
+    /// rows of the core tables, as one comparable string.
+    /// </summary>
+    protected abstract Task<string> ReadSchemaFingerprintAsync();
+
+    /// <summary>
+    /// Runs a script the way a person does: sqlcmd and SSMS go on to the next batch after an error, psql without
+    /// ON_ERROR_STOP to the next statement. Returns the error messages.
+    /// </summary>
+    protected abstract Task<List<string>> RunScriptByHandAsync(string script);
+
+    private const string AlreadyDeployed = "already holds the redb schema";
+
+    [Fact]
+    public async Task CreationScript_RunAgainOnADeployedDatabase_StopsAtTheGuard_AndChangesNothing()
+    {
+        await using var sp = Build(OwnerConnectionString, autoApply: false, cacheDomain: $"recreate-{Guid.NewGuid():N}");
+        var redb = sp.GetRequiredService<IRedbService>();
+        var script = redb.GetSchemaScript();
+        var before = await ReadSchemaFingerprintAsync();
+
+        // The way the services run it: the service's own ExecuteSchemaScriptAsync, on the service's context.
+        var execute = typeof(RedbServiceBase).GetMethod("ExecuteSchemaScriptAsync",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var act = async () => await (Task)execute.Invoke(redb, [script])!;
+        (await act.Should().ThrowAsync<Exception>()).Which.Message.Should().Contain(AlreadyDeployed);
+        (await ReadSchemaFingerprintAsync()).Should().Be(before,
+            "the script used to drop every foreign key and the identity sequence before it failed");
+
+        // The service goes on working on its own context, with no pool cleared by the test: on SQL Server the guard's
+        // NOEXEC stayed on the session the context holds, and every later query answered nothing.
+        (await sp.GetRequiredService<IRedbContext>().ExecuteScalarAsync<long>("SELECT COUNT(*) FROM _users"))
+            .Should().BeGreaterThan(0, "the context runs commands again after the refused script");
+
+        // The way a person runs it.
+        var errors = await RunScriptByHandAsync(script);
+        errors.Should().Contain(e => e.Contains(AlreadyDeployed));
+        await AfterRefusedScriptAsync();
+        (await ReadSchemaFingerprintAsync()).Should().Be(before, "the guard stops the batches after it too");
+    }
+
+    [Fact]
+    public async Task UpgradeScript_RunByHandOverANewerModule_IsRefused_AndChangesNothing()
+    {
+        // The script of this package is the "older" one here: the database carries a forged newer module. Start-up
+        // never applies the script then; a DBA running it by hand must be stopped by the script itself before its
+        // first change. The V4 columns are dropped first: the script's opening block would put them back.
+        var newer = NewerVersion();
+        await DropV4UpgradeDdlAsync();
+        await SetDeployedModuleCompatAsync($"{newer}|9.9.0");
+        await SetDeployedModuleVersionAsync(newer);
+        try
+        {
+            await using var sp = Build(OwnerConnectionString, autoApply: false, cacheDomain: $"newer-{Guid.NewGuid():N}");
+            var script = sp.GetRequiredService<IRedbService>().GetUpgradeScript();
+            script.Should().NotBeNullOrWhiteSpace();
+
+            var act = async () => await ApplyScriptAsOwnerAsync(sp.GetRequiredService<IRedbContext>(), script!);
+            (await act.Should().ThrowAsync<Exception>()).Which.Message.Should().Contain(
+                $"carries the redb module {newer}, newer than {_requiredVersion} of this package, and it needs redb " +
+                "packages from 9.9.0 on. Upgrade the redb packages of this application; the database was left unchanged.");
+            await AfterRefusedScriptAsync();
+
+            (await ReadDeployedModuleVersionAsync()).Should().Be(newer, "the script stopped before it dropped the module");
+            (await V4UpgradeDdlExistsAsync()).Should().BeFalse("the script stopped before its first change");
+        }
+        finally
+        {
+            await RepairFromNewerAsync();
+        }
     }
 }

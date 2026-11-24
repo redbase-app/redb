@@ -103,6 +103,20 @@ public class MsSqlSchemaUpgradeTests : SchemaUpgradeTestsBase
     protected override async Task<string> ReadDeployedModuleVersionAsync()
         => (await ScalarAdminAsync<string>(DatabaseName, "SELECT dbo.pvt_module_version()"))!;
 
+    protected override Task SetDeployedModuleCompatAsync(string? compat)
+        => ExecAdminAsync(DatabaseName, compat is null
+            ? "DROP FUNCTION IF EXISTS dbo.pvt_module_compat"
+            : $"""
+              CREATE OR ALTER FUNCTION dbo.pvt_module_compat() RETURNS nvarchar(50) WITH SCHEMABINDING
+              AS BEGIN RETURN N'{compat}'; END
+              """);
+
+    /// <summary>The refusing guard sets NOEXEC ON on its session (it stops SSMS and sqlcmd): no pooled session keeps it.</summary>
+    protected override Task AfterRefusedScriptAsync()
+    {
+        SqlConnection.ClearAllPools();
+        return Task.CompletedTask;
+    }
 
     protected override async Task DropV4UpgradeDdlAsync()
     {
@@ -174,7 +188,7 @@ public class MsSqlSchemaUpgradeTests : SchemaUpgradeTestsBase
     /// A first run on an empty database is unchanged.
     /// </summary>
     [Fact]
-    public async Task CreationScript_RunAgainOnADeployedDatabase_StopsAtTheGuard_AndChangesNothing()
+    public async Task CreationScript_RunAgainOnADeployedDatabase_StopsAtTheGuard_AndAFirstRunCreatesTheSchema()
     {
         const string guard = "already holds the redb schema";
         await using var sp = Build(OwnerConnectionString, autoApply: false, cacheDomain: $"recreate-{Guid.NewGuid():N}");
@@ -321,4 +335,40 @@ public class MsSqlSchemaUpgradeTests : SchemaUpgradeTestsBase
             "SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo._objects') AND name = N'IX__objects__value_string'"))
             .Should().NotBeNull("and the index the other providers always had exists now");
     }
+
+    protected override async Task<string> ReadSchemaFingerprintAsync()
+        => (await ScalarAdminAsync<string>(DatabaseName, """
+            SELECT CONCAT(
+                (SELECT COUNT(*) FROM sys.foreign_keys), '|',
+                (SELECT CONVERT(nvarchar(40), current_value) FROM sys.sequences WHERE name = N'global_identity'), '|',
+                (SELECT COUNT(*) FROM sys.triggers), '|',
+                (SELECT COUNT(*) FROM sys.objects WHERE type IN ('P', 'FN', 'IF', 'TF')), '|',
+                (SELECT COUNT(*) FROM dbo._objects), '|', (SELECT COUNT(*) FROM dbo._values), '|',
+                (SELECT COUNT(*) FROM dbo._schemes), '|', (SELECT COUNT(*) FROM dbo._users))
+            """))!;
+
+    /// <summary>
+    /// sqlcmd and SSMS: every batch on one session, an error does not stop the next batch. Only the NOEXEC the guard
+    /// sets keeps the batches after it from running.
+    /// </summary>
+    protected override async Task<List<string>> RunScriptByHandAsync(string script)
+    {
+        var errors = new List<string>();
+        var cs = new SqlConnectionStringBuilder(AdminBase) { InitialCatalog = DatabaseName, Pooling = false }.ConnectionString;
+        await using var conn = new SqlConnection(cs);
+        await conn.OpenAsync();
+        foreach (var batch in System.Text.RegularExpressions.Regex.Split(script, @"^\s*GO\s*$",
+                     System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            var trimmed = batch.Trim();
+            if (trimmed.Length == 0) continue;
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = trimmed;
+            cmd.CommandTimeout = 300;
+            try { await cmd.ExecuteNonQueryAsync(); }
+            catch (SqlException ex) { errors.Add(ex.Message); }
+        }
+        return errors;
+    }
+
 }

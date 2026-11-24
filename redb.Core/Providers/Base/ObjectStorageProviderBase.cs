@@ -692,9 +692,8 @@ namespace redb.Core.Providers.Base
                 }, cancellationToken);
             }
 
-            // Bulk delete via SQL (single query with ANY)
-            var deletedCount = await _context.ExecuteAsync(
-                Sql.ObjectStorage_DeleteByIds(), new object[] { ids.ToArray() }, cancellationToken);
+            // Bulk delete via SQL (single query with ANY), counting every object of the batch it deleted.
+            var deletedCount = await ObjectDeleteByIds.RunAsync(_context, Sql, ids.ToArray(), cancellationToken);
 
             // === CACHE INVALIDATION (ALWAYS) ===
             if (PropsCache.Instance != null)
@@ -795,12 +794,13 @@ namespace redb.Core.Providers.Base
             // Call the SQL function to mark objects for deletion. One transaction around it, joining
             // the caller's when there is one: the SQLite mark is several statements, and a failure
             // between them is rolled back by the transaction's owner, never left open on the handle.
-            var results = await _context.ExecuteAtomicAsync(
+            // Run again on a deadlock when this transaction is our own (DeadlockRetryHelper).
+            var results = await DeadlockRetryHelper.ExecuteWithRetryAsync(_context, () => _context.ExecuteAtomicAsync(
                 () => _context.QueryAsync<MarkForDeletionResult>(
                     Sql.SoftDelete_MarkForDeletion(),
                     new object[] { ids, user.Id, trashParentId! },
                     cancellationToken),
-                cancellationToken);
+                cancellationToken), cancellationToken: cancellationToken);
 
             var result = results.FirstOrDefault()
                 ?? throw new InvalidOperationException("mark_for_deletion function returned no result");
@@ -890,13 +890,14 @@ namespace redb.Core.Providers.Base
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // Call purge_trash SQL function - one transaction per batch (see SoftDeleteAsync)
-                    var results = await _context.ExecuteAtomicAsync(
+                    // Call purge_trash SQL function - one transaction per batch (see SoftDeleteAsync), run again on a
+                    // deadlock when the batch's transaction is our own (DeadlockRetryHelper).
+                    var results = await DeadlockRetryHelper.ExecuteWithRetryAsync(_context, () => _context.ExecuteAtomicAsync(
                         () => _context.QueryAsync<PurgeTrashResult>(
                             Sql.SoftDelete_PurgeTrash(),
                             new object[] { trashId, batchSize },
                             cancellationToken),
-                        cancellationToken);
+                        cancellationToken), cancellationToken: cancellationToken);
 
                     var result = results.FirstOrDefault();
                     if (result == null)
@@ -1714,22 +1715,22 @@ namespace redb.Core.Providers.Base
             {
                 case "String":
                 case "Text":
-                    // TimeOnly and TimeSpan carry db_type "String" (_types seed). Their plain
-                    // ToString() uses the CURRENT culture — "2:30 PM" under en-US, "14:30" under
-                    // ru-RU — so a value written under one culture failed or silently mis-parsed
-                    // under another. Route them through the invariant round-trip form, the same
-                    // one the JSON converters use.
+                    // A plain ToString() of a DateOnly uses the CURRENT culture, so a value written under one
+                    // culture failed or silently mis-parsed under another: the invariant round-trip form.
                     valueRecord.String = processedValue switch
                     {
-                        TimeOnly timeOnly => Core.Utils.RedbTemporalFormat.ToText(timeOnly),
-                        TimeSpan timeSpan => Core.Utils.RedbTemporalFormat.ToText(timeSpan),
                         DateOnly dateOnly => Core.Utils.RedbTemporalFormat.ToText(dateOnly),
                         _ => processedValue?.ToString()
                     };
                     break;
                 case "Long":
                 case "bigint":
-                    if (processedValue is long longVal)
+                    // TimeOnly and TimeSpan carry db_type "Long" (_types seed): their Ticks.
+                    if (processedValue is TimeSpan timeSpan)
+                        valueRecord.Long = timeSpan.Ticks;
+                    else if (processedValue is TimeOnly timeOnly)
+                        valueRecord.Long = timeOnly.Ticks;
+                    else if (processedValue is long longVal)
                         valueRecord.Long = longVal;
                     else if (processedValue is int intVal)
                         valueRecord.Long = intVal;
@@ -1749,9 +1750,9 @@ namespace redb.Core.Providers.Base
                     if (processedValue is decimal decimalVal)
                         valueRecord.Numeric = decimalVal;
                     else if (processedValue is double doubleVal2)
-                        valueRecord.Numeric = (decimal)doubleVal2;
+                        valueRecord.Numeric = redb.Core.Utils.RedbDecimal.FromDouble(doubleVal2);
                     else if (processedValue is float floatVal2)
-                        valueRecord.Numeric = (decimal)floatVal2;
+                        valueRecord.Numeric = redb.Core.Utils.RedbDecimal.FromSingle(floatVal2);
                     else if (decimal.TryParse(processedValue?.ToString(), out var parsedDecimal))
                         valueRecord.Numeric = parsedDecimal;
                     break;

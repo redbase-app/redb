@@ -186,16 +186,11 @@ public class RedbWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
         var result = new List<WindowFieldRequest>();
         foreach (var (expr, isBaseField) in _windowSpec.PartitionByFields)
         {
-            if (expr is LambdaExpression lambda && lambda.Body is MemberExpression member)
+            result.Add(new WindowFieldRequest
             {
-                var path = ExtractFieldPath(member);
-                if (!string.IsNullOrEmpty(path))
-                    result.Add(new WindowFieldRequest
-                    {
-                        FieldPath = path,
-                        IsBaseField = isBaseField  //
-                    });
-            }
+                FieldPath = WindowFieldPath.Of(((LambdaExpression)expr).Body),
+                IsBaseField = isBaseField
+            });
         }
         return result;
     }
@@ -205,41 +200,23 @@ public class RedbWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
         var result = new List<WindowOrderRequest>();
         foreach (var (expr, desc, isBaseField) in _windowSpec.OrderByFields)
         {
-            if (expr is LambdaExpression lambda && lambda.Body is MemberExpression member)
+            result.Add(new WindowOrderRequest
             {
-                var path = ExtractFieldPath(member);
-                if (!string.IsNullOrEmpty(path))
-                    result.Add(new WindowOrderRequest
-                    {
-                        FieldPath = path,
-                        Descending = desc,
-                        IsBaseField = isBaseField  //
-                    });
-            }
+                FieldPath = WindowFieldPath.Of(((LambdaExpression)expr).Body),
+                Descending = desc,
+                IsBaseField = isBaseField
+            });
         }
         return result;
     }
 
-    private string ExtractFieldPath(MemberExpression? member)
-    {
-        if (member == null) return string.Empty;
-        var parts = new List<string>();
-        Expression? current = member;
-        while (current is MemberExpression m)
-        {
-            // Filter only "Props" - for base fields leave everything as is
-            if (m.Member.Name != "Props")
-                parts.Insert(0, m.Member.Name);
-            current = m.Expression;
-        }
-        return string.Join(".", parts);
-    }
+    private static string ExtractFieldPath(MemberExpression member) => WindowFieldPath.Of(member);
 
     /// <summary>
     /// Determines if field access is base (Name, Id, SchemeId)
-    /// or EAV through Props (Props.Stock, Props.Category).
+    /// or a Props field (Props.Stock, Props.Category).
     /// Base field: path does NOT contain "Props" (x.Name, x.Id)
-    /// EAV field: path contains "Props" (x.Props.Stock)
+    /// Props field: path contains "Props" (x.Props.Stock)
     /// </summary>
     private bool IsBaseFieldAccess(MemberExpression member)
     {
@@ -247,7 +224,7 @@ public class RedbWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
         while (current is MemberExpression m)
         {
             if (m.Member.Name == "Props")
-                return false; // Contains Props → EAV field
+                return false; // Contains Props → Props field
             current = m.Expression;
         }
         return true; // Does not contain Props → base field
@@ -256,22 +233,7 @@ public class RedbWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
     /// <summary>
     /// Extracts field path from Win.Sum(x.Props.Field) argument
     /// </summary>
-    private string ExtractFieldPathFromArg(Expression arg)
-    {
-        // Unwrap Convert if present (for value types)
-        while (arg is UnaryExpression unary &&
-               (unary.NodeType == ExpressionType.Convert || unary.NodeType == ExpressionType.ConvertChecked))
-        {
-            arg = unary.Operand;
-        }
-
-        if (arg is MemberExpression member)
-        {
-            return ExtractFieldPath(member);
-        }
-
-        return string.Empty;
-    }
+    private static string ExtractFieldPathFromArg(Expression arg) => WindowFieldPath.Of(arg);
 
     private List<TResult> MaterializeResults<TResult>(JsonDocument? json,
         Expression<Func<RedbObject<TProps>, TResult>> selector)

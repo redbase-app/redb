@@ -121,7 +121,7 @@ public class SqlParameterCollectorBase
             int => arr.Select(x => x is int i ? i : Convert.ToInt32(x)).ToArray(),
             string => arr.Select(x => x?.ToString() ?? "").ToArray(),
             Guid => arr.Select(x => x is Guid g ? g : Guid.Parse(x?.ToString() ?? "")).ToArray(),
-            decimal => arr.Select(x => x is decimal d ? d : Convert.ToDecimal(x)).ToArray(),
+            decimal => arr.Select(x => x is decimal d ? d : redb.Core.Utils.RedbDecimal.From(x!)).ToArray(),
             double => arr.Select(x => x is double d ? d : Convert.ToDouble(x)).ToArray(),
             bool => arr.Select(x => x is bool b ? b : Convert.ToBoolean(x)).ToArray(),
             DateTime => arr.Select(x => x is DateTime dt ? DateTimeConverter.NormalizeForStorage(dt) : DateTime.MinValue).ToArray(),

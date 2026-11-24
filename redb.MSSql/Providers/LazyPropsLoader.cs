@@ -129,7 +129,8 @@ public class LazyPropsLoader : ILazyPropsLoader
     {
         var depth = propsDepth ?? DefaultBatchDepth;
         if (objects.Count == 0) return;
-        
+        var requested = objects;
+
         // Protection from infinite recursion
         var uniqueIds = objects.Select(o => o.id).Distinct().ToList();
         var alreadyLoading = uniqueIds.Where(id => _loadingInProgress.ContainsKey(id)).ToList();
@@ -218,6 +219,10 @@ public class LazyPropsLoader : ILazyPropsLoader
                         }
                     }
                 }
+
+                // get_object_json is null only for an object that is gone: deleted after the query found it. It
+                // leaves the list instead of being handed out without Props; the page is shorter by it.
+                requested.RemoveAll(o => needToLoad.Contains(o.id) && !(jsonById.TryGetValue(o.id, out var j) && !string.IsNullOrEmpty(j)));
             }
         }
         finally

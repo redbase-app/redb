@@ -171,6 +171,9 @@ internal static class FlatValueConverter
                     FlatStorageType.Int32 => (object)checked((int)number),
                     FlatStorageType.Int16 => checked((short)number),
                     FlatStorageType.Byte => checked((byte)number),
+                    // TimeOnly and TimeSpan are stored as their Ticks.
+                    FlatStorageType.Time => new TimeOnly(number),
+                    FlatStorageType.Duration => TimeSpan.FromTicks(number),
                     _ => number
                 };
 
@@ -207,20 +210,7 @@ internal static class FlatValueConverter
                 };
 
             case FlatValueSource.String:
-                if (source.String is not { } text) return null;
-                switch (storageType)
-                {
-                    case FlatStorageType.Time:
-                        return RedbTemporalFormat.TryParseTimeOnly(text, out var time)
-                            ? time
-                            : throw new FormatException($"Value '{text}' of column '{column.Name}' is not a TimeOnly.");
-                    case FlatStorageType.Duration:
-                        return RedbTemporalFormat.TryParseTimeSpan(text, out var span)
-                            ? span
-                            : throw new FormatException($"Value '{text}' of column '{column.Name}' is not a TimeSpan.");
-                    default:
-                        return text;
-                }
+                return source.String;
 
             default:
                 throw new InvalidOperationException($"Column '{column.Name}' has no value source.");

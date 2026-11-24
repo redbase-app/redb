@@ -226,6 +226,23 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
     // ===== TREE FILTERS =====
 
     /// <summary>
+    /// The scheme of the target type of WhereHasAncestor / WhereHasDescendant, found as Query&lt;T&gt;() finds it: the
+    /// metadata cache, then the database. A type the database has no scheme for fails here, as Query&lt;T&gt;() fails for
+    /// it: Pro dropped the filter and returned every node, Free ran into a removed legacy path.
+    /// </summary>
+    private long RequireTargetSchemeId<TTarget>(string filterName)
+    {
+        var schemeId = _treeProvider is TreeQueryProviderBase provider
+            ? provider.ResolveSchemeIdByType(typeof(TTarget))
+            : _treeProvider.Cache.GetSchemeIdByClrType(typeof(TTarget));
+        if (schemeId is null or 0)
+            throw new InvalidOperationException(
+                $"{filterName}<{typeof(TTarget).Name}>: scheme for type '{typeof(TTarget).Name}' not found. " +
+                "Ensure the type is a [RedbScheme] class and InitializeAsync() was called at startup.");
+        return schemeId.Value;
+    }
+
+    /// <summary>
     /// Filter by ancestors with polymorphic query support
     /// </summary>
     public override IRedbQueryable<TProps> WhereHasAncestor<TTarget>(
@@ -239,9 +256,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
             throw new ArgumentException("maxDepth must be >= 1", nameof(maxDepth));
 
         var newContext = _treeContext.Clone();
-
-        // Get scheme_id of target type through Cache
-        var targetSchemeId = _treeProvider.Cache.GetSchemeIdByClrType(typeof(TTarget));
+        var targetSchemeId = RequireTargetSchemeId<TTarget>(nameof(WhereHasAncestor));
 
         // Parse ancestor condition and add tree filter
         var filterExpression = _filterParser.ParseFilter(ancestorCondition);
@@ -272,9 +287,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
             throw new ArgumentException("maxDepth must be >= 1", nameof(maxDepth));
 
         var newContext = _treeContext.Clone();
-
-        // Get scheme_id of target type through Cache
-        var targetSchemeId = _treeProvider.Cache.GetSchemeIdByClrType(typeof(TTarget));
+        var targetSchemeId = RequireTargetSchemeId<TTarget>(nameof(WhereHasDescendant));
 
         // Parse descendant condition and add tree filter
         var filterExpression = _filterParser.ParseFilter(descendantCondition);
@@ -1035,7 +1048,7 @@ public class TreeQueryableBase<TProps> : RedbQueryable<TProps>
             cancellationToken);
 
         return batch.Values.TryGetValue(alias, out var value) && value != null
-            ? Convert.ToDecimal(value, System.Globalization.CultureInfo.InvariantCulture)
+            ? redb.Core.Utils.RedbDecimal.From(value)
             : null;
     }
 }

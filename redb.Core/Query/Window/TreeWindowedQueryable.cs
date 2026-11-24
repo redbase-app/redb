@@ -121,7 +121,7 @@ public class TreeWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
                     
                     funcs.Add(new WindowFuncRequest { Func = sqlFunc, FieldPath = fieldPath, Alias = alias, Buckets = buckets });
                 }
-                else if (arg is MemberExpression member)
+                else if (arg is MemberExpression member && Grouping.GroupSelectorMembers.ReferencesParameter(member, selector.Parameters[0]))
                 {
                     var path = ExtractFieldPath(member);
                     if (!string.IsNullOrEmpty(path))
@@ -146,53 +146,31 @@ public class TreeWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
         var result = new List<WindowFieldRequest>();
         foreach (var (expr, isBaseField) in _windowSpec.PartitionByFields)
         {
-            if (expr is LambdaExpression lambda && lambda.Body is MemberExpression member)
+            result.Add(new WindowFieldRequest
             {
-                var path = ExtractFieldPath(member);
-                if (!string.IsNullOrEmpty(path))
-                    result.Add(new WindowFieldRequest 
-                    { 
-                        FieldPath = path, 
-                        IsBaseField = isBaseField
-                    });
-            }
+                FieldPath = WindowFieldPath.Of(((LambdaExpression)expr).Body),
+                IsBaseField = isBaseField
+            });
         }
         return result;
     }
-    
+
     private List<WindowOrderRequest> ParseOrderBy()
     {
         var result = new List<WindowOrderRequest>();
         foreach (var (expr, desc, isBaseField) in _windowSpec.OrderByFields)
         {
-            if (expr is LambdaExpression lambda && lambda.Body is MemberExpression member)
+            result.Add(new WindowOrderRequest
             {
-                var path = ExtractFieldPath(member);
-                if (!string.IsNullOrEmpty(path))
-                    result.Add(new WindowOrderRequest 
-                    { 
-                        FieldPath = path, 
-                        Descending = desc,
-                        IsBaseField = isBaseField
-                    });
-            }
+                FieldPath = WindowFieldPath.Of(((LambdaExpression)expr).Body),
+                Descending = desc,
+                IsBaseField = isBaseField
+            });
         }
         return result;
     }
-    
-    private string ExtractFieldPath(MemberExpression? member)
-    {
-        if (member == null) return string.Empty;
-        var parts = new List<string>();
-        Expression? current = member;
-        while (current is MemberExpression m)
-        {
-            if (m.Member.Name != "Props")
-                parts.Insert(0, m.Member.Name);
-            current = m.Expression;
-        }
-        return string.Join(".", parts);
-    }
+
+    private static string ExtractFieldPath(MemberExpression member) => WindowFieldPath.Of(member);
     
     private bool IsBaseFieldAccess(MemberExpression member)
     {
@@ -206,21 +184,7 @@ public class TreeWindowedQueryable<TProps> : IRedbWindowedQueryable<TProps>
         return true;
     }
     
-    private string ExtractFieldPathFromArg(Expression arg)
-    {
-        while (arg is UnaryExpression unary && 
-               (unary.NodeType == ExpressionType.Convert || unary.NodeType == ExpressionType.ConvertChecked))
-        {
-            arg = unary.Operand;
-        }
-        
-        if (arg is MemberExpression member)
-        {
-            return ExtractFieldPath(member);
-        }
-        
-        return string.Empty;
-    }
+    private static string ExtractFieldPathFromArg(Expression arg) => WindowFieldPath.Of(arg);
     
     private List<TResult> MaterializeResults<TResult>(JsonDocument? json, 
         Expression<Func<RedbObject<TProps>, TResult>> selector)

@@ -32,7 +32,9 @@ namespace redb.Tests.Integration.Fixtures;
 public sealed class PostgresCollationFixture : IAsyncLifetime
 {
     /// <summary>Name of the C-ctype database. Distinct from every other suite's.</summary>
-    public const string DatabaseName = "redb_collation_c";
+    // 4.7.x keeps its own database: one a 4.8 build has upgraded carries a newer module, which a 4.7.5 package refuses
+    // (RedbSchemaNewerException).
+    public const string DatabaseName = "redb_collation_c_l47";
 
     /// <summary>Collation used by the tests. Deterministic, which LIKE requires.</summary>
     public const string Collation = "und-x-icu";

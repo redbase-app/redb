@@ -54,7 +54,7 @@ BEGIN
         WHEN 'datetimeoffset' THEN '_DateTimeOffset'
         WHEN 'datetime' THEN '_DateTimeOffset'
         WHEN 'dateonly' THEN '_DateTimeOffset'
-        WHEN 'timeonly' THEN '_DateTimeOffset'
+        WHEN 'timeonly' THEN '_Long'           -- Ticks, as TimeSpan
         -- Guid types
         WHEN 'guid' THEN '_Guid'
         WHEN 'uuid' THEN '_Guid'

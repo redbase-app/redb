@@ -92,6 +92,32 @@ BEGIN
     RETURN CASE WHEN v_parts = '' THEN 'TRUE' ELSE v_parts END;
 END;
 $BODY$;
+
+-- The _ord column of pvt_build_query_sql: the position of the row in the order of the query, its ORDER BY and the
+-- object id after it. The caller wraps the statement as a derived table and sorts by _ord: a subquery keeps no order
+-- by the standard, and row_number() OVER () above it relied on the plan reading the rows in that order.
+-- p_order_sql is the ORDER BY clause of the statement (pvt_build_order_conditions, empty when none).
+CREATE OR REPLACE FUNCTION pvt_ord_column(p_order_sql text, p_id_ref text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $BODY$
+    SELECT 'row_number() OVER ('
+        || CASE WHEN COALESCE(btrim(p_order_sql, E' \n'), '') = '' THEN 'ORDER BY ' || p_id_ref
+                ELSE btrim(p_order_sql, E' \n') || ', ' || p_id_ref END
+        || ') AS _ord';
+$BODY$;
+
+-- A DISTINCT statement numbered around it: the window would make every row distinct inside it. DISTINCT orders by
+-- the id alone (PostgreSQL keeps an ORDER BY of a DISTINCT SELECT to its select list), so the id gives the position.
+CREATE OR REPLACE FUNCTION pvt_ord_over_distinct(p_distinct_sql text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $BODY$
+    SELECT 'SELECT _dist._id, row_number() OVER (ORDER BY _dist._id) AS _ord FROM (' || E'\n' || p_distinct_sql
+        || E'\n) _dist';
+$BODY$;
 CREATE OR REPLACE FUNCTION pvt_build_query_sql(
     p_scheme_id    bigint,
     p_filter       jsonb    DEFAULT NULL,
@@ -125,6 +151,8 @@ DECLARE
     v_can_push      boolean;
     v_seed_level    jsonb;
     v_level_sql     text;
+    v_select        text;
+    v_id_ref        text;
 BEGIN
     IF p_scheme_id IS NULL THEN
         RAISE EXCEPTION 'pvt_build_query_sql: p_scheme_id is required';
@@ -198,16 +226,18 @@ BEGIN
             v_paging := v_paging || E'\nOFFSET ' || p_offset::text;
         END IF;
 
-        RETURN 'SELECT '
+        v_select := 'SELECT '
                || CASE WHEN p_distinct THEN 'DISTINCT ' ELSE '' END
                || pvt_build_distinct_on_select(p_distinct_on, v_fields, 'o.')
-               || '_id FROM _objects o'
+               || 'o._id' || CASE WHEN p_distinct THEN '' ELSE ', ' || pvt_ord_column(v_order_sql, 'o._id') END
+               || ' FROM _objects o'
                || E'\nWHERE o._id_scheme = ' || p_scheme_id::text
                || CASE WHEN v_push_sql IS NOT NULL AND v_push_sql <> ''
                        THEN ' AND ' || v_push_sql
                        ELSE '' END
                || v_order_sql
                || v_paging;
+        RETURN CASE WHEN p_distinct THEN pvt_ord_over_distinct(v_select) ELSE v_select END;
     END IF;
 
     -- 3. Decide LEFT vs INNER JOIN on _values: use LEFT only when the
@@ -323,26 +353,24 @@ BEGIN
     -- 7. Assemble outer SELECT. Narrow shape JOINs _objects so the
     --    residual WHERE / ORDER BY can address base columns via the
     --    `o` alias; wide shape selects directly from _pvt_cte.
-    IF v_narrow THEN
-        RETURN v_cte_sql
-            || E'\nSELECT '
-            || CASE WHEN p_distinct THEN 'DISTINCT ' ELSE '' END
-            || pvt_build_distinct_on_select(p_distinct_on, v_fields, 'o.')
-            || 'o._id FROM _pvt_cte'
-            || E'\nJOIN _objects o ON o._id = _pvt_cte._id_object'
-            || CASE WHEN v_where_sql = 'TRUE' THEN '' ELSE E'\nWHERE ' || v_where_sql END
-            || v_order_sql
-            || v_paging;
-    END IF;
-
-    RETURN v_cte_sql
-        || E'\nSELECT '
+    --    Every statement returns _id and _ord (see pvt_ord_column); a DISTINCT one is numbered around it.
+    v_id_ref := CASE WHEN v_narrow THEN 'o._id' ELSE '_pvt_cte._id' END;
+    v_select := E'SELECT '
         || CASE WHEN p_distinct THEN 'DISTINCT ' ELSE '' END
-        || pvt_build_distinct_on_select(p_distinct_on, v_fields, '')
-        || '_id FROM _pvt_cte'
+        || pvt_build_distinct_on_select(p_distinct_on, v_fields, CASE WHEN v_narrow THEN 'o.' ELSE '' END)
+        || v_id_ref || ' AS _id'
+        || CASE WHEN p_distinct THEN '' ELSE ', ' || pvt_ord_column(v_order_sql, v_id_ref) END
+        || ' FROM _pvt_cte'
+        || CASE WHEN v_narrow THEN E'\nJOIN _objects o ON o._id = _pvt_cte._id_object' ELSE '' END
         || CASE WHEN v_where_sql = 'TRUE' THEN '' ELSE E'\nWHERE ' || v_where_sql END
         || v_order_sql
         || v_paging;
+
+    IF p_distinct THEN
+        -- The WITH stays in front of the numbering SELECT; the DISTINCT statement becomes its derived table.
+        RETURN v_cte_sql || E'\n' || pvt_ord_over_distinct(v_select);
+    END IF;
+    RETURN v_cte_sql || E'\n' || v_select;
 END;
 $BODY$;
 

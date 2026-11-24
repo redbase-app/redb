@@ -22,6 +22,29 @@ public sealed class SqliteProvider : IDataProvider
     /// </summary>
     private const string SequenceName = "_global_identity";
 
+    /// <summary>
+    /// The redb tables an import writes, dependents before parents. <c>_scheme_metadata_cache</c> is a derived cache
+    /// (no foreign keys); clearing it is safe, the runtime rebuilds it on the next scheme sync.
+    /// </summary>
+    private static readonly string[] RedbTables =
+    [
+        "_values",
+        "_list_items",
+        "_objects",
+        "_permissions",
+        "_functions",
+        "_dependencies",
+        "_structures",
+        "_schemes",
+        "_users_roles",
+        "_users",
+        "_roles",
+        "_lists",
+        "_links",
+        "_types",
+        "_scheme_metadata_cache"
+    ];
+
     private SqliteConnection? _connection;
     private SqliteTransaction? _transaction;
 
@@ -75,39 +98,16 @@ public sealed class SqliteProvider : IDataProvider
     {
         if (_connection is null) return;
 
-        // Dependents before parents. SQLite has no TRUNCATE, so we DELETE.
-        // _scheme_metadata_cache is a derived cache (no FKs); clearing it is safe and
-        // it is rebuilt by the runtime on the next scheme sync. We deliberately do NOT
-        // touch sqlite_sequence — the _global_identity high-water mark must survive.
-        var tables = new[]
-        {
-            "_values",
-            "_list_items",
-            "_objects",
-            "_permissions",
-            "_functions",
-            "_dependencies",
-            "_structures",
-            "_schemes",
-            "_users_roles",
-            "_users",
-            "_roles",
-            "_lists",
-            "_links",
-            "_types",
-            "_scheme_metadata_cache"
-        };
-
+        // SQLite has no TRUNCATE, so we DELETE. We deliberately do NOT touch sqlite_sequence: the
+        // _global_identity high-water mark must survive.
         // Foreign keys are off for the whole import transaction (BeginImportAsync), so the order of the deletes
         // does not matter. A table the schema does not have is skipped by the catalog, not by swallowing an
         // error: the old catch also hid a locked database, and the import went on over a half-cleaned one.
-        foreach (var table in tables)
+        // The target keeps its own _types rows: the built-in types of this build; ImportService adds only the file's types
+        // the target lacks.
+        foreach (var table in RedbTables.Where(t => t != "_types"))
         {
-            await using var exists = _connection.CreateCommand();
-            exists.Transaction = _transaction;
-            exists.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @name";
-            exists.Parameters.AddWithValue("@name", table);
-            if (Convert.ToInt64(await exists.ExecuteScalarAsync(ct)) == 0)
+            if (!await TableExistsAsync(table, ct))
                 continue;
 
             await ExecuteAsync($"DELETE FROM {table}", ct);
@@ -158,8 +158,91 @@ public sealed class SqliteProvider : IDataProvider
         => _transaction is not null ? Task.CompletedTask : ExecuteAsync("PRAGMA foreign_keys = OFF", ct);
 
     /// <inheritdoc />
+    // Inside an import the keys come back on only after the commit, and switching them on checks nothing that is
+    // already there: the loaded rows are checked here, still inside the transaction, so a refusal rolls back.
     public Task EnableConstraintsAsync(CancellationToken ct = default)
-        => _transaction is not null ? Task.CompletedTask : ExecuteAsync("PRAGMA foreign_keys = ON", ct);
+        => _transaction is not null
+            ? CheckForeignKeysAsync("Nothing was imported; the database is unchanged.", ct)
+            : ExecuteAsync("PRAGMA foreign_keys = ON", ct);
+
+    /// <summary>
+    /// Checks the rows of the redb tables against their foreign keys with <c>PRAGMA foreign_key_check</c>, which
+    /// works whatever <c>PRAGMA foreign_keys</c> says, and refuses the import when a row points at a row that is not
+    /// there. SQLite keeps no name for a key, so a key is named by its table and column.
+    /// </summary>
+    private async Task CheckForeignKeysAsync(string outcome, CancellationToken ct)
+    {
+        if (_connection is null) return;
+
+        var broken = new List<string>();
+        foreach (var table in RedbTables)
+        {
+            if (!await TableExistsAsync(table, ct)) continue;
+
+            // One row per violating row: rowid and the id of the key (its position in foreign_key_list).
+            var violations = new Dictionary<long, (long Rows, long ExampleRowId)>();
+            await using (var check = _connection.CreateCommand())
+            {
+                check.Transaction = _transaction;
+                check.CommandText = $"PRAGMA foreign_key_check({table})";
+                await using var reader = await check.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
+                {
+                    var keyId = reader.GetInt64(3);
+                    var rowId = reader.GetInt64(1);
+                    violations[keyId] = violations.TryGetValue(keyId, out var seen)
+                        ? (seen.Rows + 1, seen.ExampleRowId)
+                        : (1, rowId);
+                }
+            }
+            if (violations.Count == 0) continue;
+
+            var keys = new List<(long Id, string Parent, string From, string? To)>();
+            await using (var list = _connection.CreateCommand())
+            {
+                list.Transaction = _transaction;
+                list.CommandText = $"SELECT id, \"table\", \"from\", \"to\" FROM pragma_foreign_key_list('{table}') ORDER BY id, seq";
+                await using var reader = await list.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
+                    keys.Add((reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3)));
+            }
+
+            foreach (var (keyId, (rows, exampleRowId)) in violations.OrderBy(v => v.Key))
+            {
+                var columns = keys.Where(k => k.Id == keyId).ToList();
+                var from = columns.Select(k => k.From).ToList();
+                var example = await DescribeRowAsync(table, exampleRowId, from, ct);
+                broken.Add(ForeignKeyRefusal.Describe(
+                    $"{table}.{string.Join(",", from)}", table, rows, columns[0].Parent,
+                    columns.Select(k => k.To ?? "primary key"), example));
+            }
+        }
+
+        if (broken.Count > 0)
+            throw ForeignKeyRefusal.Exception(broken, outcome);
+    }
+
+    /// <summary>The id and the key columns of one row, as <c>column = value</c> pairs.</summary>
+    private async Task<string> DescribeRowAsync(string table, long rowId, IReadOnlyList<string> columns, CancellationToken ct)
+    {
+        await using var read = _connection!.CreateCommand();
+        read.Transaction = _transaction;
+        read.CommandText = $"SELECT _id, {string.Join(", ", columns.Select(c => $"\"{c}\""))} FROM {table} WHERE rowid = @rowid";
+        read.Parameters.AddWithValue("@rowid", rowId);
+        await using var reader = await read.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct)) return $"rowid = {rowId}";
+        return string.Join(", ", Enumerable.Range(0, columns.Count + 1)
+            .Select(i => $"{(i == 0 ? "_id" : columns[i - 1])} = {reader.GetValue(i)}"));
+    }
+
+    private async Task<bool> TableExistsAsync(string table, CancellationToken ct)
+    {
+        await using var exists = _connection!.CreateCommand();
+        exists.Transaction = _transaction;
+        exists.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @name";
+        exists.Parameters.AddWithValue("@name", table);
+        return Convert.ToInt64(await exists.ExecuteScalarAsync(ct)) > 0;
+    }
 
     /// <inheritdoc />
     public async Task BulkInsertAsync(string tableName, System.Data.DataTable data, CancellationToken ct = default)

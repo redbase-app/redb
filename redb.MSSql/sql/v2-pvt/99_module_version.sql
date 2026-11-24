@@ -12,7 +12,22 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
--- ---------- 3. Module version function ---------------------------------
+-- ---------- 3. Module compatibility function ---------------------------
+-- What this module still serves, see the PostgreSQL twin: '<oldest package
+-- module version>|<redb package version that first shipped that module>'.
+-- Raise the first part only when a change breaks the C# of older packages;
+-- never lower it. Created before the version function, so a module that
+-- reports a version always has this function too.
+CREATE FUNCTION dbo.pvt_module_compat()
+RETURNS nvarchar(50)
+WITH SCHEMABINDING
+AS
+BEGIN
+    RETURN N'0.2.40.2|4.7.5';
+END;
+GO
+
+-- ---------- 4. Module version function ---------------------------------
 -- semver: bump MAJOR on breaking changes to entry-point signatures or
 -- result shape; bump MINOR on additive features; bump PATCH on bug fixes.
 CREATE FUNCTION dbo.pvt_module_version()
@@ -203,11 +218,14 @@ BEGIN
     --          of @distinct_on, and the wrapper keeps _rn = 1 ordered by _ord. Until 0.2.30 the first key only was
     --          partitioned, ranked by (SELECT 1), with the ordering applied outside, where a Props column does not
     --          resolve: TreeQuery(...).DistinctBy(x => x.IsActive) failed with "Invalid column name 'IsActive'".
-    -- 0.2.40.1 - 4.7 line patch. pvt_json_text: the pushed base condition ($.push of pvt_split_filter, read in 16, 20,
+    -- 0.2.40.2 - 4.7.5. dbo.pvt_module_compat(): what this module still serves, read by packages whose module is
+    --          older; they leave a newer module in place instead of putting their own back. The other module fixes of
+    --          4.7.5 ride on this version too.
+    -- 0.2.40.1 - 4.7.4. pvt_json_text: the pushed base condition ($.push of pvt_split_filter, read in 16, 20,
     --          21, 22 and 23) and the $const of $contains/$startsWith/$endsWith over an expression and of a window
     --          argument (14, 23) are read through OPENJSON. JSON_VALUE returned NULL for a text over 4,000 characters
     --          and the condition was dropped: WhereRedb(ParentId in 400+ ids) with a props filter or a GroupBy returned
-    --          every object of the scheme the props filter let through. Develop carries the same change as 0.2.47;
+    --          every object of the scheme the props filter let through. Release 4.8.0 carries the same change as 0.2.47;
     --          0.2.40.1 sorts below it, so a later package upgrades the module as usual.
     -- 0.2.40 - pvt_build_window_sql: AVG casts its operand to NUMERIC(38, 10), as pvt_agg_expr does; over a bigint
     --          field the window average cut the fraction off (32 for 32.25) (2026-11-03).
@@ -233,7 +251,7 @@ BEGIN
     --          _array_parent_id IS NOT NULL (the filtered covering index: 950 -> 160 ms on 200 thousand elements);
     --          what it cannot answer returns '--error: <text>' instead of NULL. The outer filter that fails to
     --          compile is refused; it used to be dropped (2026-11-02).
-    RETURN N'0.2.40.1';
+    RETURN N'0.2.40.2';
 END;
 GO
 

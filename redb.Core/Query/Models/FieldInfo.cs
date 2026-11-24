@@ -21,5 +21,13 @@ public record FieldInfo(
     ListItemProperty? ListItemProp = null,
     string? DictKey = null,
     long? ParentStructureId = null
-);
+)
+{
+    /// <summary>
+    /// For a field of an element of an array of classes (<c>Rows[].Kind</c>): the structure of that array. Such a field
+    /// is not a pivot column; a condition reads it under the element row. An init property, so the constructor stays as it was
+    /// in 4.7.4.
+    /// </summary>
+    public long? ElementOfArrayStructureId { get; init; }
+}
 

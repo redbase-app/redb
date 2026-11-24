@@ -34,7 +34,7 @@ Upgrading from an earlier version: see [UPGRADING.md](UPGRADING.md) and [CHANGEL
 | Learn curve | DbContext, Fluent API, migrations, conventions | One interface: `IRedbService`. One attribute: `[RedbScheme]` |
 | Forgot Include? | Runtime crash or silent null | Impossible — Props are always loaded |
 
-> **Strong typing — real columns, not JSON blobs.** Each property of your `*Props` class is a row in the `_values` table, indexed, and its value goes into a column typed by the property type: `string` → `text` (`nvarchar` on SQL Server), `decimal` → `numeric(38,18)` (on SQLite the value sits in a `REAL` column by default, or in `TEXT` in the exact mode), `DateTime` → `timestamptz`. The table carries real foreign keys to the object, the structure and the referenced objects, and arrays and dictionaries are normalised rows as well. Your data is queryable, filterable, and aggregatable at the SQL level — no `JSON_VALUE` hacks, no full-table JSON scans, no cast errors at runtime.
+> **Strong typing — real columns, not JSON blobs.** Each property of your `*Props` class is a row in the `_values` table, indexed, and its value goes into a column typed by the property type: `string` → `text` (`nvarchar` on SQL Server), `decimal` → `numeric(38,18)` (on SQLite the value sits in a `REAL` column by default, or in `TEXT` in the exact mode), `DateTime` → `timestamptz`. A `REAL` keeps about 15 significant digits of a decimal exactly; a value with more digits comes back as the nearest number the column holds, and from the 17th digit on that number can differ between .NET runtimes, so keep amounts that need more digits in the exact mode. The table carries real foreign keys to the object, the structure and the referenced objects, and arrays and dictionaries are normalised rows as well. Your data is queryable, filterable, and aggregatable at the SQL level — no `JSON_VALUE` hacks, no full-table JSON scans, no cast errors at runtime.
 
 ### Measured against EF Core
 
@@ -293,7 +293,7 @@ if (problems.Count > 0)
 ### Client-side: Blazor WebAssembly & mobile
 
 Both run on `redb.SQLite.Pro` — it is pure C#, while the Free tier hosts its SQL functions in a native
-loadable extension, which a browser cannot load. Pro requires no license key.
+loadable extension, which a browser cannot load. Pro is free of charge and needs no key.
 
 **Mobile (.NET MAUI)** needs nothing special: point the connection string at the app data directory.
 
@@ -472,8 +472,8 @@ All saved and loaded with a single `SaveAsync` / `LoadAsync`. Fields can be adde
 `DateTimeOffset` carries a real instant and keeps native .NET semantics. Base object fields
 (`DateCreate`, `DateModify`, `DateBegin`, `DateComplete`) are `DateTimeOffset`, therefore instants.
 
-`DateOnly`, `TimeOnly` and `TimeSpan` are stored in a culture-invariant form, so a row written on a
-`ru-RU` host reads identically on an `en-US` one. Nothing to configure.
+`DateOnly` is stored as a date and `TimeOnly` and `TimeSpan` as their `Ticks`, so no stored form follows the host's
+culture: a row written on a `ru-RU` host reads identically on an `en-US` one. Nothing to configure.
 
 See **[DATETIME.md](DATETIME.md)** for the full type table, the precision differences between
 providers, and the one trap worth knowing.
@@ -484,7 +484,7 @@ providers, and the one trap worth knowing.
 | Range | `.Where(e => e.HireDate >= start && e.HireDate < end)` |
 | Extract parts | `.WhereRedb(o => o.DateCreate.Year == 2025)` |
 | Ordering | `.OrderBy(e => e.HireDate)` |
-| `DateOnly` / `TimeOnly` / `TimeSpan` | equality on all three; ordered comparison on `DateTime`, `DateTimeOffset` and `DateOnly` |
+| `DateOnly` / `TimeOnly` / `TimeSpan` | comparison, range and ordering on all three (`TimeOnly` and `TimeSpan` as their `Ticks`) |
 
 ### String Operations
 
@@ -544,6 +544,11 @@ providers, and the one trap worth knowing.
 | Contains all (AND) | `.Where(e => e.Skills.Contains("C#") && e.Skills.Contains("SQL"))` |
 | Exclude element | `.Where(e => e.Skills.Contains("C#") && !e.Skills.Contains("intern"))` |
 | Mixed with scalars | `.Where(e => e.Age > 30 && e.Skills.Contains("C#"))` |
+| Condition on an element of a class array (Pro) | `.Where(e => e.Contacts!.Any(c => c.Type == "email" && c.IsVerified))` |
+
+In `Any` over an array or a list of classes, every condition reads the same element. The element's own fields of a
+simple type can be read; a field the element has no value for matches neither `==` nor `!=`. The free providers refuse
+the form with `NotSupportedException` before any SQL.
 
 ### Dictionary Operations
 
@@ -892,7 +897,7 @@ in C#, materializes Props in parallel, and adds:
 
 See [README-PRO.md](README-PRO.md).
 
-**Pro is free — no license key required.** Just add the `redb.*.Pro` packages and use them. Pro packages are proprietary (closed-source), but free of charge — starting from version 3.3.0 no license is needed, in production, with no request limits.
+**Pro is free of charge and needs no key.** Just add the `redb.*.Pro` packages and use them. Pro packages are proprietary (closed-source), free in production too, with no request limits.
 
 **Need the Pro sources?** Larger companies that require them — for a security audit, source escrow, or to build in-house — can ask, and we hand them over. Write to [redbase.app](https://redbase.app).
 
@@ -926,4 +931,4 @@ Core packages (`redb.Core`, `redb.Postgres`, `redb.MSSql`, `redb.SQLite`, `redb.
 [Apache License 2.0](LICENSE) starting from version 2.0.0.
 Versions ≤ 1.3.0 published on nuget.org remain under MIT.
 
-Pro packages (`redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`) are proprietary (closed-source) but **free to use — no license key required** starting from version 3.3.0, commercial production use included. Larger companies that need the Pro **sources** (audit, escrow, in-house builds) can request them — see [Pro](#pro).
+Pro packages (`redb.Core.Pro`, `redb.Postgres.Pro`, `redb.MSSql.Pro`, `redb.SQLite.Pro`) are proprietary (closed-source), **free of charge and need no key**, commercial production use included. Larger companies that need the Pro **sources** (audit, escrow, in-house builds) can request them — see [Pro](#pro).

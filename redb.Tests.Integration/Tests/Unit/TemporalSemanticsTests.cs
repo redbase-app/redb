@@ -17,8 +17,8 @@ namespace redb.Tests.Integration.Tests.Unit;
 /// </para>
 ///
 /// <para>
-/// <b>Text form is invariant.</b> <see cref="DateOnly"/>, <see cref="TimeOnly"/> and
-/// <see cref="TimeSpan"/> live in <c>_values._String</c>; their text form must not depend on the
+/// <b>No form follows the culture.</b> <see cref="TimeOnly"/> and <see cref="TimeSpan"/> are stored as their Ticks in
+/// <c>_values._Long</c>; the text forms (<see cref="DateOnly"/> on the JSON side, dictionary keys) must not depend on the
 /// ambient <see cref="CultureInfo"/>, or a value written on one host stops loading on another.
 /// </para>
 ///
@@ -230,12 +230,12 @@ public class TemporalSemanticsTests
     public void TypeMapping_ResolvesTemporalTypes()
     {
         RedbTypeMapping.GetValueColumn(RedbTypeIds.DateOnly).Should().Be("_DateTimeOffset");
-        RedbTypeMapping.GetValueColumn(RedbTypeIds.TimeOnly).Should().Be("_String");
-        RedbTypeMapping.GetValueColumn(RedbTypeIds.TimeSpan).Should().Be("_String");
+        RedbTypeMapping.GetValueColumn(RedbTypeIds.TimeOnly).Should().Be("_Long");
+        RedbTypeMapping.GetValueColumn(RedbTypeIds.TimeSpan).Should().Be("_Long");
 
         RedbTypeMapping.GetObjectValueColumn(RedbTypeIds.DateOnly).Should().Be("_value_datetime");
-        RedbTypeMapping.GetObjectValueColumn(RedbTypeIds.TimeOnly).Should().Be("_value_string");
-        RedbTypeMapping.GetObjectValueColumn(RedbTypeIds.TimeSpan).Should().Be("_value_string");
+        RedbTypeMapping.GetObjectValueColumn(RedbTypeIds.TimeOnly).Should().Be("_value_long");
+        RedbTypeMapping.GetObjectValueColumn(RedbTypeIds.TimeSpan).Should().Be("_value_long");
     }
 
     /// <summary>

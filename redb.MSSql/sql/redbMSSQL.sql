@@ -637,8 +637,8 @@ INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-922337
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775688, 'Base64', 'String', 'string')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775687, 'Color', 'String', 'string')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775686, 'DateOnly', 'DateTimeOffset', 'DateOnly')
-INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775685, 'TimeOnly', 'String', 'TimeOnly')
-INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775684, 'TimeSpan', 'String', 'TimeSpan')
+INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775685, 'TimeOnly', 'Long', 'TimeOnly')
+INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775684, 'TimeSpan', 'Long', 'TimeSpan')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775683, 'Enum', 'String', 'Enum')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775682, 'EnumInt', 'Long', 'Enum')
 INSERT INTO [dbo].[_types] ([_id], [_name], [_db_type], [_type]) VALUES (-9223372036854775681, 'Latitude', 'Double', 'double')
@@ -888,90 +888,8 @@ BEGIN
 END
 GO
 
--- =====================================================
--- PROCEDURE: Cascade delete object with all descendants
--- Deletes object and all its children recursively (bottom-up)
--- =====================================================
-
-IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'delete_object_cascade')
-DROP PROCEDURE [dbo].[delete_object_cascade]
-GO
-
-CREATE PROCEDURE [dbo].[delete_object_cascade]
-    @object_id BIGINT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- Collect all descendants into temp table
-    CREATE TABLE #to_delete (_id BIGINT, depth INT);
-    
-    ;WITH Descendants AS (
-        SELECT _id, 0 AS depth FROM _objects WHERE _id = @object_id
-        UNION ALL
-        SELECT o._id, d.depth + 1 
-        FROM _objects o
-        INNER JOIN Descendants d ON o._id_parent = d._id
-    )
-    INSERT INTO #to_delete SELECT _id, depth FROM Descendants;
-    
-    -- Delete bottom-up: deepest children first, then parents
-    DECLARE @max_depth INT = (SELECT MAX(depth) FROM #to_delete);
-    WHILE @max_depth >= 0
-    BEGIN
-        DELETE FROM _objects WHERE _id IN (SELECT _id FROM #to_delete WHERE depth = @max_depth);
-        SET @max_depth = @max_depth - 1;
-    END
-    
-    -- Turn NOCOUNT OFF and delete temp rows to produce correct rowcount for ExecuteNonQueryAsync
-    -- #to_delete has exactly the same row count as total deleted from _objects
-    SET NOCOUNT OFF;
-    DELETE FROM #to_delete;
-END
-GO
-
--- =====================================================
--- PROCEDURE: Cascade delete multiple objects with all descendants
--- Deletes objects and all their children recursively (bottom-up)
--- =====================================================
-
-IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'delete_objects_cascade')
-DROP PROCEDURE [dbo].[delete_objects_cascade]
-GO
-
-CREATE PROCEDURE [dbo].[delete_objects_cascade]
-    @object_ids NVARCHAR(MAX) -- Comma-separated list of IDs
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    -- Parse IDs and collect all descendants into temp table
-    CREATE TABLE #to_delete (_id BIGINT, depth INT);
-    
-    ;WITH Descendants AS (
-        SELECT _id, 0 AS depth FROM _objects 
-        WHERE _id IN (SELECT CAST(value AS BIGINT) FROM STRING_SPLIT(@object_ids, ','))
-        UNION ALL
-        SELECT o._id, d.depth + 1 
-        FROM _objects o
-        INNER JOIN Descendants d ON o._id_parent = d._id
-    )
-    INSERT INTO #to_delete SELECT _id, depth FROM Descendants;
-    
-    -- Delete bottom-up: deepest children first, then parents
-    DECLARE @max_depth INT = (SELECT MAX(depth) FROM #to_delete);
-    WHILE @max_depth >= 0
-    BEGIN
-        DELETE FROM _objects WHERE _id IN (SELECT _id FROM #to_delete WHERE depth = @max_depth);
-        SET @max_depth = @max_depth - 1;
-    END
-    
-    -- Turn NOCOUNT OFF and delete temp rows to produce correct rowcount for ExecuteNonQueryAsync
-    -- #to_delete has exactly the same row count as total deleted from _objects
-    SET NOCOUNT OFF;
-    DELETE FROM #to_delete;
-END
-GO
+-- delete_object_cascade and delete_objects_cascade: v2-pvt/32_delete_cascade.sql (the versioned module), so an
+-- existing database gets a change of them on its next start.
 
 -- =====================================================
 -- VIEW: v_user_permissions

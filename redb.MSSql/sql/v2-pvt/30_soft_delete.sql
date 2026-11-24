@@ -102,7 +102,10 @@ BEGIN
             [_value_unique] = NULL, -- V4 (decision 9): the trash releases object keys too
             [_hash] = NULL, -- full-object hash: parent and key change here outside the save path; no cached copy may outlive the move
             [_date_modify] = SYSDATETIMEOFFSET()
-        WHERE [_id] IN (SELECT _id FROM #objects_to_delete);
+        WHERE [_id] IN (SELECT _id FROM #objects_to_delete)
+          -- Checked again here, after the row lock: a concurrent soft delete may have moved the object into its
+          -- trash since the collection above. Without it the object moved into a second trash and was counted.
+          AND [_id_scheme] <> -10;
 
         SET @marked_count = @@ROWCOUNT;
 

@@ -16,11 +16,55 @@
 --      applies the bundle again.
 -- =====================================================================
 
+-- ---------- Guard: a newer module is never taken back ----------
+-- An older package never puts its module over a newer one. Start-up does not apply this script then;
+-- the guard stops a hand run of an older script (GetUpgradeScript(), redb schema --upgrade) before it
+-- changes anything, with the sentence of RedbSchemaNewerException. A version that does not read as
+-- numbers is not newer. _own is the version 99_module_version.sql stamps (a test holds them equal).
+-- psql goes on after an error unless told to stop: run the script with -v ON_ERROR_STOP=1.
+DO $$
+DECLARE
+    _own      constant text := '0.7.23.1';
+    _deployed text;
+    _core     text;
+    _compat   text;
+    _package  text;
+BEGIN
+    IF to_regprocedure('pvt_module_version()') IS NULL THEN
+        RETURN;
+    END IF;
+    EXECUTE 'SELECT pvt_module_version()' INTO _deployed;
+    _core := split_part(coalesce(_deployed, ''), '-', 1);
+    IF _core !~ '^[0-9]{1,9}(\.[0-9]{1,9}){1,3}$'
+       OR string_to_array(_core, '.')::int[] <= string_to_array(_own, '.')::int[] THEN
+        RETURN;
+    END IF;
+    IF to_regprocedure('pvt_module_compat()') IS NOT NULL THEN
+        EXECUTE 'SELECT pvt_module_compat()' INTO _compat;
+    END IF;
+    _package := CASE WHEN position('|' IN coalesce(_compat, '')) > 0
+                     THEN nullif(split_part(_compat, '|', 2), '') END;
+    RAISE EXCEPTION 'The PostgreSQL database carries the redb module %, newer than % of this package, and %. Upgrade the redb packages of this application; the database was left unchanged.',
+        _deployed, _own,
+        CASE WHEN _package IS NULL THEN 'it does not state which packages it serves'
+             ELSE 'it needs redb packages from ' || _package || ' on' END
+        USING ERRCODE = 'object_not_in_prerequisite_state';
+END
+$$;
+
 -- ---------- 0. Schema upgrades (idempotent, run on every redeploy) ----------
 -- DDL for columns added after a database was created. The base DDL in
 -- redbPostgre.sql stays the source of truth for fresh databases; this block
 -- is the delivery to existing ones (SCHEMA_DELIVERY plan, V4). Every
 -- statement is a no-op once applied.
+
+-- 0.7.23.1 (4.7.5): TimeOnly and TimeSpan are stored as Ticks in _Long (they were text, which compared wrong past a day and
+-- below zero). The type rows and their copy in the metadata cache say Long from now on; values already stored as
+-- text are not converted (UPGRADING.md gives the statement for a database that wants them).
+UPDATE _types SET _db_type = 'Long'
+    WHERE _id IN (-9223372036854775685, -9223372036854775684) AND _db_type <> 'Long';
+UPDATE _scheme_metadata_cache SET db_type = 'Long'
+    WHERE _type_id IN (-9223372036854775685, -9223372036854775684) AND db_type <> 'Long';
 
 -- V4 (UNIQUE stage 2): [RedbUnique] key metadata and the key hash column.
 ALTER TABLE _structures ADD COLUMN IF NOT EXISTS _unique boolean NULL;

@@ -1,17 +1,17 @@
 -- =====================================================================
 -- 20_pvt_build_query_sql.sql  (MSSql v2-pvt) — orchestrator
 -- ---------------------------------------------------------------------
--- Pure SQL string generation. Output yields a single `_id` column.
+-- Pure SQL string generation. Output yields two columns: `_id` and `_ord`, the position of the row in the order of
+-- the query. The caller wraps it as a derived table and sorts by `_ord` (since 0.2.45).
 --
 -- Shapes:
 --   A) pure-base (no PROPS field referenced):
---      SELECT [DISTINCT] _id FROM dbo._objects o
+--      SELECT o.[_id] AS [_id], ROW_NUMBER() OVER (ORDER BY ..., o.[_id]) AS [_ord] FROM dbo._objects o
 --       WHERE o.[_id_scheme] = X AND <where>
 --       [ORDER BY ...] [OFFSET ... ROWS FETCH NEXT ... ROWS ONLY]
 --
 --   C) wide CTE (any PROPS field referenced):
---      WITH _pvt_cte AS (...)
---      SELECT [DISTINCT] [_id] FROM _pvt_cte
+--      SELECT [_id], ROW_NUMBER() OVER (...) AS [_ord] FROM (...) _pvt_cte
 --       WHERE <where>
 --       [ORDER BY ...] [OFFSET ... ROWS FETCH NEXT ... ROWS ONLY]
 --
@@ -173,15 +173,15 @@ BEGIN
         WHEN @order_sql = N'' THEN N''
         ELSE SUBSTRING(@order_sql, 11, LEN(@order_sql)) + N', '   -- skip CHAR(10) + N'ORDER BY ' (10 chars)
     END;
-    -- T-SQL forbids ORDER BY inside subqueries unless paired with TOP/OFFSET-FETCH.
-    -- The orchestrator output is always wrapped as a derived table by the C# layer,
-    -- so drop ORDER BY when paging is absent and supply a stable default when
-    -- present. Using @base_prefix + [_id] gives deterministic paging (vs the old
-    -- (SELECT 1) placeholder which left row order to the planner).
+    -- T-SQL forbids ORDER BY inside subqueries unless paired with TOP/OFFSET-FETCH,
+    -- and the C# layer always wraps the output as a derived table. Paging without an
+    -- order gets a stable default (@base_prefix + [_id]); an order without paging
+    -- gets OFFSET 0 ROWS, which keeps it. It used to be dropped, and OrderBy without
+    -- Take came back in whatever order the plan produced.
     IF @paging <> N'' AND @order_sql = N''
         SET @order_sql = CHAR(10) + N'ORDER BY ' + @base_prefix + N'[_id]';
-    ELSE IF @paging = N''
-        SET @order_sql = N'';
+    ELSE IF @paging = N'' AND @order_sql <> N''
+        SET @order_sql = @order_sql + CHAR(10) + N'OFFSET 0 ROWS';   -- @paging stays empty: the DISTINCT branches are as before
 
     -- DISTINCT (@distinct=1) wraps the row-source in a derived table `_dist` that
     -- projects only [_id]; the OUTER ORDER BY must reference that projected column,
@@ -190,6 +190,11 @@ BEGIN
     -- T-SQL also forbids ORDER BY on columns absent from a DISTINCT SELECT, so only
     -- the projected [_id] is orderable here; use it for deterministic paging.
     DECLARE @order_sql_dist NVARCHAR(MAX) = CASE WHEN @paging <> N'' THEN CHAR(10) + N'ORDER BY [_id]' ELSE N'' END;
+    -- Every statement returns [_id] and [_ord], the position of the row in the order of the query (its ORDER BY, the
+    -- object id after it). A derived table keeps no order in T-SQL: the caller sorts by [_ord] outside. Numbering the
+    -- rows outside, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)), may run before the inner sort, and
+    -- OrderByDescending(key).DistinctBy(key) came back ascending.
+    DECLARE @ord_dist NVARCHAR(MAX) = N'ROW_NUMBER() OVER (ORDER BY [_id]) AS [_ord]';
 
     -- DistinctBy emulation: T-SQL has no SELECT DISTINCT ON. The row source gets
     --   _rn  = ROW_NUMBER() OVER (PARTITION BY <keys> ORDER BY <order>, <id>)  -- first row of a key by the query order
@@ -246,7 +251,7 @@ BEGIN
             END;
             DECLARE @rowSelT NVARCHAR(MAX) = CASE WHEN @narrow = 1 THEN N'o.[_id]' ELSE N'_pvt_cte.[_id]' END;
             IF @rn_col IS NOT NULL
-                RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                RETURN N'SELECT [_id], [_ord] FROM (' + CHAR(10)
                      + N'SELECT ' + @rowSelT + N' AS [_id], '
                      + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + @rowSelT + N') AS [_rn], '
                      + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + @rowSelT + N') AS [_ord]' + CHAR(10)
@@ -257,14 +262,15 @@ BEGIN
             -- T-SQL forbids ORDER BY items not in SELECT when DISTINCT.
             -- Wrap so paging-ORDER applies outside the DISTINCT.
             IF @distinct = 1
-                RETURN N'SELECT [_id] FROM (' + CHAR(10)
+                RETURN N'SELECT [_id], ' + @ord_dist + N' FROM (' + CHAR(10)
                      + N'SELECT DISTINCT ' + @rowSelT + N' AS [_id] FROM ('
                      + CHAR(10) + @innerT + CHAR(10) + N') _pvt_cte' + @joinT
                      + CHAR(10) + N'WHERE ' + @whereTp + CHAR(10)
                      + N') _dist'
                      + @order_sql_dist + @paging;
             RETURN N'SELECT '
-                 + @rowSelT + N' FROM (' + CHAR(10) + @innerT + CHAR(10) + N') _pvt_cte' + @joinT
+                 + @rowSelT + N' AS [_id], ROW_NUMBER() OVER (ORDER BY ' + @order_cols + @rowSelT + N') AS [_ord]'
+                 + N' FROM (' + CHAR(10) + @innerT + CHAR(10) + N') _pvt_cte' + @joinT
                  + CHAR(10) + N'WHERE ' + @whereTp
                  + @order_sql + @paging;
         END;
@@ -349,7 +355,7 @@ BEGIN
         -- Distinct as in the flat Shape A. This branch used to ignore both: DistinctByRedb on a base
         -- field (no props in the query) returned every node of the tree.
         IF @rn_col IS NOT NULL
-            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+            RETURN N'SELECT [_id], [_ord] FROM (' + CHAR(10)
                  + N'SELECT o.[_id] AS [_id], '
                  + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + N'o.[_id]) AS [_rn], '
                  + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + N'o.[_id]) AS [_ord]' + CHAR(10)
@@ -357,11 +363,11 @@ BEGIN
                  + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
                  + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
         IF @distinct = 1
-            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+            RETURN N'SELECT [_id], ' + @ord_dist + N' FROM (' + CHAR(10)
                  + N'SELECT DISTINCT o.[_id] AS [_id] ' + @baseFromT + CHAR(10)
                  + N') _dist'
                  + @order_sql_dist + @paging;
-        RETURN N'SELECT o.[_id] ' + @baseFromT
+        RETURN N'SELECT o.[_id] AS [_id], ROW_NUMBER() OVER (ORDER BY ' + @order_cols + N'o.[_id]) AS [_ord] ' + @baseFromT
              + @order_sql + @paging;
     END;
 
@@ -377,7 +383,7 @@ BEGIN
             + CHAR(10) + N'WHERE o.[_id_scheme] = ' + CAST(@scheme_id AS NVARCHAR(40))
             + CASE WHEN @whereA <> N'1=1' THEN N' AND ' + @whereA ELSE N'' END;
         IF @rn_col IS NOT NULL
-            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+            RETURN N'SELECT [_id], [_ord] FROM (' + CHAR(10)
                  + N'SELECT o.[_id] AS [_id], '
                  + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + N'o.[_id]) AS [_rn], '
                  + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + N'o.[_id]) AS [_ord]' + CHAR(10)
@@ -385,11 +391,11 @@ BEGIN
                  + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
                  + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
         IF @distinct = 1
-            RETURN N'SELECT [_id] FROM (' + CHAR(10)
+            RETURN N'SELECT [_id], ' + @ord_dist + N' FROM (' + CHAR(10)
                  + N'SELECT DISTINCT o.[_id] AS [_id] ' + @baseFrom + CHAR(10)
                  + N') _dist'
                  + @order_sql_dist + @paging;
-        RETURN N'SELECT o.[_id] ' + @baseFrom
+        RETURN N'SELECT o.[_id] AS [_id], ROW_NUMBER() OVER (ORDER BY ' + @order_cols + N'o.[_id]) AS [_ord] ' + @baseFrom
              + @order_sql + @paging;
     END;
 
@@ -409,7 +415,7 @@ BEGIN
     END;
     DECLARE @rowSelC NVARCHAR(MAX) = CASE WHEN @narrow = 1 THEN N'o.[_id]' ELSE N'_pvt_cte.[_id]' END;
     IF @rn_col IS NOT NULL
-        RETURN N'SELECT [_id] FROM (' + CHAR(10)
+        RETURN N'SELECT [_id], [_ord] FROM (' + CHAR(10)
              + N'SELECT ' + @rowSelC + N' AS [_id], '
              + N'ROW_NUMBER() OVER (PARTITION BY ' + @rn_col + N' ORDER BY ' + @order_cols + @rowSelC + N') AS [_rn], '
              + N'ROW_NUMBER() OVER (ORDER BY ' + @order_cols + @rowSelC + N') AS [_ord]' + CHAR(10)
@@ -418,14 +424,15 @@ BEGIN
              + N') _ranked' + CHAR(10) + N'WHERE _ranked.[_rn] = 1'
              + CHAR(10) + N'ORDER BY _ranked.[_ord]' + @rn_paging;
     IF @distinct = 1
-        RETURN N'SELECT [_id] FROM (' + CHAR(10)
+        RETURN N'SELECT [_id], ' + @ord_dist + N' FROM (' + CHAR(10)
              + N'SELECT DISTINCT ' + @rowSelC + N' AS [_id] FROM ('
              + CHAR(10) + @inner + CHAR(10) + N') _pvt_cte' + @joinC
              + CHAR(10) + N'WHERE ' + @whereC + CHAR(10)
              + N') _dist'
              + @order_sql_dist + @paging;
     RETURN N'SELECT '
-         + @rowSelC + N' FROM (' + CHAR(10) + @inner + CHAR(10) + N') _pvt_cte' + @joinC
+         + @rowSelC + N' AS [_id], ROW_NUMBER() OVER (ORDER BY ' + @order_cols + @rowSelC + N') AS [_ord]'
+         + N' FROM (' + CHAR(10) + @inner + CHAR(10) + N') _pvt_cte' + @joinC
          + CHAR(10) + N'WHERE ' + @whereC
          + @order_sql + @paging;
 END;

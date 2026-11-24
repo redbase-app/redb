@@ -25,10 +25,8 @@ public abstract class SqlPreviewTestsBase
     //  Aggregation over array — must unnest
     // ──────────────────────────────────────────────────────────────────
     /// <summary>
-    /// Aggregate-over-array preview. Default body asserts the PG Pro form
-    /// (CASE-based array-aggregate over <c>_values</c>). Plain PG provider has no
-    /// preview path and throws — that case is covered by an override in the
-    /// PG-free derived class.
+    /// Aggregate-over-array preview, PostgreSQL Free and Pro
+    /// (an aggregate over the <c>_long</c> column of <c>_values</c>).
     /// </summary>
     [Fact]
     public virtual async Task Preview_AggSumOverArray_ContainsUnnest()
@@ -41,7 +39,7 @@ public abstract class SqlPreviewTestsBase
 
         sql.Should().NotBeNullOrWhiteSpace();
         sql.ToUpperInvariant().Should().Contain("SUM(");
-        sql.Should().Contain("_long",
+        sql.Should().ContainEquivalentOf("_long",
             "Sum over int[] aggregates over the _long storage column");
     }
 
@@ -56,7 +54,7 @@ public abstract class SqlPreviewTestsBase
 
         sql.Should().NotBeNullOrWhiteSpace();
         sql.ToUpperInvariant().Should().Contain("AVG(");
-        sql.Should().Contain("_long");
+        sql.Should().ContainEquivalentOf("_long");
     }
 
     // ──────────────────────────────────────────────────────────────────

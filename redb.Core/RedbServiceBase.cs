@@ -310,7 +310,7 @@ public abstract class RedbServiceBase : IRedbService
     internal bool LendsScope => IsCaptive && !_context.IsInTransaction;
 
     /// <summary>The logger of this service; null when the host registered none.</summary>
-    internal ILogger? Logger => _logger;
+    protected internal ILogger? Logger => _logger;
 
     /// <summary>The scope factory of the container that resolved this service; null outside DI.</summary>
     internal IServiceScopeFactory? ScopeFactory { get; }
@@ -1118,15 +1118,16 @@ public abstract class RedbServiceBase : IRedbService
     // === v2-pvt MODULE GUARD ===
 
     /// <summary>
-    /// Verifies that the v2-pvt SQL module is deployed at the exact
-    /// version this dialect's bundle ships. If the deployed version is
-    /// missing or differs (in either direction) and the provider ships
-    /// an embedded bundle, the bundle is applied automatically — so a
-    /// simple `git pull` + restart upgrades the in-database UDFs without
-    /// any manual `psql` / `sqlcmd` step. Dialects that do not ship
-    /// v2-pvt opt out by returning null from
-    /// <see cref="ISqlDialect.Query_PvtModuleVersionFunction"/> and this
-    /// check becomes a no-op.
+    /// Verifies that the v2-pvt SQL module is deployed at the version this
+    /// dialect's bundle ships. A missing or older module is replaced by the
+    /// embedded bundle automatically — so a simple `git pull` + restart
+    /// upgrades the in-database UDFs without any manual `psql` / `sqlcmd`
+    /// step. A newer module is never replaced: it is used when it serves this
+    /// package (<see cref="ISqlDialect.Query_PvtModuleCompatFunction"/>), and
+    /// start-up stops with <see cref="Exceptions.RedbSchemaNewerException"/>
+    /// when it does not. Dialects that do not ship v2-pvt opt out by
+    /// returning null from <see cref="ISqlDialect.Query_PvtModuleVersionFunction"/>
+    /// and this check becomes a no-op.
     /// </summary>
     protected virtual async Task EnsurePvtModuleDeployedAsync()
     {
@@ -1154,6 +1155,12 @@ public abstract class RedbServiceBase : IRedbService
             return;
         }
 
+        if (Data.ModuleCompatibility.IsNewer(deployed, required))
+        {
+            await AcceptNewerModuleAsync(deployed!, required);
+            return;
+        }
+
         // The operator asked that the schema be changed by the DBA only. Say so, with the script to
         // hand over, and touch nothing.
         if (!_configuration.AutoApplyDatabaseUpgrades)
@@ -1176,6 +1183,13 @@ public abstract class RedbServiceBase : IRedbService
             if (string.Equals(deployed, required, StringComparison.Ordinal))
             {
                 _logger?.LogInformation("v2-pvt module {Required} was deployed by another process while this one waited.", required);
+                return;
+            }
+
+            // A node of a newer version deployed its module while this one waited.
+            if (Data.ModuleCompatibility.IsNewer(deployed, required))
+            {
+                await AcceptNewerModuleAsync(deployed!, required);
                 return;
             }
 
@@ -1257,6 +1271,49 @@ public abstract class RedbServiceBase : IRedbService
             return;
 
         await Data.RootStructureKey.EnsureAsync(_context, SqlDialect, await TableExistsAsync("_migrations"), _logger);
+    }
+
+    /// <summary>
+    /// The database holds a module newer than this package's: never replaced. Used, with one warning per process, when
+    /// it serves this package; otherwise start-up stops with <see cref="Exceptions.RedbSchemaNewerException"/>. A newer
+    /// module without the compatibility function states nothing and is treated as not serving.
+    /// </summary>
+    private async Task AcceptNewerModuleAsync(string deployed, string required)
+    {
+        var compatFn = SqlDialect.Query_PvtModuleCompatFunction();
+        string? compat = null;
+        if (!string.IsNullOrEmpty(compatFn))
+        {
+            try
+            {
+                compat = await _context.ExecuteScalarAsync<string>($"SELECT {compatFn}()");
+            }
+            catch (Exception ex) when (Data.DbErrorClassifier.IsUndefinedFunction(ex))
+            {
+                compat = null;
+            }
+        }
+
+        if (!Data.ModuleCompatibility.Serves(compat, required, out var fromPackage))
+            throw new Exceptions.RedbSchemaNewerException(DatabaseTypeName, deployed, required, fromPackage);
+
+        WarnNewerOnce(DatabaseTypeName, deployed, required, _logger);
+    }
+
+    private static readonly HashSet<string> NewerWarned = new(StringComparer.Ordinal);
+
+    /// <summary>One warning per process for one newer module: every scoped service runs the start-up check.</summary>
+    protected static void WarnNewerOnce(string provider, string deployed, string own, ILogger? logger)
+    {
+        lock (NewerWarned)
+        {
+            if (!NewerWarned.Add(provider + "|" + deployed + "|" + own))
+                return;
+        }
+        logger?.LogWarning(
+            "The {Provider} database carries the redb module {Deployed}, newer than {Own} of this package; it serves this " +
+            "package and was left as it is. Upgrade the redb packages of this application when convenient.",
+            provider, deployed, own);
     }
 
     private async Task<string?> ReadPvtModuleVersionAsync(string versionFn)

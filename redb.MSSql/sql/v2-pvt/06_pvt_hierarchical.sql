@@ -58,21 +58,16 @@ BEGIN
             SET @result += N' AND EXISTS (SELECT 1 FROM dbo._objects _ch WHERE _ch.[_id_parent] = ' + @alias + N'.[_id])';
     END;
 
-    -- $level: integer (exact) or object (operators)
+    -- $level: integer (exact) or object (operators). JSON_QUERY returns NULL for a scalar, so the exact level is read
+    -- with JSON_VALUE; it used to be tested through JSON_QUERY only, and {"$level": 1} was dropped from the filter.
     DECLARE @level_raw NVARCHAR(MAX) = JSON_QUERY(@facet_filters, N'$."$level"');
+    DECLARE @lvl_val NVARCHAR(4000) = JSON_VALUE(@facet_filters, N'$."$level"');
     IF @level_raw IS NOT NULL
-    BEGIN
-        IF ISJSON(@level_raw) = 1
-            -- Operator object: {"$gt":2,"$lt":5}
-            SET @result += dbo.pvt_build_level_condition_with_operators(@level_raw, @alias);
-        ELSE
-        BEGIN
-            DECLARE @lvl_val NVARCHAR(20) = JSON_VALUE(@facet_filters, N'$."$level"');
-            DECLARE @lvl_int INT = TRY_CAST(@lvl_val AS INT);
-            IF @lvl_int IS NOT NULL
-                SET @result += dbo.pvt_build_level_condition(@lvl_int, @alias);
-        END;
-    END;
+        -- Operator object: {"$gt":2,"$lt":5}
+        SET @result += dbo.pvt_build_level_condition_with_operators(@level_raw, @alias);
+    ELSE IF @lvl_val IS NOT NULL
+        SET @result += dbo.pvt_build_level_condition(
+            COALESCE(TRY_CAST(@lvl_val AS INT), CAST(dbo.pvt_fail(N'$level expects an integer') AS INT)), @alias);
 
     -- $hasAncestor: object is a descendant of the given ancestor id
     DECLARE @ha_raw NVARCHAR(40) = JSON_VALUE(@facet_filters, N'$."$hasAncestor"');

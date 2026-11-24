@@ -463,7 +463,7 @@ public class SqlRedbConnection : IRedbConnection
                         var obj = new T();
                         var value = reader.GetValue(0);
                         var targetType = Nullable.GetUnderlyingType(resultProp.PropertyType) ?? resultProp.PropertyType;
-                        var convertedValue = Convert.ChangeType(value, targetType);
+                        var convertedValue = redb.Core.Utils.RedbDecimal.ChangeType(value, targetType);
                         resultProp.SetValue(obj, convertedValue);
                         return obj;
                     }
@@ -526,7 +526,7 @@ public class SqlRedbConnection : IRedbConnection
         }
 
         // Convert for numeric types etc.
-        return (T)Convert.ChangeType(result, targetType);
+        return (T)redb.Core.Utils.RedbDecimal.ChangeType(result, targetType);
     }
 
     // === SYNCHRONOUS COUNTERPARTS (thread-pool-free lazy path) ===
@@ -770,7 +770,7 @@ public class SqlRedbConnection : IRedbConnection
             else
             {
                 var value = reader.GetValue(0);
-                results.Add((T)Convert.ChangeType(value, targetType));
+                results.Add((T)redb.Core.Utils.RedbDecimal.ChangeType(value, targetType));
             }
         }
         
@@ -1250,7 +1250,7 @@ internal class SqlRowMapper<T> where T : new()
                         continue;
                     }
                     
-                    var convertedValue = Convert.ChangeType(value, targetType);
+                    var convertedValue = redb.Core.Utils.RedbDecimal.ChangeType(value, targetType);
                     property.SetValue(obj, convertedValue);
                 }
                 catch

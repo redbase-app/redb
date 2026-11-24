@@ -13,7 +13,25 @@
 -- retried.
 -- =====================================================================
 
--- ---------- 3. Module version function ---------------------------------
+-- ---------- 3. Module compatibility function ---------------------------
+-- What this module still serves: '<oldest package module version>|<redb
+-- package version that first shipped that module>'. A package whose module
+-- is older than this one never puts its own module back: it starts when its
+-- version is not below the first part, and stops otherwise, naming the
+-- package version from the second part. Raise the first part only when a
+-- change breaks the C# of older packages (a dropped or renamed function, a
+-- changed signature, a column the old code reads); never lower it.
+-- Created before the version function: a module that reports a version
+-- always has this function too.
+CREATE OR REPLACE FUNCTION pvt_module_compat()
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $BODY$
+    SELECT '0.7.23.1|4.7.5'::text;
+$BODY$;
+
+-- ---------- 4. Module version function ---------------------------------
 -- semver: bump MAJOR on breaking changes to entry-point signatures or
 -- result shape; bump MINOR on additive features; bump PATCH on bug fixes.
 CREATE OR REPLACE FUNCTION pvt_module_version()
@@ -211,6 +229,8 @@ BEGIN
     --          00_module_init.sql. (0.7.15 was a development build of the same, without the INCLUDE.)
     -- 0.7.17 - pvt_build_order_conditions: a DISTINCT ON key takes the direction of its p_order entry instead of
     --          ASC (OrderByDescending(k).DistinctBy(k) came back ascending), and that entry is not repeated.
+    -- 0.7.23.1 - 4.7.5. pvt_module_compat(): what this module still serves, read by packages whose module is older; they leave a
+    --          newer module in place instead of putting their own back (2026-11-14). No other function changed.
     -- 0.7.23 - tree sources: the walk restricts the objects as o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree ...)) instead of
     --          an IN subquery. Since the pivot starts from the objects the walk is read twice, and the recursive CTE,
     --          estimated at a few hundred rows, became the inner side of nested loops: a Props filter over a
@@ -226,7 +246,7 @@ BEGIN
     --          COUNT(*) with a filter, elements reached from the ids of the filtered objects, element fields joined
     --          by _array_parent_id alone with _array_parent_id IS NOT NULL; every form it cannot answer raises
     --          instead of joining a field to the wrong row (2026-11-02).
-    RETURN '0.7.23';
+    RETURN '0.7.23.1';
 END;
 $BODY$;
 

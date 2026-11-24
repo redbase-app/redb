@@ -405,19 +405,21 @@ public abstract class TreeProviderBase : ITreeProvider
         // One transaction for both statements. They used to run in sequence, and a failure in the
         // second (a live FK reference pointing into the subtree) left the first committed: the
         // objects survived with their values already gone (DataLoss p.2).
+        // The count is the objects of the subtree this call deleted. It used to be the size of the subtree collected
+        // above, so an object another session deleted in between was counted too.
         var ids = objectIds.ToArray();
+        var deleted = 0;
         await Context.ExecuteAtomicAsync(async () =>
         {
             await Context.ExecuteAsync(Sql.Tree_DeleteValuesByObjectIds(), new object[] { ids }, cancellationToken);
-            await Context.ExecuteAsync(Sql.Tree_DeleteObjectsByIds(), new object[] { ids }, cancellationToken);
+            var countSql = Sql.ObjectStorage_CountObjectsByIds();
+            if (countSql != null)
+                deleted = checked((int)await Context.ExecuteScalarAsync<long>(countSql, new object[] { ids }, cancellationToken));
+            var affected = await Context.ExecuteAsync(Sql.Tree_DeleteObjectsByIds(), new object[] { ids }, cancellationToken);
+            if (countSql == null)
+                deleted = affected;
         }, cancellationToken);
-
-        // The collected id list IS the subtree (self + descendants), so its count is the correct,
-        // dialect-independent number of objects deleted. The raw DELETE rows-affected is unreliable
-        // here: on SQLite the `_id_parent ON DELETE CASCADE` FK removes child rows as a side effect of
-        // deleting the parent, so changes() under-counts them (it equals rows-affected on PG/MSSql,
-        // which have no such cascade on _id_parent).
-        return objectIds.Count;
+        return deleted;
     }
 
     // ============================================================

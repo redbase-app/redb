@@ -26,8 +26,8 @@ Pick by what the value *means*, not by which type you happen to have:
 | `DateTime` | zone-less clock reading | `_values._DateTimeOffset` | `Kind` is set to `Utc` as a label, not a conversion |
 | `DateTimeOffset` | instant with an offset | `_values._DateTimeOffset` | read back normalised to UTC (`+00:00`), same instant |
 | `DateOnly` | zone-less date | `_values._DateTimeOffset` | midnight of that date |
-| `TimeOnly` | zone-less time of day | `_values._String` | invariant text |
-| `TimeSpan` | duration | `_values._String` | invariant text, keeps days and sign |
+| `TimeOnly` | zone-less time of day | `_values._Long` | its `Ticks` |
+| `TimeSpan` | duration | `_values._Long` | its `Ticks`, keeps days and sign |
 
 Base fields of every object (`DateCreate`, `DateModify`, `DateBegin`, `DateComplete`) are
 `DateTimeOffset`, therefore instants. They line up with the database's own `now()` defaults.
@@ -62,14 +62,13 @@ obj.Props.When = DateTime.UtcNow;            // reading, already UTC, no ambigui
 
 ## Locale: nothing to configure
 
-The text form of `DateOnly`, `TimeOnly` and `TimeSpan` is culture-invariant on both ends, in every
-tier and on every provider. A row written on a machine running `ru-RU` reads identically on one
+`TimeOnly` and `TimeSpan` are stored as a number and `DateOnly` as a date, so no stored form depends on the culture, in
+every tier and on every provider. A row written on a machine running `ru-RU` reads identically on one
 running `en-US`. There is no setting, and the host's `CultureInfo` cannot influence a stored value.
 
-The only thing to be aware of: rows written by **RedBase 3.5 or earlier** used the writing machine's
-short date/time pattern. Those still load, through a fallback that tries the invariant form first and
-the current culture last. If you moved such a database to a host with a different culture, rewrite the
-affected rows once and the fallback stops mattering.
+The only thing to be aware of: `TimeOnly` and `TimeSpan` values written **before 4.7.5** are text in `_values._String`
+and are not read any more (a field reads as its default, a nullable one as `null`). [UPGRADING.md](UPGRADING.md) gives
+the statement that turns them into `Ticks`.
 
 ---
 
@@ -109,10 +108,10 @@ Everything you would expect works server-side, on all providers, for `DateTime`,
 
 Two writings of the same instant select the same rows, so `10:30+03:00` and `07:30Z` are one cutoff.
 
-`TimeOnly` and `TimeSpan` support **exact equality**. Ordered comparison on them is not supported:
-they live in a text column and SQL orders them lexicographically, so `"10.02:00:00"` sorts below
-`"2.02:00:00"`. If you need to order or range over a duration, store it as a number of ticks or
-seconds in a `long`.
+`TimeOnly` and `TimeSpan` compare, sort, group and take `Min`/`Max` chronologically: they are stored as their `Ticks`
+in `_values._Long`, so 10 days sort above 2 days and a negative duration below zero. Before 4.7.5 they were text and
+ordered comparison was wrong past a day and below zero; [UPGRADING.md](UPGRADING.md) says what to do with values stored
+then.
 
 `MinAsync` and `MaxAsync` over a **Props** date field are supported on SQLite only. The aggregate
 contract returns a number, which suits SQLite's numeric date storage and cannot represent the ISO

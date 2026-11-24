@@ -71,8 +71,11 @@ BEGIN
         _value_unique = NULL, -- V4 (decision 9): the trash releases object keys too
         _hash = NULL, -- full-object hash: parent and key change here outside the save path; no cached copy may outlive the move
         _date_modify = NOW()
-    WHERE _id IN (SELECT _id FROM all_descendants);
-    
+    WHERE _id IN (SELECT _id FROM all_descendants)
+      -- On the target row, so it is checked again on the version a concurrent soft delete committed while this
+      -- one waited for the row lock: without it the object moved into a second trash and was counted.
+      AND _id_scheme != -10;
+
     GET DIAGNOSTICS v_count = ROW_COUNT;
     
     -- V4 (UNIQUE, decision 9): a soft-deleted object releases its keys, whole and at once.

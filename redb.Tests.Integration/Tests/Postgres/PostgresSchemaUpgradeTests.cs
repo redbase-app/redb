@@ -99,8 +99,41 @@ public class PostgresSchemaUpgradeTests : SchemaUpgradeTestsBase
     protected override async Task<string> ReadDeployedModuleVersionAsync()
         => (await ScalarAdminAsync<string>(DatabaseName, "SELECT pvt_module_version()"))!;
 
+    protected override Task SetDeployedModuleCompatAsync(string? compat)
+        => ExecAdminAsync(DatabaseName, compat is null
+            ? "DROP FUNCTION IF EXISTS pvt_module_compat()"
+            : $"""
+              CREATE OR REPLACE FUNCTION pvt_module_compat() RETURNS text LANGUAGE sql IMMUTABLE
+              AS $$ SELECT '{compat}'::text $$;
+              """);
+
     protected override Task ApplyScriptAsOwnerAsync(IRedbContext ownerContext, string script)
         => ownerContext.ExecuteAsync(script);
+
+    protected override async Task<string> ReadSchemaFingerprintAsync()
+        => (await ScalarAdminAsync<string>(DatabaseName, """
+            SELECT concat_ws('|',
+                (SELECT count(*) FROM pg_constraint WHERE contype = 'f'),
+                (SELECT last_value::text FROM global_identity),
+                (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal),
+                (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public'),
+                (SELECT count(*) FROM _objects), (SELECT count(*) FROM _values),
+                (SELECT count(*) FROM _schemes), (SELECT count(*) FROM _users))
+            """))!;
+
+    /// <summary>psql with -v ON_ERROR_STOP=1, as the header of the script asks: the run stops at the first error.</summary>
+    protected override async Task<List<string>> RunScriptByHandAsync(string script)
+    {
+        try
+        {
+            await ExecAdminAsync(DatabaseName, script);
+            return [];
+        }
+        catch (PostgresException ex)
+        {
+            return [ex.MessageText];
+        }
+    }
 
     protected override async Task DropV4UpgradeDdlAsync()
     {

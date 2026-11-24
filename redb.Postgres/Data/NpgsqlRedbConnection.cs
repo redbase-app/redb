@@ -417,7 +417,7 @@ namespace redb.Postgres.Data
         {
             DateOnly d when targetType == typeof(DateTime) => d.ToDateTime(TimeOnly.MinValue),
             TimeOnly t when targetType == typeof(TimeSpan) => t.ToTimeSpan(),
-            _ => Convert.ChangeType(value, targetType)
+            _ => redb.Core.Utils.RedbDecimal.ChangeType(value, targetType)
         };
 
         // === ORPHAN TRANSACTION HYGIENE ===
