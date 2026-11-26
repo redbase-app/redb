@@ -1,5 +1,7 @@
+using redb.Core.Models.Contracts;
 using redb.Core.Models.Entities;
 using redb.Core.Query;
+using redb.Core.Query.Aggregation;
 using redb.Tests.Integration.Fixtures;
 using redb.Tests.Integration.Helpers;
 using redb.Tests.Integration.Models;
@@ -11,6 +13,14 @@ namespace redb.Tests.Integration.Tests.MsSqlPro;
 public class MsSqlProPvtPrefilterEquivalenceTests : PvtPrefilterEquivalenceTestsBase
 {
     public MsSqlProPvtPrefilterEquivalenceTests(MsSqlProFixture fixture) : base(fixture.Redb) { }
+
+    /// <summary>See <see cref="PvtPrefilterEquivalenceTestsBase.UnfilteredExtremes_FirstEntryOfTheIndex_SameAnswersAsync"/>.</summary>
+    [Fact]
+    public Task UnfilteredExtremes_FirstEntryOfTheIndex_SameAnswers() => UnfilteredExtremes_FirstEntryOfTheIndex_SameAnswersAsync();
+
+    /// <summary>See <see cref="PvtPrefilterEquivalenceTestsBase.AllWithoutFilter_ProbeThenCounts_SameAnswersAsync"/>.</summary>
+    [Fact]
+    public Task AllWithoutFilter_ProbeThenCounts_SameAnswers() => AllWithoutFilter_ProbeThenCounts_SameAnswersAsync();
 
     /// <summary>
     /// An OR of narrow branches stays on the aggregate form, where the row prefilter reads every
@@ -46,6 +56,76 @@ public class MsSqlProPvtPrefilterEquivalenceTests : PvtPrefilterEquivalenceTests
             Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
             var off = (await NarrowOr().ToListAsync()).Select(r => r.id).ToList();
             on.Should().Equal(off, "the form changes the plan, not the answer");
+        }
+        finally
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = restore);
+        }
+    }
+
+    /// <summary>
+    /// A narrow leaf on an indexed column (a number here) drives the streams off the index of values, the trash subtracted:
+    /// a count, an existence check, a page, a grouping, an aggregate. A text leaf does not: _String has no index of values on
+    /// SQL Server. Next to a filter on the object's own fields that is wide by its shape (an id range) the leaf lifts FORCE
+    /// ORDER and the index hint; next to one narrow by its shape (an IN list of ids) the forced order stays. An object in the
+    /// trash holds the value of the leaf, and a page also requires a field absent. Every answer must equal the one with the
+    /// prefilter off.
+    /// </summary>
+    [Fact]
+    public async Task DrivingLeaf_IndexedLeafOnly_TrashSubtracted_SameAnswers()
+    {
+        var ids = await TestDataFactory.SeedEmployees(Redb, 40);
+        var victim = ids[1];
+        var age = (await Redb.Query<EmployeeProps>().WhereRedb(o => o.Id == victim).ToListAsync()).Single().Props.Age;
+        await Redb.SoftDeleteAsync(new[] { victim, ids[7] });
+        var some = ids.Skip(10).Take(15).ToList();
+        const string driven = "FROM (SELECT dv._id_object AS _id";
+        const string trash = "NOT IN (SELECT t._id FROM _objects t WHERE t._id_scheme = -10)";
+        var restore = Redb.Configuration.EnablePvtPrefilter;
+        try
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
+            IRedbQueryable<EmployeeProps> Aged() => Redb.Query<EmployeeProps>().Where(e => e.Age == age);
+
+            var page = await Aged().Take(10).ToSqlStringAsync();
+            page.Should().Contain(driven).And.Contain(trash).And.NotContain("FORCE ORDER");
+            (await Aged().GroupBy(e => e.Department).ToSqlStringAsync(g => new { g.Key, C = Agg.Count(g) }))
+                .Should().Contain(driven, "a grouping reads its objects off the leaf as well");
+            (await Aged().ToAggregateSqlStringAsync(x => new { S = Agg.Sum(x.Props.Salary) }))
+                .Should().Contain(driven, "an aggregate reads its objects off the leaf as well");
+            (await Redb.Query<EmployeeProps>().Where(e => e.Department == "Engineering").Take(10).ToSqlStringAsync())
+                .Should().NotContain(driven, "a text leaf has no index of values to drive from");
+
+            var range = await Aged().WhereRedb(o => o.Id > 0).Take(10).ToSqlStringAsync();
+            range.Should().NotContain(driven, "the objects drive under WhereRedb").And.NotContain("FORCE ORDER")
+                .And.NotContain("WITH (INDEX(", "a range of ids is wide by its shape, the leaf lifts the forced order");
+            (await Aged().WhereRedb(o => some.Contains(o.Id)).Take(10).ToSqlStringAsync())
+                .Should().Contain("FORCE ORDER", "an IN list of ids is narrow by its shape and keeps the forced order");
+            (await Redb.Query<EmployeeProps>().Where(e => e.Department == "Engineering").WhereRedb(o => o.Id > 0).Take(10).ToSqlStringAsync())
+                .Should().Contain("FORCE ORDER", "a text leaf does not lift the forced order");
+
+            static string Ids(IEnumerable<IRedbObject> rows) => string.Join(",", rows.Select(r => r.Id));
+            static string Groups<T>(IEnumerable<T> rows) => string.Join(",", rows.Select(r => r!.ToString()).OrderBy(s => s, StringComparer.Ordinal));
+            async Task<string> AnswersAsync() => string.Join("; ", new[]
+            {
+                $"count {await Aged().CountAsync()}",
+                $"any {await Aged().AnyAsync()}",
+                $"page {Ids(await Aged().Take(10).ToListAsync())}",
+                $"by salary {Ids(await Aged().OrderBy(e => e.Salary).ThenByRedb(o => o.Id).Take(5).ToListAsync())}",
+                $"absent {Ids(await Aged().Where(e => e.EmployeeCode == null).Take(10).ToListAsync())}",
+                $"group {Groups(await Aged().GroupBy(e => e.Department).SelectAsync(g => new { g.Key, C = Agg.Count(g) }))}",
+                $"sum {(await Aged().AggregateAsync(x => new { S = Agg.Sum(x.Props.Salary) })).S}",
+                $"range {await Aged().WhereRedb(o => o.Id > 0).CountAsync()}",
+                $"in list {await Aged().WhereRedb(o => some.Contains(o.Id)).CountAsync()}",
+                $"range group {Groups(await Aged().WhereRedb(o => o.Id > 0).GroupBy(e => e.Department).SelectAsync(g => new { g.Key, C = Agg.Count(g) }))}",
+            });
+
+            var on = await AnswersAsync();
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            var off = await AnswersAsync();
+            on.Should().Be(off, "driving off the leaf and lifting the forced order change the plan, not the answer");
+            on.Should().NotStartWith("count 0", "the seed has live employees of the victim's age");
+            (await Redb.Query<EmployeeProps>().WhereRedb(o => o.Id == victim).CountAsync()).Should().Be(0, "the victim is in the trash");
         }
         finally
         {

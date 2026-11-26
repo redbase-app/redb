@@ -1155,110 +1155,62 @@ public class SqlRedbConnection : IRedbConnection
 /// <typeparam name="T">Target type.</typeparam>
 internal class SqlRowMapper<T> where T : new()
 {
-    private readonly Dictionary<string, PropertyInfo> _propertyMap;
-    
-    public SqlRowMapper()
-    {
-        _propertyMap = new Dictionary<string, PropertyInfo>(StringComparer.OrdinalIgnoreCase);
-        
-        foreach (var prop in typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance))
-        {
-            if (!prop.CanWrite) continue;
-            
-            // Check for JsonPropertyName attribute
-            var jsonAttr = prop.GetCustomAttribute<JsonPropertyNameAttribute>();
-            var jsonName = jsonAttr?.Name ?? ToSnakeCase(prop.Name);
-            
-            // Map all possible column name formats:
-            // 1. JsonPropertyName value (e.g., "id", "id_scheme")
-            _propertyMap[jsonName] = prop;
-            
-            // 2. MSSQL table column format (e.g., "_id", "_id_scheme")
-            _propertyMap["_" + jsonName] = prop;
-            
-            // 3. PascalCase property name (e.g., "Id", "IdScheme")
-            _propertyMap[prop.Name] = prop;
-            
-            // 4. Lowercase property name
-            _propertyMap[prop.Name.ToLowerInvariant()] = prop;
+    // Bound on the first row: one mapper reads one result set, whose columns do not change between rows.
+    private RedbRowMapping<T>.Slot?[]? _slots;
 
-            // 5. Underscore + lowercase property name without underscores (e.g., "_datetimeoffset")
-            _propertyMap["_" + prop.Name.ToLowerInvariant()] = prop;
-        }
-    }
-    
-    /// <summary>
-    /// Convert PascalCase to snake_case.
-    /// </summary>
-    private static string ToSnakeCase(string pascalCase)
-    {
-        if (string.IsNullOrEmpty(pascalCase)) return pascalCase;
-        
-        var result = new StringBuilder();
-        for (int i = 0; i < pascalCase.Length; i++)
-        {
-            var c = pascalCase[i];
-            if (char.IsUpper(c) && i > 0)
-            {
-                result.Append('_');
-            }
-            result.Append(char.ToLowerInvariant(c));
-        }
-        return result.ToString();
-    }
-    
     /// <summary>
     /// Map current row to object instance.
     /// </summary>
     public T MapRow(SqlDataReader reader)
     {
         var obj = new T();
-        
-        for (int i = 0; i < reader.FieldCount; i++)
+        var slots = _slots ??= RedbRowMapping<T>.Bind(reader);
+
+        for (int i = 0; i < slots.Length; i++)
         {
-            var columnName = reader.GetName(i);
-            
-            if (!_propertyMap.TryGetValue(columnName, out var property))
+            var slot = slots[i];
+            if (slot == null)
                 continue;
-            
+
             var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
-            
+
             if (value != null)
             {
                 try
                 {
-                    var targetType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-                    
+                    var targetType = slot.TargetType;
+
                     // Special handling for DateTimeOffset
                     if (targetType == typeof(DateTimeOffset))
                     {
                         if (value is DateTime dt)
                         {
-                            property.SetValue(obj, new DateTimeOffset(dt, TimeSpan.Zero));
+                            slot.Assign(obj, new DateTimeOffset(dt, TimeSpan.Zero));
                         }
                         else if (value is DateTimeOffset dto)
                         {
-                            property.SetValue(obj, dto);
+                            slot.Assign(obj, dto);
                         }
                         continue;
                     }
-                    
+
                     // Special handling for Guid
                     if (targetType == typeof(Guid) && value is Guid guid)
                     {
-                        property.SetValue(obj, guid);
+                        slot.Assign(obj, guid);
                         continue;
                     }
-                    
-                    var convertedValue = redb.Core.Utils.RedbDecimal.ChangeType(value, targetType);
-                    property.SetValue(obj, convertedValue);
+
+                    // A value already of the target type: Convert.ChangeType would return it unchanged.
+                    var convertedValue = value.GetType() == targetType ? value : redb.Core.Utils.RedbDecimal.ChangeType(value, targetType);
+                    slot.Assign(obj, convertedValue);
                 }
                 catch
                 {
                     // Try direct assignment
                     try
                     {
-                        property.SetValue(obj, value);
+                        slot.Property.SetValue(obj, value);
                     }
                     catch
                     {
@@ -1267,7 +1219,7 @@ internal class SqlRowMapper<T> where T : new()
                 }
             }
         }
-        
+
         return obj;
     }
 }

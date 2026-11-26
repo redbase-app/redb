@@ -465,6 +465,10 @@ All saved and loaded with a single `SaveAsync` / `LoadAsync`. Fields can be adde
 | Base field filters | `.WhereRedb(o => o.DateCreate.Year == 2025)` | Filter on `_objects` table fields directly |
 | WhereInRedb | `.WhereInRedb(x => x.Id, ids)` | IN on base fields — direct |
 
+A comparison, a negated one included (`!=`, `!(p.F == x)`, `!list.Contains(p.F)`), does not return the objects whose field
+has no value, as in SQL. One exception: on SQL Server Free a negated comparison of a list item's `Id`, `Value` or
+`Alias`, such as `!(p.Status.Id == id)` or `!ids.Contains(p.Status.Id)`, also returns the objects without a list item.
+
 ### DateTime
 
 **`DateTime` is a reading on a clock, `DateTimeOffset` is a moment in time.** `14:00` written as a
@@ -558,6 +562,9 @@ the form with `NotSupportedException` before any SQL.
 | Indexer filter | `.Where(e => e.BonusByYear![2023] > 6000)` |
 | Nested class in value | `.Where(e => e.OfficeLocations!["HQ"].City == "NY")` |
 | Tuple key | `.Where(e => e.PerformanceReviews![reviewKey] == "Excellent")` |
+
+A dictionary is stored as an unordered set of entries. A read lists them by key, the same on every provider: strings
+ordinally, numbers, dates and other simple keys by value, tuple and class keys by the text they are stored under.
 
 ### Projection & Pagination
 

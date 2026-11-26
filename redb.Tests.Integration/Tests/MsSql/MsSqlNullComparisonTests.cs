@@ -7,4 +7,6 @@ namespace redb.Tests.Integration.Tests.MsSql;
 public class MsSqlNullComparisonTests : NullComparisonTestsBase
 {
     public MsSqlNullComparisonTests(MsSqlFixture fixture) : base(fixture.Redb) { }
+
+    protected override bool NegatedListItemTakesObjectsWithoutItem => true;
 }

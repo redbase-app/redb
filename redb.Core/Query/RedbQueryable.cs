@@ -405,6 +405,17 @@ public class RedbQueryable<TProps> : IRedbQueryable<TProps>, IOrderedRedbQueryab
         if (predicateFilter is ComparisonExpression { Property.Name: "__constant", Operator: ComparisonOperator.Equal, Value: true })
             return true;
 
+        // A provider may answer All over the whole scheme in one statement of its own (QueryProviderBase.TryAllWithoutFilterAsync).
+        // Only for the plain set of the scheme: WhereRedb and WhereInRedb sit in the filter, the tree queryables have an
+        // AllAsync of their own, and Take and Skip are set aside here as by the counts below. A distinct set is not the
+        // set of objects: DistinctBy keeps one object per key, and the counts below compare keys.
+        if (_context.Filter == null && !_context.IsEmpty
+            && _context.DistinctByField == null && !_context.IsDistinct && !_context.IsDistinctRedb
+            && _provider is Base.QueryProviderBase provider
+            && ReadsPropsFieldsOnly(predicateFilter) && !IsEmptyFilter(predicateFilter)
+            && await provider.TryAllWithoutFilterAsync(_context, predicateFilter, cancellationToken) is bool all)
+            return all;
+
         if (_provider is Base.QueryProviderBase { CompilesNotTrue: true } && ReadsPropsFieldsOnly(predicateFilter))
         {
             if (IsEmptyFilter(predicateFilter))

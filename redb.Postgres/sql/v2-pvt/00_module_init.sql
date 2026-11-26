@@ -24,7 +24,7 @@
 -- psql goes on after an error unless told to stop: run the script with -v ON_ERROR_STOP=1.
 DO $$
 DECLARE
-    _own      constant text := '0.7.23.1';
+    _own      constant text := '0.7.23.2';
     _deployed text;
     _core     text;
     _compat   text;
@@ -65,6 +65,81 @@ UPDATE _types SET _db_type = 'Long'
     WHERE _id IN (-9223372036854775685, -9223372036854775684) AND _db_type <> 'Long';
 UPDATE _scheme_metadata_cache SET db_type = 'Long'
     WHERE _type_id IN (-9223372036854775685, -9223372036854775684) AND db_type <> 'Long';
+
+-- 0.7.23.2 (4.7.x): the field-name trigger compares C# keywords as written, not in lower case. C# keywords are
+-- case-sensitive, so Ref, Default or String are ordinary property names; they were refused at scheme sync ("is a C#
+-- reserved word"). The same body as in redbPostgre.sql, which a new database gets; this puts it into an existing one.
+CREATE OR REPLACE FUNCTION validate_structure_name()
+RETURNS TRIGGER AS $$
+DECLARE
+    reserved_fields text[] := ARRAY[
+        '_id', '_id_parent', '_id_scheme', '_id_owner', '_id_who_change',
+        '_date_create', '_date_modify', '_date_begin', '_date_complete',
+        '_key', '_name', '_note', '_hash',
+        '_value_long', '_value_string', '_value_guid', '_value_bool',
+        '_value_double', '_value_numeric', '_value_datetime', '_value_bytes'
+    ];
+    field_name text;
+BEGIN
+    -- Check only on INSERT and UPDATE of _name field
+    IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND OLD._name IS DISTINCT FROM NEW._name) THEN
+        field_name := LOWER(NEW._name);
+        
+        -- Check 1: Name must not match reserved fields of _objects
+        IF field_name = ANY(reserved_fields) THEN
+            RAISE EXCEPTION 'Field name "_name" cannot match system object fields: %', NEW._name
+                USING ERRCODE = '23514',
+                      HINT = 'Use a different name, avoid: ' || array_to_string(reserved_fields, ', ');
+        END IF;
+        
+        -- Check 2: Name must not start with a digit
+        IF NEW._name ~ '^[0-9]' THEN
+            RAISE EXCEPTION 'Field name "_name" cannot start with a digit: %', NEW._name
+                USING ERRCODE = '23514',
+                      HINT = 'Field name must start with a letter or underscore';
+        END IF;
+        
+        -- Check 3: Name must follow C# naming rules (letters, digits, underscores)
+        IF NEW._name !~ '^[a-zA-Z_][a-zA-Z0-9_]*$' THEN
+            RAISE EXCEPTION 'Field name "_name" contains invalid characters: %', NEW._name
+                USING ERRCODE = '23514',
+                      HINT = 'Name can only contain Latin letters, digits, underscores. Must start with letter or underscore';
+        END IF;
+        
+        -- Check 4: Name must not be empty or contain only spaces
+        IF LENGTH(TRIM(NEW._name)) = 0 THEN
+            RAISE EXCEPTION 'Field name "_name" cannot be empty'
+                USING ERRCODE = '23514';
+        END IF;
+        
+        -- Check 5: Maximum name length (reasonable limit)
+        IF LENGTH(NEW._name) > 64 THEN
+            RAISE EXCEPTION 'Field name "_name" is too long (max 64 characters): %', NEW._name
+                USING ERRCODE = '23514';
+        END IF;
+        
+        -- Check 6: C# reserved words, compared as written: C# keywords are case-sensitive, so Ref, Default or
+        -- String are ordinary property names and only ref, default, string are refused (0.7.23.2).
+        IF NEW._name = ANY(ARRAY[
+            'abstract', 'as', 'bool', 'break', 'byte', 'case', 'catch', 'char', 'checked',
+            'class', 'const', 'continue', 'decimal', 'default', 'delegate', 'do', 'double', 'else',
+            'enum', 'event', 'explicit', 'extern', 'false', 'finally', 'fixed', 'float', 'for',
+            'foreach', 'goto', 'if', 'implicit', 'in', 'int', 'interface', 'internal', 'is', 'lock',
+            'long', 'namespace', 'new', 'null', 'object', 'operator', 'out', 'override', 'params',
+            'private', 'protected', 'public', 'readonly', 'ref', 'return', 'sbyte', 'sealed',
+            'short', 'sizeof', 'stackalloc', 'static', 'string', 'struct', 'switch', 'this',
+            'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked', 'unsafe', 'ushort',
+            'using', 'virtual', 'void', 'volatile', 'while'
+        ]) THEN
+            RAISE EXCEPTION 'Field name "_name" is a C# reserved word: %', NEW._name
+                USING ERRCODE = '23514',
+                      HINT = 'Use a different name or add prefix/suffix';
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 -- V4 (UNIQUE stage 2): [RedbUnique] key metadata and the key hash column.
 ALTER TABLE _structures ADD COLUMN IF NOT EXISTS _unique boolean NULL;

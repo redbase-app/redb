@@ -67,6 +67,21 @@ internal static class ImportFinishing
     }
 
     /// <summary>
+    /// PostgreSQL: the planner statistics of the loaded tables, before an application queries them. COPY leaves a
+    /// table without statistics until autoanalyze reaches it, and a query planned meanwhile takes every table for
+    /// one row: on a new database of a few hundred objects a grouping ran for minutes. The other providers keep
+    /// their own (SQL Server creates them on the first query, SQLite plans without them). False when nothing ran.
+    /// </summary>
+    public static async Task<bool> AnalyzeAsync(IDataProvider provider, CancellationToken ct)
+    {
+        if (provider is not PostgresProvider postgres)
+            return false;
+        // Only the redb tables: the database may hold tables of others, and analyzing them is not the import's business.
+        await postgres.AnalyzeRedbTablesAsync(ct);
+        return true;
+    }
+
+    /// <summary>
     /// How many imported values of TimeSpan and TimeOnly fields are stored as text: a file of a version before they
     /// were stored as ticks. The import leaves them as the file has them; the upgrade notes convert them.
     /// </summary>

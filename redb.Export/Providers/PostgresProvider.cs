@@ -55,6 +55,18 @@ public sealed class PostgresProvider : IDataProvider, IParallelImportProvider
         _transaction = null;
     }
 
+    /// <summary>
+    /// The planner statistics of the redb tables an import wrote, and of no other table of the database: COPY leaves
+    /// them without statistics until autoanalyze reaches them (see ImportFinishing.AnalyzeAsync).
+    /// </summary>
+    public async Task AnalyzeRedbTablesAsync(CancellationToken ct = default)
+    {
+        await using var command = Connection.CreateCommand();
+        command.CommandText = "ANALYZE " + string.Join(", ", RedbTables);
+        command.CommandTimeout = 0;
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
     /// <inheritdoc />
     public async Task AbortImportAsync()
     {

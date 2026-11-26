@@ -384,6 +384,8 @@ public sealed class ImportService
             // The rows are committed: the scheme metadata cache is built now, not by the first query of an application.
             var cached = await ImportFinishing.SyncMetadataCacheAsync(_provider, ct);
             Log($"Scheme metadata cache built for {cached} scheme(s).");
+            if (await ImportFinishing.AnalyzeAsync(_provider, ct))
+                Log("Planner statistics refreshed (ANALYZE).");
 
             var timeAsText = await ImportFinishing.TimeValuesAsTextAsync(_provider, ct);
 

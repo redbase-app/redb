@@ -18,7 +18,9 @@ public abstract class ArrayGroupMetadataCacheTestsBase
 
     protected ArrayGroupMetadataCacheTestsBase(IRedbService redb) => Redb = redb;
 
-    private static Task<int> CommandsAsync(Func<Task> action) => CommandCounter.CountAsync(action);
+    // The data statement and any metadata read. Not the scalar side commands of the
+    // PostgreSQL statistics guard, which a call meets or not by timing (CommandCounter.CountWithoutScalarsAsync).
+    private static Task<int> CommandsAsync(Func<Task> action) => CommandCounter.CountWithoutScalarsAsync(action);
 
     private static Task<List<Row>> GroupAsync(IRedbQueryable<EmployeeProps> source)
         => source.GroupByArray(e => e.Contacts!.SelectMany(c => c.Metadata!), m => m.Label)

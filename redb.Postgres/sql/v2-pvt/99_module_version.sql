@@ -229,6 +229,8 @@ BEGIN
     --          00_module_init.sql. (0.7.15 was a development build of the same, without the INCLUDE.)
     -- 0.7.17 - pvt_build_order_conditions: a DISTINCT ON key takes the direction of its p_order entry instead of
     --          ASC (OrderByDescending(k).DistinctBy(k) came back ascending), and that entry is not repeated.
+    -- 0.7.23.2 - 4.7.x. validate_structure_name() (00_module_init.sql, block 0): C# keywords are compared as written, so a
+    --          field named Ref, Default or String passes and only ref, default, string are refused; it compared in lower case.
     -- 0.7.23.1 - 4.7.5. pvt_module_compat(): what this module still serves, read by packages whose module is older; they leave a
     --          newer module in place instead of putting their own back (2026-11-14). No other function changed.
     -- 0.7.23 - tree sources: the walk restricts the objects as o._id = ANY(ARRAY(SELECT _id FROM _pvt_tree ...)) instead of
@@ -246,7 +248,7 @@ BEGIN
     --          COUNT(*) with a filter, elements reached from the ids of the filtered objects, element fields joined
     --          by _array_parent_id alone with _array_parent_id IS NOT NULL; every form it cannot answer raises
     --          instead of joining a field to the wrong row (2026-11-02).
-    RETURN '0.7.23.1';
+    RETURN '0.7.23.2';
 END;
 $BODY$;
 

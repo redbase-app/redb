@@ -1,3 +1,4 @@
+using redb.Core.Models.Contracts;
 using redb.Core.Models.Entities;
 using redb.Core.Query;
 using redb.Core.Query.Aggregation;
@@ -15,6 +16,75 @@ public class SqliteProPvtPrefilterEquivalenceTests : PvtPrefilterEquivalenceTest
 
     public SqliteProPvtPrefilterEquivalenceTests(SqliteProFixture fixture) : base(fixture.Redb)
         => _fixture = fixture;
+
+    /// <summary>See <see cref="PvtPrefilterEquivalenceTestsBase.UnfilteredExtremes_FirstEntryOfTheIndex_SameAnswersAsync"/>.</summary>
+    [Fact]
+    public Task UnfilteredExtremes_FirstEntryOfTheIndex_SameAnswers() => UnfilteredExtremes_FirstEntryOfTheIndex_SameAnswersAsync();
+
+    /// <summary>See <see cref="PvtPrefilterEquivalenceTestsBase.AllWithoutFilter_ProbeThenCounts_SameAnswersAsync"/>.</summary>
+    [Fact]
+    public Task AllWithoutFilter_ProbeThenCounts_SameAnswers() => AllWithoutFilter_ProbeThenCounts_SameAnswersAsync();
+
+    /// <summary>
+    /// A narrow OR the row prefilter does not read is probed: its branches are read from the index of values up to the cap,
+    /// and the objects found seed the streams. That holds for a grouping, an aggregate, a page without an ordering and a
+    /// page sorted by a Props field (the walk of the sort field gives way to the probe). A page sorted by base fields only
+    /// and a count keep the row prefilter. One object matching a branch is in the trash. Every answer must equal the one
+    /// with the prefilter off.
+    /// </summary>
+    [Fact]
+    public async Task NarrowOr_ProbedWhereTheRowPrefilterDoesNotRead_SameAnswers()
+    {
+        var ids = await TestDataFactory.SeedEmployees(Redb, 40);
+        var restore = Redb.Configuration.EnablePvtPrefilter;
+        try
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            var victim = (await Redb.Query<EmployeeProps>().WhereRedb(o => o.Id == ids[3]).ToListAsync()).Single().Props;
+            var age = victim.Age;
+            var salary = victim.Salary;
+            await Redb.SoftDeleteAsync(new[] { ids[3] });
+
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
+            IRedbQueryable<EmployeeProps> Or() => Redb.Query<EmployeeProps>().Where(e => e.Age == age || e.Salary == salary);
+            IRedbQueryable<EmployeeProps> TextOr() => Redb.Query<EmployeeProps>().Where(e => e.Department == "Engineering" || e.Position == "Developer");
+            const string probe = "pvt_probe";
+
+            (await Or().GroupBy(e => e.Department).ToSqlStringAsync(g => new { g.Key, C = Agg.Count(g) }))
+                .Should().Contain(probe, "a grouping reads the OR from the index of values first");
+            (await Or().ToAggregateSqlStringAsync(x => new { S = Agg.Sum(x.Props.Salary) }))
+                .Should().Contain(probe, "so does an aggregate");
+            (await Or().Take(10).ToSqlStringAsync()).Should().Contain(probe, "so does a page without an ordering");
+            (await Or().OrderBy(e => e.Salary).ThenByRedb(o => o.Id).Take(10).ToSqlStringAsync())
+                .Should().Contain(probe).And.NotContain("PVT leading form", "a page sorted by a Props field is probed, not walked");
+            (await Or().OrderByRedb(o => o.Id).Take(10).ToSqlStringAsync())
+                .Should().Contain("Streams not applied, the filter is an OR of narrow branches", "a page sorted by base fields keeps the row prefilter");
+
+            static string Ids(IEnumerable<IRedbObject<EmployeeProps>> rows) => string.Join(",", rows.Select(r => r.Id));
+            static string Groups<T>(IEnumerable<T> rows) => string.Join(",", rows.Select(r => r!.ToString()).OrderBy(s => s, StringComparer.Ordinal));
+            async Task<string> AnswersAsync() => string.Join("; ", new[]
+            {
+                $"group {Groups(await Or().GroupBy(e => e.Department).SelectAsync(g => new { g.Key, C = Agg.Count(g) }))}",
+                $"text group {Groups(await TextOr().GroupBy(e => e.Age).SelectAsync(g => new { g.Key, C = Agg.Count(g) }))}",
+                $"sum {(await Or().AggregateAsync(x => new { S = Agg.Sum(x.Props.Salary), C = Agg.Count() })).S}",
+                $"count {await Or().CountAsync()}",
+                $"page {(await Or().Take(100).ToListAsync()).Count}",
+                $"by salary {Ids(await Or().OrderBy(e => e.Salary).ThenByRedb(o => o.Id).Take(10).ToListAsync())}",
+                $"text by age {Ids(await TextOr().OrderByDescending(e => e.Age).ThenByRedb(o => o.Id).Take(10).ToListAsync())}",
+                $"by id {Ids(await Or().OrderByRedb(o => o.Id).Take(10).ToListAsync())}",
+            });
+
+            var on = await AnswersAsync();
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            var off = await AnswersAsync();
+            on.Should().Be(off, "probing the OR changes the plan, not the answer");
+            on.Should().NotContain("count 0;", "live employees match the OR");
+        }
+        finally
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = restore);
+        }
+    }
 
     /// <summary>
     /// SQLite only, and a performance rule rather than a correctness one, so it is asserted on the

@@ -1296,141 +1296,89 @@ namespace redb.SQLite.Data
     /// <typeparam name="T">Target type.</typeparam>
     internal class RedbRowMapper<T> where T : new()
     {
-        private readonly Dictionary<string, PropertyInfo> _propertyMap;
-        
-        public RedbRowMapper()
-        {
-            _propertyMap = new Dictionary<string, PropertyInfo>(StringComparer.OrdinalIgnoreCase);
-            
-            foreach (var prop in typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (!prop.CanWrite) continue;
-                
-                // Check for JsonPropertyName attribute
-                var jsonAttr = prop.GetCustomAttribute<JsonPropertyNameAttribute>();
-                var jsonName = jsonAttr?.Name ?? ToSnakeCase(prop.Name);
-                
-                // Map all possible column name formats:
-                // 1. JsonPropertyName value (e.g., "id", "id_scheme")
-                _propertyMap[jsonName] = prop;
-                
-                // 2. SQLite table column format (e.g., "_id", "_id_scheme")
-                _propertyMap["_" + jsonName] = prop;
-                
-                // 3. PascalCase property name (e.g., "Id", "IdScheme")
-                _propertyMap[prop.Name] = prop;
-                
-                // 4. Lowercase property name (SQLite returns lowercase aliases!)
-                _propertyMap[prop.Name.ToLowerInvariant()] = prop;
+        // Bound on the first row: one mapper reads one result set, whose columns do not change between rows.
+        private RedbRowMapping<T>.Slot?[]? _slots;
 
-                // 5. Underscore + lowercase property name without underscores (e.g., "_datetimeoffset")
-                _propertyMap["_" + prop.Name.ToLowerInvariant()] = prop;
-            }
-        }
-        
-        /// <summary>
-        /// Convert PascalCase to snake_case.
-        /// </summary>
-        private static string ToSnakeCase(string pascalCase)
-        {
-            if (string.IsNullOrEmpty(pascalCase)) return pascalCase;
-            
-            var result = new System.Text.StringBuilder();
-            for (int i = 0; i < pascalCase.Length; i++)
-            {
-                var c = pascalCase[i];
-                if (char.IsUpper(c) && i > 0)
-                {
-                    result.Append('_');
-                }
-                result.Append(char.ToLowerInvariant(c));
-            }
-            return result.ToString();
-        }
-        
-        /// <summary>
-        /// Map current row to object instance.
-        /// </summary>
         public T MapRow(SqliteDataReader reader)
         {
             var obj = new T();
-            
-            for (int i = 0; i < reader.FieldCount; i++)
+            var slots = _slots ??= RedbRowMapping<T>.Bind(reader);
+
+            for (int i = 0; i < slots.Length; i++)
             {
-                var columnName = reader.GetName(i);
-                
-                if (!_propertyMap.TryGetValue(columnName, out var property))
+                var slot = slots[i];
+                if (slot == null)
                     continue;
-                
+
+                var property = slot.Property;
                 var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
-                
+
                 if (value != null)
                 {
                     try
                     {
-                        var targetType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-                        
+                        var targetType = slot.TargetType;
+
                         // Datetimes are stored as REAL Julian day (UTC) — value is a double.
                         if (targetType == typeof(DateTimeOffset))
                         {
                             if (value is double jd)
-                                property.SetValue(obj, SqliteJulian.FromJulian(jd));
+                                slot.Assign(obj, SqliteJulian.FromJulian(jd));
                             else if (value is DateTime dt)
-                                property.SetValue(obj, new DateTimeOffset(dt, TimeSpan.Zero));
+                                slot.Assign(obj, new DateTimeOffset(dt, TimeSpan.Zero));
                             else if (value is DateTimeOffset dto)
-                                property.SetValue(obj, dto);
+                                slot.Assign(obj, dto);
                             else if (value is string sdt)
-                                property.SetValue(obj, DateTimeOffset.Parse(sdt, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind));
+                                slot.Assign(obj, DateTimeOffset.Parse(sdt, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind));
                             continue;
                         }
 
                         if (targetType == typeof(DateTime))
                         {
-                            if (value is double jd2) property.SetValue(obj, SqliteJulian.FromJulian(jd2).UtcDateTime);
-                            else if (value is DateTime dt2) property.SetValue(obj, dt2);
-                            else if (value is DateTimeOffset dto2) property.SetValue(obj, dto2.UtcDateTime);
-                            else if (value is string sdt2) property.SetValue(obj, DateTime.Parse(sdt2, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind));
+                            if (value is double jd2) slot.Assign(obj, SqliteJulian.FromJulian(jd2).UtcDateTime);
+                            else if (value is DateTime dt2) slot.Assign(obj, dt2);
+                            else if (value is DateTimeOffset dto2) slot.Assign(obj, dto2.UtcDateTime);
+                            else if (value is string sdt2) slot.Assign(obj, DateTime.Parse(sdt2, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind));
                             continue;
                         }
 
                         if (targetType == typeof(DateOnly))
                         {
-                            if (value is double jd3) property.SetValue(obj, DateOnly.FromDateTime(SqliteJulian.FromJulian(jd3).UtcDateTime));
-                            else if (value is DateTime dt3) property.SetValue(obj, DateOnly.FromDateTime(dt3));
-                            else if (value is string sdt3) property.SetValue(obj, DateOnly.Parse(sdt3, System.Globalization.CultureInfo.InvariantCulture));
+                            if (value is double jd3) slot.Assign(obj, DateOnly.FromDateTime(SqliteJulian.FromJulian(jd3).UtcDateTime));
+                            else if (value is DateTime dt3) slot.Assign(obj, DateOnly.FromDateTime(dt3));
+                            else if (value is string sdt3) slot.Assign(obj, DateOnly.Parse(sdt3, System.Globalization.CultureInfo.InvariantCulture));
                             continue;
                         }
 
                         // A hash comes back as BLOB(16), a data guid as TEXT — SqliteHash reads both.
                         if (targetType == typeof(Guid))
                         {
-                            property.SetValue(obj, SqliteHash.FromDbValue(value));
+                            slot.Assign(obj, SqliteHash.FromDbValue(value));
                             continue;
                         }
 
                         // A value already of the property's type is assigned as is (BLOB -> byte[] among them).
                         if (property.PropertyType.IsInstanceOfType(value))
                         {
-                            property.SetValue(obj, value);
+                            slot.Assign(obj, value);
                             continue;
                         }
 
                         var convertedValue = redb.Core.Utils.RedbDecimal.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
-                        property.SetValue(obj, convertedValue);
+                        slot.Assign(obj, convertedValue);
                     }
                     catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
                     {
                         // SL-57: two silent catches left the property at its default - the row read as if the
                         // column were NULL.
                         throw new InvalidOperationException(
-                            $"Column '{columnName}': the value '{value}' ({value.GetType().Name}) cannot be read as " +
+                            $"Column '{reader.GetName(i)}': the value '{value}' ({value.GetType().Name}) cannot be read as " +
                             $"{property.PropertyType.Name} ({typeof(T).Name}.{property.Name}).", ex);
                     }
                 }
             }
-            
+
             return obj;
         }
     }
 }
-

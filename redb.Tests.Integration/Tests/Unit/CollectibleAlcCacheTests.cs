@@ -92,15 +92,36 @@ public class CollectibleAlcCacheTests
     }
 
     [Fact]
-    public void ProMaterializer_BuildMethodCache_DoesNotPinTheModule()
+    public void ProMaterializer_TypeCaches_DoNotPinTheModule()
     {
-        var getBuildMethod = typeof(ProPropsMaterializer).GetMethod("GetBuildMethod", BindingFlags.NonPublic | BindingFlags.Static)
-                             ?? throw new InvalidOperationException("GetBuildMethod not found");
+        // Every per-type cache of the materializer: the open-instance delegates of the class recursion and of GetObjectProps,
+        // the list, stub and dictionary factories, and a property slot with its compiled setter, each filled with a type
+        // of the module and used once.
+        static MethodInfo Member(string name) => typeof(ProPropsMaterializer).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)
+                                                 ?? throw new InvalidOperationException($"{name} not found");
+        var getBuildFn = Member("GetBuildFn");
+        var getObjectPropsFor = Member("GetObjectPropsFor");
+        var newList = Member("NewList");
+        var newStub = Member("NewStub");
+        var getDictionaryPlan = Member("GetDictionaryPlan");
+        var findSlot = Member("FindSlot");
 
         var weak = TouchAndUnload("alc-materializer", type =>
-            ((MethodInfo)getBuildMethod.Invoke(null, [type])!).GetGenericArguments().Should().Equal(type));
+        {
+            ((Delegate)getBuildFn.Invoke(null, [type])!).Method.GetGenericArguments().Should().Equal(type);
+            ((Delegate)getObjectPropsFor.Invoke(null, [type])!).Method.GetGenericArguments().Should().Equal(type);
+            newList.Invoke(null, [type]).Should().BeAssignableTo(typeof(List<>).MakeGenericType(type));
+            var redbObjectType = typeof(RedbObject<>).MakeGenericType(type);
+            ((RedbObject)newStub.Invoke(null, [redbObjectType, 7L])!).id.Should().Be(7);
+            getDictionaryPlan.Invoke(null, [typeof(Dictionary<,>).MakeGenericType(typeof(string), type)]).Should().NotBeNull();
 
-        AssertCollected(weak, "the MethodInfo cache of ProPropsMaterializer");
+            var slot = findSlot.Invoke(null, [type, "Title"])!;
+            var instance = Activator.CreateInstance(type)!;
+            slot.GetType().GetMethod("Assign")!.Invoke(slot, [instance, "set through the compiled setter"]);
+            type.GetProperty("Title")!.GetValue(instance).Should().Be("set through the compiled setter");
+        });
+
+        AssertCollected(weak, "the per-type caches of ProPropsMaterializer");
     }
 
     [Fact]

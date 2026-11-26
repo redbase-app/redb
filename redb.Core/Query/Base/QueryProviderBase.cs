@@ -178,6 +178,15 @@ public abstract partial class QueryProviderBase : IRedbQueryProvider, Grouping.I
     protected internal virtual bool CompilesNotTrue => false;
 
     /// <summary>
+    /// AllAsync of <paramref name="predicate"/> over every object of the scheme (the query has no filter of its own),
+    /// answered by the provider in one statement, or null when it has no such form for this predicate; AllAsync then
+    /// goes on as without it. The predicate reads Props fields only.
+    /// </summary>
+    protected internal virtual Task<bool?> TryAllWithoutFilterAsync<TProps>(QueryContext<TProps> context, FilterExpression predicate,
+        CancellationToken cancellationToken) where TProps : class, new()
+        => Task.FromResult<bool?>(null);
+
+    /// <summary>
     /// An ordering by Props fields keeps the objects without a value for the key and places them as LINQ does (null
     /// first ascending), ThenBy included. A projection then sends an OrderBy or ThenBy written after Select to the
     /// source, so a later Take/Skip stays in SQL; otherwise it sorts the projected rows in memory.

@@ -955,8 +955,9 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
         
-        -- Check 6: Additional C# reserved words
-        IF LOWER(NEW._name) = ANY(ARRAY[
+        -- Check 6: C# reserved words, compared as written: C# keywords are case-sensitive, so Ref, Default or
+        -- String are ordinary property names and only ref, default, string are refused (0.7.23.2).
+        IF NEW._name = ANY(ARRAY[
             'abstract', 'as', 'bool', 'break', 'byte', 'case', 'catch', 'char', 'checked',
             'class', 'const', 'continue', 'decimal', 'default', 'delegate', 'do', 'double', 'else',
             'enum', 'event', 'explicit', 'extern', 'false', 'finally', 'fixed', 'float', 'for',

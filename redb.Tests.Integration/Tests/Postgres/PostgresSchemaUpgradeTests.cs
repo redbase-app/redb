@@ -221,6 +221,29 @@ public class PostgresSchemaUpgradeTests : SchemaUpgradeTestsBase
         }
     }
 
+    /// <summary>
+    /// A database of 4.7.5 (module 0.7.23.1, field names checked against the C# keywords in lower case) gets the
+    /// field-name check of this build at the next owner start: the module goes to the required version and block 0 of the
+    /// bundle replaces validate_structure_name(), so a property named Ref syncs.
+    /// </summary>
+    [Fact]
+    public async Task Owner_475Module_GetsTheCaseSensitiveKeywordCheck()
+    {
+        var current = await ScalarAdminAsync<string>(DatabaseName, "SELECT pg_get_functiondef('validate_structure_name()'::regprocedure)");
+        current.Should().Contain("IF NEW._name = ANY(ARRAY[", "this build compares the keywords as written");
+        await ExecAdminAsync(DatabaseName, current!.Replace("IF NEW._name = ANY(ARRAY[", "IF LOWER(NEW._name) = ANY(ARRAY["));
+        await SetDeployedModuleVersionAsync("0.7.23.1");
+
+        await using var sp = Build(OwnerConnectionString, autoApply: true, cacheDomain: $"keyword-case-{Guid.NewGuid():N}");
+        var redb = sp.GetRequiredService<redb.Core.IRedbService>();
+        await redb.InitializeAsync(ensureCreated: true);
+
+        (await ReadDeployedModuleVersionAsync()).Should().NotBe("0.7.23.1", "the start upgrades the 4.7.5 module");
+        var upgraded = await ScalarAdminAsync<string>(DatabaseName, "SELECT pg_get_functiondef('validate_structure_name()'::regprocedure)");
+        upgraded.Should().Contain("IF NEW._name = ANY(ARRAY[").And.NotContain("LOWER(NEW._name) = ANY(ARRAY[");
+        await redb.SyncSchemeAsync<redb.Tests.Integration.Models.KeywordNamesProps>();
+    }
+
     private async Task<bool> RootKeyExistsAsync()
         => await ScalarAdminAsync<object>(DatabaseName,
             $"SELECT 1 FROM pg_indexes WHERE indexname = '{RootStructureKey.IndexName}'") != null;

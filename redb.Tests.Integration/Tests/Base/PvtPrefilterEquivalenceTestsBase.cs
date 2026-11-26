@@ -1,5 +1,6 @@
 using redb.Core;
 using redb.Core.Query;
+using redb.Core.Query.Aggregation;
 using redb.Tests.Integration.Helpers;
 using redb.Tests.Integration.Models;
 
@@ -30,6 +31,91 @@ public abstract class PvtPrefilterEquivalenceTestsBase
     private bool _seeded;
 
     protected PvtPrefilterEquivalenceTestsBase(IRedbService redb) => Redb = redb;
+
+    /// <summary>
+    /// A page the leading form takes (a condition on the sort field that rejects NULL) ordered then by the object id
+    /// (ThenByRedb). The streams branch of the form sorts by the id as well and must carry that column: on PostgreSQL and
+    /// SQLite it did not, and the page failed with "column pvt._id does not exist". Pages with and without Skip, ascending
+    /// and descending, must equal the ones with the prefilter off.
+    /// </summary>
+    [Fact]
+    public async Task LeadingForm_ThenByObjectId_SameAnswers()
+    {
+        await SeedAsync();
+        var restore = Redb.Configuration.EnablePvtPrefilter;
+        try
+        {
+            IRedbQueryable<EmployeeProps> BySalary() => Redb.Query<EmployeeProps>()
+                .Where(e => e.Salary > 0m).OrderBy(e => e.Salary).ThenByRedb(o => o.Id);
+            IRedbQueryable<EmployeeProps> ByAgeDesc() => Redb.Query<EmployeeProps>()
+                .Where(e => e.Age >= 20).OrderByDescending(e => e.Age).ThenByRedb(o => o.Id);
+            async Task<string> AnswersAsync() => string.Join("; ", new[]
+            {
+                string.Join(",", (await BySalary().Take(10).ToListAsync()).Select(r => r.Id)),
+                string.Join(",", (await BySalary().Skip(7).Take(10).ToListAsync()).Select(r => r.Id)),
+                string.Join(",", (await ByAgeDesc().Take(10).ToListAsync()).Select(r => r.Id)),
+                string.Join(",", (await ByAgeDesc().Skip(25).Take(10).ToListAsync()).Select(r => r.Id)),
+            });
+
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
+            var on = await AnswersAsync();
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            var off = await AnswersAsync();
+            on.Should().Be(off, "the leading form changes the plan, not the page");
+        }
+        finally
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = restore);
+        }
+    }
+
+    /// <summary>
+    /// A page with no filter, sorted descending by a field a quarter of the objects lack (Rating), is led by the index
+    /// of values of that field: the objects without a value come last. Pages inside the values, one that crosses into
+    /// the objects without a value and one past every object (the walk does not fill them, the other branch answers),
+    /// with ThenBy and without; without a tiebreak only the sequence of sort values is compared.
+    /// </summary>
+    [Fact]
+    public async Task LeadingForm_UnfilteredDescending_SameAnswers()
+    {
+        await SeedAsync();
+        var restore = Redb.Configuration.EnablePvtPrefilter;
+        try
+        {
+            IRedbQueryable<EmployeeProps> ByRating() => Redb.Query<EmployeeProps>()
+                .OrderByDescending(e => e.Rating).ThenByRedb(o => o.Id);
+            IRedbQueryable<EmployeeProps> ByRatingThenAge() => Redb.Query<EmployeeProps>()
+                .OrderByDescending(e => e.Rating).ThenBy(e => e.Age).ThenByRedb(o => o.Id);
+            IRedbQueryable<EmployeeProps> BySalary() => Redb.Query<EmployeeProps>()
+                .OrderByDescending(e => e.Salary);
+            async Task<string> AnswersAsync()
+            {
+                var rated = await Redb.Query<EmployeeProps>().Where(e => e.Rating != null).CountAsync();
+                var total = await Redb.Query<EmployeeProps>().CountAsync();
+                return string.Join("; ", new[]
+                {
+                    string.Join(",", (await ByRating().Take(10).ToListAsync()).Select(r => r.Id)),
+                    string.Join(",", (await ByRating().Skip(7).Take(10).ToListAsync()).Select(r => r.Id)),
+                    string.Join(",", (await ByRating().Skip(rated - 4).Take(10).ToListAsync()).Select(r => r.Id)),
+                    string.Join(",", (await ByRating().Skip(total + 5).Take(10).ToListAsync()).Select(r => r.Id)),
+                    string.Join(",", (await ByRatingThenAge().Skip(3).Take(10).ToListAsync()).Select(r => r.Id)),
+                    string.Join(",", (await ByRatingThenAge().Skip(rated - 2).Take(5).ToListAsync()).Select(r => r.Id)),
+                    string.Join(",", (await BySalary().Take(10).ToListAsync()).Select(r => r.Props.Salary)),
+                    string.Join(",", (await BySalary().Skip(12).Take(10).ToListAsync()).Select(r => r.Props.Salary)),
+                });
+            }
+
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
+            var on = await AnswersAsync();
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            var off = await AnswersAsync();
+            on.Should().Be(off, "the walk of the index changes the plan, not the page");
+        }
+        finally
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = restore);
+        }
+    }
 
     private async Task SeedAsync()
     {
@@ -520,6 +606,130 @@ public abstract class PvtPrefilterEquivalenceTestsBase
             on.Count.Should().Be(off.Count);
             on.Missing.Should().Be(off.Missing);
             on.Missing.Should().Be(await Redb.Query<EmployeeProps>().CountAsync(), "no employee has the key absent-key");
+        }
+        finally
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = restore);
+        }
+    }
+
+    /// <summary>
+    /// SQL Server and SQLite: MIN and MAX without any condition take the first entry of the index of values of each field in
+    /// its order, the trash subtracted; a batch with SUM or AVG, a filter or WhereRedb keeps the streams form. The employees
+    /// holding the highest salary and the lowest age are moved to the trash, so the first entries of those indexes belong to
+    /// trashed objects. Answers must equal the ones with the prefilter off for a decimal, an integer, a nullable double, a
+    /// date, a nested-class field, base fields with COUNT(*), and an empty scheme.
+    /// </summary>
+    protected async Task UnfilteredExtremes_FirstEntryOfTheIndex_SameAnswersAsync()
+    {
+        await TestDataFactory.SeedEmployees(Redb, 30);
+        var restore = Redb.Configuration.EnablePvtPrefilter;
+        try
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            IRedbQueryable<EmployeeProps> All() => Redb.Query<EmployeeProps>();
+            var richest = (await All().OrderByDescending(e => e.Salary).ThenByRedb(o => o.Id).Take(1).ToListAsync()).Single().Id;
+            var youngest = (await All().OrderBy(e => e.Age).ThenByRedb(o => o.Id).Take(1).ToListAsync()).Single().Id;
+            await Redb.SoftDeleteAsync(new[] { richest, youngest });
+            await Redb.SyncSchemeAsync<UnfilteredAggregateEmptyProps>();
+
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
+            const string firstEntry = "ORDER BY v._numeric DESC";
+            (await All().ToAggregateSqlStringAsync(x => new { Mn = Agg.Min(x.Props.Salary), Mx = Agg.Max(x.Props.Salary), C = Agg.Count() }))
+                .Should().Contain(firstEntry, "no condition: the extreme is the first entry of the index");
+            (await All().ToAggregateSqlStringAsync(x => new { Mx = Agg.Max(x.Props.Salary), S = Agg.Sum(x.Props.Age) }))
+                .Should().NotContain(firstEntry, "a SUM in the batch keeps the streams form");
+            (await All().Where(e => e.Age > 0).ToAggregateSqlStringAsync(x => new { Mx = Agg.Max(x.Props.Salary) }))
+                .Should().NotContain(firstEntry, "a filter keeps the streams form");
+            (await All().WhereRedb(o => o.Id > 0).ToAggregateSqlStringAsync(x => new { Mx = Agg.Max(x.Props.Salary) }))
+                .Should().NotContain(firstEntry, "WhereRedb keeps the streams form");
+
+            async Task<string> AnswersAsync() => System.Text.Json.JsonSerializer.Serialize(new object[]
+            {
+                await All().AggregateAsync(x => new { Mn = Agg.Min(x.Props.Salary), Mx = Agg.Max(x.Props.Salary), C = Agg.Count() }),
+                await All().AggregateAsync(x => new { Mn = Agg.Min(x.Props.Age), Mx = Agg.Max(x.Props.Age) }),
+                // Rating is a double, null on every fourth employee.
+                await All().AggregateAsync(x => new { Mn = Agg.Min(x.Props.Rating), Mx = Agg.Max(x.Props.Rating) }),
+                await All().AggregateAsync(x => new { Mn = Agg.Min(x.Props.HireDate), Mx = Agg.Max(x.Props.HireDate) }),
+                await All().AggregateAsync(x => new { Low = Agg.Min(x.Props.HomeAddress!.Building!.Floor), Top = Agg.Max(x.Props.HomeAddress!.Building!.Floor) }),
+                await All().AggregateAsync(x => new { FirstId = Agg.Min(x.Id), LastId = Agg.Max(x.Id), C = Agg.Count(), Mx = Agg.Max(x.Props.Salary) }),
+                await All().AggregateAsync(x => new { Mx = Agg.Max(x.Props.Salary), S = Agg.Sum(x.Props.Age) }),
+                await Redb.Query<UnfilteredAggregateEmptyProps>().AggregateAsync(x => new
+                {
+                    MnN = Agg.Min(x.Props.Number), MxA = Agg.Max(x.Props.Amount), MnR = Agg.Min(x.Props.Ratio), C = Agg.Count()
+                }),
+            });
+
+            var on = await AnswersAsync();
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            var off = await AnswersAsync();
+            on.Should().Be(off, "reading the first entry of the index changes the plan, not the answer");
+        }
+        finally
+        {
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = restore);
+        }
+    }
+
+    /// <summary>
+    /// SQL Server and SQLite: AllAsync over the whole scheme with a predicate on one plain field first looks for a
+    /// counterexample among the first 1 000 objects, then compares the objects of the scheme with the values of the field
+    /// that satisfy the predicate. 1 100 objects of a scheme of their own put the counterexamples past the probe, so the
+    /// counts decide: another name at the end, an object without a note, the same objects moved to the trash. A Where or a
+    /// WhereRedb before AllAsync, a number field and an IN list are compared too. Every answer must equal the one with the
+    /// prefilter off.
+    /// </summary>
+    protected async Task AllWithoutFilter_ProbeThenCounts_SameAnswersAsync()
+    {
+        var objects = Enumerable.Range(0, 1100).Select(i => (redb.Core.Models.Contracts.IRedbObject<AllTextProbeProps>)
+            new redb.Core.Models.Entities.RedbObject<AllTextProbeProps>
+            {
+                name = $"all-text-{i}",
+                // The last object holds another name; the one before it has no note.
+                Props = new AllTextProbeProps { Name = i == 1099 ? "b" : "a", Note = i == 1098 ? null : "n" }
+            }).ToList();
+        var ids = await Redb.AddNewObjectsAsync(objects);
+        await TestDataFactory.SeedEmployees(Redb, 20);
+        var restore = Redb.Configuration.EnablePvtPrefilter;
+        try
+        {
+            IRedbQueryable<AllTextProbeProps> Q() => Redb.Query<AllTextProbeProps>();
+            IRedbQueryable<EmployeeProps> E() => Redb.Query<EmployeeProps>();
+            async Task<string> AnswersAsync() => string.Join(",",
+                await Q().AllAsync(p => p.Name == "a"),
+                await Q().AllAsync(p => p.Name != "zzz"),
+                await Q().AllAsync(p => p.Name.StartsWith("a")),
+                await Q().AllAsync(p => p.Note != null),
+                await Q().AllAsync(p => p.Note == "n"),
+                await Q().AllAsync(p => new[] { "a", "b" }.Contains(p.Name)),
+                await Q().Where(p => p.Note == "n").AllAsync(p => p.Name == "a"),
+                await Q().WhereRedb(o => o.Id < ids[1099]).AllAsync(p => p.Name == "a"),
+                await E().AllAsync(e => e.Age >= 0),
+                await E().AllAsync(e => e.Salary > 1_000_000m),
+                await E().AllAsync(e => e.Rating != null),
+                // Every other narrowing a query carries keeps its own answer: DistinctBy compares keys, not objects.
+                await Q().DistinctBy(p => p.Note).AllAsync(p => p.Name == "a"),
+                await Q().Distinct().AllAsync(p => p.Name == "a"),
+                await Q().Take(5).AllAsync(p => p.Name == "a"),
+                await Q().Skip(1090).AllAsync(p => p.Name == "a"),
+                await Q().WhereInRedb(o => o.Id, ids.Take(10)).AllAsync(p => p.Name == "a"));
+
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
+            var on = await AnswersAsync();
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            var off = await AnswersAsync();
+            on.Should().Be(off, "the probe and the counts change the plan, not the answer");
+            on.Should().StartWith("False,True,False,False,False,True,False,True",
+                "one late other name, one object without a note; Where keeps the object with another name");
+
+            // The objects past the probe moved to the trash: their values stay until the purge and must not count.
+            await Redb.SoftDeleteAsync(new[] { ids[1098], ids[1099] });
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = true);
+            var trashedOn = await AnswersAsync();
+            Redb.UpdateConfiguration(c => c.EnablePvtPrefilter = false);
+            var trashedOff = await AnswersAsync();
+            trashedOn.Should().Be(trashedOff, "the trash is subtracted from the values counted");
+            trashedOn.Should().StartWith("True,True,True,True,True,True,True,True", "the objects left all hold the name and the note");
         }
         finally
         {

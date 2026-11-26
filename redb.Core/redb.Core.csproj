@@ -27,6 +27,10 @@
   <ItemGroup>
     <!-- The command-telemetry tests read the internal span wrapper directly. -->
     <InternalsVisibleTo Include="redb.Tests.Integration" />
+    <!-- The row mappers of the providers share RedbRowMapping (Data/RedbRowMapping.cs). -->
+    <InternalsVisibleTo Include="redb.Postgres" />
+    <InternalsVisibleTo Include="redb.MSSql" />
+    <InternalsVisibleTo Include="redb.SQLite" />
   </ItemGroup>
 
   <!-- Microsoft.Extensions: version matches target framework -->

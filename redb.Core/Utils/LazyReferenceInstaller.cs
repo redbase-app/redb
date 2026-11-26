@@ -72,9 +72,8 @@ public static class LazyReferenceInstaller
         }
 
         if (type.Namespace?.StartsWith("System", StringComparison.Ordinal) == true) return;
-        foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var p in WalkedProperties(type))
         {
-            if (!IsWalkedProperty(p)) continue;
             var value = p.GetValue(node);
             MarkInto(value, visited);
         }
@@ -172,9 +171,8 @@ public static class LazyReferenceInstaller
         }
 
         if (type.Namespace?.StartsWith("System", StringComparison.Ordinal) == true) return;
-        foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var p in WalkedProperties(type))
         {
-            if (!IsWalkedProperty(p)) continue;
             MarkSharedInto(p.GetValue(node), visited, collected);
         }
     }
@@ -219,6 +217,20 @@ public static class LazyReferenceInstaller
         => property.CanRead
            && property.GetIndexParameters().Length == 0
            && !Extensions.PropertyInfoExtensions.ShouldIgnoreForRedb(property);
+
+    // The walked properties of a type (public instance, IsWalkedProperty), once per type. Each walk of each node read
+    // the properties of its type again and the [RedbIgnore] attribute of each of them. Keyed weakly: a Props type of a
+    // module in a collectible AssemblyLoadContext must not keep that context alive.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Type, PropertyInfo[]> WalkedPropertyCache = new();
+
+    private static PropertyInfo[] WalkedProperties(Type type)
+        => WalkedPropertyCache.GetValue(type, static t =>
+        {
+            var walked = new List<PropertyInfo>();
+            foreach (var p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                if (IsWalkedProperty(p)) walked.Add(p);
+            return walked.ToArray();
+        });
 
     private static bool IsLeafType(Type? t)
         => t != null && (t.IsPrimitive || t.IsValueType || t == typeof(string) || t == typeof(byte[]));
@@ -282,9 +294,8 @@ public static class LazyReferenceInstaller
 
         // A business class (the Props object itself or a nested class): walk its properties.
         if (type.Namespace?.StartsWith("System", StringComparison.Ordinal) == true) return;
-        foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var p in WalkedProperties(type))
         {
-            if (!IsWalkedProperty(p)) continue;
             var value = p.GetValue(node);
             InstallInto(value, loader, visited);
         }

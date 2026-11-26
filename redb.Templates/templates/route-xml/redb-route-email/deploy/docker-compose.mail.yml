@@ -23,7 +23,7 @@ services:
       - "127.0.0.1:3143:3143"
 
   module:
-    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.7.5-net10}
+    image: ghcr.io/redbase-app/redb-tsak-worker:${TSAK_VERSION:-4.7.6-net10}
     depends_on:
       - mail
     environment:
